@@ -110,7 +110,7 @@ func TestMain(m *testing.M) {
 			log.Fatalf("failed to get working directory: %s", err)
 		}
 		req := testcontainers.ContainerRequest{
-			Image:        "dremio/dremio-ee:24.0",
+			Image:        "dremio/dremio-oss:24.0",
 			ExposedPorts: []string{"9047/tcp"},
 			WaitingFor:   wait.ForLog("Dremio Daemon Started as master"),
 			Files: []testcontainers.ContainerFile{
@@ -157,15 +157,15 @@ func TestMain(m *testing.M) {
 			log.Fatalf("expected status code %v but instead got %v. Dremio is not ready", expectedCode, res.StatusCode)
 		}
 		// accept EULA
-		var empty bytes.Buffer
-		eulaURL := fmt.Sprintf("http://localhost:%v/apiv2/eula/accept", dremioTestPort)
-		res, err = http.Post(eulaURL, "application/json", &empty) //nolint
-		if err != nil {
-			log.Fatalf("error accepting EULA request: %s\n", err)
-		}
-		if res.StatusCode != 204 {
-			log.Fatalf("expected status code 204 but instead got %v while trying to accept EULA", res.StatusCode)
-		}
+		//var empty bytes.Buffer
+		//eulaURL := fmt.Sprintf("http://localhost:%v/apiv2/eula/accept", dremioTestPort)
+		//res, err = http.Post(eulaURL, "application/json", &empty) //nolint
+		//if err != nil {
+		//	log.Fatalf("error accepting EULA request: %s\n", err)
+		//}
+		//if res.StatusCode != 204 {
+		//	log.Fatalf("expected status code 204 but instead got %v while trying to accept EULA", res.StatusCode)
+		//}
 		authRequest := &AuthRequest{
 			Username: "dremio",
 			Password: "dremio123",
@@ -260,12 +260,13 @@ func TestCreateAllDirs(t *testing.T) {
 	}
 }
 
-func TestCollectWlm(t *testing.T) {
-	err := runCollectWLM(c)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-}
+// until we add back the dremio-ee image
+// func TestCollectWlm(t *testing.T) {
+// 	err := runCollectWLM(c)
+// 	if err != nil {
+// 		t.Errorf("unexpected error %v", err)
+// 	}
+// }
 
 func TestCollectKVReport(t *testing.T) {
 	kvStoreDir := c.KVstoreOutDir()
