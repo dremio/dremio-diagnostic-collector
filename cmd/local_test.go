@@ -18,14 +18,15 @@ package cmd
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,9 +34,8 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 	"github.com/spf13/pflag"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 type AuthResponse struct {
@@ -97,54 +97,113 @@ node-metrics-collect-duration-seconds: 10
 	}
 	return testDDCYaml
 }
+func GetRootProjectDir() (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
 
-// TestMain setups up a docker runtime and we use this to spin up dremio https://github.com/ory/dockertest
+	rootDir := strings.TrimSpace(string(output))
+	return rootDir, nil
+}
+
 func TestMain(m *testing.M) {
 	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
 		restclient.InitClient(true)
-		ctx := context.Background()
+		// ctx := context.Background()
 
-		pwd, err := os.Getwd()
+		// pwd, err := os.Getwd()
+		// if err != nil {
+		// 	log.Fatalf("failed to get working directory: %s", err)
+		// }
+		// req := testcontainers.ContainerRequest{
+		// 	Image:        "dremio/dremio-oss:24.0",
+		// 	ExposedPorts: []string{"9047/tcp"},
+		// 	WaitingFor:   wait.ForLog("Dremio Daemon Started as master"),
+		// 	Files: []testcontainers.ContainerFile{
+		// 		{
+		// 			HostFilePath:      fmt.Sprintf("%s/testdata/conf/dremio.conf", pwd), // a directory
+		// 			ContainerFilePath: "/opt/dremio/conf/dremio.conf",                   // important! its parent already exists
+		// 			FileMode:          644,
+		// 		},
+		// 	},
+		// }
+		// dremioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		// 	ContainerRequest: req,
+		// 	Started:          true,
+		// })
+		// if err != nil {
+		// 	panic(err)
+		// }
+		// defer func() {
+		// 	if err := dremioC.Terminate(ctx); err != nil {
+		// 		panic(fmt.Sprintf("failed to terminate container: %s", err.Error()))
+		// 	}
+		// }()
+		// dremioTestPortRaw, err := dremioC.MappedPort(ctx, "9047/tcp")
+		// if err != nil {
+		// 	log.Fatalf("could not get dremio port: %s", err)
+		// }
+		rootDir, err := GetRootProjectDir()
 		if err != nil {
-			log.Fatalf("failed to get working directory: %s", err)
+			log.Fatal(err)
 		}
-		req := testcontainers.ContainerRequest{
-			Image:        "dremio/dremio-oss:24.0",
-			ExposedPorts: []string{"9047/tcp"},
-			WaitingFor:   wait.ForLog("Dremio Daemon Started as master"),
-			Files: []testcontainers.ContainerFile{
-				{
-					HostFilePath:      fmt.Sprintf("%s/testdata/conf/dremio.conf", pwd), // a directory
-					ContainerFilePath: "/opt/dremio/conf/dremio.conf",                   // important! its parent already exists
-					FileMode:          644,
-				},
-			},
+		if err := ddcio.CopyFile(filepath.Join("testdata", "conf", "dremio.conf"), filepath.Join(rootDir, "server-install", "conf", "dremio.conf")); err != nil {
+			log.Fatal(err)
 		}
-		dremioC, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-			ContainerRequest: req,
-			Started:          true,
-		})
-		if err != nil {
-			panic(err)
+		dremioExec := filepath.Join(rootDir, "server-install", "bin", "dremio")
+		cmd := exec.Command(dremioExec, "start")
+		// Attach to standard output and error
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		// Start the process
+		if err := cmd.Start(); err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println("sleeping 60 seconds so that dremio can start")
+		time.Sleep(60 * time.Second)
+
+		defer func() {
+			//send shutdown
+			shutdownCmd := exec.Command(dremioExec, "stop")
+			// Attach to standard output and error
+			shutdownCmd.Stdout = os.Stdout
+			shutdownCmd.Stderr = os.Stderr
+			// Start the process
+			if err := shutdownCmd.Start(); err != nil {
+				log.Print(err)
+			}
+			if err := shutdownCmd.Wait(); err != nil {
+				log.Print(err)
+			}
+			// if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
+			// 	log.Print(err)
+			// }
+		}()
+
+		dremioTestPort := 9047
+		if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
+			log.Printf("unable to remove dremio-source do to error %v", err)
+		}
+
+		if err := os.MkdirAll("/tmp/dremio-source", 0700); err != nil {
+			log.Fatalf("need to make the source dir to do the test %v", err)
 		}
 		defer func() {
-			if err := dremioC.Terminate(ctx); err != nil {
-				panic(fmt.Sprintf("failed to terminate container: %s", err.Error()))
+			if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
+				log.Printf("unable to remove dremio-source do to error %v", err)
 			}
 		}()
-		dremioTestPortRaw, err := dremioC.MappedPort(ctx, "9047/tcp")
-		if err != nil {
-			log.Fatalf("could not get dremio port: %s", err)
-		}
-		dremioTestPort := dremioTestPortRaw.Int()
-		exit, _, err := dremioC.Exec(context.Background(), []string{"mkdir", "/tmp/dremio-source"})
-		if err != nil {
-			log.Fatalf("could not make dremio source: %s", err)
-		}
-		if exit > 0 {
-			log.Fatalf("unable to make dremio source due to exit code %d", exit)
-		}
+		//exit, _, err := dremioC.Exec(context.Background(), []string{"mkdir", "/tmp/dremio-source"})
+		//if err != nil {
+		//	log.Fatalf("could not make dremio source: %s", err)
+		//}
+		//if exit > 0 {
+		//	log.Fatalf("unable to make dremio source due to exit code %d", exit)
+		//}
 
 		dremioEndpoint := fmt.Sprintf("http://localhost:%v", dremioTestPort)
 
@@ -166,6 +225,7 @@ func TestMain(m *testing.M) {
 		//if res.StatusCode != 204 {
 		//	log.Fatalf("expected status code 204 but instead got %v while trying to accept EULA", res.StatusCode)
 		//}
+
 		authRequest := &AuthRequest{
 			Username: "dremio",
 			Password: "dremio123",
@@ -269,6 +329,7 @@ func TestCreateAllDirs(t *testing.T) {
 // }
 
 func TestCollectKVReport(t *testing.T) {
+	simplelog.InitLogger(4)
 	kvStoreDir := c.KVstoreOutDir()
 	err := os.MkdirAll(kvStoreDir, 0755)
 	if err != nil {

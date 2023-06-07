@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 	"github.com/google/uuid"
 	"github.com/spf13/pflag"
@@ -58,6 +59,7 @@ type CollectConf struct {
 	jobProfilesNumSlowPlanning        int
 	jobProfilesNumRecentErrors        int
 	nodeMetricsCollectDurationSeconds int
+	allowInsecureSSL                  bool
 	collectNodeMetrics                bool
 	collectJFR                        bool
 	collectJStack                     bool
@@ -244,6 +246,8 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	if !personalAccessTokenPresent {
 		simplelog.Warningf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
+	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
+	restclient.InitClient(c.allowInsecureSSL)
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
 	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && personalAccessTokenPresent
 	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && personalAccessTokenPresent
@@ -254,6 +258,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
 	c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
 	c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
+
 	simplelog.Infof("Current configuration: %+v", viper.AllSettings())
 
 	return c, nil
