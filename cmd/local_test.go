@@ -176,9 +176,6 @@ func TestMain(m *testing.M) {
 			if err := shutdownCmd.Start(); err != nil {
 				log.Print(err)
 			}
-			if err := shutdownCmd.Wait(); err != nil {
-				log.Print(err)
-			}
 			// if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil {
 			// 	log.Print(err)
 			// }
