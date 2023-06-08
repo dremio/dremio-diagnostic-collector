@@ -73,8 +73,10 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 		simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
 		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
 		for key := range profilesToCollect {
+			//because we are looping
+			keyToDownload := key
 			downloadThreadPool.AddJob(func() error {
-				err := downloadJobProfile(c, key)
+				err := downloadJobProfile(c, keyToDownload)
 				if err != nil {
 					simplelog.Error(err.Error()) // Print instead of Error
 				}
