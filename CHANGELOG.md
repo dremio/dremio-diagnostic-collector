@@ -1,6 +1,23 @@
 # Changelog
 
 
+## [0.3.2]
+
+### Added
+
+* redaction of PAT token in logs
+* enhanced logging of configuration file to help in identifying typos in the conf
+* more tests
+
+### Fixed
+
+* REST api capture was disabled, this is now fixed
+* job profiles were always selecting one type, now the types of job profiles are spread out
+* we were always downloading the same job profile now we are not
+* fixed race in cli output to non thread safe implementations
+* spelling fixes
+* AWSE sometimes is tricky and fools DDC which is the correct PID we have no added more thorough detection
+
 ## [0.3.1]
 
 ### Added
@@ -226,6 +243,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.0-rc1...v0.3.0
 [0.3.0-rc1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.0-beta5...v0.3.0-rc1
