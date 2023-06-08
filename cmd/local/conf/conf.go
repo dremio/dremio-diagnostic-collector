@@ -345,13 +345,17 @@ func (c *CollectConf) CollectAccessLogs() bool {
 	return c.collectAccessLogs
 }
 
-// only works on coordinator so does not need node name
-func (c *CollectConf) HeapDumpsOutDir() string    { return path.Join(c.outputDir, "heap-dumps") }
-func (c *CollectConf) JobProfilesOutDir() string  { return path.Join(c.outputDir, "job-profiles") }
-func (c *CollectConf) KubernetesOutDir() string   { return path.Join(c.outputDir, "kubernetes") }
-func (c *CollectConf) KVstoreOutDir() string      { return path.Join(c.outputDir, "kvstore") }
-func (c *CollectConf) SystemTablesOutDir() string { return path.Join(c.outputDir, "system-tables") }
-func (c *CollectConf) WLMOutDir() string          { return path.Join(c.outputDir, "wlm") }
+func (c *CollectConf) HeapDumpsOutDir() string { return path.Join(c.outputDir, "heap-dumps") }
+
+func (c *CollectConf) JobProfilesOutDir() string {
+	return path.Join(c.outputDir, "job-profiles", c.nodeName)
+}
+func (c *CollectConf) KubernetesOutDir() string { return path.Join(c.outputDir, "kubernetes") }
+func (c *CollectConf) KVstoreOutDir() string    { return path.Join(c.outputDir, "kvstore", c.nodeName) }
+func (c *CollectConf) SystemTablesOutDir() string {
+	return path.Join(c.outputDir, "system-tables", c.nodeName)
+}
+func (c *CollectConf) WLMOutDir() string { return path.Join(c.outputDir, "wlm", c.nodeName) }
 
 // works on all nodes but includes node name in file name
 func (c *CollectConf) JFROutDir() string { return path.Join(c.outputDir, "jfr") }

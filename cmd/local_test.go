@@ -22,6 +22,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -120,6 +121,24 @@ func TestCreateAllDirs(t *testing.T) {
 	err = createAllDirs(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
+	}
+
+	// WLM should end with nodename
+	if !strings.HasSuffix(c.WLMOutDir(), c.NodeName()) {
+		t.Errorf("expected %v to end with %v", c.WLMOutDir(), c.NodeName())
+	}
+	// System table should end with nodename
+	if !strings.HasSuffix(c.SystemTablesOutDir(), c.NodeName()) {
+		t.Errorf("expected %v to end with %v", c.SystemTablesOutDir(), c.NodeName())
+	}
+	// job profiles should end with nodename
+	if !strings.HasSuffix(c.JobProfilesOutDir(), c.NodeName()) {
+		t.Errorf("expected %v to end with %v", c.JobProfilesOutDir(), c.NodeName())
+	}
+	// kvreport should end with nodename
+	// job profiles should end with nodename
+	if !strings.HasSuffix(c.KVstoreOutDir(), c.NodeName()) {
+		t.Errorf("expected %v to end with %v", c.KVstoreOutDir(), c.NodeName())
 	}
 }
 

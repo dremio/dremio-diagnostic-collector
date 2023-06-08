@@ -21,7 +21,6 @@ date "+%H:%M:%S"
 
 ./script/cover
 
-
 echo "Linting started at…"
 date "+%H:%M:%S"
 

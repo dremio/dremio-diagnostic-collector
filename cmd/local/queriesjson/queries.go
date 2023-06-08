@@ -27,6 +27,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 )
 
 type QueriesRow struct {
@@ -116,7 +118,7 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 	queriesrows := []QueriesRow{}
 	file, err := os.Open(path.Clean(filename))
 	if err != nil {
-		fmt.Println(err.Error() + `: ` + filename)
+		simplelog.Errorf("can't open %v due to error %v", filename, err)
 		return queriesrows, err
 	}
 	defer errCheck(file.Close)
@@ -126,7 +128,7 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 		line := scanner.Text()
 		row, err := parseLine(line, i)
 		if err != nil {
-			fmt.Println(err.Error() + `: ` + filename)
+			simplelog.Errorf("can't parse line %v from file %v due to error %v", line, filename, err)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
@@ -150,22 +152,22 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	if val, ok := dat["queryType"]; ok {
 		row.QueryType = val.(string)
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'queryType'")
+		simplelog.Warningf("queries.json is missing field 'queryType'")
 	}
 	if val, ok := dat["queryCost"]; ok {
 		row.QueryCost = val.(float64)
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'queryCost'")
+		simplelog.Warningf("queries.json is missing field 'queryCost'")
 	}
 	if val, ok := dat["executionPlanningTime"]; ok {
 		row.ExecutionPlanningTime = val.(float64)
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'executionPlanningTime'")
+		simplelog.Warningf("queries.json is missing field 'executionPlanningTime'")
 	}
 	if val, ok := dat["runningTime"]; ok {
 		row.RunningTime = val.(float64)
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'runningTime'")
+		simplelog.Warningf("queries.json is missing field 'runningTime'")
 	}
 	if val, ok := dat["start"]; ok {
 		row.Start = val.(float64)
@@ -244,30 +246,30 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 
 	queriesrows := []QueriesRow{}
 	for _, queriesjson := range queriesjsons {
-		log.Println("Attempting to open queries.json file", queriesjson)
+		simplelog.Infof("Attempting to open queries.json file %v", queriesjson)
 		rows := []QueriesRow{}
 		var err error
 
 		if strings.HasSuffix(queriesjson, ".gz") {
 			rows, err = ReadGzFile(queriesjson)
 			if err != nil {
-				log.Println("ERROR", err)
+				simplelog.Errorf("failed to read gunzip %v due to error %v", queriesjson, err)
 				continue
 			}
 			queriesrows = append(queriesrows, rows...)
 		} else if strings.HasSuffix(queriesjson, ".json") {
 			rows, err = ReadJSONFile(queriesjson)
 			if err != nil {
-				log.Println("ERROR", err)
+				simplelog.Errorf("failed to parse json file %v due to error %v", queriesjson, err)
 				continue
 			}
 			queriesrows = append(queriesrows, rows...)
 		} else {
-			log.Println("ERROR", "File is neither JSON or GZIP format.")
+			simplelog.Error("File is neither JSON or GZIP format.")
 		}
 		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", queriesjson)
 	}
-	log.Println("Collected a total of", strconv.Itoa(len(queriesrows)), "rows of queries.json")
+	simplelog.Infof("Collected a total of %v rows of queries.json", len(queriesrows))
 	return queriesrows
 }
 

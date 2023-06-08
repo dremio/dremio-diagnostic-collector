@@ -69,21 +69,25 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	simplelog.Infof("jobProfilesNumHighQueryCost: %v", c.JobProfilesNumHighQueryCost())
 	simplelog.Infof("jobProfilesNumRecentErrors: %v", c.JobProfilesNumRecentErrors())
 
-	simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
-	downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
-	for key := range profilesToCollect {
-		downloadThreadPool.AddJob(func() error {
-			err := downloadJobProfile(c, key)
-			if err != nil {
-				simplelog.Error(err.Error()) // Print instead of Error
-			}
-			return nil
-		})
+	if len(profilesToCollect) > 0 {
+		simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
+		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
+		for key := range profilesToCollect {
+			downloadThreadPool.AddJob(func() error {
+				err := downloadJobProfile(c, key)
+				if err != nil {
+					simplelog.Error(err.Error()) // Print instead of Error
+				}
+				return nil
+			})
+		}
+		if err := downloadThreadPool.ProcessAndWait(); err != nil {
+			simplelog.Errorf("job profile download thread pool wait error %v", err)
+		}
+		simplelog.Infof("Finished downloading %v job profiles", len(profilesToCollect))
+	} else {
+		simplelog.Info("No job profiles to collect exiting...")
 	}
-	if err := downloadThreadPool.ProcessAndWait(); err != nil {
-		simplelog.Errorf("job profile download thread pool wait error %v", err)
-	}
-	simplelog.Infof("Finished downloading %v job profiles", len(profilesToCollect))
 
 	return nil
 }

@@ -8,6 +8,4 @@ cd "$(dirname "$0")/.."
 
 [ -z "$DEBUG" ] || set -x
 
-echo "appending coverage results to test.out"
-go tool cover -func=covprofile >> test.out
-cat test.out
+go tool cover -func=covprofile

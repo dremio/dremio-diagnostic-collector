@@ -82,7 +82,7 @@ dremio-endpoint: %v
 dremio-username: dremio
 dremio-pat-token: %v
 collect-dremio-configuration: true
-number-job-profiles: 0
+number-job-profiles: 1
 capture-heap-dump: false
 accept-collection-consent: true
 tmp-output-dir: %v
@@ -105,10 +105,13 @@ func GetRootProjectDir() (string, error) {
 	return rootDir, nil
 }
 
+var rootDir string
+
 func TestMain(m *testing.M) {
 	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
-		rootDir, err := GetRootProjectDir()
+		var err error
+		rootDir, err = GetRootProjectDir()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -261,7 +264,6 @@ func TestMain(m *testing.M) {
 // }
 
 func TestCollectKVReport(t *testing.T) {
-	simplelog.InitLogger(4)
 	kvStoreDir := c.KVstoreOutDir()
 	err := os.MkdirAll(kvStoreDir, 0755)
 	if err != nil {
@@ -290,18 +292,30 @@ func TestDownloadJobProfile(t *testing.T) {
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
 	}
+	jobid, err := submitSQLQuery()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(10 * time.Second)
+	err = downloadJobProfile(c, jobid)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
+func submitSQLQuery() (string, error) {
 	sql := `{
 		"sql": "CREATE TABLE tester.table1 AS SELECT \"a\", \"b\" FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(\"a\", \"b\")"
 	}`
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/api/v3/sql/", c.DremioEndpoint()), bytes.NewBuffer([]byte(sql)))
 	if err != nil {
-		t.Fatalf("unable to create table request %v", err)
+		return "", fmt.Errorf("unable to create table request %v", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "_dremio"+c.DremioPATToken())
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("unable to create table %v", err)
+		return "", fmt.Errorf("unable to create table %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode > 299 {
@@ -309,8 +323,8 @@ func TestDownloadJobProfile(t *testing.T) {
 		if err != nil {
 			log.Fatalf("fatal attempt to make job api call %v and unable to read body for debugging", err)
 		}
-		log.Printf("body was %s", string(text))
-		t.Fatalf("expected status code greater than 299 but instead got %v while trying to create source", res.StatusCode)
+		simplelog.Debugf("body was %s", string(text))
+		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to create source", res.StatusCode)
 	}
 	var jobResponse JobAPIResponse
 	err = json.NewDecoder(res.Body).Decode(&jobResponse)
@@ -319,15 +333,10 @@ func TestDownloadJobProfile(t *testing.T) {
 		if err != nil {
 			log.Fatalf("fatal attempt to decode body from dremio job api call %v and unable to read body for debugging", err)
 		}
-		log.Printf("body was %s", string(text))
-		log.Fatalf("fatal attempt to decode body from dremio job api %v", err)
+		simplelog.Debugf("body was %s", string(text))
+		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
 	}
-	time.Sleep(10 * time.Second)
-	jobid := jobResponse.ID
-	err = downloadJobProfile(c, jobid)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
+	return jobResponse.ID, nil
 }
 
 func TestValidateAPICredentials(t *testing.T) {
@@ -338,14 +347,44 @@ func TestValidateAPICredentials(t *testing.T) {
 }
 
 func TestValidateCollectJobProfiles(t *testing.T) {
+	_, err := submitSQLQuery()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
 	}
 	if err := os.MkdirAll(c.QueriesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
 	}
-	err := RunCollectJobProfiles(c)
+	if err := ddcio.CopyFile(filepath.Join(rootDir, "server-install", "log", "queries.json"), filepath.Join(c.QueriesOutDir(), "queries.json")); err != nil {
+		t.Errorf("failed moving queries.json to folder to allow download of jobs due to error %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(c.QueriesOutDir()); err != nil {
+			t.Logf("unable to clean up dir %v due to error %v", c.QueriesOutDir(), err)
+		}
+		if err := os.RemoveAll(c.JobProfilesOutDir()); err != nil {
+			t.Logf("unable to clean up dir %v due to error %v", c.JobProfilesOutDir(), err)
+		}
+	}()
+	entries, err := os.ReadDir(c.JobProfilesOutDir())
+	if err != nil {
+		t.Errorf("unable to read dir %v due to error %v", c.JobProfilesOutDir(), err)
+	}
+	numberFilesInDir := len(entries)
+	err = RunCollectJobProfiles(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
+	}
+	entries, err = os.ReadDir(c.JobProfilesOutDir())
+	if err != nil {
+		t.Errorf("unable to read dir %v due to error %v", c.JobProfilesOutDir(), err)
+	}
+	afterJobNumberFilesInDir := len(entries)
+	//should have collected 1 profile
+	profilesCollected := afterJobNumberFilesInDir - numberFilesInDir
+	if profilesCollected != 1 {
+		t.Errorf("expected 1 job profile but had %v", profilesCollected)
 	}
 }
