@@ -82,7 +82,7 @@ dremio-endpoint: %v
 dremio-username: dremio
 dremio-pat-token: %v
 collect-dremio-configuration: true
-number-job-profiles: 1
+number-job-profiles: 10
 capture-heap-dump: false
 accept-collection-consent: true
 tmp-output-dir: %v
@@ -241,7 +241,10 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Fatalf("reading config %v", err)
 		}
-
+		_, err = submitSQLQuery("CREATE TABLE tester.table1 AS SELECT a, b FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(a, b)")
+		if err != nil {
+			log.Fatalf("unable to create table for testing %v", err)
+		}
 		return m.Run()
 	}()
 
@@ -292,7 +295,7 @@ func TestDownloadJobProfile(t *testing.T) {
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
 	}
-	jobid, err := submitSQLQuery()
+	jobid, err := submitSQLQuery("SELECT * FROM tester.table1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,20 +305,19 @@ func TestDownloadJobProfile(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 }
-
-func submitSQLQuery() (string, error) {
-	sql := `{
-		"sql": "CREATE TABLE tester.table1 AS SELECT \"a\", \"b\" FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(\"a\", \"b\")"
-	}`
+func submitSQLQuery(query string) (string, error) {
+	sql := fmt.Sprintf(`{
+		"sql": "%v"
+	}`, query)
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/api/v3/sql/", c.DremioEndpoint()), bytes.NewBuffer([]byte(sql)))
 	if err != nil {
-		return "", fmt.Errorf("unable to create table request %v", err)
+		return "", fmt.Errorf("unable to run sql %v", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "_dremio"+c.DremioPATToken())
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("unable to create table %v", err)
+		return "", fmt.Errorf("unable to run sql %v due to error  %v", query, err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode > 299 {
@@ -324,7 +326,7 @@ func submitSQLQuery() (string, error) {
 			log.Fatalf("fatal attempt to make job api call %v and unable to read body for debugging", err)
 		}
 		simplelog.Debugf("body was %s", string(text))
-		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to create source", res.StatusCode)
+		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to run sql %v ", res.StatusCode, query)
 	}
 	var jobResponse JobAPIResponse
 	err = json.NewDecoder(res.Body).Decode(&jobResponse)
@@ -347,9 +349,11 @@ func TestValidateAPICredentials(t *testing.T) {
 }
 
 func TestValidateCollectJobProfiles(t *testing.T) {
-	_, err := submitSQLQuery()
-	if err != nil {
-		t.Fatal(err)
+	for i := 0; i < 25; i++ {
+		_, err := submitSQLQuery("SELECT a,b FROM tester.table1")
+		if err != nil {
+			t.Fatalf("failed query #%v with error %v", i+1, err)
+		}
 	}
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
@@ -372,8 +376,13 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to read dir %v due to error %v", c.JobProfilesOutDir(), err)
 	}
-	numberFilesInDir := len(entries)
-	err = RunCollectJobProfiles(c)
+	filesInDirBefore := []string{}
+	for _, e := range entries {
+		filesInDirBefore = append(filesInDirBefore, e.Name())
+	}
+	t.Logf("before running the collection - %v dir has the following files %v", c.JobProfilesOutDir(), strings.Join(filesInDirBefore, ", "))
+	numberFilesInDir := len(filesInDirBefore)
+	tried, _, err := getNumberOfJobProfilesCollected(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -381,10 +390,19 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to read dir %v due to error %v", c.JobProfilesOutDir(), err)
 	}
-	afterJobNumberFilesInDir := len(entries)
-	//should have collected 1 profile
+	filesInDirAfter := []string{}
+	for _, e := range entries {
+		filesInDirAfter = append(filesInDirAfter, e.Name())
+	}
+	t.Logf("after running the collection - %v dir has the following files %v", c.JobProfilesOutDir(), strings.Join(filesInDirAfter, ", "))
+	afterJobNumberFilesInDir := len(filesInDirAfter)
+	//should have collected at the number of tried job profiles as duplicates may be less than the number asked for
 	profilesCollected := afterJobNumberFilesInDir - numberFilesInDir
-	if profilesCollected != 1 {
-		t.Errorf("expected 1 job profile but had %v", profilesCollected)
+	if profilesCollected != tried {
+		t.Errorf("expected at %v job profiles to be collected but there are %v", tried, profilesCollected)
+	}
+	//this is just hoping based on math, but it should be very rare that we have all duplicates out of 10
+	if tried < 2 {
+		t.Errorf("expected at least 3 tried but was %v", tried)
 	}
 }
