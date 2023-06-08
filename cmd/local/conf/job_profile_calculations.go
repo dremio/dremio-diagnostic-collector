@@ -19,73 +19,72 @@ import (
 	"github.com/spf13/viper"
 )
 
-func CalculateJobProfileSettings(c *CollectConf) (numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning int) {
+func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost int) {
 	// don't bother doing any of the calculation if personal access token is not present in fact zero out everything
 	if c.DremioPATToken() == "" {
 		return
 	}
 	// check if job profile is set
-	var defaultJobProfilesNumSlowExec int
-	var defaultJobProfilesNumRecentErrors int
-	var defaultJobProfilesNumSlowPlanning int
-	var defaultJobProfilesNumHighQueryCost int
 	if c.NumberJobProfilesToCollect() > 0 {
 		if c.NumberJobProfilesToCollect() < 4 {
 			//so few that it is not worth being clever
 			defaultJobProfilesNumSlowExec = c.NumberJobProfilesToCollect()
 		} else {
 			defaultJobProfilesNumSlowExec = int(float64(c.NumberJobProfilesToCollect()) * 0.4)
-			defaultJobProfilesNumRecentErrors = int(float64(defaultJobProfilesNumRecentErrors) * 0.2)
-			defaultJobProfilesNumSlowPlanning = int(float64(defaultJobProfilesNumSlowPlanning) * 0.2)
-			defaultJobProfilesNumHighQueryCost = int(float64(defaultJobProfilesNumHighQueryCost) * 0.2)
+			defaultJobProfilesNumRecentErrors = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
+			defaultJobProfilesNumSlowPlanning = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
+			defaultJobProfilesNumHighQueryCost = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
 			//grab the remainder and drop on top of defaultJobProfilesNumSlowExec
 			totalAllocated := defaultJobProfilesNumSlowExec + defaultJobProfilesNumRecentErrors + defaultJobProfilesNumSlowPlanning + defaultJobProfilesNumHighQueryCost
 			diff := c.NumberJobProfilesToCollect() - totalAllocated
 			defaultJobProfilesNumSlowExec += diff
 		}
-		simplelog.Infof("setting default values for slow execution profiles: %v, recent error profiles %v, slow planning profiles %v, high query cost profiles %v",
+		simplelog.Debugf("setting default values for slow execution profiles: %v, recent error profiles %v, slow planning profiles %v, high query cost profiles %v",
 			defaultJobProfilesNumSlowExec,
 			defaultJobProfilesNumRecentErrors,
 			defaultJobProfilesNumSlowPlanning,
 			defaultJobProfilesNumHighQueryCost)
 	}
+	return
+}
 
+func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning int) {
+	defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost := calculateDefaultJobProfileNumbers(c)
 	// job profile specific numbers
 	jobProfilesNumHighQueryCost = viper.GetInt(KeyJobProfilesNumHighQueryCost)
-	if c.JobProfilesNumHighQueryCost() == 0 {
+	if jobProfilesNumHighQueryCost == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumHighQueryCost = defaultJobProfilesNumHighQueryCost
-	} else if c.JobProfilesNumHighQueryCost() != defaultJobProfilesNumHighQueryCost {
+	} else if jobProfilesNumHighQueryCost != defaultJobProfilesNumHighQueryCost {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumHighQueryCost, jobProfilesNumHighQueryCost)
 	}
 
 	jobProfilesNumSlowExec = viper.GetInt(KeyJobProfilesNumSlowExec)
-	if c.JobProfilesNumSlowExec() == 0 {
+	if jobProfilesNumSlowExec == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumSlowExec = defaultJobProfilesNumSlowExec
-	} else if c.JobProfilesNumSlowExec() != defaultJobProfilesNumSlowExec {
-		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowExec, c.JobProfilesNumSlowExec())
+	} else if jobProfilesNumSlowExec != defaultJobProfilesNumSlowExec {
+		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowExec, jobProfilesNumSlowExec)
 	}
 
 	jobProfilesNumRecentErrors = viper.GetInt(KeyJobProfilesNumRecentErrors)
-	if c.JobProfilesNumRecentErrors() == 0 {
+	if jobProfilesNumRecentErrors == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumRecentErrors = defaultJobProfilesNumRecentErrors
-	} else if c.JobProfilesNumRecentErrors() != defaultJobProfilesNumRecentErrors {
-		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumRecentErrors, c.JobProfilesNumRecentErrors())
+	} else if jobProfilesNumRecentErrors != defaultJobProfilesNumRecentErrors {
+		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumRecentErrors, jobProfilesNumRecentErrors)
 	}
 
 	jobProfilesNumSlowPlanning = viper.GetInt(KeyJobProfilesNumSlowPlanning)
-	if c.JobProfilesNumSlowPlanning() == 0 {
+	if jobProfilesNumSlowPlanning == 0 {
 		jobProfilesNumSlowPlanning = defaultJobProfilesNumSlowPlanning
-	} else if c.JobProfilesNumSlowPlanning() != defaultJobProfilesNumSlowPlanning {
-		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowPlanning, c.JobProfilesNumSlowPlanning())
+	} else if jobProfilesNumSlowPlanning != defaultJobProfilesNumSlowPlanning {
+		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowPlanning, jobProfilesNumSlowPlanning)
 	}
 
-	totalAllocated := defaultJobProfilesNumSlowExec + defaultJobProfilesNumRecentErrors + defaultJobProfilesNumSlowPlanning + defaultJobProfilesNumHighQueryCost
-	if totalAllocated > 0 && totalAllocated != c.NumberJobProfilesToCollect() {
-		numberJobProfilesToCollect = totalAllocated
-		simplelog.Warningf("due to configuration parameters new total jobs profiles collected has been adjusted to %v", totalAllocated)
+	numberJobProfilesToCollect = jobProfilesNumSlowExec + jobProfilesNumRecentErrors + jobProfilesNumSlowPlanning + jobProfilesNumHighQueryCost
+	if numberJobProfilesToCollect != c.NumberJobProfilesToCollect() {
+		simplelog.Warningf("due to configuration parameters new total jobs profiles collected has been adjusted to %v", numberJobProfilesToCollect)
 	}
 	return
 }
