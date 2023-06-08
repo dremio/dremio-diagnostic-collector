@@ -28,17 +28,16 @@ import (
 
 func GetDremioPIDFromText(jpsOutput string, isAWSE bool) (int, error) {
 	var procName string
-	if isAWSE {
-		procName = "AwsDremioDaemon"
-	} else {
-		procName = "DremioDaemon"
-	}
+	var previewName string
+	procName = "DremioDaemon"
+	previewName = "preview"
 	var lines []string
 	scanner := bufio.NewScanner(strings.NewReader(jpsOutput))
 	for scanner.Scan() {
 		line := scanner.Text()
 		lines = append(lines, line)
-		if strings.Contains(line, procName) {
+		simplelog.Debugf("jps line: %v", line)
+		if strings.Contains(line, procName) && !strings.Contains(line, previewName) {
 			tokens := strings.Split(line, " ")
 			if len(tokens) == 0 {
 				return -1, fmt.Errorf("no pid for dremio found in text '%v'", line)
@@ -52,7 +51,7 @@ func GetDremioPIDFromText(jpsOutput string, isAWSE bool) (int, error) {
 
 func GetDremioPID() (int, error) {
 	var jpsOutput bytes.Buffer
-	if err := ddcio.Shell(&jpsOutput, "jps"); err != nil {
+	if err := ddcio.Shell(&jpsOutput, "jps -v"); err != nil {
 		simplelog.Warningf("attempting to get full jps output failed: %v", err)
 	}
 	isAWSE, err := IsAWSE()
