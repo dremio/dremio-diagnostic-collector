@@ -26,7 +26,12 @@ import (
 )
 
 func IsAWSEFromJPSOutput(jpsText string) (bool, error) {
-	return strings.Contains(jpsText, "AwsDremioDaemon"), nil
+	if strings.Contains(jpsText, "DremioDaemon") && strings.Contains(jpsText, "preview") {
+		return true, nil
+	} else if strings.Contains(jpsText, "AwsDremioDaemon") {
+		return true, nil
+	}
+	return false, nil
 }
 
 func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
@@ -51,8 +56,8 @@ func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
 
 func IsAWSE() (bool, error) {
 	var dremioPIDOutput bytes.Buffer
-	if err := ddcio.Shell(&dremioPIDOutput, "jps"); err != nil {
-		return false, fmt.Errorf("grepping from Dremio from jps failed %v with output %v", err, dremioPIDOutput.String())
+	if err := ddcio.Shell(&dremioPIDOutput, "jps -v"); err != nil {
+		return false, fmt.Errorf("grepping from Dremio from jps -v failed %v with output %v", err, dremioPIDOutput.String())
 	}
 	dremioPIDString := dremioPIDOutput.String()
 	return IsAWSEFromJPSOutput(dremioPIDString)
