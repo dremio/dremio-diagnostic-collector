@@ -26,7 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 )
 
-func GetDremioPIDFromText(jpsOutput string, isAWSE bool) (int, error) {
+func GetDremioPIDFromText(jpsOutput string) (int, error) {
 	var procName string
 	var previewName string
 	procName = "DremioDaemon"
@@ -54,9 +54,5 @@ func GetDremioPID() (int, error) {
 	if err := ddcio.Shell(&jpsOutput, "jps -v"); err != nil {
 		simplelog.Warningf("attempting to get full jps output failed: %v", err)
 	}
-	isAWSE, err := IsAWSE()
-	if err != nil {
-		return -1, fmt.Errorf("failed getting awse status %v", err)
-	}
-	return GetDremioPIDFromText(jpsOutput.String(), isAWSE)
+	return GetDremioPIDFromText(jpsOutput.String())
 }
