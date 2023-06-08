@@ -401,4 +401,8 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if profilesCollected != tried {
 		t.Errorf("expected at %v job profiles to be collected but there are %v", tried, profilesCollected)
 	}
+	//this is just hoping based on math, but it should be very rare that we have all duplicates out of 10
+	if tried < 2 {
+		t.Errorf("expected at least 3 tried but was %v", tried)
+	}
 }
