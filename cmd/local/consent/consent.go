@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// package consent containts the logic for showing what files are collected as well the boilerplate text
+// package consent contains the logic for showing what files are collected as well the boilerplate text
 package consent
 
 import (

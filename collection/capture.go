@@ -66,7 +66,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 				Err:  fmt.Errorf("unable to copy local ddc to remote path due to error: '%v' with output '%v'", err, out),
 			})
 		} else {
-			simplelog.Infof("sucessfully copied ddc to host %v", host)
+			simplelog.Infof("successfully copied ddc to host %v", host)
 		}
 	}
 	//always update the configuration
@@ -77,7 +77,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			Err:  fmt.Errorf("unable to copy local ddc yaml to remote path due to error: '%v' with output '%v'", err, out),
 		})
 	} else {
-		simplelog.Infof("sucessfully copied ddc.yaml to host %v", host)
+		simplelog.Infof("successfully copied ddc.yaml to host %v", host)
 	}
 	//execute local-collect if skipRESTCollect is set blank the pat
 	localCollectArgs := []string{pathToDDC, "local-collect"}
