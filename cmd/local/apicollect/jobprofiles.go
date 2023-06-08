@@ -29,15 +29,10 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/threading"
 )
 
-func RunCollectJobProfiles(c *conf.CollectConf) error {
-	simplelog.Info("Collecting Job Profiles...")
-	err := ValidateAPICredentials(c)
-	if err != nil {
-		return err
-	}
+func getNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
 	files, err := os.ReadDir(c.QueriesOutDir())
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	queriesjsons := []string{}
 	for _, file := range files {
@@ -46,7 +41,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 
 	if len(queriesjsons) == 0 {
 		simplelog.Warning("no queries.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
-		return nil
+		return
 	}
 
 	queriesrows := queriesjson.CollectQueriesJSON(queriesjsons)
@@ -68,7 +63,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	simplelog.Infof("jobProfilesNumSlowExec: %v", c.JobProfilesNumSlowExec())
 	simplelog.Infof("jobProfilesNumHighQueryCost: %v", c.JobProfilesNumHighQueryCost())
 	simplelog.Infof("jobProfilesNumRecentErrors: %v", c.JobProfilesNumRecentErrors())
-
+	tried = len(profilesToCollect)
 	if len(profilesToCollect) > 0 {
 		simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
 		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
@@ -82,15 +77,29 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 				}
 				return nil
 			})
+			collected++
 		}
 		if err := downloadThreadPool.ProcessAndWait(); err != nil {
 			simplelog.Errorf("job profile download thread pool wait error %v", err)
 		}
-		simplelog.Infof("Finished downloading %v job profiles", len(profilesToCollect))
 	} else {
 		simplelog.Info("No job profiles to collect exiting...")
 	}
+	return tried, collected, nil
+}
 
+func RunCollectJobProfiles(c *conf.CollectConf) error {
+	simplelog.Info("Collecting Job Profiles...")
+	err := ValidateAPICredentials(c)
+	if err != nil {
+		return err
+	}
+	tried, collected, err := getNumberOfJobProfilesCollected(c)
+	if err != nil {
+		return err
+	}
+	simplelog.Infof("After eliminating duplicates we are tried to collect %v profiles", tried)
+	simplelog.Infof("Downloaded %v job profiles", collected)
 	return nil
 }
 

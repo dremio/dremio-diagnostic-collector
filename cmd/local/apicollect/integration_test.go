@@ -349,7 +349,7 @@ func TestValidateAPICredentials(t *testing.T) {
 }
 
 func TestValidateCollectJobProfiles(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 25; i++ {
 		_, err := submitSQLQuery("SELECT a,b FROM tester.table1")
 		if err != nil {
 			t.Fatalf("failed query #%v with error %v", i+1, err)
@@ -382,7 +382,7 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	}
 	t.Logf("before running the collection - %v dir has the following files %v", c.JobProfilesOutDir(), strings.Join(filesInDirBefore, ", "))
 	numberFilesInDir := len(filesInDirBefore)
-	err = RunCollectJobProfiles(c)
+	tried, _, err := getNumberOfJobProfilesCollected(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -396,9 +396,9 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	}
 	t.Logf("after running the collection - %v dir has the following files %v", c.JobProfilesOutDir(), strings.Join(filesInDirAfter, ", "))
 	afterJobNumberFilesInDir := len(filesInDirAfter)
-	//should have collected 1 profile
+	//should have collected at the number of tried job profiles as duplicates may be less than the number asked for
 	profilesCollected := afterJobNumberFilesInDir - numberFilesInDir
-	if profilesCollected != 10 {
-		t.Errorf("expected at least 10 job profiles but there are %v", profilesCollected)
+	if profilesCollected != tried {
+		t.Errorf("expected at %v job profiles to be collected but there are %v", tried, profilesCollected)
 	}
 }
