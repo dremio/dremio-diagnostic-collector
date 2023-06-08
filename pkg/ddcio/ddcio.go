@@ -196,3 +196,10 @@ func Shell(writer io.Writer, commandLine string) error {
 
 	return nil
 }
+
+// EnsureClose logs a failure when the close does not succeed this should not be used with "just in case closes" and should indeed signal an error
+func EnsureClose(fileName string, f func() error) {
+	if err := f(); err != nil {
+		simplelog.Errorf("unable to finish writing file %v due to error %v", fileName, err)
+	}
+}
