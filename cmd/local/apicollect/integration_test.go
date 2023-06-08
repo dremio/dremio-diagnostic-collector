@@ -82,7 +82,7 @@ dremio-endpoint: %v
 dremio-username: dremio
 dremio-pat-token: %v
 collect-dremio-configuration: true
-number-job-profiles: 10
+number-job-profiles: 25
 capture-heap-dump: false
 accept-collection-consent: true
 tmp-output-dir: %v
@@ -401,7 +401,7 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if profilesCollected != tried {
 		t.Errorf("expected at %v job profiles to be collected but there are %v", tried, profilesCollected)
 	}
-	//this is just hoping based on math, but it should be very rare that we have all duplicates out of 10
+	//this is just hoping based on math, but it should be very rare that we have all duplicates out of 25
 	if tried < 2 {
 		t.Errorf("expected at least 3 tried but was %v", tried)
 	}
