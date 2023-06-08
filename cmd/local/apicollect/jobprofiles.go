@@ -47,22 +47,22 @@ func getNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	queriesrows := queriesjson.CollectQueriesJSON(queriesjsons)
 	profilesToCollect := map[string]string{}
 
+	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowPlanning", c.JobProfilesNumSlowPlanning())
 	slowplanqueriesrows := queriesjson.GetSlowPlanningJobs(queriesrows, c.JobProfilesNumSlowPlanning())
 	queriesjson.AddRowsToSet(slowplanqueriesrows, profilesToCollect)
 
+	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowExec", c.JobProfilesNumSlowExec())
 	slowexecqueriesrows := queriesjson.GetSlowExecJobs(queriesrows, c.JobProfilesNumSlowExec())
 	queriesjson.AddRowsToSet(slowexecqueriesrows, profilesToCollect)
 
+	simplelog.Infof("searching queries.json for profiles %v of jobProfilesNumHighQueryCost", c.JobProfilesNumHighQueryCost())
 	highcostqueriesrows := queriesjson.GetHighCostJobs(queriesrows, c.JobProfilesNumHighQueryCost())
 	queriesjson.AddRowsToSet(highcostqueriesrows, profilesToCollect)
 
+	simplelog.Infof("searching queries.json for %v of jobProfilesNumRecentErrors", c.JobProfilesNumRecentErrors())
 	errorqueriesrows := queriesjson.GetRecentErrorJobs(queriesrows, c.JobProfilesNumRecentErrors())
 	queriesjson.AddRowsToSet(errorqueriesrows, profilesToCollect)
 
-	simplelog.Infof("jobProfilesNumSlowPlanning: %v", c.JobProfilesNumSlowPlanning())
-	simplelog.Infof("jobProfilesNumSlowExec: %v", c.JobProfilesNumSlowExec())
-	simplelog.Infof("jobProfilesNumHighQueryCost: %v", c.JobProfilesNumHighQueryCost())
-	simplelog.Infof("jobProfilesNumRecentErrors: %v", c.JobProfilesNumRecentErrors())
 	tried = len(profilesToCollect)
 	if len(profilesToCollect) > 0 {
 		simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
