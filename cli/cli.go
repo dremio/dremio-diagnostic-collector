@@ -83,7 +83,7 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	stdErrScanner := bufio.NewScanner(stderr)
 
 	startScan := make(chan struct{})
-
+	var m sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -93,7 +93,9 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	go func() {
 		<-startScan // Wait for signal to start scanning
 		for stdOutScanner.Scan() {
+			m.Lock()
 			outputHandler(stdOutScanner.Text())
+			m.Unlock()
 		}
 		wg.Done()
 	}()
@@ -103,7 +105,9 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	go func() {
 		<-startScan // Wait for signal to start scanning
 		for stdErrScanner.Scan() {
+			m.Lock()
 			outputHandler(stdErrScanner.Text())
+			m.Unlock()
 		}
 		wg.Done()
 	}()

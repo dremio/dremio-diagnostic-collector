@@ -105,6 +105,30 @@ func TestCalculateDefaultJobProfileSettingsWith25000Jobs(t *testing.T) {
 		t.Errorf("expected 5000 but got %v", numSlowPlan)
 	}
 }
+func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfigAndNoPat(t *testing.T) {
+	c := &CollectConf{
+		dremioPATToken:             "",
+		numberJobProfilesToCollect: 25000,
+	}
+	viper.Reset()
+	//put them all in slow exec since we are dealing with fractions here
+	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
+	if numberProfiles != 0 {
+		t.Errorf("expected 0 but got %v", numberProfiles)
+	}
+	if numHighCost != 0 {
+		t.Errorf("expected 0 but got %v", numHighCost)
+	}
+	if numSlowExec != 0 {
+		t.Errorf("expected 0 but got %v", numSlowExec)
+	}
+	if numErrors != 0 {
+		t.Errorf("expected 0 but got %v", numErrors)
+	}
+	if numSlowPlan != 0 {
+		t.Errorf("expected 0 but got %v", numSlowPlan)
+	}
+}
 
 func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfig(t *testing.T) {
 	c := &CollectConf{
@@ -157,5 +181,34 @@ func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverride(t *testing
 	}
 	if numSlowPlan != 250 {
 		t.Errorf("expected 250 but got %v", numSlowPlan)
+	}
+}
+
+func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverrideAndNoPat(t *testing.T) {
+	c := &CollectConf{
+		dremioPATToken:             "",
+		numberJobProfilesToCollect: 25000,
+	}
+	viper.Reset()
+	viper.Set(KeyJobProfilesNumSlowExec, 50)
+	viper.Set(KeyJobProfilesNumRecentErrors, 150)
+	viper.Set(KeyJobProfilesNumSlowPlanning, 250)
+	viper.Set(KeyJobProfilesNumHighQueryCost, 350)
+	//put them all in slow exec since we are dealing with fractions here
+	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
+	if numberProfiles != 0 {
+		t.Errorf("expected 0 but got %v", numberProfiles)
+	}
+	if numHighCost != 0 {
+		t.Errorf("expected 0 but got %v", numHighCost)
+	}
+	if numSlowExec != 0 {
+		t.Errorf("expected 0 but got %v", numSlowExec)
+	}
+	if numErrors != 0 {
+		t.Errorf("expected 0 but got %v", numErrors)
+	}
+	if numSlowPlan != 0 {
+		t.Errorf("expected 0 but got %v", numSlowPlan)
 	}
 }
