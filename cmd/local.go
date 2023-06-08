@@ -19,14 +19,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,12 +32,11 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/queriesjson"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
@@ -202,19 +199,19 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	if !c.CollectKVStoreReport() {
 		simplelog.Info("skipping Capture of KV Store Report")
 	} else {
-		t.AddJob(wrapConfigJob(runCollectKvReport))
+		t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
 	}
 
 	if !c.CollectWLM() {
 		simplelog.Info("skipping Capture of Workload Manager Report")
 	} else {
-		t.AddJob(wrapConfigJob(runCollectWLM))
+		t.AddJob(wrapConfigJob(apicollect.RunCollectWLM))
 	}
 
 	if !c.CollectSystemTablesExport() {
 		simplelog.Info("Skipping Collect of Export System Tables...")
 	} else {
-		t.AddJob(wrapConfigJob(runCollectDremioSystemTables))
+		t.AddJob(wrapConfigJob(apicollect.RunCollectDremioSystemTables))
 	}
 
 	if err := t.ProcessAndWait(); err != nil {
@@ -225,7 +222,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	if c.NumberJobProfilesToCollect() == 0 {
 		simplelog.Info("Skipping Collect of Job Profiles...")
 	} else {
-		if err := runCollectJobProfiles(c); err != nil {
+		if err := apicollect.RunCollectJobProfiles(c); err != nil {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
@@ -454,68 +451,6 @@ func runCollectJStacks(c *conf.CollectConf) error {
 	return nil
 }
 
-func runCollectKvReport(c *conf.CollectConf) error {
-	err := validateAPICredentials(c)
-	if err != nil {
-		return err
-	}
-	filename := "kvstore-report.zip"
-	apipath := "/apiv2/kvstore/report"
-	url := c.DremioEndpoint() + apipath
-	headers := map[string]string{"Accept": "application/octet-stream"}
-	body, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
-	if err != nil {
-		return fmt.Errorf("unable to retrieve KV store report from %s due to error %v", url, err)
-	}
-	sb := string(body)
-	kvStoreReportFile := path.Join(c.KVstoreOutDir(), filename)
-	file, err := os.Create(path.Clean(kvStoreReportFile))
-	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-	}
-	defer errCheck(file.Close)
-	_, err = fmt.Fprint(file, sb)
-	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-	}
-	simplelog.Info("SUCCESS - Created " + filename)
-	return nil
-}
-
-func runCollectWLM(c *conf.CollectConf) error {
-	err := validateAPICredentials(c)
-	if err != nil {
-		return err
-	}
-	apiobjects := [][]string{
-		{"/api/v3/wlm/queue", "queues.json"},
-		{"/api/v3/wlm/rule", "rules.json"},
-	}
-	for _, apiobject := range apiobjects {
-		apipath := apiobject[0]
-		filename := apiobject[1]
-		url := c.DremioEndpoint() + apipath
-		headers := map[string]string{"Content-Type": "application/json"}
-		body, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
-		if err != nil {
-			return fmt.Errorf("unable to retrieve WLM from %s due to error %v", url, err)
-		}
-		sb := string(body)
-		wlmFile := path.Clean(path.Join(c.WLMOutDir(), filename))
-		file, err := os.Create(path.Clean(wlmFile))
-		if err != nil {
-			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-		}
-		defer errCheck(file.Close)
-		_, err = fmt.Fprint(file, sb)
-		if err != nil {
-			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-		}
-		simplelog.Infof("SUCCESS - Created " + filename)
-	}
-	return nil
-}
-
 func runCollectHeapDump(c *conf.CollectConf) error {
 	simplelog.Info("Capturing Java Heap Dump")
 	dremioPID := c.DremioPID()
@@ -544,169 +479,6 @@ func runCollectHeapDump(c *conf.CollectConf) error {
 		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)
 	}
 	return nil
-}
-
-func runCollectJobProfiles(c *conf.CollectConf) error {
-
-	simplelog.Info("Collecting Job Profiles...")
-	err := validateAPICredentials(c)
-	if err != nil {
-		return err
-	}
-	files, err := os.ReadDir(c.QueriesOutDir())
-	if err != nil {
-		return err
-	}
-	queriesjsons := []string{}
-	for _, file := range files {
-		queriesjsons = append(queriesjsons, path.Join(c.QueriesOutDir(), file.Name()))
-	}
-
-	if len(queriesjsons) == 0 {
-		simplelog.Warning("no queries.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
-		return nil
-	}
-
-	queriesrows := queriesjson.CollectQueriesJSON(queriesjsons)
-	profilesToCollect := map[string]string{}
-
-	slowplanqueriesrows := queriesjson.GetSlowPlanningJobs(queriesrows, c.JobProfilesNumSlowPlanning())
-	queriesjson.AddRowsToSet(slowplanqueriesrows, profilesToCollect)
-
-	slowexecqueriesrows := queriesjson.GetSlowExecJobs(queriesrows, c.JobProfilesNumSlowExec())
-	queriesjson.AddRowsToSet(slowexecqueriesrows, profilesToCollect)
-
-	highcostqueriesrows := queriesjson.GetHighCostJobs(queriesrows, c.JobProfilesNumHighQueryCost())
-	queriesjson.AddRowsToSet(highcostqueriesrows, profilesToCollect)
-
-	errorqueriesrows := queriesjson.GetRecentErrorJobs(queriesrows, c.JobProfilesNumRecentErrors())
-	queriesjson.AddRowsToSet(errorqueriesrows, profilesToCollect)
-
-	simplelog.Infof("jobProfilesNumSlowPlanning: %v", c.JobProfilesNumSlowPlanning())
-	simplelog.Infof("jobProfilesNumSlowExec: %v", c.JobProfilesNumSlowExec())
-	simplelog.Infof("jobProfilesNumHighQueryCost: %v", c.JobProfilesNumHighQueryCost())
-	simplelog.Infof("jobProfilesNumRecentErrors: %v", c.JobProfilesNumRecentErrors())
-
-	simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
-	downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
-	for key := range profilesToCollect {
-		downloadThreadPool.AddJob(func() error {
-			err := downloadJobProfile(c, key)
-			if err != nil {
-				simplelog.Error(err.Error()) // Print instead of Error
-			}
-			return nil
-		})
-	}
-	if err := downloadThreadPool.ProcessAndWait(); err != nil {
-		simplelog.Errorf("job profile download thread pool wait error %v", err)
-	}
-	simplelog.Infof("Finished downloading %v job profiles", len(profilesToCollect))
-
-	return nil
-}
-
-func downloadJobProfile(c *conf.CollectConf, jobid string) error {
-	apipath := "/apiv2/support/" + jobid + "/download"
-	filename := jobid + ".zip"
-	url := c.DremioEndpoint() + apipath
-	headers := map[string]string{"Accept": "application/octet-stream"}
-	body, err := restclient.APIRequest(url, c.DremioPATToken(), "POST", headers)
-	if err != nil {
-		return err
-	}
-	sb := string(body)
-	jobProfileFile := path.Clean(path.Join(c.JobProfilesOutDir(), filename))
-	file, err := os.Create(path.Clean(jobProfileFile))
-	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-	}
-	defer errCheck(file.Close)
-	_, err = fmt.Fprint(file, sb)
-	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-	}
-	return nil
-}
-
-func runCollectDremioSystemTables(c *conf.CollectConf) error {
-	simplelog.Info("Collecting results from Export System Tables...")
-	err := validateAPICredentials(c)
-	if err != nil {
-		return err
-	}
-	// TODO: Row limit and sleem MS need to be configured
-	rowlimit := 100000
-	sleepms := 100
-
-	for _, systable := range c.Systemtables() {
-		filename := "sys." + strings.Replace(systable, "\\\"", "", -1) + ".json"
-		body, err := downloadSysTable(c, systable, rowlimit, sleepms)
-		if err != nil {
-			return err
-		}
-		dat := make(map[string]interface{})
-		err = json.Unmarshal(body, &dat)
-		if err != nil {
-			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
-		}
-		if err == nil {
-			rowcount := dat["returnedRowCount"].(float64)
-			if int(rowcount) == rowlimit {
-				simplelog.Warning("Returned row count for sys." + systable + " has been limited to " + strconv.Itoa(rowlimit))
-			}
-		}
-		sb := string(body)
-		systemTableFile := path.Join(c.SystemTablesOutDir(), filename)
-		file, err := os.Create(path.Clean(systemTableFile))
-		if err != nil {
-			return fmt.Errorf("unable to create file %v due to error %v", filename, err)
-		}
-		defer errCheck(file.Close)
-		_, err = fmt.Fprint(file, sb)
-		if err != nil {
-			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
-		}
-		simplelog.Info("SUCCESS - Created " + filename)
-	}
-
-	return nil
-}
-
-func downloadSysTable(c *conf.CollectConf, systable string, rowlimit int, sleepms int) ([]byte, error) {
-	// TODO: Consider using official api/v3, requires paging of job results
-	headers := map[string]string{"Content-Type": "application/json"}
-	sqlurl := c.DremioEndpoint() + "/api/v3/sql"
-	joburl := c.DremioEndpoint() + "/api/v3/job/"
-	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, systable)
-	if err != nil {
-		return nil, err
-	}
-	jobstateurl := joburl + jobid
-	jobstate := "RUNNING"
-	for jobstate == "RUNNING" {
-		time.Sleep(time.Duration(sleepms) * time.Millisecond)
-		body, err := restclient.APIRequest(jobstateurl, c.DremioPATToken(), "GET", headers)
-		if err != nil {
-			return nil, fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)
-		}
-		dat := make(map[string]interface{})
-		err = json.Unmarshal(body, &dat)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshall JSON response - %w", err)
-		}
-		jobstate = dat["jobState"].(string)
-	}
-	if jobstate == "COMPLETED" {
-		jobresultsurl := c.DremioEndpoint() + "/apiv2/job/" + jobid + "/data?offset=0&limit=" + strconv.Itoa(rowlimit)
-		simplelog.Info("Retrieving job results ...")
-		body, err := restclient.APIRequest(jobresultsurl, c.DremioPATToken(), "GET", headers)
-		if err != nil {
-			return nil, fmt.Errorf("unable to retrieve job results from %s due to error %v", jobresultsurl, err)
-		}
-		return body, nil
-	}
-	return nil, fmt.Errorf("unable to retrieve job results for sys." + systable)
 }
 
 var localCollectCmd = &cobra.Command{
@@ -853,21 +625,4 @@ func init() {
 	localCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	localCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	rootCmd.AddCommand(localCollectCmd)
-
-}
-
-// ### Helper functions
-func validateAPICredentials(c *conf.CollectConf) error {
-	simplelog.Info("Validating REST API user credentials...")
-	url := c.DremioEndpoint() + "/apiv2/login"
-	headers := map[string]string{"Content-Type": "application/json"}
-	_, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
-	return err
-}
-
-func errCheck(f func() error) {
-	err := f()
-	if err != nil {
-		fmt.Println("Received error:", err)
-	}
 }
