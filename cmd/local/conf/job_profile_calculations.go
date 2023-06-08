@@ -53,7 +53,7 @@ func CalculateJobProfileSettings(c *CollectConf) (numberJobProfilesToCollect, jo
 	// job profile specific numbers
 	jobProfilesNumHighQueryCost = viper.GetInt(KeyJobProfilesNumHighQueryCost)
 	if c.JobProfilesNumHighQueryCost() == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculatios above
+		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumHighQueryCost = defaultJobProfilesNumHighQueryCost
 	} else if c.JobProfilesNumHighQueryCost() != defaultJobProfilesNumHighQueryCost {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumHighQueryCost, jobProfilesNumHighQueryCost)
@@ -61,7 +61,7 @@ func CalculateJobProfileSettings(c *CollectConf) (numberJobProfilesToCollect, jo
 
 	jobProfilesNumSlowExec = viper.GetInt(KeyJobProfilesNumSlowExec)
 	if c.JobProfilesNumSlowExec() == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculatios above
+		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumSlowExec = defaultJobProfilesNumSlowExec
 	} else if c.JobProfilesNumSlowExec() != defaultJobProfilesNumSlowExec {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowExec, c.JobProfilesNumSlowExec())
@@ -69,7 +69,7 @@ func CalculateJobProfileSettings(c *CollectConf) (numberJobProfilesToCollect, jo
 
 	jobProfilesNumRecentErrors = viper.GetInt(KeyJobProfilesNumRecentErrors)
 	if c.JobProfilesNumRecentErrors() == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculatios above
+		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumRecentErrors = defaultJobProfilesNumRecentErrors
 	} else if c.JobProfilesNumRecentErrors() != defaultJobProfilesNumRecentErrors {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumRecentErrors, c.JobProfilesNumRecentErrors())
