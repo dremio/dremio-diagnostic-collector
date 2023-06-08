@@ -295,6 +295,9 @@ func TestDownloadJobProfile(t *testing.T) {
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
 	}
+	if err := ddcio.DeleteDirContents(c.JobProfilesOutDir()); err != nil {
+		t.Logf("failed clearing out directory %v with error %v", c.JobProfilesOutDir(), err)
+	}
 	jobid, err := submitSQLQuery("SELECT * FROM tester.table1")
 	if err != nil {
 		t.Fatal(err)
@@ -360,6 +363,9 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	}
 	if err := os.MkdirAll(c.QueriesOutDir(), 0700); err != nil {
 		t.Errorf("unable to setup directory for creation with error %v", err)
+	}
+	if err := ddcio.DeleteDirContents(c.JobProfilesOutDir()); err != nil {
+		t.Logf("failed clearing out directory %v with error %v", c.JobProfilesOutDir(), err)
 	}
 	if err := ddcio.CopyFile(filepath.Join(rootDir, "server-install", "log", "queries.json"), filepath.Join(c.QueriesOutDir(), "queries.json")); err != nil {
 		t.Errorf("failed moving queries.json to folder to allow download of jobs due to error %v", err)
