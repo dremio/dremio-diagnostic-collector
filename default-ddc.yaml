@@ -10,7 +10,7 @@ dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use f
 dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
 dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
 collect-dremio-configuration: true # will collect dremio.conf, dremio-env, logback.xml and logback-access.xml
-number-job-profiles: 25000 # need to have the dremio-pat-token set to work
+number-job-profiles: 25000 # up to this number, may have less due to duplicates NOTE: need to have the dremio-pat-token set to work
 capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
 accept-collection-consent: true # when true you accept consent to collect data on each node, if false collection will fail
 allow-insecure-ssl: true # when true skip the ssl cert check when doing API calls

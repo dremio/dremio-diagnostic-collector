@@ -234,12 +234,11 @@ func min(a, b int) int {
 	return b
 }
 
-func AddRowsToSet(queriesrows []QueriesRow, profilesToCollect map[string]string) map[string]string {
+func AddRowsToSet(queriesrows []QueriesRow, profilesToCollect map[string]string) {
 	for _, row := range queriesrows {
 		jobid := row.QueryID
 		profilesToCollect[jobid] = ""
 	}
-	return profilesToCollect
 }
 
 func CollectQueriesJSON(queriesjsons []string) []QueriesRow {

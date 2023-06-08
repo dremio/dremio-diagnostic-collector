@@ -23,6 +23,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 var _ = Describe("Conf", func() {
@@ -117,6 +119,21 @@ collect-kvstore-report: true
 			Expect(cfg.CollectSystemTablesExport()).To(BeTrue())
 			Expect(cfg.CollectWLM()).To(BeTrue())
 			Expect(cfg.DremioConfDir()).To(Equal("/path/to/dremio/conf"))
+		})
+	})
+
+	Context("when logging parsing of ddc.yaml ", func() {
+		It("should log redacted when token is present", func() {
+			out, err := tests.CaptureOutput(func() {
+				simplelog.InitLogger(4)
+				cfg, err = conf.ReadConf(overrides, tmpDir)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(cfg).NotTo(BeNil())
+			})
+			if err != nil {
+				simplelog.Errorf("unable to capture output %v", err)
+			}
+			Expect(out).To(ContainSubstring("conf key 'dremio-pat-token':'REDACTED'"))
 		})
 	})
 })

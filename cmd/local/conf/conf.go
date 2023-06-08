@@ -142,6 +142,14 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 
 	supportedExtensions := []string{"yaml", "json", "toml", "hcl", "env", "props"}
 	foundConfig := ParseConfig(configDir, viper.SupportedExts, overrides)
+	simplelog.Info("logging parsed configuration from ddc.yaml")
+	for k, v := range viper.AllSettings() {
+		if k == KeyDremioPatToken && v != "" {
+			simplelog.Infof("conf key '%v':'REDACTED'", k)
+		} else {
+			simplelog.Infof("conf key '%v':'%v'", k, v)
+		}
+	}
 	// now we can setup verbosity as we are parsing it in the ParseConfig function
 	verboseString := viper.GetString("verbose")
 	verbose := strings.Count(verboseString, "v")
@@ -258,8 +266,6 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
 	c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
 	c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
-
-	simplelog.Infof("Current configuration: %+v", viper.AllSettings())
 
 	return c, nil
 }

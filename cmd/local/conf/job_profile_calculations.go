@@ -20,10 +20,6 @@ import (
 )
 
 func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost int) {
-	// don't bother doing any of the calculation if personal access token is not present in fact zero out everything
-	if c.DremioPATToken() == "" {
-		return
-	}
 	// check if job profile is set
 	if c.NumberJobProfilesToCollect() > 0 {
 		if c.NumberJobProfilesToCollect() < 4 {

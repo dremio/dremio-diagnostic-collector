@@ -138,7 +138,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				NodeCaptureOutput: "/tmp/ddc", //TODO use node output dirs from the config
 			}
 			//we want to be able to capture the job profiles of all the nodes
-			skipRESTCalls := true
+			skipRESTCalls := false
 			writtenFiles, failedFiles, skippedFiles := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
 			m.Lock()
 			totalFailedFiles = append(totalFailedFiles, failedFiles...)
@@ -163,7 +163,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				DDCfs:             ddcfs,
 				NodeCaptureOutput: "/tmp/ddc",
 			}
-			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), true)
+			//always skip executor calls
+			skipRESTCalls := true
+			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
 			m.Lock()
 			totalFailedFiles = append(totalFailedFiles, failedFiles...)
 			totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
