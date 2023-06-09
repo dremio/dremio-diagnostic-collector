@@ -15,57 +15,31 @@
 package autodetect_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
 )
 
-var _ = Describe("GetDefaultThreadsFromCPUs", func() {
-	Context("Given the number of CPUs", func() {
-		It("should return the default number of threads", func() {
-			var numCPUs int
-			var expectedNumThreads int
+func TestGetDefaultThreadsFromCPUs(t *testing.T) {
+	cases := []struct {
+		name     string
+		numCPUs  int
+		expected int
+	}{
+		{"CPUs is 1", 1, 2},
+		{"CPUs is 4", 4, 2},
+		{"CPUs is 6", 6, 3},
+		{"CPUs is 5", 5, 2},
+		{"CPUs is 1000", 1000, 500},
+		{"CPUs is 0", 0, 2},
+		{"CPUs is -4", -4, 2},
+	}
 
-			By("having number of CPUs as 1")
-			numCPUs = 1
-			expectedNumThreads = 2 // The minimum number of threads should be 2
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-
-			By("having number of CPUs as 4")
-			numCPUs = 4
-			expectedNumThreads = 2 // 4/2 = 2, which is not less than 2
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-
-			By("having number of CPUs as 6")
-			numCPUs = 6
-			expectedNumThreads = 3 // 6/2 = 3
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-
-			By("having an odd number of CPUs as 5")
-			numCPUs = 5
-			expectedNumThreads = 2 // 5/2 = 2.5 (rounded down to 2 by Go's integer division)
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-
-			By("having large number of CPUs as 1000")
-			numCPUs = 1000
-			expectedNumThreads = 500 // 1000/2 = 500
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := autodetect.GetDefaultThreadsFromCPUs(c.numCPUs); got != c.expected {
+				t.Errorf("GetDefaultThreadsFromCPUs(%d) = %d; want %d", c.numCPUs, got, c.expected)
+			}
 		})
-	})
-
-	Context("Given negative or zero CPUs", func() {
-		It("should return at least 2 threads", func() {
-			var numCPUs int
-			expectedNumThreads := 2 // In these cases, the function should return 2 threads
-
-			By("having number of CPUs as 0")
-			numCPUs = 0
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-
-			By("having negative number of CPUs")
-			numCPUs = -4
-			Expect(autodetect.GetDefaultThreadsFromCPUs(numCPUs)).To(Equal(expectedNumThreads))
-		})
-	})
-})
+	}
+}

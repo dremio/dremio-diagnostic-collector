@@ -12,16 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package conf_test
+package tests
 
 import (
-	"testing"
+	"fmt"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 )
 
-func TestConf(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Conf Suite")
+func MatchFile(expectedFile string, actual interface{}) (success bool, err error) {
+	filePath, ok := actual.(string)
+	if !ok {
+		return false, fmt.Errorf("MatchFile matcher expects a string (file path) as actual, but got %T", actual)
+	}
+
+	areSame, err := ddcio.CompareFiles(expectedFile, filePath)
+	if err != nil {
+		return false, err
+	}
+
+	return areSame, nil
 }

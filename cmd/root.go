@@ -49,15 +49,15 @@ var namespace string
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
-func getVersion() string {
+func GetCLIVersion() string {
 	return fmt.Sprintf("ddc %v-%v\n", versions.GetDDCRuntimeVersion(), GitSha)
 }
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
+// RootCmd represents the base command when called without any subcommands
+var RootCmd = &cobra.Command{
 	Use:   "ddc",
-	Short: getVersion() + "ddc connects via to dremio servers collects logs into an archive",
-	Long: getVersion() + `ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
+	Short: GetCLIVersion() + "ddc connects via to dremio servers collects logs into an archive",
+	Long: GetCLIVersion() + `ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
 
 ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-key $HOME/.ssh/id_rsa_dremio
@@ -72,9 +72,9 @@ ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executo
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	foundCmd, _, err := rootCmd.Find(os.Args[1:])
+	foundCmd, _, err := RootCmd.Find(os.Args[1:])
 	// default cmd if no cmd is given
-	if err == nil && foundCmd.Use == rootCmd.Use && foundCmd.Flags().Parse(os.Args[1:]) != pflag.ErrHelp {
+	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(os.Args[1:]) != pflag.ErrHelp {
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
@@ -96,7 +96,7 @@ func Execute() {
 		if err != nil {
 			fmt.Println("COMMAND HELP TEXT:")
 			fmt.Println("")
-			err := rootCmd.Help()
+			err := RootCmd.Help()
 			if err != nil {
 				simplelog.Errorf("unable to print help %v", err)
 				os.Exit(1)
@@ -107,7 +107,7 @@ func Execute() {
 			fmt.Println("")
 			os.Exit(1)
 		}
-		simplelog.Info(getVersion())
+		simplelog.Info(GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(os.Args, " "))
 		cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs)
 		// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
@@ -141,7 +141,7 @@ func Execute() {
 			os.Exit(1)
 		}
 	}
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -168,16 +168,16 @@ func sshDefault() (string, error) {
 func init() {
 	// command line flags
 
-	rootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
-	rootCmd.Flags().StringVar(&executorsContainer, "executors-container", "dremio-executor", "for use with -k8s flag: sets the container name to use to retrieve logs in the executors")
-	rootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
-	rootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
-	rootCmd.Flags().StringVarP(&sshKeyLoc, "ssh-key", "s", "", "location of ssh key to use to login")
-	rootCmd.Flags().StringVarP(&sshUser, "ssh-user", "u", "", "user to use during ssh operations to login")
-	rootCmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "namespace to use for kubernetes pods")
-	rootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "kubectl", "where to find kubectl")
-	rootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --cordinator and --executors flags")
-	rootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostcs commands need a sudo user (i.e. for jcmd)")
+	RootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
+	RootCmd.Flags().StringVar(&executorsContainer, "executors-container", "dremio-executor", "for use with -k8s flag: sets the container name to use to retrieve logs in the executors")
+	RootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
+	RootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
+	RootCmd.Flags().StringVarP(&sshKeyLoc, "ssh-key", "s", "", "location of ssh key to use to login")
+	RootCmd.Flags().StringVarP(&sshUser, "ssh-user", "u", "", "user to use during ssh operations to login")
+	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "namespace to use for kubernetes pods")
+	RootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "kubectl", "where to find kubectl")
+	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --cordinator and --executors flags")
+	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostcs commands need a sudo user (i.e. for jcmd)")
 	// TODO implement embedded k8s and ssh support using go libs
 	//rootCmd.Flags().BoolVar(&isEmbeddedK8s, "embedded-k8s", false, "use embedded k8s client in place of kubectl binary")
 	//rootCmd.Flags().BoolVar(&isEmbeddedSSH, "embedded-ssh", false, "use embedded ssh go client in place of ssh and scp binary")

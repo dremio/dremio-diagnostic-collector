@@ -15,27 +15,27 @@
 package autodetect_test
 
 import (
+	"testing"
+
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("DremioPID", func() {
-	Context("GetDremioPIDFromText", func() {
-		It("should return an error when no matching process name is found", func() {
-			jpsOutput := "12345 JavaProcess\n67890 AnotherProcess"
-			pid, err := autodetect.GetDremioPIDFromText(jpsOutput)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(Equal("found no matching process named DremioDaemon in text 12345 JavaProcess, 67890 AnotherProcess therefore cannot get the pid"))
-			Expect(pid).To(Equal(-1))
-		})
+func TestGetDremioPIDFromText(t *testing.T) {
+	jpsOutput1 := "12345 JavaProcess\n67890 AnotherProcess"
+	pid1, err1 := autodetect.GetDremioPIDFromText(jpsOutput1)
+	if err1 == nil || err1.Error() != "found no matching process named DremioDaemon in text 12345 JavaProcess, 67890 AnotherProcess therefore cannot get the pid" {
+		t.Errorf("Unexpected error: %v", err1)
+	}
+	if pid1 != -1 {
+		t.Errorf("Unexpected value for pid. Got %v, expected -1", pid1)
+	}
 
-		It("should return PID when a matching process name is found", func() {
-			jpsOutput := "12345 DremioDaemon\n67890 AnotherProcess"
-			pid, err := autodetect.GetDremioPIDFromText(jpsOutput)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(pid).To(Equal(12345))
-		})
-	})
-
-})
+	jpsOutput2 := "12345 DremioDaemon\n67890 AnotherProcess"
+	pid2, err2 := autodetect.GetDremioPIDFromText(jpsOutput2)
+	if err2 != nil {
+		t.Errorf("Unexpected error: %v", err2)
+	}
+	if pid2 != 12345 {
+		t.Errorf("Unexpected value for pid. Got %v, expected 12345", pid2)
+	}
+}

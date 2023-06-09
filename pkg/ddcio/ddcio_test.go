@@ -18,45 +18,45 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-func TestCompareFiles(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "CompareFiles Suite")
+func TestCompareFiles_WhenCompareingFilesWithTheSameContent(t *testing.T) {
+	//It("should return true", func() {
+	file1 := "testdata/file1.txt"
+	file2 := "testdata/file1_copy.txt"
+	areSame, err := ddcio.CompareFiles(file1, file2)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if !areSame {
+		t.Error("the files don't match but they should")
+	}
 }
 
-var _ = Describe("CompareFiles", func() {
-	Context("when comparing files with the same content", func() {
-		It("should return true", func() {
-			file1 := "testdata/file1.txt"
-			file2 := "testdata/file1_copy.txt"
-			areSame, err := ddcio.CompareFiles(file1, file2)
-			Expect(err).To(BeNil())
-			Expect(areSame).To(BeTrue())
-		})
-	})
+func TestCompareFiles_WhenComparingFilesWithDifferentContent(t *testing.T) {
+	//It("should return false", func() {
+	file1 := "testdata/file1.txt"
+	file2 := "testdata/file2.txt"
 
-	Context("when comparing files with different content", func() {
-		It("should return false", func() {
-			file1 := "testdata/file1.txt"
-			file2 := "testdata/file2.txt"
+	areSame, err := ddcio.CompareFiles(file1, file2)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if areSame {
+		t.Error("the files match but they should not")
+	}
+}
 
-			areSame, err := ddcio.CompareFiles(file1, file2)
-			Expect(err).To(BeNil())
-			Expect(areSame).To(BeFalse())
-		})
-	})
+func TestCompareFiles_WhenComparingNonExistentFiles(t *testing.T) {
+	//It("should return an error", func() {
+	file1 := "testdata/nonexistent1.txt"
+	file2 := "testdata/nonexistent2.txt"
 
-	Context("when comparing non-existent files", func() {
-		It("should return an error", func() {
-			file1 := "testdata/nonexistent1.txt"
-			file2 := "testdata/nonexistent2.txt"
-
-			areSame, err := ddcio.CompareFiles(file1, file2)
-			Expect(err).NotTo(BeNil())
-			Expect(areSame).To(BeFalse())
-		})
-	})
-})
+	areSame, err := ddcio.CompareFiles(file1, file2)
+	if err == nil {
+		t.Errorf("expected error but there was none")
+	}
+	if areSame {
+		t.Error("the files match but they should not")
+	}
+}
