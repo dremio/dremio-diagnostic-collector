@@ -136,7 +136,7 @@ func GzipContainsFile(t *testing.T, expectedFile, gzipArchive string) {
 		}
 	}
 	if err != nil {
-		t.Errorf("cannot read stat to get accurate comparision %s", err)
+		t.Errorf("cannot read stat to get accurate comparison %s", err)
 	}
 
 	expectedText, err := os.ReadFile(cleanedExpectedFile)

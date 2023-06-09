@@ -18,98 +18,107 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cli"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Cli", func() {
-	var (
-		c              *cli.Cli
-		outputHandler  cli.OutputHandler
-		executedOutput string
-	)
+var (
+	c              *cli.Cli
+	outputHandler  cli.OutputHandler
+	executedOutput string
+)
 
-	BeforeEach(func() {
-		c = &cli.Cli{}
-		executedOutput = ""
-		outputHandler = func(line string) {
-			executedOutput += line + "\n"
-		}
-	})
+func setupTestCLI() {
+	c = &cli.Cli{}
+	executedOutput = ""
+	outputHandler = func(line string) {
+		executedOutput += line + "\n"
+	}
+}
 
-	Describe("ExecuteAndStreamOutput", func() {
-		Context("with a valid command", func() {
-			It("should stream the command output", func() {
-				err := c.ExecuteAndStreamOutput(outputHandler, "ls", "-v")
-				Expect(err).To(BeNil())
-				Expect(strings.TrimSpace(executedOutput)).ToNot(BeEmpty())
-			})
-		})
+func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
+	setupTestCLI()
+	err := c.ExecuteAndStreamOutput(outputHandler, "ls", "-v")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if strings.TrimSpace(executedOutput) == "" {
+		t.Errorf("Expected executedOutput to be not empty")
+	}
+}
 
-		Context("with a command that produces stderr", func() {
-			It("should stream the command error output", func() {
-				err := c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
-				Expect(err).ToNot(BeNil())
-				Expect(strings.TrimSpace(executedOutput)).To(ContainSubstring("No such file or directory"))
-			})
-		})
+func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
+	setupTestCLI()
+	err := c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
+	if err == nil {
+		t.Errorf("Expected error but got nil")
+	}
+	if !strings.Contains(strings.TrimSpace(executedOutput), "No such file or directory") {
+		t.Errorf("Expected executedOutput to contain 'No such file or directory'")
+	}
+}
 
-		Context("with an invalid command", func() {
-			It("should return an error", func() {
-				err := c.ExecuteAndStreamOutput(outputHandler, "22JIDJMJMHHF")
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(BeAssignableToTypeOf(cli.UnableToStartErr{}))
-				expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
-				Expect(strings.Contains(err.Error(), expectedErr)).To(BeTrue())
-			})
-		})
-	})
+func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
+	setupTestCLI()
+	err := c.ExecuteAndStreamOutput(outputHandler, "22JIDJMJMHHF")
+	if err == nil {
+		t.Errorf("Expected error but got nil")
+	}
+	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
+	if !strings.Contains(err.Error(), expectedErr) {
+		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
+	}
+}
 
-	Describe("Execute", func() {
-		Context("when the command is valid", func() {
-			It("should execute the command and return the output", func() {
-				var expectedOut string
-				var out string
-				var err error
-				if runtime.GOOS == "windows" {
-					out, err = c.Execute("cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
-					expectedOut = "file1\r\nfile2\r\n"
-				} else {
-					out, err = c.Execute("ls", "-a", filepath.Join("testdata", "ls"))
-					expectedOut = "file1\nfile2\n"
-				}
-				Expect(err).NotTo(HaveOccurred())
-				Expect(strings.Contains(out, expectedOut)).To(BeTrue())
-			})
-		})
+func TestExecute_WhenCommandIsValid(t *testing.T) {
+	setupTestCLI()
+	var expectedOut string
+	var out string
+	var err error
+	if runtime.GOOS == "windows" {
+		out, err = c.Execute("cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
+		expectedOut = "file1\r\nfile2\r\n"
+	} else {
+		out, err = c.Execute("ls", "-a", filepath.Join("testdata", "ls"))
+		expectedOut = "file1\nfile2\n"
+	}
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !strings.Contains(out, expectedOut) {
+		t.Errorf("Expected output to contain '%s', but it didn't", expectedOut)
+	}
+}
 
-		Context("when no arguments are provided for the command", func() {
-			It("should execute the command and return the output", func() {
-				var expectedOut string
-				var out string
-				var err error
-				if runtime.GOOS == "windows" {
-					out, err = c.Execute("cmd.exe")
-					expectedOut = "Microsoft"
-				} else {
-					out, err = c.Execute("ls")
-					expectedOut = "cli.go"
-				}
-				Expect(err).NotTo(HaveOccurred())
-				Expect(strings.Contains(out, expectedOut)).To(BeTrue())
-			})
-		})
+func TestExecute_WhenNoArgumentsProvidedForCommand(t *testing.T) {
+	setupTestCLI()
+	var expectedOut string
+	var out string
+	var err error
+	if runtime.GOOS == "windows" {
+		out, err = c.Execute("cmd.exe")
+		expectedOut = "Microsoft"
+	} else {
+		out, err = c.Execute("ls")
+		expectedOut = "cli.go"
+	}
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !strings.Contains(out, expectedOut) {
+		t.Errorf("Expected output to contain '%s', but it didn't", expectedOut)
+	}
+}
 
-		Context("when the command is invalid", func() {
-			It("should return an error", func() {
-				_, err := c.Execute("22JIDJMJMHHF")
-				Expect(err).To(HaveOccurred())
-				Expect(err).To(BeAssignableToTypeOf(cli.UnableToStartErr{}))
-				expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
-				Expect(strings.Contains(err.Error(), expectedErr)).To(BeTrue())
-			})
-		})
-	})
-})
+func TestExecute_WhenCommandIsInvalid(t *testing.T) {
+	setupTestCLI()
+	_, err := c.Execute("22JIDJMJMHHF")
+	if err == nil {
+		t.Errorf("Expected error but got nil")
+	}
+	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
+	if !strings.Contains(err.Error(), expectedErr) {
+		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
+	}
+}
