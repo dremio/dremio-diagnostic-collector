@@ -32,6 +32,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
@@ -485,13 +486,13 @@ var localCollectCmd = &cobra.Command{
 	Use:   "local-collect",
 	Short: "retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cobraCmd *cobra.Command, args []string) {
 
-		simplelog.Infof("ddc local-collect version: %v", getVersion())
+		simplelog.Infof("ddc local-collect version: %v", cmd.GetCLIVersion())
 		simplelog.Infof("args: %v", strings.Join(args, " "))
 		overrides := make(map[string]*pflag.Flag)
 		//if a cli flag was set go ahead and use those values to override the viper configuration
-		cmd.Flags().Visit(func(flag *pflag.Flag) {
+		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
 			overrides[flag.Name] = flag
 			simplelog.Warningf("overriding yaml with cli flag %v and value %v", flag.Name, flag.Value.String())
 		})
@@ -515,7 +516,7 @@ var localCollectCmd = &cobra.Command{
 			}
 		}
 		if failed {
-			err := cmd.Usage()
+			err := cobraCmd.Usage()
 			if err != nil {
 				simplelog.Errorf("unable to even print usage, this is critical report this bug %v", err)
 				os.Exit(1)
@@ -624,5 +625,5 @@ func init() {
 	localCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
 	localCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	localCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
-	rootCmd.AddCommand(localCollectCmd)
+	cmd.RootCmd.AddCommand(localCollectCmd)
 }

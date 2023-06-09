@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(versionCmd)
+	RootCmd.AddCommand(versionCmd)
 }
 
 var versionCmd = &cobra.Command{
@@ -30,6 +30,6 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of DDC",
 	Long:  `All software has versions. This is DDC's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(getVersion())
+		fmt.Println(GetCLIVersion())
 	},
 }

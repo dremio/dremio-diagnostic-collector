@@ -16,10 +16,11 @@ package conf_test
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"strings"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/spf13/pflag"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -27,22 +28,23 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
-var _ = Describe("Conf", func() {
-	var (
-		tmpDir      string
-		cfgFilePath string
-		overrides   map[string]*pflag.Flag
-		err         error
-		cfg         *conf.CollectConf
-	)
+var (
+	tmpDir      string
+	cfgFilePath string
+	overrides   map[string]*pflag.Flag
+	err         error
+	cfg         *conf.CollectConf
+)
 
-	BeforeEach(func() {
-		tmpDir, err = os.MkdirTemp("", "testdataabdc")
-		Expect(err).NotTo(HaveOccurred())
-		cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
+var beforeEachContTest = func() {
+	tmpDir, err = os.MkdirTemp("", "testdataabdc")
+	if err != nil {
+		log.Fatalf("unable to create dir with error %v", err)
+	}
+	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
 
-		// Create a sample configuration file.
-		cfgContent := `
+	// Create a sample configuration file.
+	cfgContent := `
 accept-collection-consent: true
 collect-acceleration-log: true
 collect-access-log: true
@@ -79,61 +81,114 @@ collect-system-tables-export: true
 collect-kvstore-report: true
 `
 
-		// Write the sample configuration to a file.
-		err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
-		Expect(err).NotTo(HaveOccurred())
+	// Write the sample configuration to a file.
+	err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
+	if err != nil {
+		log.Fatalf("unable to create conf file with error %v", err)
+	}
+	overrides = map[string]*pflag.Flag{}
+}
 
-		overrides = map[string]*pflag.Flag{}
+var afterEachConfTest = func() {
+	// Remove the configuration file after each test.
+	err := os.Remove(cfgFilePath)
+	if err != nil {
+		log.Fatalf("unable to remove conf file with error %v", err)
+	}
+	// Remove the temporary directory after each test.
+	err = os.RemoveAll(tmpDir)
+	if err != nil {
+		log.Fatalf("unable to remove conf dir with error %v", err)
+	}
+}
+
+func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
+	beforeEachContTest()
+	//should parse the configuration correctly
+	cfg, err = conf.ReadConf(overrides, tmpDir)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Error("invalid conf")
+	}
+
+	if cfg.AcceptCollectionConsent() != true {
+		t.Errorf("Expected AcceptCollectionConsent to be true, got false")
+	}
+
+	if cfg.CollectAccelerationLogs() != true {
+		t.Errorf("Expected CollectAccelerationLogs to be true, got false")
+	}
+
+	if cfg.CollectAccessLogs() != true {
+		t.Errorf("Expected CollectAccessLogs to be true, got false")
+	}
+
+	if cfg.CollectDiskUsage() != true {
+		t.Errorf("Expected CollectDiskUsage to be true, got false")
+	}
+
+	if cfg.CollectDremioConfiguration() != true {
+		t.Errorf("Expected CollectDremioConfiguration to be true, got false")
+	}
+
+	if cfg.CollectKVStoreReport() != true {
+		t.Errorf("Expected CollectKVStoreReport to be true, got false")
+	}
+
+	if cfg.CollectMetaRefreshLogs() != true {
+		t.Errorf("Expected CollectMetaRefreshLogs to be true, got false")
+	}
+
+	if cfg.CollectNodeMetrics() != true {
+		t.Errorf("Expected CollectNodeMetrics to be true, got false")
+	}
+
+	if cfg.CollectQueriesJSON() != true {
+		t.Errorf("Expected CollectQueriesJSON to be true, got false")
+	}
+
+	if cfg.CollectReflectionLogs() != true {
+		t.Errorf("Expected CollectReflectionLogs to be true, got false")
+	}
+
+	if cfg.CollectServerLogs() != true {
+		t.Errorf("Expected CollectServerLogs to be true, got false")
+	}
+
+	if cfg.CollectSystemTablesExport() != true {
+		t.Errorf("Expected CollectSystemTablesExport to be true, got false")
+	}
+
+	if cfg.CollectWLM() != true {
+		t.Errorf("Expected CollectWLM to be true, got false")
+	}
+
+	if cfg.DremioConfDir() != "/path/to/dremio/conf" {
+		t.Errorf("Expected DremioConfDir to be '/path/to/dremio/conf', got '%s'", cfg.DremioConfDir())
+	}
+	afterEachConfTest()
+}
+
+func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
+	beforeEachContTest()
+	//should log redacted when token is present
+	out, err := tests.CaptureOutput(func() {
+		simplelog.InitLogger(4)
+		cfg, err = conf.ReadConf(overrides, tmpDir)
+		if err != nil {
+			t.Errorf("expected no error but had %v", err)
+		}
+		if cfg == nil {
+			t.Error("expected a valid CollectConf but it is nil")
+		}
 	})
-
-	AfterEach(func() {
-		// Remove the configuration file after each test.
-		err := os.Remove(cfgFilePath)
-		Expect(err).NotTo(HaveOccurred())
-		// Remove the temporary directory after each test.
-		err = os.RemoveAll(tmpDir)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	Context("with a valid configuration file", func() {
-		It("should parse the configuration correctly", func() {
-			cfg, err = conf.ReadConf(overrides, tmpDir)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cfg).NotTo(BeNil())
-
-			Expect(cfg.AcceptCollectionConsent()).To(BeTrue())
-			//	Expect(cfg.CaptureHeapDump()).To(BeTrue()) no valid PID for dremio so should be false
-			Expect(cfg.CollectAccelerationLogs()).To(BeTrue())
-			Expect(cfg.CollectAccessLogs()).To(BeTrue())
-			Expect(cfg.CollectDiskUsage()).To(BeTrue())
-			Expect(cfg.CollectDremioConfiguration()).To(BeTrue())
-			//	Expect(cfg.GcLogsDir()).To(Equal("/path/to/gclogs")) autodetect ends up overriding this
-			//Expect(cfg.CollectJFR()).To(BeFalse())    // no valid PID for dremio so should be false
-			//Expect(cfg.CollectJStack()).To(BeFalse()) // no valid PID for dremio so should be false
-			Expect(cfg.CollectKVStoreReport()).To(BeTrue())
-			Expect(cfg.CollectMetaRefreshLogs()).To(BeTrue())
-			Expect(cfg.CollectNodeMetrics()).To(BeTrue())
-			Expect(cfg.CollectQueriesJSON()).To(BeTrue())
-			Expect(cfg.CollectReflectionLogs()).To(BeTrue())
-			Expect(cfg.CollectServerLogs()).To(BeTrue())
-			Expect(cfg.CollectSystemTablesExport()).To(BeTrue())
-			Expect(cfg.CollectWLM()).To(BeTrue())
-			Expect(cfg.DremioConfDir()).To(Equal("/path/to/dremio/conf"))
-		})
-	})
-
-	Context("when logging parsing of ddc.yaml ", func() {
-		It("should log redacted when token is present", func() {
-			out, err := tests.CaptureOutput(func() {
-				simplelog.InitLogger(4)
-				cfg, err = conf.ReadConf(overrides, tmpDir)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(cfg).NotTo(BeNil())
-			})
-			if err != nil {
-				simplelog.Errorf("unable to capture output %v", err)
-			}
-			Expect(out).To(ContainSubstring("conf key 'dremio-pat-token':'REDACTED'"))
-		})
-	})
-})
+	if err != nil {
+		simplelog.Errorf("unable to capture output %v", err)
+	}
+	if !strings.Contains(out, "conf key 'dremio-pat-token':'REDACTED'") {
+		t.Errorf("expected dremio-pat-token to be redacted in '%v' but it was not", out)
+	}
+	afterEachConfTest()
+}
