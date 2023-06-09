@@ -17,28 +17,27 @@ package masking_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
+	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Config", func() {
+func TestConfig_WhenRemoveSecretsFromDremioConfAndConfIsNotFound(t *testing.T) {
+	//It("should throw an error if the provided file is not a dremio.conf", func() {
+	err := masking.RemoveSecretsFromDremioConf("testdata/myFile.txt")
+	if err == nil {
+		t.Errorf("we expected an error but there was not one")
+	}
+	if !strings.Contains(err.Error(), "expected file with name 'dremio.conf', got ") {
+		t.Errorf("should be 'expected file with name 'dremio.conf'' in string '%v' but there was not", err.Error())
+	}
+}
 
-	Describe("RemoveSecretsFromDremioConf", func() {
-		It("should throw an error if the provided file is not a dremio.conf", func() {
-			err := masking.RemoveSecretsFromDremioConf("testdata/myFile.txt")
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("expected file with name 'dremio.conf', got "))
-		})
-
-	})
-
-	Describe("RemoveSecretsFromDremioConf", func() {
-		It("should mask secrets in the config file", func() {
-			// We'll write the dremio.conf contents to a temporary file for this test
-			conf := `
+func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
+	//It("should mask secrets in the config file", func() {
+	// We'll write the dremio.conf contents to a temporary file for this test
+	conf := `
 			paths: {
 				local: ${DREMIO_HOME}"/data"
 				dist: "pdfs://"${paths.local}"/pdfs"
@@ -65,29 +64,37 @@ var _ = Describe("Config", func() {
 				}
 			}
 			`
-			tmpDir, err := os.MkdirTemp("", "ddctester")
-			if err != nil {
-				Expect(err).NotTo(HaveOccurred())
-			}
-			tmpfile := filepath.Join(tmpDir, "dremio.conf")
-			defer func() {
-				if err := os.RemoveAll(tmpDir); err != nil {
-					simplelog.Warningf("cannot remove test dir %v due to error %v", tmpDir, err)
-				}
-			}()
+	tmpDir, err := os.MkdirTemp("", "ddctester")
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	tmpfile := filepath.Join(tmpDir, "dremio.conf")
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			t.Logf("cannot remove test dir %v due to error %v", tmpDir, err)
+		}
+	}()
 
-			err = os.WriteFile(tmpfile, []byte(conf), 0700)
-			Expect(err).NotTo(HaveOccurred())
+	err = os.WriteFile(tmpfile, []byte(conf), 0700)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
 
-			err = masking.RemoveSecretsFromDremioConf(tmpfile)
-			Expect(err).NotTo(HaveOccurred())
+	err = masking.RemoveSecretsFromDremioConf(tmpfile)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
 
-			cleanedConf, err := os.ReadFile(tmpfile)
-			Expect(err).NotTo(HaveOccurred())
+	cleanedConf, err := os.ReadFile(tmpfile)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
 
-			Expect(string(cleanedConf)).To(ContainSubstring(`keyStorePassword: "<REMOVED_POTENTIAL_SECRET>"`))
-			Expect(string(cleanedConf)).To(ContainSubstring(`trustStorePassword: "<REMOVED_POTENTIAL_SECRET>"`))
-		})
-	})
-
-})
+	//should mask passwords in dremio.conf
+	if !strings.Contains(string(cleanedConf), `keyStorePassword: "<REMOVED_POTENTIAL_SECRET>"`) {
+		t.Errorf("keystorePassword was not masked")
+	}
+	if !strings.Contains(string(cleanedConf), `trustStorePassword: "<REMOVED_POTENTIAL_SECRET>"`) {
+		t.Errorf("trustStorePassword was not masked")
+	}
+}

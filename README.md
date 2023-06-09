@@ -1,5 +1,5 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector)
-![Coverage Status](https://img.shields.io/badge/Code%20Coverage-46%25-orange)
+![Coverage Status](https://img.shields.io/badge/Code%20Coverage-48%25-orange)
 
 collect logs of dremio for analysis
 

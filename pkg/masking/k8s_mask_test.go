@@ -17,19 +17,16 @@ package masking_test
 import (
 	"bytes"
 	"encoding/json"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"strings"
+	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 )
 
-var _ = Describe("K8s Masking", func() {
-
-	Context("RemoveSecretsFromK8sJSON", func() {
-		It("should mask secrets from k8s JSON", func() {
-			input := `{
+func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
+	//It("should mask secrets from k8s JSON", func() {
+	input := `{
 				"items": [
 					{
 						"kind": "pod",
@@ -53,7 +50,7 @@ var _ = Describe("K8s Masking", func() {
 					}
 				]
 			}`
-			expected := `{
+	expected := `{
 				"items": [
 					{
 						"kind": "pod",
@@ -77,13 +74,16 @@ var _ = Describe("K8s Masking", func() {
 					}
 				]
 			}`
-			output, err := masking.RemoveSecretsFromK8sJSON(input)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(jsonCompact(output)).To(Equal(jsonCompact(expected)))
-		})
+	output, err := masking.RemoveSecretsFromK8sJSON(input)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if jsonCompact(output) != jsonCompact(expected) {
+		t.Errorf("expected %v to equal %v", expected, output)
+	}
 
-		It("should no op for unsupported kind", func() {
-			input := `{
+	//It("should no op for unsupported kind", func() {
+	input = `{
 				"items": [
 					{
 						"kind": "unsupported",
@@ -92,7 +92,7 @@ var _ = Describe("K8s Masking", func() {
 					}
 				]
 			}`
-			expected := `{
+	expected = `{
 				"items": [
 					{
 						"kind": "unsupported",
@@ -101,23 +101,29 @@ var _ = Describe("K8s Masking", func() {
 					}
 				]
 			}`
-			output, err := masking.RemoveSecretsFromK8sJSON(input)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(jsonCompact(output)).To(Equal(jsonCompact(expected)))
+	output, err = masking.RemoveSecretsFromK8sJSON(input)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if jsonCompact(output) != jsonCompact(expected) {
+		t.Errorf("expected %v to equal %v", expected, output)
+	}
 
-		})
+	//})
 
-		It("should handle invalid JSON input", func() {
-			input := `{
+	//It("should handle invalid JSON input", func() {
+	input = `{
 				"items": "invalid"
 			}`
 
-			_, err := masking.RemoveSecretsFromK8sJSON(input)
-			Expect(err).To(HaveOccurred())
-			Expect(err).To(MatchError("items must be an array but was 'string'"))
-		})
-	})
-})
+	_, err = masking.RemoveSecretsFromK8sJSON(input)
+	if err == nil {
+		t.Error("expected error but there was none")
+	}
+	if !strings.Contains(err.Error(), "items must be an array but was 'string'") {
+		t.Errorf("expected %v to contain message 'items must be an array but was 'string''", err.Error())
+	}
+}
 
 func jsonCompact(s string) string {
 	buf := new(bytes.Buffer)
