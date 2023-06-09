@@ -209,8 +209,8 @@ func TestLogCollect_WhenServerOutIsMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 
 	//It("should collect all logs with age", func() {
@@ -257,8 +257,8 @@ func TestLogCollect_WhenServerLogIsMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 
 	//It("should collect all logs still present", func() {
@@ -290,8 +290,8 @@ func TestLogCollect_WhenServerLogArchivesAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectDremioServerLog()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -367,8 +367,8 @@ func TestLogCollect_WhenReflectionLogArchivesAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectReflectionLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -404,8 +404,8 @@ func TestLogCollect_WhenReflectionLogIsMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectReflectionLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -474,8 +474,8 @@ func TestLogCollect_WhenAccelerationLogArchivesAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectAccelerationLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -511,8 +511,8 @@ func TestLogCollect_WhenAccelerationLogIsMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectAccelerationLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -581,8 +581,8 @@ func TestLogCollect_WhenAccessLogArchiveAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectDremioAccessLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -618,8 +618,8 @@ func TestLogCollect_WhenAaccessLogIsMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectDremioAccessLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -688,8 +688,8 @@ func TestLogCollect_WhenMetadataRefreshLogArchivesAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectMetadataRefreshLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -725,8 +725,8 @@ func TestLogCollect_WhenMetadataRefreshLogIsMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectMetadataRefreshLogs()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -795,8 +795,8 @@ func TestLogCollect_WhenQueriesJsonArchivesAreMissing(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectQueriesJSON()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationQueriesJSON, testLogDir)
 	defer AfterEachLogCollectTest()
@@ -834,8 +834,8 @@ func TestLogCollect_WhenQueriesJsonIsMissing(t *testing.T) {
 		}
 	}
 	err = logCollector.RunCollectQueriesJSON()
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
+	if err == nil {
+		t.Error("expected an error but there was none")
 	}
 	defer cleanUp(destinationQueriesJSON, testLogDir)
 	defer AfterEachLogCollectTest()

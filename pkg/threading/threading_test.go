@@ -16,103 +16,99 @@ package threading_test
 
 import (
 	"sync"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/threading"
 )
 
-var _ = Describe("Threading", func() {
-	var (
-		tp *threading.ThreadPool
-	)
+var (
+	tp *threading.ThreadPool
+)
 
-	BeforeEach(func() {
-		tp = threading.NewThreadPool(10)
-	})
+var setupThreadPool = func() {
+	tp = threading.NewThreadPool(10)
+}
 
-	When("Wait with one job", func() {
-		var waitErr error
-		var executed bool
-		BeforeEach(func() {
-			executed = false
-			jobFunc := func() error {
-				executed = true
-				return nil
-			}
+func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
+	var waitErr error
+	var executed bool
+	setupThreadPool()
+	executed = false
+	jobFunc := func() error {
+		executed = true
+		return nil
+	}
 
-			tp.AddJob(jobFunc)
-			waitErr = tp.ProcessAndWait()
-		})
+	tp.AddJob(jobFunc)
+	waitErr = tp.ProcessAndWait()
 
-		It("should execute all jobs", func() {
-			Expect(executed).To(BeTrue())
-		})
+	//		It("should execute all jobs", func() {
+	if !executed {
+		t.Errorf("did not execute all jobs")
+	}
 
-		It("should wait successfully", func() {
-			Expect(waitErr).To(BeNil())
-		})
-	})
+	//It("should wait successfully", func() {
+	if waitErr != nil {
+		t.Errorf("unexpected error %v", waitErr)
+	}
+}
 
-	When("Wait with no jobs", func() {
-		It("should fail", func() {
-			err := tp.ProcessAndWait()
-			Expect(err).ToNot(BeNil())
-		})
-	})
+func TestThreadPool_WhenWaitWithNoJobs(t *testing.T) {
+	err := tp.ProcessAndWait()
+	if err == nil {
+		t.Error("expected an error but received none")
+	}
+}
 
-	When("there are a lot more jobs to add than there are threads", func() {
-		var executed []bool
-		var mut sync.RWMutex
-		var waitErr error
-		BeforeEach(func() {
-			jobFunc := func() error {
-				mut.Lock()
-				defer mut.Unlock()
-				executed = append(executed, true)
-				return nil
-			}
-			for i := 0; i < 100; i++ {
-				tp.AddJob(jobFunc)
-			}
-			waitErr = tp.ProcessAndWait()
-		})
+func TestThreadPool_When(t *testing.T) {
+	var executed []bool
+	var mut sync.RWMutex
+	var waitErr error
+	setupThreadPool()
+	jobFunc := func() error {
+		mut.Lock()
+		defer mut.Unlock()
+		executed = append(executed, true)
+		return nil
+	}
+	for i := 0; i < 100; i++ {
+		tp.AddJob(jobFunc)
+	}
+	waitErr = tp.ProcessAndWait()
 
-		It("should execute all jobs", func() {
-			Expect(executed).To(HaveLen(100))
-		})
+	//It("should execute all jobs", func() {
+	if len(executed) != 100 {
+		t.Errorf("expected 100 jobs executed but had only %v", len(executed))
+	}
 
-		It("should wait successfully", func() {
-			Expect(waitErr).To(BeNil())
-		})
+	//It("should wait successfully", func() {
+	if waitErr != nil {
+		t.Errorf("unexpected error %v", waitErr)
+	}
+}
 
-	})
+func TestThreadPool_WhenWait(t *testing.T) {
+	var executed []bool
+	var mut sync.RWMutex
+	var waitErr error
+	setupThreadPool()
+	jobFunc := func() error {
+		mut.Lock()
+		defer mut.Unlock()
+		executed = append(executed, true)
+		return nil
+	}
 
-	When("Wait", func() {
-		var executed []bool
-		var mut sync.RWMutex
-		var waitErr error
-		BeforeEach(func() {
-			jobFunc := func() error {
-				mut.Lock()
-				defer mut.Unlock()
-				executed = append(executed, true)
-				return nil
-			}
+	for i := 0; i < 10; i++ {
+		tp.AddJob(jobFunc)
+	}
+	waitErr = tp.ProcessAndWait()
 
-			for i := 0; i < 10; i++ {
-				tp.AddJob(jobFunc)
-			}
-			waitErr = tp.ProcessAndWait()
-		})
-
-		It("should execute all jobs", func() {
-			Expect(executed).To(HaveLen(10))
-		})
-
-		It("should wait successfully", func() {
-			Expect(waitErr).To(BeNil())
-		})
-	})
-})
+	//It("should execute all jobs", func() {
+	if len(executed) != 10 {
+		t.Errorf("expected 10 jobs executed but had only %v", len(executed))
+	}
+	if waitErr != nil {
+		t.Errorf("unexpected error %v", waitErr)
+	}
+}
