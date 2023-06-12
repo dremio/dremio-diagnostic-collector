@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -277,7 +278,7 @@ func TestCollectKVReport(t *testing.T) {
 			t.Logf("error removing kvstore out dir %v", err)
 		}
 	}()
-	err = RunCollectKvReport(c)
+	err = apicollect.RunCollectKvReport(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -303,7 +304,7 @@ func TestDownloadJobProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(10 * time.Second)
-	err = downloadJobProfile(c, jobid)
+	err = apicollect.DownloadJobProfile(c, jobid)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -345,7 +346,7 @@ func submitSQLQuery(query string) (string, error) {
 }
 
 func TestValidateAPICredentials(t *testing.T) {
-	err := ValidateAPICredentials(c)
+	err := apicollect.ValidateAPICredentials(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -388,7 +389,7 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	}
 	t.Logf("before running the collection - %v dir has the following files %v", c.JobProfilesOutDir(), strings.Join(filesInDirBefore, ", "))
 	numberFilesInDir := len(filesInDirBefore)
-	tried, _, err := getNumberOfJobProfilesCollected(c)
+	tried, _, err := apicollect.GetNumberOfJobProfilesCollected(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
