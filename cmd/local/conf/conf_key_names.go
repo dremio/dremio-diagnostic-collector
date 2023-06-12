@@ -55,5 +55,4 @@ const (
 	KeyJobProfilesNumSlowExec            = "job-profiles-num-slow-exec"
 	KeyJobProfilesNumRecentErrors        = "job-profiles-num-recent-errors"
 	KeyJobProfilesNumSlowPlanning        = "job-profiles-num-slow-planning"
-	KeyRestHttpTimeout                   = "rest-http-timeout"
 )
