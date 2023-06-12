@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {

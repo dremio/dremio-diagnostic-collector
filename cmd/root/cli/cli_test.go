@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 )
 
 var (

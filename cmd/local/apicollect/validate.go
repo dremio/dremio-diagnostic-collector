@@ -18,7 +18,7 @@ package apicollect
 import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func ValidateAPICredentials(c *conf.CollectConf) error {

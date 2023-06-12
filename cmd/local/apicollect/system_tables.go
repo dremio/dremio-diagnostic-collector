@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func RunCollectDremioSystemTables(c *conf.CollectConf) error {

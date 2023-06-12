@@ -20,10 +20,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cli"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, c Collector, k string) error {

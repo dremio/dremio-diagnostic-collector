@@ -22,12 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/versions"
-	"github.com/dremio/dremio-diagnostic-collector/collection"
-	"github.com/dremio/dremio-diagnostic-collector/helpers"
-	"github.com/dremio/dremio-diagnostic-collector/kubernetes"
-	"github.com/dremio/dremio-diagnostic-collector/ssh"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -44,20 +44,16 @@ const outputLoc = "diag.tgz"
 var kubectlPath string
 var isK8s bool
 var sudoUser string
-var GitSha = "unknown"
 var namespace string
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
-func GetCLIVersion() string {
-	return fmt.Sprintf("ddc %v-%v\n", versions.GetDDCRuntimeVersion(), GitSha)
-}
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "ddc",
-	Short: GetCLIVersion() + "ddc connects via to dremio servers collects logs into an archive",
-	Long: GetCLIVersion() + `ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
+	Short: versions.GetCLIVersion() + " ddc connects via to dremio servers collects logs into an archive",
+	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
 
 ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-key $HOME/.ssh/id_rsa_dremio
@@ -107,7 +103,7 @@ func Execute() {
 			fmt.Println("")
 			os.Exit(1)
 		}
-		simplelog.Info(GetCLIVersion())
+		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(os.Args, " "))
 		cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs)
 		// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this

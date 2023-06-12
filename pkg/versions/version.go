@@ -14,8 +14,11 @@
 
 package versions
 
-var Version string
+import "fmt"
 
-func GetDDCRuntimeVersion() string {
-	return Version
+var Version string
+var GitSha string
+
+func GetCLIVersion() string {
+	return fmt.Sprintf("ddc %v-%v\n", Version, GitSha)
 }

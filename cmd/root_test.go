@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 )
 
 func TestSSHDefault(t *testing.T) {

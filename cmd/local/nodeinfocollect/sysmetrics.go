@@ -25,7 +25,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"

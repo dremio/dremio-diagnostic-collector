@@ -17,7 +17,7 @@ package ddcio_test
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 )
 
 func TestCompareFiles_WhenCompareingFilesWithTheSameContent(t *testing.T) {

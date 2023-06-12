@@ -19,7 +19,7 @@ import (
 	"log"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func main() {

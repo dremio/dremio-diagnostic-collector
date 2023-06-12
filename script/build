@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 # this is also set in script/release and is a copy paste
 GIT_SHA=`git rev-parse --short HEAD`
 VERSION=`git rev-parse --abbrev-ref HEAD`
-LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/cmd.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/cmd/versions.Version=$VERSION"
+LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/pkg/versions/cmd.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/linux/ddc

@@ -18,7 +18,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/threading"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
 )
 
 var (

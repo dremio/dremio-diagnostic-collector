@@ -22,7 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 // CaptureOutput captures standard output for a function f and returns the output string
