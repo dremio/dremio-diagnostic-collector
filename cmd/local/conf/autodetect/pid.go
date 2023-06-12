@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 )
 
 func GetDremioPIDFromText(jpsOutput string) (int, error) {

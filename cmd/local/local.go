@@ -40,8 +40,8 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )

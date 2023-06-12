@@ -17,7 +17,7 @@ package tests
 import (
 	"fmt"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 )
 
 func MatchFile(expectedFile string, actual interface{}) (success bool, err error) {

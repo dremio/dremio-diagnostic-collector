@@ -21,8 +21,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 )
 
 func IsAWSEFromJPSOutput(jpsText string) (bool, error) {

@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
