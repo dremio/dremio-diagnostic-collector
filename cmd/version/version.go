@@ -18,16 +18,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(versionCmd)
-}
-
-var versionCmd = &cobra.Command{
+var VersionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of DDC",
 	Long:  `All software has versions. This is DDC's`,
