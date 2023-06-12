@@ -32,7 +32,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
@@ -483,7 +482,7 @@ func runCollectHeapDump(c *conf.CollectConf) error {
 	return nil
 }
 
-var localCollectCmd = &cobra.Command{
+var LocalCollectCmd = &cobra.Command{
 	Use:   "local-collect",
 	Short: "retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
@@ -608,23 +607,22 @@ func TarGzDir(srcDir, dest string) error {
 func init() {
 	//wire up override flags
 	// consent form
-	localCollectCmd.Flags().Bool("accept-collection-consent", false, "consent for collection of files, if not true, then collection will stop and a log message will be generated")
+	LocalCollectCmd.Flags().Bool("accept-collection-consent", false, "consent for collection of files, if not true, then collection will stop and a log message will be generated")
 	// command line flags ..default is set at runtime due to the CountVarP not having this capacity
-	localCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
-	localCollectCmd.Flags().Bool("collect-acceleration-log", false, "Run the Collect Acceleration Log collector")
-	localCollectCmd.Flags().Bool("collect-access-log", false, "Run the Collect Access Log collector")
-	localCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
-	localCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
-	localCollectCmd.Flags().IntP("number-threads", "t", 0, "control concurrency in the system")
+	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
+	LocalCollectCmd.Flags().Bool("collect-acceleration-log", false, "Run the Collect Acceleration Log collector")
+	LocalCollectCmd.Flags().Bool("collect-access-log", false, "Run the Collect Access Log collector")
+	LocalCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
+	LocalCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
+	LocalCollectCmd.Flags().IntP("number-threads", "t", 0, "control concurrency in the system")
 	// Add flags for Dremio connection information
-	localCollectCmd.Flags().String("dremio-endpoint", "", "Dremio REST API endpoint")
-	localCollectCmd.Flags().String("dremio-username", "", "Dremio username")
-	localCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
-	localCollectCmd.Flags().String("dremio-rocksdb-dir", "", "Path to Dremio RocksDB directory")
-	localCollectCmd.Flags().String("dremio-conf-dir", "", "Directory where to find the configuration files")
-	localCollectCmd.Flags().Bool("collect-dremio-configuration", true, "Collect Dremio Configuration collector")
-	localCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
-	localCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
-	localCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
-	cmd.RootCmd.AddCommand(localCollectCmd)
+	LocalCollectCmd.Flags().String("dremio-endpoint", "", "Dremio REST API endpoint")
+	LocalCollectCmd.Flags().String("dremio-username", "", "Dremio username")
+	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
+	LocalCollectCmd.Flags().String("dremio-rocksdb-dir", "", "Path to Dremio RocksDB directory")
+	LocalCollectCmd.Flags().String("dremio-conf-dir", "", "Directory where to find the configuration files")
+	LocalCollectCmd.Flags().Bool("collect-dremio-configuration", true, "Collect Dremio Configuration collector")
+	LocalCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
+	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
+	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 }

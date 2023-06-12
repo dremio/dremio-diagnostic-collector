@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 func TestSSHDefault(t *testing.T) {
@@ -123,4 +124,19 @@ func captureAllOutput(f func()) (string, error) {
 func checkstds() {
 	os.Stdout.Write([]byte("This is stdout\n"))
 	os.Stderr.Write([]byte("This is stderr\n"))
+}
+
+func TestAllSubCommandsAreWiredUp(t *testing.T) {
+	helpText, err := tests.CaptureOutput(func() {
+		if err := RootCmd.Help(); err != nil {
+			t.Errorf("unable to process help text with error %v", err)
+		}
+	})
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	expected := "Available Commands:\n  local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support\n  version       Print the version number of DDC"
+	if !strings.Contains(helpText, expected) {
+		t.Errorf("missing command text in `%q`", helpText)
+	}
 }

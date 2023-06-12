@@ -22,10 +22,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
+	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/spf13/cobra"
@@ -178,6 +180,9 @@ func init() {
 	//rootCmd.Flags().BoolVar(&isEmbeddedK8s, "embedded-k8s", false, "use embedded k8s client in place of kubectl binary")
 	//rootCmd.Flags().BoolVar(&isEmbeddedSSH, "embedded-ssh", false, "use embedded ssh go client in place of ssh and scp binary")
 
+	//init
+	RootCmd.AddCommand(local.LocalCollectCmd)
+	RootCmd.AddCommand(version.VersionCmd)
 }
 
 func validateParameters(args collection.Args, sshKeyLoc, sshUser string, isK8s bool) error {
