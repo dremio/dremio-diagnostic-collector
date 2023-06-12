@@ -24,10 +24,10 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
-	"github.com/dremio/dremio-diagnostic-collector/ssh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

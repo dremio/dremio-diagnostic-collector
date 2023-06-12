@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
 )
