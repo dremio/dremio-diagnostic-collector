@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type Collector struct {

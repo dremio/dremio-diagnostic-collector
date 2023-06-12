@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type ErrorlessStringBuilder struct {

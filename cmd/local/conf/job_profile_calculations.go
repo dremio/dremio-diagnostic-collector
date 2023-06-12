@@ -15,7 +15,7 @@
 package conf
 
 import (
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/spf13/viper"
 )
 

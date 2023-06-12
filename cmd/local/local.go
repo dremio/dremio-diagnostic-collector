@@ -38,7 +38,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"

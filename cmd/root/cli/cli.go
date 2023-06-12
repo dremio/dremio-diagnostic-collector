@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type CmdExecutor interface {

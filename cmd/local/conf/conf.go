@@ -24,7 +24,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"

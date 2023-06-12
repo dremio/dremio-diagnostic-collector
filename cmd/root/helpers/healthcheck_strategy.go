@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func NewHCCopyStrategy(ddcfs Filesystem) *CopyStrategyHC {

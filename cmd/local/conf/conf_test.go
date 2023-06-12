@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 

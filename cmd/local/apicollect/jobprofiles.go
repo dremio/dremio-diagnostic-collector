@@ -26,7 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/queriesjson"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func getNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {

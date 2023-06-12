@@ -23,7 +23,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 var secretKeywords = []string{
