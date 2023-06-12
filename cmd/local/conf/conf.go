@@ -74,7 +74,6 @@ type CollectConf struct {
 	collectGCLogs                     bool
 	collectWLM                        bool
 	nodeName                          string
-	restHttpTimeout                   int
 
 	// variables
 	systemtables            []string
@@ -259,8 +258,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
 	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && personalAccessTokenPresent
 	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && personalAccessTokenPresent
-	c.restHttpTimeout = viper.GetInt(KeyRestHttpTimeout)
-	restclient.InitClient(c.allowInsecureSSL, c.restHttpTimeout)
+	restclient.InitClient(c.allowInsecureSSL)
 
 	numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
 	c.numberJobProfilesToCollect = numberJobProfilesToCollect
@@ -457,8 +455,4 @@ func (c *CollectConf) DremioLogsNumDays() int {
 
 func (c *CollectConf) NodeMetricsCollectDurationSeconds() int {
 	return c.nodeMetricsCollectDurationSeconds
-}
-
-func (c *CollectConf) RestHttpTimeout() int {
-	return c.restHttpTimeout
 }

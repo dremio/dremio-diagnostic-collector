@@ -28,13 +28,13 @@ import (
 
 var client *http.Client
 
-func InitClient(allowInsecureSSL bool, restHttpTimeout int) {
+func InitClient(allowInsecureSSL bool) {
 	tr := &http.Transport{
 		MaxIdleConns:          10,
-		IdleConnTimeout:       time.Duration(restHttpTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(restHttpTimeout) * time.Second,
-		TLSHandshakeTimeout:   time.Duration(restHttpTimeout) * time.Second,
-		ExpectContinueTimeout: time.Duration(restHttpTimeout) * time.Second,
+		IdleConnTimeout:       30 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		TLSHandshakeTimeout:   30 * time.Second,
+		ExpectContinueTimeout: 30 * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: allowInsecureSSL},
 	}
 	client = &http.Client{
