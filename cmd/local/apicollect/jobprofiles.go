@@ -29,7 +29,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func getNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
+func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
 	files, err := os.ReadDir(c.QueriesOutDir())
 	if err != nil {
 		return 0, 0, err
@@ -71,7 +71,7 @@ func getNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			//because we are looping
 			keyToDownload := key
 			downloadThreadPool.AddJob(func() error {
-				err := downloadJobProfile(c, keyToDownload)
+				err := DownloadJobProfile(c, keyToDownload)
 				if err != nil {
 					simplelog.Error(err.Error()) // Print instead of Error
 				}
@@ -94,7 +94,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	if err != nil {
 		return err
 	}
-	tried, collected, err := getNumberOfJobProfilesCollected(c)
+	tried, collected, err := GetNumberOfJobProfilesCollected(c)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	return nil
 }
 
-func downloadJobProfile(c *conf.CollectConf, jobid string) error {
+func DownloadJobProfile(c *conf.CollectConf, jobid string) error {
 	apipath := "/apiv2/support/" + jobid + "/download"
 	filename := jobid + ".zip"
 	url := c.DremioEndpoint() + apipath
