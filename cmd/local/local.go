@@ -43,6 +43,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/threading"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
 func createAllDirs(c *conf.CollectConf) error {
@@ -488,7 +489,7 @@ var localCollectCmd = &cobra.Command{
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
 
-		simplelog.Infof("ddc local-collect version: %v", cmd.GetCLIVersion())
+		simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 		simplelog.Infof("args: %v", strings.Join(args, " "))
 		overrides := make(map[string]*pflag.Flag)
 		//if a cli flag was set go ahead and use those values to override the viper configuration

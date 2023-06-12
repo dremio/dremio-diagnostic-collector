@@ -18,11 +18,13 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	RootCmd.AddCommand(versionCmd)
+	cmd.RootCmd.AddCommand(versionCmd)
 }
 
 var versionCmd = &cobra.Command{
@@ -30,6 +32,6 @@ var versionCmd = &cobra.Command{
 	Short: "Print the version number of DDC",
 	Long:  `All software has versions. This is DDC's`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(GetCLIVersion())
+		fmt.Println(versions.GetCLIVersion())
 	},
 }
