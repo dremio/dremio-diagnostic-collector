@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/cli"
 )
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct

@@ -32,7 +32,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd"
+	//"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
@@ -626,5 +626,5 @@ func init() {
 	localCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
 	localCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	localCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
-	cmd.RootCmd.AddCommand(localCollectCmd)
+	RootCmd.AddCommand(localCollectCmd)
 }

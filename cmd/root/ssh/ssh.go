@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/cli"
 )
 
 func NewCmdSSHActions(sshKey, sshUser string) *CmdSSHActions {

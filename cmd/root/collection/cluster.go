@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
