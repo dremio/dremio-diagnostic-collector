@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/helpers"
 )
 
 var DirPerms fs.FileMode = 0750
