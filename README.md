@@ -95,13 +95,18 @@ As of the today the following is collected
 The help is pretty straight forward and comes with examples
 
 ```sh
-ddc v0.3.0
+ddc v0.4.0
 ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
 
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-key $HOME/.ssh/id_rsa_dremio 
+ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+or more briefly
+ddc -c 10.0.0.19 -e 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
 
-ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor
+
+ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
+or more briefly
+ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor 
 
 Usage:
   ddc [flags]
