@@ -24,7 +24,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -81,8 +80,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	outputLoc := collectionArgs.OutputLoc
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
-	operationSystem := runtime.GOOS
-	arch := runtime.GOARCH
 	var ddcLoc string
 	var err error
 	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
@@ -94,11 +91,15 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
 		}
 	}()
-	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir, operationSystem, arch)
+	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir)
 	if err != nil {
 		return fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
 	}
-	ddcYamlFilePath := filepath.Join(path.Dir(ddcLoc), "ddc.yaml")
+	execLoc, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	ddcYamlFilePath := filepath.Join(path.Dir(execLoc), "ddc.yaml")
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err
