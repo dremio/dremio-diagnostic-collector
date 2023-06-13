@@ -45,74 +45,7 @@ if ! type "gh" > /dev/null; then
       esac
 fi
 
-echo "Checking if zip is installed…"
-date "+%H:%M:%S"
-
-if ! type "zip" > /dev/null; then
-    echo "zip not found installing…"
-    date "+%H:%M:%S"
-    OS="`uname`"
-    case $OS in
-      'Linux')
-        if type "apt" > /dev/null; then
-            echo "detected debian based system installing via apt"
-            sudo apt install zip
-        fi
-        if type "yum" > /dev/null; then
-            echo "detected rpm based system installing via yum"
-            sudo yum install zip
-        fi
-        ;;
-      'WindowsNT')
-        echo "install gnu zip and try again http://gnuwin32.sourceforge.net/packages/zip.htm"
-        exit 1
-        ;;
-      'Darwin') 
-        if type "brew" > /dev/null; then
-            brew install zip
-        else
-            echo "install homebrew to have zip https://brew.sh/"
-            exit 1
-        fi
-        ;;
-      *) ;;
-      esac
-fi
-# this is also set in script/build and is a copy paste
-GIT_SHA=`git rev-parse --short HEAD`
-VERSION=$1
-LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION"
-
-echo "Cleaning bin folder…"
-date "+%H:%M:%S"
-./script/clean
-
-
-echo "Building linux-amd64…"
-date "+%H:%M:%S"
-GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-cp ./default-ddc.yaml ./bin/ddc.yaml
-zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml
-mkdir -p ./bin/linux
-mv ./bin/ddc ./bin/linux/ddc
-mv ./bin/ddc.yaml ./bin/ddc.yaml
-echo "Building linux-arm64…"
-date "+%H:%M:%S"
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/linux/ddc ./bin/ddc.yaml
-echo "Building darwin-os-x-amd64…"
-date "+%H:%M:%S"
-GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-darwin-amd64.zip ./bin/ddc ./bin/linux/ddc ./bin/ddc.yaml
-echo "Building darwin-os-x-arm64…"
-date "+%H:%M:%S"
-GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-darwin-arm64.zip ./bin/ddc ./bin/linux/ddc ./bin/ddc.yaml
-echo "Building windows-amd64…"
-date "+%H:%M:%S"
-GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/linux/ddc ./bin/ddc.yaml
-
+./script/release-build
 
 gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-amd64.zip ./bin/ddc-darwin-arm64.zip ./bin/ddc-darwin-amd64.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip 
  
