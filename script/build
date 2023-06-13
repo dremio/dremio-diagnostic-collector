@@ -9,7 +9,8 @@ cd "$(dirname "$0")/.."
 GIT_SHA=`git rev-parse --short HEAD`
 VERSION=`git rev-parse --abbrev-ref HEAD`
 LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/pkg/versions/cmd.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION"
+GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./cmd/root/ddcbinary/output/ddc
+
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 
-GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/linux/ddc
 cp ./default-ddc.yaml ./bin/ddc.yaml

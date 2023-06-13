@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -84,19 +85,20 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	arch := runtime.GOARCH
 	var ddcLoc string
 	var err error
-	ddcLoc, err = os.Executable()
+	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpIinstallDir); err != nil {
+			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
+		}
+	}()
+	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir, operationSystem, arch)
 	if err != nil {
 		return fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
 	}
-	ddcExecName := path.Base(ddcLoc)
 	ddcYamlFilePath := filepath.Join(path.Dir(ddcLoc), "ddc.yaml")
-	if operationSystem == "linux" && arch == "amd64" {
-		simplelog.Infof("using linux ddc")
-	} else {
-		// we need to use the exec in the folder next to ddc should be /linux and should contain a ddc exec that is setup for linux
-		ddcDir := path.Join(path.Dir(ddcLoc), "linux")
-		ddcLoc = path.Join(ddcDir, ddcExecName)
-	}
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err
