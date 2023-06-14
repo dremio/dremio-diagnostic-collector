@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
@@ -27,13 +28,16 @@ var (
 	c              *cli.Cli
 	outputHandler  cli.OutputHandler
 	executedOutput string
+	mut            sync.Mutex
 )
 
 func setupTestCLI() {
 	c = &cli.Cli{}
 	executedOutput = ""
 	outputHandler = func(line string) {
+		mut.Lock()
 		executedOutput += line + "\n"
+		mut.Unlock()
 	}
 }
 
