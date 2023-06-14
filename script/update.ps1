@@ -3,8 +3,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location -Path $scriptPath
+# Change working directory to script's grandparents directory
+Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "==> Running bootstrap..."
 

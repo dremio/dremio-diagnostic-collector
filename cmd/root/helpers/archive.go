@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -171,14 +170,20 @@ func GZipDiag(zipFileName string, _ string, file string) error {
 }
 
 func findAllFiles(path string) ([]string, error) {
-	cmd := cli.Cli{}
-	f := []string{}
-	out, err := cmd.Execute("find", path, "-type", "f")
+	var files []string
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
 	if err != nil {
-		return f, err
+		return nil, err
 	}
-	f = strings.Split(out, "\n")
-	return f, nil
+	return files, nil
 }
 
 func createFileList(foundFiles []string) (files []CollectedFile, err error) {
