@@ -33,3 +33,5 @@ func TestLinuxBinaryShouldReturnItself(t *testing.T) {
 
 	if binaryPath != out {
 		t.Errorf("expected '%q' but was '%q'", binaryPath, out)
+	}
+}
