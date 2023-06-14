@@ -25,14 +25,13 @@ import (
 )
 
 var (
-	c              *cli.Cli
+	c              = &cli.Cli{}
 	outputHandler  cli.OutputHandler
 	executedOutput string
 	mut            sync.Mutex
 )
 
 func setupTestCLI() {
-	c = &cli.Cli{}
 	executedOutput = ""
 	outputHandler = func(line string) {
 		mut.Lock()
@@ -54,10 +53,11 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}
-
+	mut.Lock()
 	if strings.TrimSpace(executedOutput) == "" {
 		t.Errorf("Expected executedOutput to be not empty")
 	}
+	mut.Unlock()
 }
 
 func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
@@ -67,17 +67,21 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
+		mut.Lock()
 		if !strings.Contains(strings.TrimSpace(executedOutput), "No such file or directory") {
 			t.Errorf("Expected executedOutput to contain 'No such file or directory' but was %v", executedOutput)
 		}
+		mut.Unlock()
 	} else {
 		err := c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
+		mut.Lock()
 		if executedOutput == "" {
 			t.Errorf("Expected executedOutput to not be empty but was")
 		}
+		mut.Unlock()
 	}
 
 }
@@ -89,9 +93,11 @@ func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 		t.Errorf("Expected error but got nil")
 	}
 	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
+	mut.Lock()
 	if !strings.Contains(err.Error(), expectedErr) {
 		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
 	}
+	mut.Unlock()
 }
 
 func TestExecute_WhenCommandIsValid(t *testing.T) {
