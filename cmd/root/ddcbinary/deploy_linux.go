@@ -20,7 +20,7 @@ import (
 	"os"
 )
 
-func WriteOutDDC(targetDir string) (string, error) {
+func WriteOutDDC(_ string) (string, error) {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return "", err
