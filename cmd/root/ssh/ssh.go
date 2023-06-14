@@ -17,9 +17,13 @@ package ssh
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/google/uuid"
 )
 
 func NewCmdSSHActions(sshKey, sshUser string) *CmdSSHActions {
@@ -39,6 +43,8 @@ type CmdSSHActions struct {
 	sshUser string
 }
 
+var tmpDir string
+
 func (c *CmdSSHActions) HostExecuteAndStream(hostString string, output cli.OutputHandler, _ bool, args ...string) (err error) {
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostString))
@@ -50,21 +56,66 @@ func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destinatio
 	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
 }
 
-func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, _, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
+func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+	var args []string
+	sourceFile := filepath.Base(source)
+	if tmpDir == "" {
+		tmpDir = "/tmp/" + uuid.NewString()
+		args = []string{"mkdir", "-p", tmpDir}
+		c.HostExecuteSudo(hostName, sudoUser, args...)
+	}
+	tmpSourceFile := path.Join(tmpDir, sourceFile)
+	simplelog.Infof("testing: %v", tmpSourceFile)
+	// first move to tmp dir from source as sudo
+	args = []string{"cp", source, tmpSourceFile}
+	simplelog.Infof("testing: %v", args)
+	c.HostExecuteSudo(hostName, sudoUser, args...)
+	// next copy from tmp dir as non-sudo
+	out, err := c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpSourceFile, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+	if err != nil {
+		return out, err
+	}
+	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpDir), destination)
 }
 
 func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination string) (string, error) {
 	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
-func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, _, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+	var args []string
+	sourceFile := filepath.Base(source)
+	if tmpDir == "" {
+		tmpDir = "/tmp/" + uuid.NewString()
+		args = []string{"mkdir", "-p", tmpDir}
+		c.HostExecute(hostName, false, args...)
+	}
+	tmpDestFile := path.Join(tmpDir, sourceFile)
+	simplelog.Infof("testing: %v", tmpDestFile)
+	// first copy to tmp dir as non-sudo
+	out, err := c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpDir))
+	if err != nil {
+		return out, err
+	}
+	// next move from tmp dir to destination as sudo
+	args = []string{"cp", tmpDestFile, destination}
+	simplelog.Infof("testing: %v", args)
+	return c.HostExecuteSudo(hostName, sudoUser, args...)
 }
 
 func (c *CmdSSHActions) HostExecute(hostName string, _ bool, args ...string) (string, error) {
+	simplelog.Infof("testing: %v", c.sshUser)
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
+	sshArgs = append(sshArgs, strings.Join(args, " "))
+	return c.cli.Execute(sshArgs...)
+}
+
+func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args ...string) (string, error) {
+	sudoArgs := []string{"sudo", "-u", sudoUser}
+	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
+	sshArgs = append(sshArgs, strings.Join(sudoArgs, " "))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
 	return c.cli.Execute(sshArgs...)
 }

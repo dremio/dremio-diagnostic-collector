@@ -86,6 +86,20 @@ func ComposeCopy(conf HostCaptureConfiguration, source, destination string) (std
 	return stdOut, err
 }
 
+// The archive copy back should never change regardless of the sudo user being passed or not
+func ComposeCopyArchive(conf HostCaptureConfiguration, source, destination string) (stdOut string, err error) {
+	host := conf.Host
+	c := conf.Collector
+	isCoordinator := conf.IsCoordinator
+
+	stdOut, err = c.CopyFromHost(host, isCoordinator, source, destination)
+	if err != nil {
+		simplelog.Errorf("host %v failed to run command with error %v", host, err)
+	}
+
+	return stdOut, err
+}
+
 // Adds the sudo part into the CopyFromHost call
 func ComposeCopyTo(conf HostCaptureConfiguration, source, destination string) (stdOut string, err error) {
 	host := conf.Host
