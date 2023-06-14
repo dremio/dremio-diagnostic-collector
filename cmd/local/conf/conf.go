@@ -74,6 +74,7 @@ type CollectConf struct {
 	collectGCLogs                     bool
 	collectWLM                        bool
 	nodeName                          string
+	restHttpTimeout                   int
 
 	// variables
 	systemtables            []string
@@ -255,10 +256,11 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		simplelog.Warningf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
 	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
-	restclient.InitClient(c.allowInsecureSSL)
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
 	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && personalAccessTokenPresent
 	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && personalAccessTokenPresent
+	c.restHttpTimeout = viper.GetInt(KeyRestHttpTimeout)
+	restclient.InitClient(c.allowInsecureSSL, c.restHttpTimeout)
 
 	numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
 	c.numberJobProfilesToCollect = numberJobProfilesToCollect
@@ -455,4 +457,8 @@ func (c *CollectConf) DremioLogsNumDays() int {
 
 func (c *CollectConf) NodeMetricsCollectDurationSeconds() int {
 	return c.nodeMetricsCollectDurationSeconds
+}
+
+func (c *CollectConf) RestHttpTimeout() int {
+	return c.restHttpTimeout
 }
