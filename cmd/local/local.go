@@ -16,11 +16,8 @@
 package cmd
 
 import (
-	"archive/tar"
 	"bytes"
-	"compress/gzip"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -37,6 +34,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -531,77 +529,19 @@ var LocalCollectCmd = &cobra.Command{
 		if err != nil {
 			simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
 		} else {
-			ddcDir := path.Dir(ddcLoc)
-			if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), path.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
+			ddcDir := filepath.Dir(ddcLoc)
+			if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
 				simplelog.Warningf("uanble to copy log to archive due to error %v", err)
 			}
 		}
 		tarballName := c.OutputDir() + c.NodeName() + ".tar.gz"
 		simplelog.Infof("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
-		if err := TarGzDir(c.OutputDir(), tarballName); err != nil {
+		if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
 			simplelog.Errorf("unable to compress archive exiting due to error %v", err)
 			os.Exit(1)
 		}
 		simplelog.Infof("Archive %v complete", tarballName)
 	},
-}
-
-func TarGzDir(srcDir, dest string) error {
-	tarGzFile, err := os.Create(path.Clean(dest))
-	if err != nil {
-		return err
-	}
-	defer tarGzFile.Close()
-
-	gzWriter := gzip.NewWriter(tarGzFile)
-	defer gzWriter.Close()
-
-	tarWriter := tar.NewWriter(gzWriter)
-	defer tarWriter.Close()
-
-	// Make sure the srcDir is an absolute path and ends with '/'
-	srcDir = filepath.Clean(srcDir) + string(filepath.Separator)
-
-	return filepath.Walk(srcDir, func(filePath string, fileInfo os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Get the relative path of the file
-		relativePath, err := filepath.Rel(srcDir, filePath)
-		if err != nil {
-			return err
-		}
-
-		// Make sure the relative path starts with './'
-		if !strings.HasPrefix(relativePath, ".") {
-			relativePath = "./" + relativePath
-		}
-
-		header, err := tar.FileInfoHeader(fileInfo, relativePath)
-		if err != nil {
-			return err
-		}
-
-		header.Name = relativePath
-
-		if err := tarWriter.WriteHeader(header); err != nil {
-			return err
-		}
-
-		if !fileInfo.IsDir() {
-			file, err := os.Open(path.Clean(filePath))
-			if err != nil {
-				return err
-			}
-			defer file.Close()
-
-			_, err = io.Copy(tarWriter, file)
-			return err
-		}
-
-		return nil
-	})
 }
 
 func init() {

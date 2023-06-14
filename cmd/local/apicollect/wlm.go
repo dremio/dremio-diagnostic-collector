@@ -69,10 +69,10 @@ func RunCollectWLM(c *conf.CollectConf) error {
 
 		// Prepare the output directory and filename
 		sb := string(body)
-		wlmFile := path.Clean(path.Join(c.WLMOutDir(), filename))
+		wlmFile := path.Clean(filepath.Join(c.WLMOutDir(), filename))
 
 		// Create a new file in the output directory
-		file, err := os.Create(path.Clean(wlmFile))
+		file, err := os.Create(filepath.Clean(wlmFile))
 
 		// Log and return if there was an error with file creation
 		if err != nil {

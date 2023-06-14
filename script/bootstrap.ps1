@@ -3,8 +3,8 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location -Path $scriptPath
+# Change working directory to script's grandparents directory
+Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "Resolving server installation..."
 # Please follow the manual installation instructions for the Dremio server
@@ -15,7 +15,7 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "license-header-checker" -ErrorAction SilentlyContinue)) {
     Write-Output "license-header-checker not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/lluissm/license-header-checker@v1.4.0
+    go install github.com/lluissm/license-header-checker/cmd/license-header-checker@latest
 }
 
 Write-Output "Checking if golangci-lint is installed..."

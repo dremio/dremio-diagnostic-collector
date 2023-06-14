@@ -7,4 +7,4 @@ $ErrorActionPreference = "Stop"
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "Running gosec..."
-Invoke-Expression "gosec -exclude=G204,G402 ./..."
+Invoke-Expression "gosec -exclude='G204,G402' ./..."

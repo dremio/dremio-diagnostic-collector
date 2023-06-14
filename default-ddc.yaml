@@ -1,4 +1,4 @@
-verbose: vvvv
+verbose: vv
 collect-acceleration-log: false
 collect-access-log: false
 dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir

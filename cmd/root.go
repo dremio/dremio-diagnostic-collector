@@ -81,7 +81,7 @@ func Execute() {
 			}
 			sshKeyLoc = sshDefault
 		}
-
+		simplelog.InitLogger(2)
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,

@@ -99,7 +99,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if err != nil {
 		return err
 	}
-	ddcYamlFilePath := filepath.Join(path.Dir(execLoc), "ddc.yaml")
+	ddcYamlFilePath := filepath.Join(filepath.Dir(execLoc), "ddc.yaml")
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err

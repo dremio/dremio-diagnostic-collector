@@ -157,12 +157,15 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile string) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if string(filepath.Separator)+filepath.Base(hdr.Name) == string(filepath.Separator)+filepath.Base(cleanedExpectedFile) {
+			found = true
+		} else {
+			continue
+		}
 		matchingFileModTime = hdr.ModTime.UTC()
 		fmt.Printf("Contents of %s:\n", hdr.Name)
 		names = append(names, hdr.Name)
-		if string(filepath.Separator)+filepath.Base(hdr.Name) == string(filepath.Separator)+filepath.Base(cleanedExpectedFile) {
-			found = true
-		}
+
 		for {
 			_, err := io.CopyN(&buf, tr, 1024)
 			if err != nil {
@@ -172,7 +175,6 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile string) {
 				t.Fatal(err)
 			}
 		}
-		fmt.Println()
 	}
 	if !found {
 		t.Errorf("expected to find the newly archived %v file but did not, inside was %v", cleanedExpectedFile, names)
@@ -187,6 +189,6 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile string) {
 	}
 	row := buf.String()
 	if row != string(expectedText) {
-		t.Errorf("expected content to have %v but was %v", string(expectedText), row)
+		t.Errorf("expected content to have '%v' but was '%v'", string(expectedText), row)
 	}
 }

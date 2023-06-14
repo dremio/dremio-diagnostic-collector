@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -141,7 +142,7 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	}
 
 	// call general archive routine
-	return ArchiveDiagDirectory(outputLoc, s.TmpDir)
+	return archive.TarGzDir(s.TmpDir, outputLoc)
 }
 
 // This function creates a couple of supplemental files required for the HC data to be uploaded
