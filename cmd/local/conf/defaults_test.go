@@ -23,21 +23,20 @@ import (
 	"github.com/spf13/viper"
 )
 
-func setupTestSetViperDefaults() (int, string, int, string) {
-	defaultThreads := 10
+func setupTestSetViperDefaults() (string, int, string) {
 	hostName := "test-host"
 	defaultCaptureSeconds := 30
 	outputDir := "/tmp"
 
 	viper.Reset()
 	// Run the function.
-	conf.SetViperDefaults(defaultThreads, hostName, defaultCaptureSeconds, outputDir)
+	conf.SetViperDefaults(hostName, defaultCaptureSeconds, outputDir)
 
-	return defaultThreads, hostName, defaultCaptureSeconds, outputDir
+	return hostName, defaultCaptureSeconds, outputDir
 }
 
 func TestSetViperDefaults(t *testing.T) {
-	defaultThreads, hostName, defaultCaptureSeconds, outputDir := setupTestSetViperDefaults()
+	hostName, defaultCaptureSeconds, outputDir := setupTestSetViperDefaults()
 
 	checks := []struct {
 		key      string
@@ -46,7 +45,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
 		{conf.KeyDremioLogDir, "/var/log/dremio"},
-		{conf.KeyNumberThreads, defaultThreads},
+		{conf.KeyNumberThreads, 2},
 		{conf.KeyDremioUsername, "dremio"},
 		{conf.KeyDremioPatToken, ""},
 		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
@@ -78,7 +77,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyDremioGCLogsDir, ""},
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
-		{conf.KeyAllowInsecureSSL, false},
+		{conf.KeyAllowInsecureSSL, true},
 	}
 
 	for _, check := range checks {

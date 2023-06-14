@@ -15,6 +15,7 @@
 package conf
 
 const (
+	KeyVerbose                           = "verbose"
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
 	KeyDremioLogDir                      = "dremio-log-dir"
