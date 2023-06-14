@@ -39,9 +39,10 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	host := conf.Host
 
 	ddcTmpDir := "/tmp/ddc"
-	pathToDDC := path.Join(ddcTmpDir, path.Base(localDDCPath))
+	pathToDDC := "/tmp/ddc/ddc" //nasty hard coding for now
+	pathToDDCYAML := "/tmp/ddc/ddc.yaml"
 	// clear out the old
-	if out, err := ComposeExecute(conf, []string{"rm", "-fr", path.Join(ddcTmpDir)}); err != nil {
+	if out, err := ComposeExecute(conf, []string{"rm", "-fr", ddcTmpDir}); err != nil {
 		simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
 	}
 	versionMatch := false
@@ -68,9 +69,13 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		} else {
 			simplelog.Infof("successfully copied ddc to host %v", host)
 		}
+		//make  exec /tmp/ddc/
+		if out, err := ComposeExecute(conf, []string{"chmod", "+x", pathToDDC}); err != nil {
+			simplelog.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
+			return
+		}
 	}
 	//always update the configuration
-	pathToDDCYAML := path.Join(ddcTmpDir, path.Base(localDDCYamlPath))
 	if out, err := ComposeCopyTo(conf, localDDCYamlPath, pathToDDCYAML); err != nil {
 		failedFiles = append(failedFiles, FailedFiles{
 			Path: localDDCYamlPath,
@@ -112,8 +117,10 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		simplelog.Errorf("ERROR: host %v unable to find tar.gz in directory %v with error %v", host, tarGZ, err)
 	} else {
 		for _, sourceFile := range foundTarGzFiles {
-			destFile := path.Join(outDir, path.Base(sourceFile))
+			//have to use filepath for cross platform path on client
+			destFile := filepath.Join(outDir, filepath.Base(sourceFile))
 			simplelog.Infof("found %v for copying to %v", sourceFile, destFile)
+			//but we want to use path.join here because otherwise it will be wrong for linux servers
 			if out, err := ComposeCopy(conf, path.Join(ddcTmpDir, sourceFile), destFile); err != nil {
 				failedFiles = append(failedFiles, FailedFiles{
 					Path: destFile,

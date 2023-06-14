@@ -5,6 +5,8 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+./script/clean
+
 echo "Checking if zip is installed…"
 date "+%H:%M:%S"
 

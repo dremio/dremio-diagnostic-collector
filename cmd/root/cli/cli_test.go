@@ -39,10 +39,18 @@ func setupTestCLI() {
 
 func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	setupTestCLI()
-	err := c.ExecuteAndStreamOutput(outputHandler, "ls", "-v")
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	if runtime.GOOS != "windows" {
+		err := c.ExecuteAndStreamOutput(outputHandler, "ls", "-v")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	} else {
+		err := c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir")
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 	}
+
 	if strings.TrimSpace(executedOutput) == "" {
 		t.Errorf("Expected executedOutput to be not empty")
 	}
@@ -50,13 +58,24 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 
 func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 	setupTestCLI()
-	err := c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
-	if err == nil {
-		t.Errorf("Expected error but got nil")
+	if runtime.GOOS != "windows" {
+		err := c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
+		if err == nil {
+			t.Errorf("Expected error but got nil")
+		}
+		if !strings.Contains(strings.TrimSpace(executedOutput), "No such file or directory") {
+			t.Errorf("Expected executedOutput to contain 'No such file or directory' but was %v", executedOutput)
+		}
+	} else {
+		err := c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
+		if err == nil {
+			t.Errorf("Expected error but got nil")
+		}
+		if executedOutput == "" {
+			t.Errorf("Expected executedOutput to not be empty but was")
+		}
 	}
-	if !strings.Contains(strings.TrimSpace(executedOutput), "No such file or directory") {
-		t.Errorf("Expected executedOutput to contain 'No such file or directory'")
-	}
+
 }
 
 func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {

@@ -93,13 +93,13 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	}()
 	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir)
 	if err != nil {
-		return fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
+		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
 	execLoc, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	ddcYamlFilePath := filepath.Join(path.Dir(execLoc), "ddc.yaml")
+	ddcYamlFilePath := filepath.Join(filepath.Dir(execLoc), "ddc.yaml")
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err

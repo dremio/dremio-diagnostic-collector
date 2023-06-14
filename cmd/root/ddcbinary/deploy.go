@@ -106,6 +106,10 @@ func Unzip(src string) error {
 			return err
 		}
 	}
+	// release for windows
+	if err := r.Close(); err != nil {
+		return fmt.Errorf("unable to close zip reader %v", err)
+	}
 
 	// Delete the zip file
 	err = os.Remove(src)

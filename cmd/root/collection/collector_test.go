@@ -26,6 +26,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
@@ -278,7 +279,7 @@ func TestTgzArchive(t *testing.T) {
 	}
 	//testing tgz
 	archiveFile := filepath.Join(tmpDir, "test.tgz")
-	err = helpers.ArchiveDiagDirectory(archiveFile, tmpDir)
+	err = archive.TarGzDir(tmpDir, archiveFile)
 	if err != nil {
 		t.Fatal(err)
 	}
