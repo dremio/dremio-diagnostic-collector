@@ -16,8 +16,13 @@
 
 package ddcbinary
 
+import (
+	"os"
+	"testing"
+)
+
 func TestLinuxBinaryShouldReturnItself(t *testing.T) {
-	out, err := WriteOutDDC()
+	out, err := WriteOutDDC("Iamignored")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -27,6 +32,6 @@ func TestLinuxBinaryShouldReturnItself(t *testing.T) {
 	}
 
 	if binaryPath != out {
-		t.Errrof("expected '%q' but was '%q'", binaryPath, out)
+		t.Errorf("expected '%q' but was '%q'", binaryPath, out)
 	}
 }
