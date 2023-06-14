@@ -19,7 +19,7 @@ date "+%H:%M:%S"
 if ! type "license-header-checker" > /dev/null; then
   echo "license-header-checker not found installing.."
   date "+%H:%M:%S"
-  curl -s https://raw.githubusercontent.com/lluissm/license-header-checker/master/install.sh | bash
+  go install github.com/lluissm/license-header-checker/cmd/license-header-checker@latest
 fi
 
 echo "Checking if golangci-lint is installed…"
