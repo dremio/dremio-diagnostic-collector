@@ -56,5 +56,5 @@ func SetViperDefaults(defaultThreads int, hostName string, defaultCaptureSeconds
 	viper.SetDefault(KeyNodeName, hostName)
 	viper.SetDefault(KeyAcceptCollectionConsent, true)
 	viper.SetDefault(KeyAllowInsecureSSL, false)
-	viper.SetDefault(KeyRestHttpTimeout, 30)
+	viper.SetDefault(KeyRestHTTPTimeout, 30)
 }
