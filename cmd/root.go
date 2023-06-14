@@ -58,9 +58,15 @@ var RootCmd = &cobra.Command{
 	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
 
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-key $HOME/.ssh/id_rsa_dremio
+ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+or more briefly
+ddc -c 10.0.0.19 -e 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+
 
 ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
+or more briefly
+ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor 
+
 `,
 	Run: func(c *cobra.Command, args []string) {
 
