@@ -87,7 +87,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	//execute local-collect if skipRESTCollect is set blank the pat
 	localCollectArgs := []string{pathToDDC, "local-collect"}
 	if skipRESTCollect {
-		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "''")
+		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "")
 	}
 	if err := ComposeExecuteAndStream(conf, func(line string) {
 		simplelog.HostLog(host, line)
