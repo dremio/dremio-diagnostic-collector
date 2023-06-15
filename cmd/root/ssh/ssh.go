@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
 )
 
@@ -61,14 +62,12 @@ func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, sour
 	if err != nil {
 		return "", err
 	}
-	// set perms
-	_, err = c.HostExecute(hostName, false, "chmod", "a+rwx", tmpDir)
-	if err != nil {
-		return "", err
-	}
 	// cleanup the tmp dir
 	defer func() {
-		c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		_, err = c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		if err != nil {
+			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
+		}
 	}()
 	// first move to tmp dir from source as sudo
 	tmpFilePath := path.Join(tmpDir, sourceFileName)
@@ -92,14 +91,12 @@ func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source
 	if err != nil {
 		return "", err
 	}
-	// set perms
-	_, err = c.HostExecute(hostName, false, "chmod", "a+rwx", tmpDir)
-	if err != nil {
-		return "", err
-	}
 	// cleanup the tmp dir
 	defer func() {
-		c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		_, err = c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		if err != nil {
+			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
+		}
 	}()
 	tmpFilePath := path.Join(tmpDir, sourceFileName)
 	// first copy to tmp dir as non-sudo
