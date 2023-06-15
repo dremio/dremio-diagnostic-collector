@@ -2,9 +2,24 @@
 
 ## [0.4.0]
 
+### Added
+
+* configuration options using --rest-http-timeout for setting request timeout during rest collection
+* DDC Linux is now embedded in the Windows and Mac versions of DDC, this means one less binary to move around
+
+### Fixed
+
+* gc logs now respect log age (default 7 days)
+* windows collection was broken with ddc, this is now fixed
+* executor capture was broken on ssh due to difference in argument parsing between k8s and ssh
+* sudo now is respected when copying files back and forth with ssh installs
+
 ### Changed
 
 * removed ginkgo for testing, this should make contributions easier
+* logs are much less chatty in the console, they are still busy in the logs
+* default ddc.yaml is much less noisy and busy
+* updated code samples in cli
 
 ## [0.3.2]
 
