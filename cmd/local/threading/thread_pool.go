@@ -23,29 +23,33 @@ import (
 )
 
 type ThreadPool struct {
-	wg            sync.WaitGroup
-	numberThreads int
-	jobs          chan func() error
-	pendingJobs   int
-	mut           sync.Mutex
+	wg               sync.WaitGroup
+	numberThreads    int
+	jobs             chan func() error
+	pendingJobs      int
+	totalJobs        int
+	loggingFrequency int
+	mut              sync.Mutex
 }
 
-func NewThreadPool(numberThreads int) *ThreadPool {
+func NewThreadPool(numberThreads int, loggingFrequency int) *ThreadPool {
 	//by default support 4 million jobs
 	jobs := make(chan func() error, 4000000)
 
 	return &ThreadPool{
-		numberThreads: numberThreads,
-		jobs:          jobs,
+		numberThreads:    numberThreads,
+		jobs:             jobs,
+		loggingFrequency: loggingFrequency,
 	}
 }
 
-func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int) *ThreadPool {
+func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency int) *ThreadPool {
 	jobs := make(chan func() error, jobQueueSize)
 
 	return &ThreadPool{
-		numberThreads: numberThreads,
-		jobs:          jobs,
+		numberThreads:    numberThreads,
+		jobs:             jobs,
+		loggingFrequency: loggingFrequency,
 	}
 }
 
@@ -53,6 +57,7 @@ func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int) *ThreadPool {
 func (t *ThreadPool) AddJob(job func() error) {
 	t.mut.Lock()
 	t.pendingJobs++
+	t.totalJobs++
 	t.mut.Unlock()
 	t.wg.Add(1)
 	t.jobs <- job
@@ -64,10 +69,13 @@ func (t *ThreadPool) worker() {
 		go func(j func() error) {
 			err := j()
 			if err != nil {
-				simplelog.Infof("Failed to execute job: %v", err)
+				simplelog.Debugf("Failed to execute job: %v", err)
 			}
 			t.mut.Lock()
 			t.pendingJobs--
+			if t.pendingJobs%t.loggingFrequency == 0 {
+				simplelog.Infof("%v/%v tasks completed", t.totalJobs-t.pendingJobs, t.totalJobs)
+			}
 			t.mut.Unlock()
 			t.wg.Done()
 		}(job)
@@ -89,6 +97,10 @@ func (t *ThreadPool) ProcessAndWait() error {
 	//then wait for them
 	t.wg.Wait()
 	close(t.jobs)
+	t.mut.Lock()
+	simplelog.Infof("%v/%v tasks completed", t.totalJobs, t.totalJobs)
+	t.totalJobs = 0
+	t.mut.Unlock()
 	return nil
 }
 

@@ -22,7 +22,7 @@ import (
 )
 
 func ValidateAPICredentials(c *conf.CollectConf) error {
-	simplelog.Info("Validating REST API user credentials...")
+	simplelog.Debugf("Validating REST API user credentials...")
 	url := c.DremioEndpoint() + "/apiv2/login"
 	headers := map[string]string{"Content-Type": "application/json"}
 	_, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)

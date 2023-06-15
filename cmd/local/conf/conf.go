@@ -142,12 +142,12 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 
 	supportedExtensions := []string{"yaml", "json", "toml", "hcl", "env", "props"}
 	foundConfig := ParseConfig(configDir, viper.SupportedExts, overrides)
-	simplelog.Info("logging parsed configuration from ddc.yaml")
+	simplelog.Debugf("logging parsed configuration from ddc.yaml")
 	for k, v := range viper.AllSettings() {
 		if k == KeyDremioPatToken && v != "" {
-			simplelog.Infof("conf key '%v':'REDACTED'", k)
+			simplelog.Debugf("conf key '%v':'REDACTED'", k)
 		} else {
-			simplelog.Infof("conf key '%v':'%v'", k, v)
+			simplelog.Debugf("conf key '%v':'%v'", k, v)
 		}
 	}
 	// now we can setup verbosity as we are parsing it in the ParseConfig function
@@ -167,7 +167,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	if foundConfig == "" {
 		simplelog.Warningf("was unable to read any of the valid config file formats (%v) due to error '%v' - falling back to defaults, command line flags and environment variables", strings.Join(supportedExtensions, ","), c.unableToReadConfigError)
 	} else {
-		simplelog.Infof("found config file %v", foundConfig)
+		simplelog.Debugf("found config file %v", foundConfig)
 	}
 	c.acceptCollectionConsent = viper.GetBool(KeyAcceptCollectionConsent)
 	c.collectAccelerationLogs = viper.GetBool(KeyCollectAccelerationLog)
@@ -189,14 +189,14 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 			} else {
 				// ok so looks like we need to adjust this since the node name is not already in the path
 				c.dremioLogDir = path.Join(c.dremioLogDir, "executor", c.nodeName)
-				simplelog.Infof("AWSE detected adding the node name %v to the log directory path %v", c.nodeName, c.dremioLogDir)
+				simplelog.Debugf("AWSE detected adding the node name %v to the log directory path %v", c.nodeName, c.dremioLogDir)
 			}
 		} else {
 			if strings.Contains(c.dremioLogDir, "coordinator") {
 				simplelog.Warningf("coordinator already included in log directory of %v make this is intentional as you do not need to put the coordinator in the log path", c.dremioLogDir)
 			} else {
 				c.dremioLogDir = path.Join(c.dremioLogDir, "coordinator")
-				simplelog.Infof("AWSE coordinator node detected adding coordinator name to log dir %v", c.dremioLogDir)
+				simplelog.Debugf("AWSE coordinator node detected adding coordinator name to log dir %v", c.dremioLogDir)
 			}
 		}
 	}
@@ -234,7 +234,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	}
 	if parsedGCLogDir != "" {
 		if c.gcLogsDir == "" {
-			simplelog.Infof("setting gc logs to %v", parsedGCLogDir)
+			simplelog.Debugf("setting gc logs to %v", parsedGCLogDir)
 		} else {
 			simplelog.Warningf("overriding gc logs location from %v to %v due to detection of gclog directory", c.gcLogsDir, parsedGCLogDir)
 		}
@@ -250,9 +250,11 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.dremioJStackFreqSeconds = viper.GetInt(KeyDremioJStackFreqSeconds)
 
 	// collect rest apis
-	personalAccessTokenPresent := c.dremioPATToken != ""
+	personalAccessTokenPresent := c.DremioPATToken() != ""
 	if !personalAccessTokenPresent {
 		simplelog.Warningf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+	} else {
+		simplelog.Errorf("--dremio-pat-token is set to %q", c.DremioPATToken())
 	}
 	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent

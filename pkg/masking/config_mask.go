@@ -76,7 +76,7 @@ func maskConfigSecret(line string) string {
 func RemoveSecretsFromDremioConf(configFile string) error {
 	// Check if the input file is a Dremio configuration file
 	if strings.HasSuffix(configFile, "dremio.conf") {
-		simplelog.Infof("... Removing potential secrets from %s\n", configFile)
+		simplelog.Debugf("... Removing potential secrets from %s\n", configFile)
 
 		// Open the file. Clean the configFile path before opening to remove any relative or redundant path elements.
 		// If there is an issue opening the file, an error is returned.

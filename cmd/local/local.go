@@ -89,7 +89,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		fmt.Printf("unable to create directories due to error %v\n", err)
 		os.Exit(1)
 	}
-	t := threading.NewThreadPool(numberThreads)
+	t := threading.NewThreadPool(numberThreads, 1)
 	wrapConfigJob := func(j func(c *conf.CollectConf) error) func() error {
 		return func() error { return j(c) }
 	}
@@ -98,37 +98,37 @@ func collect(numberThreads int, c *conf.CollectConf) {
 
 	// os diagnostic collection
 	if !c.CollectNodeMetrics() {
-		simplelog.Info("Skipping Collecting Node Metrics...")
+		simplelog.Debugf("Skipping node metrics collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectNodeMetrics))
 	}
 
 	if !c.CollectJFR() {
-		simplelog.Info("skipping Collection of Java Flight Recorder Information")
+		simplelog.Debugf("Skipping Java Flight Recorder collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectJFR))
 	}
 
 	if !c.CollectJStack() {
-		simplelog.Info("skipping Collection of java thread dumps")
+		simplelog.Debugf("Skipping Java thread dumps collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectJStacks))
 	}
 
 	if !c.CaptureHeapDump() {
-		simplelog.Info("skipping Capture of Java Heap Dump")
+		simplelog.Debugf("Skipping Java heap dump collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectHeapDump))
 	}
 
 	if !c.CollectDiskUsage() {
-		simplelog.Infof("Skipping Collect Disk Usage from %v ...", c.NodeName())
+		simplelog.Info("Skipping disk usage collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectDiskUsage))
 	}
 
 	if !c.CollectDremioConfiguration() {
-		simplelog.Infof("Skipping Dremio config from %v ...", c.NodeName())
+		simplelog.Info("Skipping Dremio config collection")
 	} else {
 		t.AddJob(wrapConfigJob(runCollectDremioConfig))
 	}
@@ -147,7 +147,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	)
 
 	if !c.CollectQueriesJSON() && c.NumberJobProfilesToCollect() == 0 {
-		simplelog.Info("Skipping Collect Queries JSON ...")
+		simplelog.Debug("Skipping queries.json collection")
 	} else {
 		if !c.CollectQueriesJSON() {
 			simplelog.Warning("NOT Skipping collection of Queries JSON, because --number-job-profiles is greater than 0 and job profile download requires queries.json ...")
@@ -156,37 +156,37 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	}
 
 	if !c.CollectServerLogs() {
-		simplelog.Info("Skipping Collect Server Logs  ...")
+		simplelog.Debug("Skipping server log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectDremioServerLog)
 	}
 
 	if !c.CollectGCLogs() {
-		simplelog.Info("Skipping Collect Garbage Collection Logs  ...")
+		simplelog.Debug("Skipping gc log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectGcLogs)
 	}
 
 	if !c.CollectMetaRefreshLogs() {
-		simplelog.Info("Skipping Collect Metadata Refresh Logs  ...")
+		simplelog.Debug("Skipping metadata refresh log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectMetadataRefreshLogs)
 	}
 
 	if !c.CollectReflectionLogs() {
-		simplelog.Info("Skipping Collect Reflection Logs  ...")
+		simplelog.Debug("Skipping reflection log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectReflectionLogs)
 	}
 
 	if !c.CollectAccelerationLogs() {
-		simplelog.Info("Skipping Collect Acceleration Logs  ...")
+		simplelog.Debug("Skipping acceleration log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectAccelerationLogs)
 	}
 
 	if !c.CollectAccessLogs() {
-		simplelog.Info("Skipping Collect Access Logs  ...")
+		simplelog.Debug("Skipping access log collection")
 	} else {
 		t.AddJob(logCollector.RunCollectDremioAccessLogs)
 	}
@@ -196,19 +196,19 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	// rest call collections
 
 	if !c.CollectKVStoreReport() {
-		simplelog.Info("skipping Capture of KV Store Report")
+		simplelog.Debug("Skipping KV store report collection")
 	} else {
 		t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
 	}
 
 	if !c.CollectWLM() {
-		simplelog.Info("skipping Capture of Workload Manager Report")
+		simplelog.Debug("Skipping Workload Manager report collection")
 	} else {
 		t.AddJob(wrapConfigJob(apicollect.RunCollectWLM))
 	}
 
 	if !c.CollectSystemTablesExport() {
-		simplelog.Info("Skipping Collect of Export System Tables...")
+		simplelog.Debug("Skipping system tables collection")
 	} else {
 		t.AddJob(wrapConfigJob(apicollect.RunCollectDremioSystemTables))
 	}
@@ -219,7 +219,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 
 	//we wait on the thread pool to empty out as this is also multithreaded and takes the longest
 	if c.NumberJobProfilesToCollect() == 0 {
-		simplelog.Info("Skipping Collect of Job Profiles...")
+		simplelog.Debugf("Skipping job profiles collection")
 	} else {
 		if err := apicollect.RunCollectJobProfiles(c); err != nil {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
@@ -262,13 +262,13 @@ func runCollectDiskUsage(c *conf.CollectConf) error {
 		}
 
 	}
-	simplelog.Infof("... Collecting Disk Usage from %v COMPLETED", c.NodeName())
+	simplelog.Debugf("... Collecting Disk Usage from %v COMPLETED", c.NodeName())
 
 	return nil
 }
 
 func runCollectOSConfig(c *conf.CollectConf) error {
-	simplelog.Infof("Collecting OS Information from %v ...", c.NodeName())
+	simplelog.Debug("Collecting OS Information")
 	osInfoFile := path.Join(c.NodeInfoOutDir(), "os_info.txt")
 	w, err := os.Create(path.Clean(osInfoFile))
 	if err != nil {
@@ -304,21 +304,21 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write uname -r for os_info.txt due to error %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> lsb_release -a\n"))
+	_, err = w.Write([]byte("___\n>>> cat /etc/issue\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write lsb_release -r header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write cat /etc/issue header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "lsb_release -a")
+	err = ddcio.Shell(w, "cat /etc/issue")
 	if err != nil {
-		simplelog.Warningf("unable to write lsb_release -a for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write /etc/issue for os_info.txt due to error %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> hostnamectl\n"))
+	_, err = w.Write([]byte("___\n>>> hostname\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write hostnamectl for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "hostnamectl")
+	err = ddcio.Shell(w, "hostname")
 	if err != nil {
-		simplelog.Warningf("unable to write hostnamectl for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> cat /proc/meminfo\n"))
 	if err != nil {
@@ -337,19 +337,19 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		simplelog.Warningf("unable to write lscpu for os_info.txt due to error %v", err)
 	}
 
-	simplelog.Infof("... Collecting OS Information from %v COMPLETED", c.NodeName())
+	simplelog.Debugf("... Collecting OS Information from %v COMPLETED", c.NodeName())
 	return nil
 }
 
 func runCollectDremioConfig(c *conf.CollectConf) error {
-	simplelog.Infof("Collecting Configuration Information from %v ...", c.NodeName())
+	simplelog.Debugf("Collecting Configuration Information from %v ...", c.NodeName())
 
 	dremioConfDest := filepath.Join(c.ConfigurationOutDir(), "dremio.conf")
 	err := ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "dremio.conf"), dremioConfDest)
 	if err != nil {
 		simplelog.Warningf("unable to copy dremio.conf due to error %v", err)
 	}
-	simplelog.Info("masking passwords in dremio.conf")
+	simplelog.Debugf("masking passwords in dremio.conf")
 	if err := masking.RemoveSecretsFromDremioConf(dremioConfDest); err != nil {
 		simplelog.Warningf("UNABLE TO MASK SECRETS in dremio.conf due to error %v", err)
 	}
@@ -365,13 +365,12 @@ func runCollectDremioConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to copy logback-access.xml due to error %v", err)
 	}
-	simplelog.Infof("... Collecting Configuration Information from %v COMPLETED", c.NodeName())
+	simplelog.Debugf("... Collecting Configuration Information from %v COMPLETED", c.NodeName())
 
 	return nil
 }
 
 func runCollectJvmConfig(c *conf.CollectConf) error {
-	simplelog.Warning("You may have to run the following command 'jcmd 1 VM.flags' as 'sudo' and specify '-u dremio' when running on Dremio AWSE or VM deployments")
 	jvmSettingsFile := path.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
 	jvmSettingsFileWriter, err := os.Create(path.Clean(jvmSettingsFile))
 	if err != nil {
@@ -394,7 +393,7 @@ func runCollectJvmConfig(c *conf.CollectConf) error {
 }
 
 func runCollectNodeMetrics(c *conf.CollectConf) error {
-	simplelog.Infof("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
+	simplelog.Debugf("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
 	nodeMetricsFile := path.Join(c.NodeInfoOutDir(), "metrics.txt")
 	nodeMetricsJSONFile := path.Join(c.NodeInfoOutDir(), "metrics.json")
 	return nodeinfocollect.SystemMetrics(c.NodeMetricsCollectDurationSeconds(), path.Clean(nodeMetricsFile), path.Clean(nodeMetricsJSONFile))
@@ -413,7 +412,7 @@ func runCollectJFR(c *conf.CollectConf) error {
 	simplelog.Debugf("node: %v - jfr start output - %v", c.NodeName(), w.String())
 	time.Sleep(time.Duration(c.DremioJFRTimeSeconds()) * time.Second)
 	// do not "optimize". the recording first needs to be stopped for all processes before collecting the data.
-	simplelog.Infof("... stopping JFR %v", c.NodeName())
+	simplelog.Debugf("... stopping JFR %v", c.NodeName())
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.dump name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
 		return fmt.Errorf("unable to dump JFR due to error %v", err)
@@ -429,10 +428,10 @@ func runCollectJFR(c *conf.CollectConf) error {
 }
 
 func runCollectJStacks(c *conf.CollectConf) error {
-	simplelog.Info("Collecting GC logs ...")
+	simplelog.Debug("Collecting GC logs ...")
 	threadDumpFreq := c.DremioJStackFreqSeconds()
 	iterations := c.DremioJStackTimeSeconds() / threadDumpFreq
-	simplelog.Infof("Running Java thread dumps every %v second(s) for a total of %v iterations ...", threadDumpFreq, iterations)
+	simplelog.Debugf("Running Java thread dumps every %v second(s) for a total of %v iterations ...", threadDumpFreq, iterations)
 	for i := 0; i < iterations; i++ {
 		var w bytes.Buffer
 		if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v Thread.print -l", c.DremioPID())); err != nil {
@@ -443,15 +442,15 @@ func runCollectJStacks(c *conf.CollectConf) error {
 		if err := os.WriteFile(path.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
 			return fmt.Errorf("unable to write thread dump %v due to error %v", threadDumpFileName, err)
 		}
-		simplelog.Infof("Saved %v", threadDumpFileName)
-		simplelog.Infof("Waiting %v second(s) ...", threadDumpFreq)
+		simplelog.Debugf("Saved %v", threadDumpFileName)
+		simplelog.Debugf("Waiting %v second(s) ...", threadDumpFreq)
 		time.Sleep(time.Duration(threadDumpFreq) * time.Second)
 	}
 	return nil
 }
 
 func runCollectHeapDump(c *conf.CollectConf) error {
-	simplelog.Info("Capturing Java Heap Dump")
+	simplelog.Debug("Capturing Java Heap Dump")
 	dremioPID := c.DremioPID()
 	baseName := fmt.Sprintf("%v.hprof", c.NodeName())
 	hprofFile := fmt.Sprintf("/tmp/%v.hprof", baseName)
@@ -466,7 +465,7 @@ func runCollectHeapDump(c *conf.CollectConf) error {
 	if err := ddcio.Shell(&w, fmt.Sprintf("jmap -dump:format=b,file=%v %v", hprofFile, dremioPID)); err != nil {
 		return fmt.Errorf("unable to capture heap dump %v", err)
 	}
-	simplelog.Infof("heap dump output %v", w.String())
+	simplelog.Debugf("heap dump output %v", w.String())
 	if err := ddcio.GzipFile(hprofFile, hprofGzFile); err != nil {
 		return fmt.Errorf("unable to gzip heap dump file")
 	}
@@ -535,7 +534,7 @@ var LocalCollectCmd = &cobra.Command{
 			}
 		}
 		tarballName := c.OutputDir() + c.NodeName() + ".tar.gz"
-		simplelog.Infof("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
+		simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
 		if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
 			simplelog.Errorf("unable to compress archive exiting due to error %v", err)
 			os.Exit(1)

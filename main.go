@@ -24,7 +24,7 @@ import (
 
 func main() {
 	//initial logger before verbosity is parsed
-	simplelog.InitLogger(3)
+	simplelog.InitLogger(2)
 	defer func() {
 		if err := simplelog.Close(); err != nil {
 			log.Printf("unable to close log due to error %v", err)

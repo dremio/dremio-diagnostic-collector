@@ -35,7 +35,7 @@ func ParseConfig(configDir string, supportedExtensions []string, overrides map[s
 		confFiles = append(confFiles, fmt.Sprintf("%v.%v", baseConfig, e))
 	}
 
-	simplelog.Infof("searching in directory %v for the following: %v", configDir, strings.Join(confFiles, ", "))
+	simplelog.Debugf("searching in directory %v for the following: %v", configDir, strings.Join(confFiles, ", "))
 	//searching for all known
 	for _, ext := range supportedExtensions {
 		viper.SetConfigType(ext)
@@ -49,7 +49,12 @@ func ParseConfig(configDir string, supportedExtensions []string, overrides map[s
 	viper.AutomaticEnv() // Automatically read environment variables
 
 	for k, v := range overrides {
-		viper.Set(k, v)
+		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
+		if v.Value.String() == "\"\"" {
+			viper.Set(k, "")
+		} else {
+			viper.Set(k, v.Value.String())
+		}
 	}
 	return
 }

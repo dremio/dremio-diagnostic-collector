@@ -47,26 +47,26 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	queriesrows := queriesjson.CollectQueriesJSON(queriesjsons)
 	profilesToCollect := map[string]string{}
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowPlanning", c.JobProfilesNumSlowPlanning())
+	simplelog.Debugf("searching queries.json for %v of jobProfilesNumSlowPlanning", c.JobProfilesNumSlowPlanning())
 	slowplanqueriesrows := queriesjson.GetSlowPlanningJobs(queriesrows, c.JobProfilesNumSlowPlanning())
 	queriesjson.AddRowsToSet(slowplanqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowExec", c.JobProfilesNumSlowExec())
+	simplelog.Debugf("searching queries.json for %v of jobProfilesNumSlowExec", c.JobProfilesNumSlowExec())
 	slowexecqueriesrows := queriesjson.GetSlowExecJobs(queriesrows, c.JobProfilesNumSlowExec())
 	queriesjson.AddRowsToSet(slowexecqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for profiles %v of jobProfilesNumHighQueryCost", c.JobProfilesNumHighQueryCost())
+	simplelog.Debugf("searching queries.json for profiles %v of jobProfilesNumHighQueryCost", c.JobProfilesNumHighQueryCost())
 	highcostqueriesrows := queriesjson.GetHighCostJobs(queriesrows, c.JobProfilesNumHighQueryCost())
 	queriesjson.AddRowsToSet(highcostqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumRecentErrors", c.JobProfilesNumRecentErrors())
+	simplelog.Debugf("searching queries.json for %v of jobProfilesNumRecentErrors", c.JobProfilesNumRecentErrors())
 	errorqueriesrows := queriesjson.GetRecentErrorJobs(queriesrows, c.JobProfilesNumRecentErrors())
 	queriesjson.AddRowsToSet(errorqueriesrows, profilesToCollect)
 
 	tried = len(profilesToCollect)
 	if len(profilesToCollect) > 0 {
-		simplelog.Infof("Downloading %v job profiles...", len(profilesToCollect))
-		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect))
+		simplelog.Debugf("Downloading %v job profiles...", len(profilesToCollect))
+		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100)
 		for key := range profilesToCollect {
 			//because we are looping
 			keyToDownload := key
@@ -98,7 +98,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	if err != nil {
 		return err
 	}
-	simplelog.Infof("After eliminating duplicates we are tried to collect %v profiles", tried)
+	simplelog.Debugf("After eliminating duplicates we are tried to collect %v profiles", tried)
 	simplelog.Infof("Downloaded %v job profiles", collected)
 	return nil
 }
