@@ -84,7 +84,10 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	stdErrScanner := bufio.NewScanner(stderr)
 
 	startScan := make(chan struct{})
-
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -112,11 +115,6 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 		}
 		wg.Done()
 	}()
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
-	}
 
 	// Signal the goroutines to start scanning
 	close(startScan)
