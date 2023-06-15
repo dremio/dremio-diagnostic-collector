@@ -70,7 +70,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			simplelog.Infof("successfully copied ddc to host %v", host)
 		}
 		//make  exec /tmp/ddc/
-		if out, err := ComposeExecuteNoSudo(conf, []string{"chmod", "+x", pathToDDC}); err != nil {
+		if out, err := ComposeExecute(conf, []string{"chmod", "+x", pathToDDC}); err != nil {
 			simplelog.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 			return
 		}
