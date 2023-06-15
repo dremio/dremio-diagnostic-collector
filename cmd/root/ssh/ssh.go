@@ -59,8 +59,8 @@ func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destinatio
 func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
 	var args []string
 	sourceFile := filepath.Base(source)
-	if tmpDir == "" {
-		tmpDir = "/tmp/" + uuid.NewString()
+	if !strings.Contains(tmpDir, hostName) {
+		tmpDir = path.Join("/tmp/", hostName, uuid.NewString())
 		args = []string{"mkdir", "-p", tmpDir}
 		c.HostExecuteSudo(hostName, sudoUser, args...)
 	}
@@ -85,8 +85,8 @@ func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination 
 func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
 	var args []string
 	sourceFile := filepath.Base(source)
-	if tmpDir == "" {
-		tmpDir = "/tmp/" + uuid.NewString()
+	if !strings.Contains(tmpDir, hostName) {
+		tmpDir = path.Join("/tmp/", hostName, uuid.NewString())
 		args = []string{"mkdir", "-p", tmpDir}
 		c.HostExecute(hostName, false, args...)
 	}
