@@ -58,7 +58,12 @@ func InitLogger(level int) {
 }
 
 func Close() error {
-	logger.Info("Close called on log")
+	logger.Debug("Close called on log")
+	logger.debugLogger = log.New(io.Discard, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.infoLogger = log.New(io.Discard, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.warningLogger = log.New(io.Discard, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.errorLogger = log.New(io.Discard, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	logger.hostLog = log.New(io.Discard, "", 0)
 	if err := ddcLog.Close(); err != nil {
 		return fmt.Errorf("unable to close ddc.log with error %v", err)
 	}
@@ -76,7 +81,10 @@ func newLogger(level int) *Logger {
 		adjustedLevel = 3
 	}
 
-	debugOut, infoOut, warningOut, errorOut := io.Discard, io.Discard, io.Discard, io.Discard
+	var debugOut io.Writer
+	var infoOut io.Writer
+	var warningOut io.Writer
+	var errorOut io.Writer
 	ddcLoc, err := os.Executable()
 	if err != nil {
 		log.Fatalf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
@@ -107,6 +115,7 @@ func newLogger(level int) *Logger {
 	}
 	internalDebug(adjustedLevel, fmt.Sprintf("initialized log with level %v", stringLevelText))
 
+	debugOut, infoOut, warningOut, errorOut = ddcLog, ddcLog, ddcLog, ddcLog
 	//set logger levels because we rely on fall through we cannot use the above switch easily
 	switch adjustedLevel {
 	case LevelDebug:

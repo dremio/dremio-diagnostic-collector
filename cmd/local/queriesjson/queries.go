@@ -245,7 +245,7 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 
 	queriesrows := []QueriesRow{}
 	for _, queriesjson := range queriesjsons {
-		simplelog.Infof("Attempting to open queries.json file %v", queriesjson)
+		simplelog.Debugf("Attempting to open queries.json file %v", queriesjson)
 		rows := []QueriesRow{}
 		var err error
 
@@ -268,7 +268,7 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 		}
 		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", queriesjson)
 	}
-	simplelog.Infof("Collected a total of %v rows of queries.json", len(queriesrows))
+	simplelog.Debugf("Collected a total of %v rows of queries.json", len(queriesrows))
 	return queriesrows
 }
 

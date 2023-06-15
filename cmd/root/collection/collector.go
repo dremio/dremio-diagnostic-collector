@@ -206,17 +206,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		return err
 	}
 	if len(tarballs) > 0 {
-		simplelog.Infof("extracting the following tarballs %v", strings.Join(tarballs, ", "))
+		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {
-			simplelog.Infof("extracting %v to %v", t, s.GetTmpDir())
+			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDir())
 			if err := ExtractTarGz(t, s.GetTmpDir()); err != nil {
 				simplelog.Errorf("unable to extract tarball %v due to error %v", t, err)
 			}
-			simplelog.Infof("extracted %v", t)
+			simplelog.Debugf("extracted %v", t)
 			if err := os.Remove(t); err != nil {
 				simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)
 			}
-			simplelog.Infof("removed %v", t)
+			simplelog.Debugf("removed %v", t)
 		}
 	}
 	// archives the collected files
@@ -294,7 +294,7 @@ func ExtractTarGz(gzFilePath, dest string) error {
 }
 
 func FindTarGzFiles(rootDir string) ([]string, error) {
-	simplelog.Infof("looking in %v for tar.gz files", rootDir)
+	simplelog.Debugf("looking in %v for tar.gz files", rootDir)
 	var files []string
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

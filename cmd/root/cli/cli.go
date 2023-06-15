@@ -64,7 +64,7 @@ type Cli struct {
 // be returned as an error from this function.
 func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string) error {
 	// Log the command that's about to be run
-	simplelog.Infof("args: %v\n", strings.Join(args, " "))
+	simplelog.Debugf("args: %v\n", strings.Join(args, " "))
 
 	// Create the command based on the passed arguments
 	cmd := exec.Command(args[0], args[1:]...)
@@ -134,7 +134,7 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 }
 
 func (c *Cli) Execute(args ...string) (string, error) {
-	simplelog.Infof("args: %v", strings.Join(args, " "))
+	simplelog.Debugf("args: %v", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()
@@ -145,7 +145,7 @@ func (c *Cli) Execute(args ...string) (string, error) {
 }
 
 func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {
-	simplelog.Infof("args: %v", strings.Join(args, " "))
+	simplelog.Debugf("args: %v", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()
