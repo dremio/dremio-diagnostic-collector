@@ -110,7 +110,7 @@ func downloadSysTable(c *conf.CollectConf, systable string, rowlimit int, sleepm
 	}
 	jobstateurl := joburl + jobid
 	jobstate := "RUNNING"
-	for jobstate != "FAILED" && jobstate != "CANCELED" && jobstate != "CANCELLATION_REQUESTED" && jobstate != "INVALID_STATE" {
+	for jobstate != "COMPLETED" && jobstate != "FAILED" && jobstate != "CANCELED" && jobstate != "CANCELLATION_REQUESTED" && jobstate != "INVALID_STATE" {
 		time.Sleep(time.Duration(sleepms) * time.Millisecond)
 		body, err := restclient.APIRequest(jobstateurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {

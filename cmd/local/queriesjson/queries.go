@@ -21,6 +21,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -83,6 +84,58 @@ type QueriesRow struct {
 	// IsTruncatedQueryText bool  `json:"isTruncatedQueryText"`
 }
 
+type HistoryJobs struct {
+	RowCount int   `json:"rowCount"`
+	Schema   []any `json:"schema"`
+	Rows     []Row `json:"rows"`
+}
+
+type Row struct {
+	JobID                       string  `json:"job_id"`
+	Status                      string  `json:"status"`
+	QueryType                   string  `json:"query_type"`
+	UserName                    string  `json:"user_name"`
+	QueriedDatasets             any     `json:"queried_datasets"`
+	ScannedDatasets             any     `json:"scanned_datasets"`
+	ExecutionCPUTimeNs          int     `json:"execution_cpu_time_ns"`
+	AttemptCount                int     `json:"attempt_count"`
+	SubmittedTs                 string  `json:"submitted_ts"`
+	AttemptStartedTs            string  `json:"attempt_started_ts"`
+	MetadataRetrievalTs         any     `json:"metadata_retrieval_ts"`
+	PlanningStartTs             any     `json:"planning_start_ts"`
+	QueryEnqueuedTs             any     `json:"query_enqueued_ts"`
+	EngineStartTs               any     `json:"engine_start_ts"`
+	ExecutionPlanningStartTs    any     `json:"execution_planning_start_ts"`
+	ExecutionStartTs            any     `json:"execution_start_ts"`
+	FinalStateTs                string  `json:"final_state_ts"`
+	SubmittedEpoch              int64   `json:"submitted_epoch"`
+	AttemptStartedEpoch         int64   `json:"attempt_started_epoch"`
+	MetadataRetrievalEpoch      int     `json:"metadata_retrieval_epoch"`
+	PlanningStartEpoch          int     `json:"planning_start_epoch"`
+	QueryEnqueuedEpoch          int     `json:"query_enqueued_epoch"`
+	EngineStartEpoch            int     `json:"engine_start_epoch"`
+	ExecutionPlanningStartEpoch int     `json:"execution_planning_start_epoch,omitempty"`
+	ExecutionStartEpoch         int     `json:"execution_start_epoch"`
+	FinalStateEpoch             int64   `json:"final_state_epoch"`
+	PlannerEstimatedCost        float64 `json:"planner_estimated_cost"`
+	RowsScanned                 int     `json:"rows_scanned"`
+	BytesScanned                int     `json:"bytes_scanned"`
+	RowsReturned                int     `json:"rows_returned"`
+	BytesReturned               int     `json:"bytes_returned"`
+	Accelerated                 bool    `json:"accelerated"`
+	QueueName                   any     `json:"queue_name"`
+	Engine                      any     `json:"engine"`
+	ExecutionNodes              any     `json:"execution_nodes"`
+	MemoryAvailable             int     `json:"memory_available"`
+	ErrorMsg                    string  `json:"error_msg"`
+	Query                       string  `json:"query"`
+	QueryChunks                 any     `json:"query_chunks"`
+	ReflectionMatches           any     `json:"reflection_matches"`
+	StartingTs                  any     `json:"starting_ts"`
+	StartingEpoch               int     `json:"starting_epoch"`
+	ExecutionPlanningStart      int64   `json:"execution_planning_start_,omitempty"`
+}
+
 func ReadGzFile(filename string) ([]QueriesRow, error) {
 	queriesrows := []QueriesRow{}
 	file, err := os.Open(path.Clean(filename))
@@ -137,9 +190,39 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 	return queriesrows, err
 }
 
-// func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
-// 	// TODO
-// }
+func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
+	queriesrows := []QueriesRow{}
+	file, err := os.Open(path.Clean(filename))
+	if err != nil {
+		simplelog.Errorf("can't open %v due to error %v", filename, err)
+		return queriesrows, err
+	}
+	defer errCheck(file.Close)
+
+	var bytedata []byte
+	bytedata, err = ioutil.ReadAll(file)
+	if err != nil {
+		simplelog.Errorf("can't read data of %v due to error %v", filename, err)
+		return queriesrows, err
+	}
+
+	var dat HistoryJobs
+	err = json.Unmarshal(bytedata, &dat)
+	if err != nil {
+		return queriesrows, fmt.Errorf("can't JSON unmarshall %v due to error %v", filename, err)
+	}
+	i := 0
+	for _, line := range dat.Rows {
+		row, err := parseLineDC(line, i)
+		if err != nil {
+			simplelog.Errorf("can't parse line %v from file %v due to error %v", row, filename, err)
+		} else {
+			queriesrows = append(queriesrows, row)
+		}
+		i++
+	}
+	return queriesrows, err
+}
 
 func parseLine(line string, i int) (QueriesRow, error) {
 	dat := make(map[string]interface{})
@@ -187,66 +270,17 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	return queriesrow, err
 }
 
-func parseLineDC(line string, i int) (QueriesRow, error) {
-	dat := make(map[string]interface{})
-	err := json.Unmarshal([]byte(line), &dat)
+func parseLineDC(line Row, i int) (QueriesRow, error) {
 	var row = new(QueriesRow)
-	if val, ok := dat["job_id"]; ok {
-		row.QueryID = val.(string)
-	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'job_id'")
-	}
-	if val, ok := dat["query_type"]; ok {
-		row.QueryType = val.(string)
-	} else {
-		simplelog.Warningf("missing field 'query_type'")
-	}
-	if val, ok := dat["planner_estimated_cost"]; ok {
-		row.QueryCost = val.(float64)
-	} else {
-		simplelog.Warningf("missing field 'planner_estimated_cost'")
-	}
-	var submitted_epoch float64
-	if val, ok := dat["submitted_epoch"]; ok {
-		submitted_epoch = val.(float64)
-		row.Start = val.(float64)
-	} else {
-		simplelog.Warningf("missing field 'submitted_epoch'")
-		submitted_epoch = -1
-	}
-	var execution_planning_start_epoch float64
-	if val, ok := dat["execution_planning_start_epoch"]; ok {
-		execution_planning_start_epoch = val.(float64)
-	} else {
-		simplelog.Warningf("missing field 'execution_planning_start_epoch'")
-		execution_planning_start_epoch = -1
-	}
-	var execution_start_epoch float64
-	if val, ok := dat["execution_start_epoch"]; ok {
-		execution_start_epoch = val.(float64)
-		if execution_planning_start_epoch > 0 {
-			row.ExecutionPlanningTime = execution_start_epoch - execution_planning_start_epoch
-		}
-	} else {
-		simplelog.Warningf("missing field 'execution_start_epoch'")
-	}
-	var final_state_epoch float64
-	if val, ok := dat["final_state_epoch"]; ok {
-		final_state_epoch = val.(float64)
-		if submitted_epoch > 0 {
-			row.RunningTime = final_state_epoch - submitted_epoch
-		}
-	} else {
-		simplelog.Warningf("missing field 'final_state_epoch'")
-	}
-
-	if val, ok := dat["status"]; ok {
-		row.Outcome = val.(string)
-	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'status'")
-	}
+	row.QueryID = line.JobID
+	row.QueryType = line.QueryType
+	row.QueryCost = line.PlannerEstimatedCost
+	row.Start = float64(line.SubmittedEpoch)
+	row.ExecutionPlanningTime = float64(line.ExecutionStartEpoch) - float64(line.ExecutionPlanningStartEpoch)
+	row.RunningTime = float64(line.FinalStateEpoch) - float64(line.SubmittedEpoch)
+	row.Outcome = line.Status
 	queriesrow := *row
-	return queriesrow, err
+	return queriesrow, nil
 }
 
 func GetRecentErrorJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
@@ -335,6 +369,25 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", queriesjson)
 	}
 	simplelog.Infof("Collected a total of %v rows of queries.json", len(queriesrows))
+	return queriesrows
+}
+
+func CollectJobHistoryJSON(jobhistoryjsons []string) []QueriesRow {
+
+	queriesrows := []QueriesRow{}
+	for _, jobhistoryjson := range jobhistoryjsons {
+		if strings.Contains(jobhistoryjson, "project.history.jobs") {
+			simplelog.Infof("Attempting to open json file %v", jobhistoryjson)
+			rows, err := ReadHistoryJobsJSONFile(jobhistoryjson)
+			if err != nil {
+				simplelog.Errorf("failed to parse json file %v due to error %v", jobhistoryjson, err)
+				continue
+			}
+			queriesrows = append(queriesrows, rows...)
+			log.Println("Found", strconv.Itoa(len(rows)), "new rows in", jobhistoryjson)
+		}
+	}
+	simplelog.Infof("Collected a total of %v rows of jobs history", len(queriesrows))
 	return queriesrows
 }
 

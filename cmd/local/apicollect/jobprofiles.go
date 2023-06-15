@@ -17,6 +17,7 @@ package apicollect
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,36 +31,57 @@ import (
 )
 
 func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
-	files, err := os.ReadDir(c.QueriesOutDir())
-	if err != nil {
-		return 0, 0, err
-	}
-	queriesjsons := []string{}
-	for _, file := range files {
-		queriesjsons = append(queriesjsons, path.Join(c.QueriesOutDir(), file.Name()))
+	var files []fs.DirEntry
+	var queriesrows []queriesjson.QueriesRow
+	if !c.IsDremioCloud() {
+		files, err = os.ReadDir(c.QueriesOutDir())
+		if err != nil {
+			return 0, 0, err
+		}
+		queriesjsons := []string{}
+		for _, file := range files {
+			queriesjsons = append(queriesjsons, path.Join(c.QueriesOutDir(), file.Name()))
+		}
+
+		if len(queriesjsons) == 0 {
+			simplelog.Warning("no queries.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
+			return
+		}
+
+		queriesrows = queriesjson.CollectQueriesJSON(queriesjsons)
+	} else {
+		files, err = os.ReadDir(c.SystemTablesOutDir())
+		if err != nil {
+			return 0, 0, err
+		}
+		jobhistoryjsons := []string{}
+		for _, file := range files {
+			jobhistoryjsons = append(jobhistoryjsons, path.Join(c.QueriesOutDir(), file.Name()))
+		}
+
+		if len(jobhistoryjsons) == 0 {
+			simplelog.Warning("no sys.project.history.jobs.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
+			return
+		}
+
+		queriesrows = queriesjson.CollectJobHistoryJSON(jobhistoryjsons)
 	}
 
-	if len(queriesjsons) == 0 {
-		simplelog.Warning("no queries.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
-		return
-	}
-
-	queriesrows := queriesjson.CollectQueriesJSON(queriesjsons)
 	profilesToCollect := map[string]string{}
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowPlanning", c.JobProfilesNumSlowPlanning())
+	simplelog.Infof("searching job history for %v of jobProfilesNumSlowPlanning", c.JobProfilesNumSlowPlanning())
 	slowplanqueriesrows := queriesjson.GetSlowPlanningJobs(queriesrows, c.JobProfilesNumSlowPlanning())
 	queriesjson.AddRowsToSet(slowplanqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumSlowExec", c.JobProfilesNumSlowExec())
+	simplelog.Infof("searching job history for %v of jobProfilesNumSlowExec", c.JobProfilesNumSlowExec())
 	slowexecqueriesrows := queriesjson.GetSlowExecJobs(queriesrows, c.JobProfilesNumSlowExec())
 	queriesjson.AddRowsToSet(slowexecqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for profiles %v of jobProfilesNumHighQueryCost", c.JobProfilesNumHighQueryCost())
+	simplelog.Infof("searching job history for profiles %v of jobProfilesNumHighQueryCost", c.JobProfilesNumHighQueryCost())
 	highcostqueriesrows := queriesjson.GetHighCostJobs(queriesrows, c.JobProfilesNumHighQueryCost())
 	queriesjson.AddRowsToSet(highcostqueriesrows, profilesToCollect)
 
-	simplelog.Infof("searching queries.json for %v of jobProfilesNumRecentErrors", c.JobProfilesNumRecentErrors())
+	simplelog.Infof("searching job history for %v of jobProfilesNumRecentErrors", c.JobProfilesNumRecentErrors())
 	errorqueriesrows := queriesjson.GetRecentErrorJobs(queriesrows, c.JobProfilesNumRecentErrors())
 	queriesjson.AddRowsToSet(errorqueriesrows, profilesToCollect)
 
@@ -71,7 +93,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			//because we are looping
 			keyToDownload := key
 			downloadThreadPool.AddJob(func() error {
-				err := DownloadJobProfile(c, keyToDownload)
+				err = DownloadJobProfile(c, keyToDownload)
 				if err != nil {
 					simplelog.Error(err.Error()) // Print instead of Error
 				}
@@ -79,7 +101,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			})
 			collected++
 		}
-		if err := downloadThreadPool.ProcessAndWait(); err != nil {
+		if err = downloadThreadPool.ProcessAndWait(); err != nil {
 			simplelog.Errorf("job profile download thread pool wait error %v", err)
 		}
 	} else {
@@ -104,7 +126,12 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 }
 
 func DownloadJobProfile(c *conf.CollectConf, jobid string) error {
-	apipath := "/apiv2/support/" + jobid + "/download"
+	var apipath string
+	if !c.IsDremioCloud() {
+		apipath = "/apiv2/support/" + jobid + "/download"
+	} else {
+		apipath = "/ui/projects/" + c.DremioCloudProjectID() + "/support/" + jobid + "/download"
+	}
 	filename := jobid + ".zip"
 	url := c.DremioEndpoint() + apipath
 	headers := map[string]string{"Accept": "application/octet-stream"}

@@ -241,74 +241,6 @@ func TestParseLine_ValidJsonWithMissingFields(t *testing.T) {
 	}
 }
 
-func TestParseLineDC(t *testing.T) {
-	s := "123"
-	actual, err := parseLineDC(s, 1)
-	if err == nil {
-		t.Errorf("There should be an error here")
-	}
-	expected := *new(QueriesRow)
-	if expected != actual {
-		t.Errorf("ERROR")
-	}
-}
-
-func TestParseLineDC_ValidJson(t *testing.T) {
-	s := `{
-		"job_id": "1d94df6c-b0a0-10cd-0c5b-6c8b96aff600",
-		"status": "COMPLETED",
-		"query_type": "METADATA_REFRESH",
-		"submitted_epoch": 			1651164694649000000,
-		"planning_start_epoch": 	1651164694715000000,
-		"query_enqueued_epoch": 	1651164694752000000,
-		"execution_planning_start_epoch": 1651164694758000000,
-		"execution_start_epoch": 	1651164694803000000,
-		"final_state_epoch": 		1651164695620000000,
-		"planner_estimated_cost": 15123.0
-	}`
-	actual, err := parseLineDC(s, 1)
-	if err != nil {
-		t.Errorf("There should not be an error here")
-	}
-	var expected = new(QueriesRow)
-	expected.QueryID = "1d94df6c-b0a0-10cd-0c5b-6c8b96aff600"
-	expected.QueryType = "METADATA_REFRESH"
-	expected.QueryCost = 15123
-	expected.ExecutionPlanningTime = 44999936 // Float rounding error
-	expected.RunningTime = 971000064          // Float rounding error
-	expected.Start = 1651164694649000000
-	expected.Outcome = "COMPLETED"
-	if *expected != actual {
-		t.Errorf("ERROR")
-	}
-}
-
-func TestParseLineDC_EmptyJson(t *testing.T) {
-	s := "{}"
-	actual, err := parseLineDC(s, 1)
-	if err == nil {
-		t.Errorf("There should be an error here")
-	}
-	expected := *new(QueriesRow)
-	if expected != actual {
-		t.Errorf("ERROR")
-	}
-}
-
-func TestParseLineDC_ValidJsonWithMissingFields(t *testing.T) {
-	s := `{
-		"queryId":"1b9b9629-8289-b46c-c765-455d24da7800"
-	}`
-	actual, err := parseLineDC(s, 1)
-	if err == nil {
-		t.Errorf("There should be an error here")
-	}
-	expected := *new(QueriesRow)
-	if expected != actual {
-		t.Errorf("ERROR")
-	}
-}
-
 func TestMin(t *testing.T) {
 	actual := min(1, 2)
 	expected := 1
@@ -351,6 +283,19 @@ func TestReadGzippedJSONFile(t *testing.T) {
 	}
 }
 
+func TestReadHistoryHobsJSONFile(t *testing.T) {
+	filename := "../../testdata/queries/sys.project.history.jobs.json"
+	actual, err := ReadHistoryJobsJSONFile(filename)
+	if err != nil {
+		t.Errorf("%v", err)
+		t.Errorf("There should not be an error here")
+	}
+	if len(actual) != 2 {
+		t.Errorf("%v", len(actual))
+		t.Errorf("The sys.project.history.jobs.json should produce 2 valid entries")
+	}
+}
+
 func TestCollectQueriesJSON(t *testing.T) {
 	queriesDir := "../../testdata/queries/"
 	files, err := os.ReadDir(queriesDir)
@@ -377,6 +322,36 @@ func TestCollectQueriesJSON(t *testing.T) {
 		t.Errorf("The profile ID is missing")
 	}
 	if _, ok := profilesToCollect["123456"]; !ok {
+		t.Errorf("The profile ID is missing")
+	}
+}
+
+func TestCollectJobHistoryJSON(t *testing.T) {
+	queriesDir := "../../testdata/queries/"
+	files, err := os.ReadDir(queriesDir)
+	if err != nil {
+		t.Errorf("There should not be an error here")
+	}
+	queriesjsons := []string{}
+	for _, file := range files {
+		queriesjsons = append(queriesjsons, path.Join(queriesDir, file.Name()))
+	}
+	numValidEntries := 2
+	queriesrows := CollectJobHistoryJSON(queriesjsons)
+	if len(queriesrows) != numValidEntries {
+		t.Errorf("The queries files in testdata should produce %v entries", numValidEntries)
+	}
+
+	// Testing AddRowsToSet with the data
+	profilesToCollect := map[string]string{}
+	AddRowsToSet(queriesrows, profilesToCollect)
+	if len(profilesToCollect) != numValidEntries {
+		t.Errorf("The profiles to collect should be %v entries", numValidEntries)
+	}
+	if _, ok := profilesToCollect["1c38de7b-1028-54d9-e238-87eae52bc200"]; !ok {
+		t.Errorf("The profile ID is missing")
+	}
+	if _, ok := profilesToCollect["1d956036-df02-a335-a573-c4b281926000"]; !ok {
 		t.Errorf("The profile ID is missing")
 	}
 }
