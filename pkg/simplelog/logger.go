@@ -41,6 +41,7 @@ type Logger struct {
 	infoLogger    *log.Logger
 	warningLogger *log.Logger
 	errorLogger   *log.Logger
+	hostLog       *log.Logger
 }
 
 func init() {
@@ -120,12 +121,14 @@ func newLogger(level int) *Logger {
 	case LevelError:
 		errorOut = io.MultiWriter(os.Stdout, ddcLog)
 	}
-
+	//always add this
+	hostOut := io.MultiWriter(os.Stdout, ddcLog)
 	return &Logger{
 		debugLogger:   log.New(debugOut, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
 		infoLogger:    log.New(infoOut, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),
 		warningLogger: log.New(warningOut, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile),
 		errorLogger:   log.New(errorOut, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
+		hostLog:       log.New(hostOut, "", 0),
 	}
 }
 
@@ -201,6 +204,11 @@ func Warningf(format string, v ...interface{}) {
 func Errorf(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	handleLogError(logger.errorLogger.Output(2, msg), msg, "ERRORF")
+}
+
+func HostLog(host, line string) {
+	msg := fmt.Sprintf("HOST %v - %v", host, line)
+	handleLogError(logger.hostLog.Output(2, msg), line, "HOSTLOG")
 }
 
 func handleLogError(err error, attemptedMsg, level string) {
