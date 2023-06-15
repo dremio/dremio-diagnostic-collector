@@ -45,6 +45,8 @@ type CollectConf struct {
 	collectAccessLogs          bool
 	captureHeapDump            bool
 	acceptCollectionConsent    bool
+	isDremioCloud              bool
+	dremioCloudProjectID       string
 
 	// advanced variables setable by configuration or environement variable
 	outputDir                         string
@@ -78,6 +80,7 @@ type CollectConf struct {
 
 	// variables
 	systemtables            []string
+	systemtablesdremiocloud []string
 	unableToReadConfigError error
 	dremioPID               int
 }
@@ -132,6 +135,21 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		"cache.objects",
 		"cache.storage_plugins",
 	}
+	c.systemtablesdremiocloud = []string{
+		"organization.clouds",
+		"organization.privileges",
+		"organization.projects",
+		"organization.roles",
+		"organization.usage",
+		"project.engines",
+		"project.jobs",
+		"project.privileges",
+		"project.reflections",
+		"project.\\\"tables\\\"",
+		"project.views",
+		// "project.history.events",
+		"project.history.jobs",
+	}
 	dremioPID, err := autodetect.GetDremioPID()
 	if err != nil {
 		simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
@@ -170,6 +188,8 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		simplelog.Infof("found config file %v", foundConfig)
 	}
 	c.acceptCollectionConsent = viper.GetBool(KeyAcceptCollectionConsent)
+	c.isDremioCloud = viper.GetBool(KeyIsDremioCloud)
+	c.dremioCloudProjectID = viper.GetString(KeyDremioCloudProjectID)
 	c.collectAccelerationLogs = viper.GetBool(KeyCollectAccelerationLog)
 	c.collectAccessLogs = viper.GetBool(KeyCollectAccessLog)
 	c.gcLogsDir = viper.GetString(KeyDremioGCLogsDir)
@@ -177,7 +197,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.nodeName = viper.GetString(KeyNodeName)
 	isAWSE, err := autodetect.IsAWSE()
 	if err != nil {
-		simplelog.Warningf("unable to determind if node is AWSE or not due to error %v", err)
+		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
 	}
 	if isAWSE {
 		isExec, err := autodetect.IsAWSEExecutor(c.nodeName)
@@ -324,6 +344,10 @@ func (c *CollectConf) Systemtables() []string {
 	return c.systemtables
 }
 
+func (c *CollectConf) SystemtablesDremioCloud() []string {
+	return c.systemtablesdremiocloud
+}
+
 func (c *CollectConf) CollectServerLogs() bool {
 	return c.collectServerLogs
 }
@@ -388,6 +412,14 @@ func (c *CollectConf) DremioPATToken() string {
 
 func (c *CollectConf) AcceptCollectionConsent() bool {
 	return c.acceptCollectionConsent
+}
+
+func (c *CollectConf) IsDremioCloud() bool {
+	return c.isDremioCloud
+}
+
+func (c *CollectConf) DremioCloudProjectID() string {
+	return c.dremioCloudProjectID
 }
 
 func (c *CollectConf) NodeName() string {

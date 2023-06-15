@@ -23,7 +23,12 @@ import (
 
 func ValidateAPICredentials(c *conf.CollectConf) error {
 	simplelog.Info("Validating REST API user credentials...")
-	url := c.DremioEndpoint() + "/apiv2/login"
+	var url string
+	if !c.IsDremioCloud() {
+		url = c.DremioEndpoint() + "/apiv2/login"
+	} else {
+		url = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID()
+	}
 	headers := map[string]string{"Content-Type": "application/json"}
 	_, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
 	return err

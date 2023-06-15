@@ -137,6 +137,10 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 	return queriesrows, err
 }
 
+// func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
+// 	// TODO
+// }
+
 func parseLine(line string, i int) (QueriesRow, error) {
 	dat := make(map[string]interface{})
 	err := json.Unmarshal([]byte(line), &dat)
@@ -178,6 +182,68 @@ func parseLine(line string, i int) (QueriesRow, error) {
 		row.Outcome = val.(string)
 	} else {
 		return *new(QueriesRow), fmt.Errorf("missing field 'outcome'")
+	}
+	queriesrow := *row
+	return queriesrow, err
+}
+
+func parseLineDC(line string, i int) (QueriesRow, error) {
+	dat := make(map[string]interface{})
+	err := json.Unmarshal([]byte(line), &dat)
+	var row = new(QueriesRow)
+	if val, ok := dat["job_id"]; ok {
+		row.QueryID = val.(string)
+	} else {
+		return *new(QueriesRow), fmt.Errorf("missing field 'job_id'")
+	}
+	if val, ok := dat["query_type"]; ok {
+		row.QueryType = val.(string)
+	} else {
+		simplelog.Warningf("missing field 'query_type'")
+	}
+	if val, ok := dat["planner_estimated_cost"]; ok {
+		row.QueryCost = val.(float64)
+	} else {
+		simplelog.Warningf("missing field 'planner_estimated_cost'")
+	}
+	var submitted_epoch float64
+	if val, ok := dat["submitted_epoch"]; ok {
+		submitted_epoch = val.(float64)
+		row.Start = val.(float64)
+	} else {
+		simplelog.Warningf("missing field 'submitted_epoch'")
+		submitted_epoch = -1
+	}
+	var execution_planning_start_epoch float64
+	if val, ok := dat["execution_planning_start_epoch"]; ok {
+		execution_planning_start_epoch = val.(float64)
+	} else {
+		simplelog.Warningf("missing field 'execution_planning_start_epoch'")
+		execution_planning_start_epoch = -1
+	}
+	var execution_start_epoch float64
+	if val, ok := dat["execution_start_epoch"]; ok {
+		execution_start_epoch = val.(float64)
+		if execution_planning_start_epoch > 0 {
+			row.ExecutionPlanningTime = execution_start_epoch - execution_planning_start_epoch
+		}
+	} else {
+		simplelog.Warningf("missing field 'execution_start_epoch'")
+	}
+	var final_state_epoch float64
+	if val, ok := dat["final_state_epoch"]; ok {
+		final_state_epoch = val.(float64)
+		if submitted_epoch > 0 {
+			row.RunningTime = final_state_epoch - submitted_epoch
+		}
+	} else {
+		simplelog.Warningf("missing field 'final_state_epoch'")
+	}
+
+	if val, ok := dat["status"]; ok {
+		row.Outcome = val.(string)
+	} else {
+		return *new(QueriesRow), fmt.Errorf("missing field 'status'")
 	}
 	queriesrow := *row
 	return queriesrow, err

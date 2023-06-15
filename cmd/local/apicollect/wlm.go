@@ -45,9 +45,17 @@ func RunCollectWLM(c *conf.CollectConf) error {
 	}
 
 	// Define the API objects (queues and rules) to be fetched
-	apiobjects := [][]string{
-		{"/api/v3/wlm/queue", "queues.json"},
-		{"/api/v3/wlm/rule", "rules.json"},
+	var apiobjects [][]string
+	if !c.IsDremioCloud() {
+		apiobjects = [][]string{
+			{"/api/v3/wlm/queue", "queues.json"},
+			{"/api/v3/wlm/rule", "rules.json"},
+		}
+	} else {
+		apiobjects = [][]string{
+			{"/v0/projects/" + c.DremioCloudProjectID() + "/engines", "engines.json"},
+			{"/v0/projects/" + c.DremioCloudProjectID() + "/rules", "rules.json"},
+		}
 	}
 
 	// Iterate over each API object

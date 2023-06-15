@@ -1,0 +1,473 @@
+{
+    "rowCount": 2,
+    "schema": [
+        {
+            "name": "job_id",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "status",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "query_type",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "user_name",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "queried_datasets",
+            "type": {
+                "name": "LIST",
+                "subSchema": [
+                    {
+                        "type": {
+                            "name": "STRUCT",
+                            "subSchema": [
+                                {
+                                    "name": "name",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "type",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "scanned_datasets",
+            "type": {
+                "name": "LIST",
+                "subSchema": [
+                    {
+                        "type": {
+                            "name": "STRUCT",
+                            "subSchema": [
+                                {
+                                    "name": "name",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "type",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "execution_cpu_time_ns",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "attempt_count",
+            "type": {
+                "name": "INTEGER"
+            }
+        },
+        {
+            "name": "submitted_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "attempt_started_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "metadata_retrieval_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "planning_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "query_enqueued_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "engine_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "execution_planning_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "execution_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "final_state_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "submitted_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "attempt_started_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "metadata_retrieval_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "planning_start_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "query_enqueued_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "engine_start_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "execution_planning_start_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "execution_start_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "final_state_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "planner_estimated_cost",
+            "type": {
+                "name": "DOUBLE"
+            }
+        },
+        {
+            "name": "rows_scanned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "bytes_scanned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "rows_returned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "bytes_returned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "accelerated",
+            "type": {
+                "name": "BOOLEAN"
+            }
+        },
+        {
+            "name": "queue_name",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "engine",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "execution_nodes",
+            "type": {
+                "name": "LIST",
+                "subSchema": [
+                    {
+                        "type": {
+                            "name": "STRUCT",
+                            "subSchema": [
+                                {
+                                    "name": "node_id",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "hostname",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "max_mem_used",
+                                    "type": {
+                                        "name": "BIGINT"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "memory_available",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "error_msg",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "query",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "query_chunks",
+            "type": {
+                "name": "LIST",
+                "subSchema": [
+                    {
+                        "type": {
+                            "name": "VARCHAR"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "reflection_matches",
+            "type": {
+                "name": "LIST",
+                "subSchema": [
+                    {
+                        "type": {
+                            "name": "STRUCT",
+                            "subSchema": [
+                                {
+                                    "name": "reflection_id",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "reflection_type",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "dataset_id",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "dataset_name",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "materialization_id",
+                                    "type": {
+                                        "name": "VARCHAR"
+                                    }
+                                },
+                                {
+                                    "name": "chosen",
+                                    "type": {
+                                        "name": "BOOLEAN"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "starting_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "starting_epoch",
+            "type": {
+                "name": "BIGINT"
+            }
+        }
+    ],
+    "rows": [
+        {
+            "job_id": "1c38de7b-1028-54d9-e238-87eae52bc200",
+            "status": "FAILED",
+            "query_type": "METADATA_REFRESH",
+            "user_name": "$dremio$",
+            "queried_datasets": null,
+            "scanned_datasets": null,
+            "execution_cpu_time_ns": 0,
+            "attempt_count": 1,
+            "submitted_ts": "2023-01-17 22:30:28.723",
+            "attempt_started_ts": "2023-01-17 22:30:28.723",
+            "metadata_retrieval_ts": null,
+            "planning_start_ts": null,
+            "query_enqueued_ts": null,
+            "engine_start_ts": null,
+            "execution_planning_start_ts": null,
+            "execution_start_ts": null,
+            "final_state_ts": "2023-01-17 22:30:28.825",
+            "submitted_epoch": 1673994628723000000,
+            "attempt_started_epoch": 1673994628723000000,
+            "metadata_retrieval_epoch": 0,
+            "planning_start_epoch": 0,
+            "query_enqueued_epoch": 0,
+            "engine_start_epoch": 0,
+            "execution_planning_start_epoch": 0,
+            "execution_start_epoch": 0,
+            "final_state_epoch": 1673994628825000000,
+            "planner_estimated_cost": 0.0,
+            "rows_scanned": 0,
+            "bytes_scanned": 0,
+            "rows_returned": 0,
+            "bytes_returned": 0,
+            "accelerated": false,
+            "queue_name": null,
+            "engine": null,
+            "execution_nodes": null,
+            "memory_available": 0,
+            "error_msg": "The engine 'preview' has been disabled. Enable the engine under Project Settings > Engines, and then try again.",
+            "query": "REFRESH DATASET \"Samples\".\"samples.dremio.com\".\"NYC-taxi-trips\"",
+            "query_chunks": null,
+            "reflection_matches": null,
+            "starting_ts": null,
+            "starting_epoch": 0
+        },
+        {
+            "job_id": "1d956036-df02-a335-a573-c4b281926000",
+            "status": "COMPLETED",
+            "query_type": "UI_PREVIEW",
+            "user_name": "max.margalith@dremio.com",
+            "queried_datasets": [
+                {
+                    "name": "\"max-margalith-test-s3\".\"eks-test\".\"userdata1.csv\"",
+                    "type": "PHYSICAL_DATASET_SOURCE_FILE"
+                }
+            ],
+            "scanned_datasets": null,
+            "execution_cpu_time_ns": 0,
+            "attempt_count": 1,
+            "submitted_ts": "2022-04-28 14:08:08.669",
+            "attempt_started_ts": "2022-04-28 14:08:08.669",
+            "metadata_retrieval_ts": null,
+            "planning_start_ts": "2022-04-28 14:08:08.791",
+            "query_enqueued_ts": "2022-04-28 14:08:09.658",
+            "engine_start_ts": null,
+            "execution_planning_start_ts": "2022-04-28 14:08:09.696",
+            "execution_start_ts": "2022-04-28 14:08:10.181",
+            "final_state_ts": "2022-04-28 14:08:10.542",
+            "submitted_epoch": 1651154888669000000,
+            "attempt_started_epoch": 1651154888669000000,
+            "metadata_retrieval_epoch": 0,
+            "planning_start_epoch": 1651154888791000000,
+            "query_enqueued_epoch": 1651154889658000000,
+            "engine_start_epoch": 0,
+            "execution_planning_start_epoch": 1651154889696000000,
+            "execution_start_epoch": 1651154890181000000,
+            "final_state_epoch": 1651154890542000000,
+            "planner_estimated_cost": 1070000.0,
+            "rows_scanned": 0,
+            "bytes_scanned": 0,
+            "rows_returned": 0,
+            "bytes_returned": 0,
+            "accelerated": false,
+            "queue_name": "SMALL",
+            "engine": "preview",
+            "execution_nodes": null,
+            "memory_available": 0,
+            "error_msg": null,
+            "query": "SELECT * FROM \"userdata1.csv\"",
+            "query_chunks": null,
+            "reflection_matches": null,
+            "starting_ts": null,
+            "starting_epoch": null
+        },
+    ]
+}

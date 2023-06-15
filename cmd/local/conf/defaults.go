@@ -56,6 +56,8 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyDremioGCLogsDir, "")
 	viper.SetDefault(KeyNodeName, hostName)
 	viper.SetDefault(KeyAcceptCollectionConsent, true)
+	viper.SetDefault(KeyIsDremioCloud, false)
+	viper.SetDefault(KeyDremioCloudProjectID, "")
 	viper.SetDefault(KeyAllowInsecureSSL, true)
 	viper.SetDefault(KeyRestHTTPTimeout, 30)
 

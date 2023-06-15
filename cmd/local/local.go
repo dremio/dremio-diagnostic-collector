@@ -45,32 +45,31 @@ import (
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
-	if err := os.MkdirAll(c.ConfigurationOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create configuration directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.JFROutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create jfr directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.ThreadDumpsOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create thread-dumps directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.HeapDumpsOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create heap-dumps directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.JobProfilesOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create job-profiles directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.KubernetesOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create kubernetes directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.KVstoreOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create kvstore directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.LogsOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create logs directory due to error %v", err)
-	}
-	if err := os.MkdirAll(c.NodeInfoOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create node-info directory due to error %v", err)
+	if !c.IsDremioCloud() {
+		if err := os.MkdirAll(c.ConfigurationOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create configuration directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.JFROutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create jfr directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.ThreadDumpsOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create thread-dumps directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.HeapDumpsOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create heap-dumps directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.KubernetesOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create kubernetes directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.KVstoreOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create kvstore directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.LogsOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create logs directory due to error %v", err)
+		}
+		if err := os.MkdirAll(c.NodeInfoOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create node-info directory due to error %v", err)
+		}
 	}
 	if err := os.MkdirAll(c.QueriesOutDir(), perms); err != nil {
 		return fmt.Errorf("unable to create queries directory due to error %v", err)
@@ -80,6 +79,9 @@ func createAllDirs(c *conf.CollectConf) error {
 	}
 	if err := os.MkdirAll(c.WLMOutDir(), perms); err != nil {
 		return fmt.Errorf("unable to create wlm directory due to error %v", err)
+	}
+	if err := os.MkdirAll(c.JobProfilesOutDir(), perms); err != nil {
+		return fmt.Errorf("unable to create job-profiles directory due to error %v", err)
 	}
 	return nil
 }
@@ -94,111 +96,113 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		return func() error { return j(c) }
 	}
 
-	//put all things that take time up front
+	if !c.IsDremioCloud() {
+		//put all things that take time up front
 
-	// os diagnostic collection
-	if !c.CollectNodeMetrics() {
-		simplelog.Info("Skipping Collecting Node Metrics...")
-	} else {
-		t.AddJob(wrapConfigJob(runCollectNodeMetrics))
-	}
-
-	if !c.CollectJFR() {
-		simplelog.Info("skipping Collection of Java Flight Recorder Information")
-	} else {
-		t.AddJob(wrapConfigJob(runCollectJFR))
-	}
-
-	if !c.CollectJStack() {
-		simplelog.Info("skipping Collection of java thread dumps")
-	} else {
-		t.AddJob(wrapConfigJob(runCollectJStacks))
-	}
-
-	if !c.CaptureHeapDump() {
-		simplelog.Info("skipping Capture of Java Heap Dump")
-	} else {
-		t.AddJob(wrapConfigJob(runCollectHeapDump))
-	}
-
-	if !c.CollectDiskUsage() {
-		simplelog.Infof("Skipping Collect Disk Usage from %v ...", c.NodeName())
-	} else {
-		t.AddJob(wrapConfigJob(runCollectDiskUsage))
-	}
-
-	if !c.CollectDremioConfiguration() {
-		simplelog.Infof("Skipping Dremio config from %v ...", c.NodeName())
-	} else {
-		t.AddJob(wrapConfigJob(runCollectDremioConfig))
-	}
-	t.AddJob(wrapConfigJob(runCollectOSConfig))
-
-	// log collection
-
-	logCollector := logcollect.NewLogCollector(
-		c.DremioLogDir(),
-		c.LogsOutDir(),
-		c.GcLogsDir(),
-		c.DremioGCFilePattern(),
-		c.QueriesOutDir(),
-		c.DremioQueriesJSONNumDays(),
-		c.DremioLogsNumDays(),
-	)
-
-	if !c.CollectQueriesJSON() && c.NumberJobProfilesToCollect() == 0 {
-		simplelog.Info("Skipping Collect Queries JSON ...")
-	} else {
-		if !c.CollectQueriesJSON() {
-			simplelog.Warning("NOT Skipping collection of Queries JSON, because --number-job-profiles is greater than 0 and job profile download requires queries.json ...")
+		// os diagnostic collection
+		if !c.CollectNodeMetrics() {
+			simplelog.Info("Skipping Collecting Node Metrics...")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
 		}
-		t.AddJob(logCollector.RunCollectQueriesJSON)
-	}
 
-	if !c.CollectServerLogs() {
-		simplelog.Info("Skipping Collect Server Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectDremioServerLog)
-	}
+		if !c.CollectJFR() {
+			simplelog.Info("skipping Collection of Java Flight Recorder Information")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJFR))
+		}
 
-	if !c.CollectGCLogs() {
-		simplelog.Info("Skipping Collect Garbage Collection Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectGcLogs)
-	}
+		if !c.CollectJStack() {
+			simplelog.Info("skipping Collection of java thread dumps")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJStacks))
+		}
 
-	if !c.CollectMetaRefreshLogs() {
-		simplelog.Info("Skipping Collect Metadata Refresh Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectMetadataRefreshLogs)
-	}
+		if !c.CaptureHeapDump() {
+			simplelog.Info("skipping Capture of Java Heap Dump")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectHeapDump))
+		}
 
-	if !c.CollectReflectionLogs() {
-		simplelog.Info("Skipping Collect Reflection Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectReflectionLogs)
-	}
+		if !c.CollectDiskUsage() {
+			simplelog.Infof("Skipping Collect Disk Usage from %v ...", c.NodeName())
+		} else {
+			t.AddJob(wrapConfigJob(runCollectDiskUsage))
+		}
 
-	if !c.CollectAccelerationLogs() {
-		simplelog.Info("Skipping Collect Acceleration Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectAccelerationLogs)
-	}
+		if !c.CollectDremioConfiguration() {
+			simplelog.Infof("Skipping Dremio config from %v ...", c.NodeName())
+		} else {
+			t.AddJob(wrapConfigJob(runCollectDremioConfig))
+		}
+		t.AddJob(wrapConfigJob(runCollectOSConfig))
 
-	if !c.CollectAccessLogs() {
-		simplelog.Info("Skipping Collect Access Logs  ...")
-	} else {
-		t.AddJob(logCollector.RunCollectDremioAccessLogs)
-	}
+		// log collection
 
-	t.AddJob(wrapConfigJob(runCollectJvmConfig))
+		logCollector := logcollect.NewLogCollector(
+			c.DremioLogDir(),
+			c.LogsOutDir(),
+			c.GcLogsDir(),
+			c.DremioGCFilePattern(),
+			c.QueriesOutDir(),
+			c.DremioQueriesJSONNumDays(),
+			c.DremioLogsNumDays(),
+		)
 
-	// rest call collections
+		if !c.CollectQueriesJSON() && c.NumberJobProfilesToCollect() == 0 {
+			simplelog.Info("Skipping Collect Queries JSON ...")
+		} else {
+			if !c.CollectQueriesJSON() {
+				simplelog.Warning("NOT Skipping collection of Queries JSON, because --number-job-profiles is greater than 0 and job profile download requires queries.json ...")
+			}
+			t.AddJob(logCollector.RunCollectQueriesJSON)
+		}
 
-	if !c.CollectKVStoreReport() {
-		simplelog.Info("skipping Capture of KV Store Report")
-	} else {
-		t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
+		if !c.CollectServerLogs() {
+			simplelog.Info("Skipping Collect Server Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectDremioServerLog)
+		}
+
+		if !c.CollectGCLogs() {
+			simplelog.Info("Skipping Collect Garbage Collection Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectGcLogs)
+		}
+
+		if !c.CollectMetaRefreshLogs() {
+			simplelog.Info("Skipping Collect Metadata Refresh Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectMetadataRefreshLogs)
+		}
+
+		if !c.CollectReflectionLogs() {
+			simplelog.Info("Skipping Collect Reflection Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectReflectionLogs)
+		}
+
+		if !c.CollectAccelerationLogs() {
+			simplelog.Info("Skipping Collect Acceleration Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectAccelerationLogs)
+		}
+
+		if !c.CollectAccessLogs() {
+			simplelog.Info("Skipping Collect Access Logs  ...")
+		} else {
+			t.AddJob(logCollector.RunCollectDremioAccessLogs)
+		}
+
+		t.AddJob(wrapConfigJob(runCollectJvmConfig))
+
+		// rest call collections
+
+		if !c.CollectKVStoreReport() {
+			simplelog.Info("skipping Capture of KV Store Report")
+		} else {
+			t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
+		}
 	}
 
 	if !c.CollectWLM() {
@@ -218,13 +222,13 @@ func collect(numberThreads int, c *conf.CollectConf) {
 	}
 
 	//we wait on the thread pool to empty out as this is also multithreaded and takes the longest
-	if c.NumberJobProfilesToCollect() == 0 {
-		simplelog.Info("Skipping Collect of Job Profiles...")
-	} else {
-		if err := apicollect.RunCollectJobProfiles(c); err != nil {
-			simplelog.Errorf("during job profile collection there was an error: %v", err)
-		}
-	}
+	// if c.NumberJobProfilesToCollect() == 0 {
+	// 	simplelog.Info("Skipping Collect of Job Profiles...")
+	// } else {
+	// 	if err := apicollect.RunCollectJobProfiles(c); err != nil {
+	// 		simplelog.Errorf("during job profile collection there was an error: %v", err)
+	// 	}
+	// }
 }
 
 func runCollectDiskUsage(c *conf.CollectConf) error {

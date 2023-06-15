@@ -51,6 +51,8 @@ const (
 	KeyDremioGCLogsDir                   = "dremio-gclogs-dir"
 	KeyNodeName                          = "node-name"
 	KeyAcceptCollectionConsent           = "accept-collection-consent"
+	KeyIsDremioCloud                     = "is-dremio-cloud"
+	KeyDremioCloudProjectID              = "dremio-cloud-project-id"
 	KeyAllowInsecureSSL                  = "allow-insecure-ssl"
 	KeyJobProfilesNumHighQueryCost       = "job-profiles-num-high-query-cost"
 	KeyJobProfilesNumSlowExec            = "job-profiles-num-slow-exec"
