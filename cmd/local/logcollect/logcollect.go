@@ -81,6 +81,8 @@ func (l *Collector) RunCollectGcLogs() error {
 	if err != nil {
 		return fmt.Errorf("error reading directory: %w", err)
 	}
+	now := time.Now()
+	logAgeLimit := now.AddDate(0, 0, -l.dremioLogsNumDays)
 	var errs []error
 	for _, file := range files {
 		if file.IsDir() {
@@ -92,9 +94,19 @@ func (l *Collector) RunCollectGcLogs() error {
 		}
 		if matched {
 			srcPath := filepath.Join(l.gcLogsDir, file.Name())
+			f, err := os.Stat(srcPath)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("while getting file info for %v there was an error: %v", srcPath, err))
+				continue
+			}
+			if f.ModTime().Before(logAgeLimit) {
+				simplelog.Debugf("skipping file %v due to having mode time of %v when logage is %v and current time of collection at %v resulting in all logs being skipped older than %v", srcPath, f.ModTime(), l.dremioLogsNumDays, now, logAgeLimit)
+				continue
+			}
 			destPath := filepath.Join(l.logsOutDir, file.Name())
 			if err := ddcio.CopyFile(path.Clean(srcPath), path.Clean(destPath)); err != nil {
 				errs = append(errs, fmt.Errorf("error copying file %s: %w", file.Name(), err))
+				continue
 			}
 			simplelog.Debugf("Copied file %s to %s", srcPath, destPath)
 		}
