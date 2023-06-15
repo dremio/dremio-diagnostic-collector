@@ -18,12 +18,13 @@ import (
 	"github.com/spf13/viper"
 )
 
-func SetViperDefaults(defaultThreads int, hostName string, defaultCaptureSeconds int, outputDir string) {
+func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir string) {
 	// set default config
+	viper.SetDefault(KeyVerbose, "vv")
 	viper.SetDefault(KeyCollectAccelerationLog, false)
 	viper.SetDefault(KeyCollectAccessLog, false)
 	viper.SetDefault(KeyDremioLogDir, "/var/log/dremio")
-	viper.SetDefault(KeyNumberThreads, defaultThreads)
+	viper.SetDefault(KeyNumberThreads, 2)
 	viper.SetDefault(KeyDremioUsername, "dremio")
 	viper.SetDefault(KeyDremioPatToken, "")
 	viper.SetDefault(KeyDremioConfDir, "/opt/dremio/conf")
@@ -55,6 +56,7 @@ func SetViperDefaults(defaultThreads int, hostName string, defaultCaptureSeconds
 	viper.SetDefault(KeyDremioGCLogsDir, "")
 	viper.SetDefault(KeyNodeName, hostName)
 	viper.SetDefault(KeyAcceptCollectionConsent, true)
-	viper.SetDefault(KeyAllowInsecureSSL, false)
+	viper.SetDefault(KeyAllowInsecureSSL, true)
 	viper.SetDefault(KeyRestHTTPTimeout, 30)
+
 }

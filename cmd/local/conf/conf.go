@@ -97,14 +97,13 @@ func ReadConfFromExecLocation(overrides map[string]*pflag.Flag) (*CollectConf, e
 }
 
 func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf, error) {
-	defaultThreads := autodetect.GetThreads()
 	defaultCaptureSeconds := 60
 	// set node name
 	hostName, err := os.Hostname()
 	if err != nil {
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
-	SetViperDefaults(defaultThreads, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
+	SetViperDefaults(hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
 
 	c := &CollectConf{}
 	c.systemtables = []string{

@@ -849,8 +849,55 @@ func TestLogCollect_WhenQueriesJsonIsMissing(t *testing.T) {
 	}
 }
 
+func TestLogCollect_WhenGCLogsArePresentAndSomeHaveModTimeMoreThanLogDays(t *testing.T) {
+	destinationDir, _ := setupEnv()
+	gcLogFromToday := "gc.0.log"
+	currentTime := time.Now()
+
+	err := os.Chtimes(filepath.Join(testGCLogsDir, gcLogFromToday), currentTime, currentTime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcLogFromYesterday := "gc.1.log"
+	yesterday := currentTime.AddDate(0, 0, -1)
+	err = os.Chtimes(filepath.Join(testGCLogsDir, gcLogFromYesterday), yesterday, yesterday)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcLogFromLastWeek := "gc.2.log"
+	lastWeek := currentTime.AddDate(0, 0, -7)
+	err = os.Chtimes(filepath.Join(testGCLogsDir, gcLogFromLastWeek), lastWeek, lastWeek)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = logCollector.RunCollectGcLogs()
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	defer cleanUp(destinationDir)
+	defer AfterEachLogCollectTest()
+	assertFileCopied := func(gclog string) {
+		actual := filepath.Join(destinationDir, gclog)
+		expected := filepath.Join(testGCLogsDir, gclog)
+		if match, err := tests.MatchFile(expected, actual); !match && err != nil {
+			t.Errorf("expected %v file content does not match file content of %v, error report was :%v", expected, actual, err)
+		}
+	}
+
+	assertFileCopied(gcLogFromToday)
+	assertFileCopied(gcLogFromYesterday)
+
+	_, err = os.Stat(filepath.Join(destinationDir, gcLogFromLastWeek))
+	// we are assuming an error also means not copied even though in theory it could
+	// we should still fail the test as we don't have a clear ideal of the state of the system
+	fileNotCopied := err != nil
+	if !fileNotCopied {
+		t.Errorf("was expecting file %v to not be copied but it was despite being too old", gcLogFromLastWeek)
+	}
+}
+
 func TestLogCollect_WhenGCLogsArePresentAndThereAreMoreThanOne(t *testing.T) {
-	var err error
 	var destinationDir string
 	//It("should collect all gc logs as gzips", func() {
 	tests.Tree(destinationDir)
@@ -859,6 +906,14 @@ func TestLogCollect_WhenGCLogsArePresentAndThereAreMoreThanOne(t *testing.T) {
 	for _, gclog := range gclogs {
 		t.Run("Test GCLog "+gclog, func(t *testing.T) {
 			destinationDir, _ = setupEnv()
+			//update mod time of each
+			expected := filepath.Join(testGCLogsDir, gclog)
+			currentTime := time.Now()
+			// Change both the access time and the modification time to current time
+			err := os.Chtimes(expected, currentTime, currentTime)
+			if err != nil {
+				log.Fatal(err)
+			}
 			err = logCollector.RunCollectGcLogs()
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
@@ -866,7 +921,6 @@ func TestLogCollect_WhenGCLogsArePresentAndThereAreMoreThanOne(t *testing.T) {
 			defer cleanUp(destinationDir)
 			defer AfterEachLogCollectTest()
 			actual := filepath.Join(destinationDir, gclog)
-			expected := filepath.Join(testGCLogsDir, gclog)
 			if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 				t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 			}

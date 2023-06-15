@@ -1,16 +1,20 @@
-verbose: vv
-collect-acceleration-log: false
-collect-access-log: false
-dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir
+
+# please set these to match your environment
 dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
 dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
-number-threads: 2 #number of threads to use for collection
-dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use for collecting Workload Manager, KV Report and Job Profiles
-dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
-dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
-collect-dremio-configuration: true # will collect dremio.conf, dremio-env, logback.xml and logback-access.xml
-number-job-profiles: 25000 # up to this number, may have less due to duplicates NOTE: need to have the dremio-pat-token set to work
-capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
-accept-collection-consent: true # when true you accept consent to collect data on each node, if false collection will fail
-allow-insecure-ssl: true # when true skip the ssl cert check when doing API calls
+
+# these are optional
+# dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use for collecting Workload Manager, KV Report and Job Profiles
+# dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
+# dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
+# dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir
+# verbose: vv
+# collect-acceleration-log: false
+# collect-access-log: false
+# collect-dremio-configuration: true # will collect dremio.conf, dremio-env, logback.xml and logback-access.xml
+# number-job-profiles: 25000 # up to this number, may have less due to duplicates NOTE: need to have the dremio-pat-token set to work
+# capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
+# accept-collection-consent: true # when true you accept consent to collect data on each node, if false collection will fail
+# allow-insecure-ssl: true # when true skip the ssl cert check when doing API calls
+# number-threads: 2 #number of threads to use for collection

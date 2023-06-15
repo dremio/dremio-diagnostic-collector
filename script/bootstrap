@@ -7,6 +7,12 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+cd ./server-install
+wget https://download.dremio.com/community-server/24.0.0-202302100528110223-3a169b7c/dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
+tar -zx --strip-components 1 -f  dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
+rm dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
+cd ..
+
 echo "Checking if license-header-checker is installed"
 date "+%H:%M:%S"
 
