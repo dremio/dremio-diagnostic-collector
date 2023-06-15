@@ -90,7 +90,8 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "")
 	}
 	if err := ComposeExecuteAndStream(conf, func(line string) {
-		fmt.Printf("HOST %v - %v\n", host, line)
+		simplelog.HostLog(host, line)
+		//fmt.Printf("HOST %v - %v", host, line)
 	}, localCollectArgs); err != nil {
 		simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
 		//return
@@ -121,7 +122,8 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			destFile := filepath.Join(outDir, filepath.Base(sourceFile))
 			simplelog.Infof("found %v for copying to %v", sourceFile, destFile)
 			//but we want to use path.join here because otherwise it will be wrong for linux servers
-			if out, err := ComposeCopy(conf, path.Join(ddcTmpDir, sourceFile), destFile); err != nil {
+			//note also we do not care about sudo when copying back the archive
+			if out, err := ComposeCopyNoSudo(conf, path.Join(ddcTmpDir, sourceFile), destFile); err != nil {
 				failedFiles = append(failedFiles, FailedFiles{
 					Path: destFile,
 					Err:  err,

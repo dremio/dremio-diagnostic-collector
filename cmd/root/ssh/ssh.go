@@ -17,9 +17,13 @@ package ssh
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/google/uuid"
 )
 
 func NewCmdSSHActions(sshKey, sshUser string) *CmdSSHActions {
@@ -50,21 +54,72 @@ func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destinatio
 	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
 }
 
-func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, _, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
+func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+	sourceFileName := filepath.Base(source)
+	// create a tmp dir for scp
+	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
+	_, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
+	if err != nil {
+		return "", err
+	}
+	// cleanup the tmp dir
+	defer func() {
+		_, err = c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		if err != nil {
+			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
+		}
+	}()
+	// first move to tmp dir from source as sudo
+	tmpFilePath := path.Join(tmpDir, sourceFileName)
+	_, err = c.HostExecuteSudo(hostName, sudoUser, "cp", source, tmpFilePath)
+	if err != nil {
+		return "", err
+	}
+	// next copy from tmp dir as non-sudo
+	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpFilePath, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
 func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination string) (string, error) {
 	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
-func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, _, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+	sourceFileName := filepath.Base(source)
+	// create a tmp dir for scp
+	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
+	_, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
+	if err != nil {
+		return "", err
+	}
+	// cleanup the tmp dir
+	defer func() {
+		_, err = c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
+		if err != nil {
+			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
+		}
+	}()
+	tmpFilePath := path.Join(tmpDir, sourceFileName)
+	// first copy to tmp dir as non-sudo
+	_, err = c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
+	if err != nil {
+		return "", err
+	}
+	// next move from tmp dir to destination as sudo
+	return c.HostExecuteSudo(hostName, sudoUser, "cp", tmpFilePath, destination)
 }
 
 func (c *CmdSSHActions) HostExecute(hostName string, _ bool, args ...string) (string, error) {
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
+	sshArgs = append(sshArgs, strings.Join(args, " "))
+	return c.cli.Execute(sshArgs...)
+}
+
+func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args ...string) (string, error) {
+	sudoArgs := []string{"sudo", "-u", sudoUser}
+	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
+	sshArgs = append(sshArgs, strings.Join(sudoArgs, " "))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
 	return c.cli.Execute(sshArgs...)
 }
