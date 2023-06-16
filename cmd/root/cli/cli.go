@@ -113,13 +113,13 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 		wg.Done()
 	}()
 
-	// Wait for the command to finish
+	//wait for the wait group too so that we can finish writing the text
+	wg.Wait()
+	// Wait for the command to finish apparently should be called AFTER the capturing is done.
+	//this seems counterintuitive to me but we will go with it
 	if err := cmd.Wait(); err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
-
-	//wait for the wait group too so that we can finish writing the text
-	wg.Wait()
 
 	// If there was no error, return nil
 	return nil

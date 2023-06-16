@@ -4,7 +4,7 @@ dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
 dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
 
-# these are optional
+## these are optional
 # dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use for collecting Workload Manager, KV Report and Job Profiles
 # dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
 # dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
@@ -18,3 +18,34 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # accept-collection-consent: true # when true you accept consent to collect data on each node, if false collection will fail
 # allow-insecure-ssl: true # when true skip the ssl cert check when doing API calls
 # number-threads: 2 #number of threads to use for collection
+
+## not typically recommended to change
+# rest-http-timeout: 30
+# collect-metrics: true
+# collect-disk-usage: true
+# dremio-logs-num-days: 7
+# dremio-queries-json-num-days: 28
+# dremio-gc-file-pattern: "gc*.log*"
+# collect-queries-json: true
+# collect-server-logs; true
+# collect-meta-refresh-log: true
+# collect-reflection-log: true
+# collect-gc-logs: true
+# collect-jfr: true
+# collect-jstack: true
+# collect-system-tables-export: true
+# collect-wlm: true
+# collect-kvstore-report: true
+# dremio-jstack-time-seconds: 60
+# dremio-jfr-time-seconds: 60
+# node-metrics-collect-duration-seconds: 60
+# dremio-jstack-freq-seconds: 1
+# node-name: "" //dynamically set normally
+# is-dremio-cloud: false
+# dremio-cloud-project-id: ""
+# allow-insecure-ssl: true
+# job-profiles-num-high-query-cost: 5000 // dynamically set
+# job-profiles-num-slow-exec: 10000 // dynamically set
+# job-profiles-num-recent-errors: 5000 // dynamically set
+# job-profiles-num-slow-planning: 5000 // dynamically set
+# tmp-output-dir: "" # dynamically set normally, avoid using
