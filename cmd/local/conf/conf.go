@@ -47,6 +47,7 @@ type CollectConf struct {
 	acceptCollectionConsent    bool
 	isDremioCloud              bool
 	dremioCloudProjectID       string
+	dremioCloudAppEndpoint     string
 
 	// advanced variables setable by configuration or environement variable
 	outputDir                         string
@@ -72,6 +73,7 @@ type CollectConf struct {
 	collectDremioConfiguration        bool
 	collectReflectionLogs             bool
 	collectSystemTablesExport         bool
+	systemTablesRowLimit              int
 	collectDiskUsage                  bool
 	collectGCLogs                     bool
 	collectWLM                        bool
@@ -227,7 +229,13 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		if len(c.dremioCloudProjectID) != 36 {
 			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the following provided id may be incorrect: %v", c.dremioCloudProjectID)
 		}
-		if c.dremioEndpoint != "https://app.dremio.cloud" && c.dremioEndpoint != "https://app.eu.dremio.cloud" {
+		if strings.Contains(c.dremioEndpoint, "eu.dremio.cloud") {
+			c.dremioEndpoint = "https://api.eu.dremio.cloud"
+			c.dremioCloudAppEndpoint = "https://app.eu.dremio.cloud"
+		} else if strings.Contains(c.dremioEndpoint, "dremio.cloud") {
+			c.dremioEndpoint = "https://api.dremio.cloud"
+			c.dremioCloudAppEndpoint = "https://app.dremio.cloud"
+		} else {
 			simplelog.Warningf("unexpected dremio cloud endpoint: %v - Known endpoints are https://app.dremio.cloud and https://app.eu.dremio.cloud", c.dremioEndpoint)
 		}
 	}
@@ -285,6 +293,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
 	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && personalAccessTokenPresent
+	c.systemTablesRowLimit = viper.GetInt(KeySystemTablesRowLimit)
 	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && personalAccessTokenPresent
 	c.restHTTPTimeout = viper.GetInt(KeyRestHTTPTimeout)
 	restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
@@ -342,6 +351,10 @@ func (c *CollectConf) CollectDremioConfiguration() bool {
 
 func (c *CollectConf) CollectSystemTablesExport() bool {
 	return c.collectSystemTablesExport
+}
+
+func (c *CollectConf) SystemTablesRowLimit() int {
+	return c.systemTablesRowLimit
 }
 
 func (c *CollectConf) CollectKVStoreReport() bool {
@@ -428,6 +441,10 @@ func (c *CollectConf) IsDremioCloud() bool {
 
 func (c *CollectConf) DremioCloudProjectID() string {
 	return c.dremioCloudProjectID
+}
+
+func (c *CollectConf) DremioCloudAppEndpoint() string {
+	return c.dremioCloudAppEndpoint
 }
 
 func (c *CollectConf) NodeName() string {

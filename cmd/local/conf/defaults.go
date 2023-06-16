@@ -47,6 +47,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyCollectJFR, true)
 	viper.SetDefault(KeyCollectJStack, true)
 	viper.SetDefault(KeyCollectSystemTablesExport, true)
+	viper.SetDefault(KeySystemTablesRowLimit, 100000)
 	viper.SetDefault(KeyCollectWLM, true)
 	viper.SetDefault(KeyCollectKVStoreReport, true)
 	viper.SetDefault(KeyDremioJStackTimeSeconds, defaultCaptureSeconds)
@@ -58,6 +59,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyAcceptCollectionConsent, true)
 	viper.SetDefault(KeyIsDremioCloud, false)
 	viper.SetDefault(KeyDremioCloudProjectID, "")
+	viper.SetDefault(KeyDremioCloudAppEndpoint, "")
 	viper.SetDefault(KeyAllowInsecureSSL, true)
 	viper.SetDefault(KeyRestHTTPTimeout, 30)
 

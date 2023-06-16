@@ -69,9 +69,7 @@ func APIRequest(url string, pat string, request string, headers map[string]strin
 	return body, nil
 }
 
-func PostQuery(url string, pat string, headers map[string]string, systable string) (string, error) {
-	simplelog.Debugf("Collecting sys." + systable)
-	sqlbody := "{\"sql\": \"SELECT * FROM sys." + systable + "\"}"
+func PostQuery(url string, pat string, headers map[string]string, sqlbody string) (string, error) {
 
 	req, err := http.NewRequest("POST", url, strings.NewReader(sqlbody))
 	if err != nil {

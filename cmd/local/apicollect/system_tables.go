@@ -57,7 +57,8 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 }
 
 func downloadSysTable(c *conf.CollectConf, systable string) error {
-	// TODO: Need to implement paging of sys table results
+	tablerowlimit := strconv.Itoa(c.SystemTablesRowLimit())
+
 	headers := map[string]string{"Content-Type": "application/json"}
 	var joburl, sqlurl, jobresultsurl string
 	if !c.IsDremioCloud() {
@@ -68,7 +69,17 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 		joburl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/job/"
 	}
 
-	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, systable)
+	simplelog.Debugf("Collecting sys." + systable + " (Limit: " + tablerowlimit + " rows)")
+	sql := "SELECT * FROM sys." + systable
+	if strings.Contains(systable, "project.history.jobs") {
+		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + strconv.Itoa(c.DremioQueriesJSONNumDays()) + " AS INTERVAL DAY))"
+		sql += " ORDER BY submitted_ts DESC"
+	}
+	sql += " LIMIT " + tablerowlimit
+	simplelog.Debugf(sql)
+	sqlbody := "{\"sql\": \"" + sql + "\"}"
+
+	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, sqlbody)
 	if err != nil {
 		return err
 	}
@@ -88,7 +99,7 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 }
 
 func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]string) error {
-	sleepms := 100 // Consider moving to config
+	sleepms := 200 // Consider moving to config
 	jobstate := "RUNNING"
 	for jobstate != "COMPLETED" {
 		time.Sleep(time.Duration(sleepms) * time.Millisecond)
@@ -115,8 +126,8 @@ func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]s
 }
 
 func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[string]string, systable string) error {
-	apilimit := 500        // Consider moving to config
-	tablerowlimit := 10000 // Consider moving to config
+	apilimit := 500 // Consider moving to config
+	tablerowlimit := c.SystemTablesRowLimit()
 
 	offset := 0
 
