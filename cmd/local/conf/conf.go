@@ -252,9 +252,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	// collect rest apis
 	personalAccessTokenPresent := c.DremioPATToken() != ""
 	if !personalAccessTokenPresent {
-		simplelog.Warningf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
-	} else {
-		simplelog.Errorf("--dremio-pat-token is set to %q", c.DremioPATToken())
+		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
 	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
 	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
