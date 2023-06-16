@@ -223,6 +223,14 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.dremioConfDir = viper.GetString(KeyDremioConfDir)
 	c.numberThreads = viper.GetInt(KeyNumberThreads)
 	c.dremioEndpoint = viper.GetString(KeyDremioEndpoint)
+	if c.isDremioCloud {
+		if len(c.dremioCloudProjectID) != 36 {
+			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the following provided id may be incorrect: %v", c.dremioCloudProjectID)
+		}
+		if c.dremioEndpoint != "https://app.dremio.cloud" && c.dremioEndpoint != "https://app.eu.dremio.cloud" {
+			simplelog.Warningf("unexpected dremio cloud endpoint: %v - Known endpoints are https://app.dremio.cloud and https://app.eu.dremio.cloud", c.dremioEndpoint)
+		}
+	}
 	c.dremioUsername = viper.GetString(KeyDremioUsername)
 	c.dremioPATToken = viper.GetString(KeyDremioPatToken)
 	c.dremioRocksDBDir = viper.GetString(KeyDremioRocksdbDir)
