@@ -495,7 +495,7 @@ var LocalCollectCmd = &cobra.Command{
 		//if a cli flag was set go ahead and use those values to override the viper configuration
 		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
 			overrides[flag.Name] = flag
-			simplelog.Warningf("overriding yaml with cli flag %v and value %v", flag.Name, flag.Value.String())
+			simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
 		})
 		c, err := conf.ReadConfFromExecLocation(overrides)
 		if err != nil {
