@@ -69,7 +69,7 @@ func (t *ThreadPool) worker() {
 		go func(j func() error) {
 			err := j()
 			if err != nil {
-				simplelog.Debugf("Failed to execute job: %v", err)
+				simplelog.Errorf("Failed to execute job: %v", err)
 			}
 			t.mut.Lock()
 			t.pendingJobs--

@@ -37,45 +37,115 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 	if err != nil {
 		return err
 	}
-	// TODO: Row limit and sleem MS need to be configured
-	rowlimit := 100000
-	sleepms := 100
 
 	var systables []string
-	var rowcountfield string
 	if !c.IsDremioCloud() {
 		systables = c.Systemtables()
-		rowcountfield = "returnedRowCount"
 	} else {
 		systables = c.SystemtablesDremioCloud()
-		rowcountfield = "rowCount"
 	}
 
 	for _, systable := range systables {
-		filename := "sys." + strings.Replace(systable, "\\\"", "", -1) + ".json"
-		body, err := downloadSysTable(c, systable, rowlimit, sleepms)
+		err := downloadSysTable(c, systable)
 		if err != nil {
 			return err
+		}
+
+	}
+
+	return nil
+}
+
+func downloadSysTable(c *conf.CollectConf, systable string) error {
+	// TODO: Need to implement paging of sys table results
+	headers := map[string]string{"Content-Type": "application/json"}
+	var joburl, sqlurl, jobresultsurl string
+	if !c.IsDremioCloud() {
+		sqlurl = c.DremioEndpoint() + "/api/v3/sql"
+		joburl = c.DremioEndpoint() + "/api/v3/job/"
+	} else {
+		sqlurl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/sql"
+		joburl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/job/"
+	}
+
+	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, systable)
+	if err != nil {
+		return err
+	}
+	jobstateurl := joburl + jobid
+	err = checkJobState(c, jobstateurl, headers)
+	if err != nil {
+		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
+	} else {
+		jobresultsurl = joburl + jobid + "/results"
+		simplelog.Debugf("Retrieving job results ...")
+		err = retrieveJobResults(c, jobresultsurl, headers, systable)
+		if err != nil {
+			return fmt.Errorf("unable to retrieve job results due to error %v", err)
+		}
+	}
+	return nil
+}
+
+func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]string) error {
+	sleepms := 100 // Consider moving to config
+	jobstate := "RUNNING"
+	for jobstate != "COMPLETED" {
+		time.Sleep(time.Duration(sleepms) * time.Millisecond)
+		body, err := restclient.APIRequest(jobstateurl, c.DremioPATToken(), "GET", headers)
+		if err != nil {
+			return fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)
 		}
 		dat := make(map[string]interface{})
 		err = json.Unmarshal(body, &dat)
 		if err != nil {
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
 		}
-		if err == nil {
-			var rowcount float64
-			if val, ok := dat[rowcountfield]; ok {
+		if val, ok := dat["jobState"]; ok {
+			jobstate = val.(string)
+			simplelog.Debugf("job state: %s", jobstate)
+		} else {
+			return fmt.Errorf("returned json does not contain expected field 'jobState'")
+		}
+		if jobstate == "FAILED" || jobstate == "CANCELED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
+			return fmt.Errorf("unable to retrieve job results - job state: " + jobstate)
+		}
+	}
+	return nil
+}
+
+func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[string]string, systable string) error {
+	apilimit := 500        // Consider moving to config
+	tablerowlimit := 10000 // Consider moving to config
+
+	offset := 0
+
+	for {
+		urlsuffix := "?offset=" + strconv.Itoa(offset) + "&limit=" + strconv.Itoa(apilimit)
+		resultsurl := jobresultsurl + urlsuffix
+		body, err := restclient.APIRequest(resultsurl, c.DremioPATToken(), "GET", headers)
+		if err != nil {
+			return fmt.Errorf("unable to retrieve job results from %s due to error %v", resultsurl, err)
+		}
+
+		dat := make(map[string]interface{})
+		err = json.Unmarshal(body, &dat)
+		var rowcount float64
+		if err != nil {
+			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
+		} else {
+			if val, ok := dat["rowCount"]; ok {
 				rowcount = val.(float64)
 			} else {
 				rowcount = 0
-				simplelog.Warningf("returned json does not contain expected field '%v'", rowcountfield)
-			}
-			if int(rowcount) == rowlimit {
-				simplelog.Warning("Returned row count for sys." + systable + " has been limited to " + strconv.Itoa(rowlimit))
+				simplelog.Warningf("returned json does not contain expected field 'rowCount'")
 			}
 		}
 		sb := string(body)
+
+		filename := "sys." + strings.Replace(systable, "\\\"", "", -1) + urlsuffix + ".json"
 		systemTableFile := path.Join(c.SystemTablesOutDir(), filename)
+		simplelog.Debugf("Creating " + filename + " ...")
 		file, err := os.Create(path.Clean(systemTableFile))
 		if err != nil {
 			return fmt.Errorf("unable to create file %v due to error %v", filename, err)
@@ -86,60 +156,16 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
 		}
 		simplelog.Debugf("SUCCESS - Created " + filename)
+
+		offset = offset + apilimit
+		if offset > int(rowcount) || offset >= tablerowlimit {
+			if offset >= tablerowlimit {
+				simplelog.Warningf("table results have been limited to %v records", tablerowlimit)
+			}
+			break
+		}
 	}
 
 	return nil
-}
 
-func downloadSysTable(c *conf.CollectConf, systable string, rowlimit int, sleepms int) ([]byte, error) {
-	// TODO: Need to implement paging of sys table results
-	headers := map[string]string{"Content-Type": "application/json"}
-	var joburl, sqlurl, jobresultsurl string
-	if !c.IsDremioCloud() {
-		sqlurl = c.DremioEndpoint() + "/api/v3/sql"
-		joburl = c.DremioEndpoint() + "/api/v3/job/"
-	} else {
-		rowlimit = 500
-		sqlurl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/sql"
-		joburl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/job/"
-	}
-
-	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, systable)
-	if err != nil {
-		return nil, err
-	}
-	jobstateurl := joburl + jobid
-	jobstate := "RUNNING"
-	for jobstate != "COMPLETED" && jobstate != "FAILED" && jobstate != "CANCELED" && jobstate != "CANCELLATION_REQUESTED" && jobstate != "INVALID_STATE" {
-		time.Sleep(time.Duration(sleepms) * time.Millisecond)
-		body, err := restclient.APIRequest(jobstateurl, c.DremioPATToken(), "GET", headers)
-		if err != nil {
-			return nil, fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)
-		}
-		dat := make(map[string]interface{})
-		err = json.Unmarshal(body, &dat)
-		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshall JSON response - %w", err)
-		}
-		if val, ok := dat["jobState"]; ok {
-			jobstate = val.(string)
-			simplelog.Debugf("job state: %s", jobstate)
-		} else {
-			return nil, fmt.Errorf("returned json does not contain expected field 'jobState'")
-		}
-	}
-	if jobstate == "COMPLETED" {
-		if !c.IsDremioCloud() {
-			jobresultsurl = c.DremioEndpoint() + "/apiv2/job/" + jobid + "/data?offset=0&limit=" + strconv.Itoa(rowlimit)
-		} else {
-			jobresultsurl = joburl + jobid + "/results?offset=0&limit=" + strconv.Itoa(rowlimit)
-		}
-		simplelog.Debugf("Retrieving job results ...")
-		body, err := restclient.APIRequest(jobresultsurl, c.DremioPATToken(), "GET", headers)
-		if err != nil {
-			return nil, fmt.Errorf("unable to retrieve job results from %s due to error %v", jobresultsurl, err)
-		}
-		return body, nil
-	}
-	return nil, fmt.Errorf("unable to retrieve job results for sys." + systable + " - job state: " + jobstate)
 }

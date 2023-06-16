@@ -63,7 +63,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 		}
 
 		if len(jobhistoryjsons) == 0 {
-			simplelog.Warning("no sys.project.history.jobs.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
+			simplelog.Warning("no valid records or sys.project.history.jobs.json files found. Therefore, we are skipping collection of Job Profiles")
 			return
 		}
 
