@@ -264,7 +264,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		if c.gcLogsDir == "" {
 			simplelog.Debugf("setting gc logs to %v", parsedGCLogDir)
 		} else {
-			simplelog.Warningf("overriding gc logs location from %v to %v due to detection of gclog directory", c.gcLogsDir, parsedGCLogDir)
+			simplelog.Debugf("overriding gc logs location from %v to %v due to detection of gclog directory", c.gcLogsDir, parsedGCLogDir)
 		}
 		c.gcLogsDir = parsedGCLogDir
 	}
