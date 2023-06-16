@@ -96,7 +96,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			//because we are looping
 			keyToDownload := key
 			downloadThreadPool.AddJob(func() error {
-				err = DownloadJobProfile(c, keyToDownload)
+				err := DownloadJobProfile(c, keyToDownload)
 				if err != nil {
 					simplelog.Error(err.Error()) // Print instead of Error
 				}

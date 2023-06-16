@@ -21,7 +21,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -200,7 +200,7 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 	defer errCheck(file.Close)
 
 	var bytedata []byte
-	bytedata, err = ioutil.ReadAll(file)
+	bytedata, err = io.ReadAll(file)
 	if err != nil {
 		simplelog.Errorf("can't read data of %v due to error %v", filename, err)
 		return queriesrows, err
@@ -211,15 +211,13 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 	if err != nil {
 		return queriesrows, fmt.Errorf("can't JSON unmarshall %v due to error %v", filename, err)
 	}
-	i := 0
 	for _, line := range dat.Rows {
-		row, err := parseLineDC(line, i)
+		row, err := parseLineDC(line)
 		if err != nil {
 			simplelog.Errorf("can't parse line %v from file %v due to error %v", row, filename, err)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
-		i++
 	}
 	return queriesrows, err
 }
@@ -270,7 +268,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	return queriesrow, err
 }
 
-func parseLineDC(line Row, i int) (QueriesRow, error) {
+func parseLineDC(line Row) (QueriesRow, error) {
 	var row = new(QueriesRow)
 	row.QueryID = line.JobID
 	row.QueryType = line.QueryType
