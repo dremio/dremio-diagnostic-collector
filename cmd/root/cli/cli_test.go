@@ -15,75 +15,87 @@
 package cli_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 var (
-	c              = &cli.Cli{}
-	outputHandler  cli.OutputHandler
-	executedOutput string
-	mut            sync.Mutex
+	c             = &cli.Cli{}
+	outputHandler cli.OutputHandler
 )
 
 func setupTestCLI() {
-	executedOutput = ""
 	outputHandler = func(line string) {
-		mut.Lock()
-		executedOutput += line + "\n"
-		mut.Unlock()
+		fmt.Println(line)
 	}
 }
 
 func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	setupTestCLI()
+	var err error
+	var captureErr error
+	var out string
+	var expectedOut string
 	if runtime.GOOS != "windows" {
-		err := c.ExecuteAndStreamOutput(outputHandler, "ls", "-v")
+		expectedOut = "file1\nfile2\n"
+		out, captureErr = tests.CaptureOutput(func() {
+			err = c.ExecuteAndStreamOutput(outputHandler, "ls", "-1", filepath.Join("testdata", "ls"))
+		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	} else {
-		err := c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir")
+		expectedOut = "file1\r\nfile2\r\n"
+		out, captureErr = tests.CaptureOutput(func() {
+			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
+		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}
-	mut.Lock()
-	if strings.TrimSpace(executedOutput) == "" {
-		t.Errorf("Expected executedOutput to be not empty")
+	if captureErr != nil {
+		t.Errorf("Unexpected error: %v", captureErr)
 	}
-	mut.Unlock()
+	if out != expectedOut {
+		t.Errorf("expected '%q' but was '%q'", expectedOut, out)
+	}
 }
 
 func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 	setupTestCLI()
+	var err error
+	var captureErr error
+	var out string
+	var expectedOut string
 	if runtime.GOOS != "windows" {
-		err := c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
+		expectedOut = "No such file or directory"
+		out, captureErr = tests.CaptureOutput(func() {
+			err = c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
+		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
-		mut.Lock()
-		if !strings.Contains(strings.TrimSpace(executedOutput), "No such file or directory") {
-			t.Errorf("Expected executedOutput to contain 'No such file or directory' but was %v", executedOutput)
-		}
-		mut.Unlock()
 	} else {
-		err := c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
+		expectedOut = "doesntexist"
+		out, captureErr = tests.CaptureOutput(func() {
+			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
+		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
-		mut.Lock()
-		if executedOutput == "" {
-			t.Errorf("Expected executedOutput to not be empty but was")
-		}
-		mut.Unlock()
 	}
-
+	if captureErr != nil {
+		t.Errorf("Unexpected error: %v", captureErr)
+	}
+	if !strings.Contains(out, expectedOut) {
+		t.Errorf("Expected output to contain '%v' but was '%v'", expectedOut, out)
+	}
 }
 
 func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
@@ -93,11 +105,9 @@ func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 		t.Errorf("Expected error but got nil")
 	}
 	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
-	mut.Lock()
 	if !strings.Contains(err.Error(), expectedErr) {
 		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
 	}
-	mut.Unlock()
 }
 
 func TestExecute_WhenCommandIsValid(t *testing.T) {
@@ -105,18 +115,18 @@ func TestExecute_WhenCommandIsValid(t *testing.T) {
 	var expectedOut string
 	var out string
 	var err error
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS != "windows" {
+		out, err = c.Execute("ls", "-1", filepath.Join("testdata", "ls"))
+		expectedOut = "file1\nfile2\n"
+	} else {
 		out, err = c.Execute("cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		expectedOut = "file1\r\nfile2\r\n"
-	} else {
-		out, err = c.Execute("ls", "-a", filepath.Join("testdata", "ls"))
-		expectedOut = "file1\nfile2\n"
 	}
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if !strings.Contains(out, expectedOut) {
-		t.Errorf("Expected output to contain '%s', but it didn't", expectedOut)
+	if out != expectedOut {
+		t.Errorf("expected %q but was %q", expectedOut, out)
 	}
 }
 
