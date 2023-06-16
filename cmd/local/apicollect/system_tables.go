@@ -92,7 +92,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 }
 
 func downloadSysTable(c *conf.CollectConf, systable string, rowlimit int, sleepms int) ([]byte, error) {
-	// TODO: Consider using official api/v3, requires paging of job results
+	// TODO: Need to implement paging of sys table results
 	headers := map[string]string{"Content-Type": "application/json"}
 	var joburl, sqlurl, jobresultsurl string
 	if !c.IsDremioCloud() {

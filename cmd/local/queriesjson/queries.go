@@ -376,16 +376,14 @@ func CollectJobHistoryJSON(jobhistoryjsons []string) []QueriesRow {
 
 	queriesrows := []QueriesRow{}
 	for _, jobhistoryjson := range jobhistoryjsons {
-		if strings.Contains(jobhistoryjson, "project.history.jobs") {
-			simplelog.Infof("Attempting to open json file %v", jobhistoryjson)
-			rows, err := ReadHistoryJobsJSONFile(jobhistoryjson)
-			if err != nil {
-				simplelog.Errorf("failed to parse json file %v due to error %v", jobhistoryjson, err)
-				continue
-			}
-			queriesrows = append(queriesrows, rows...)
-			log.Println("Found", strconv.Itoa(len(rows)), "new rows in", jobhistoryjson)
+		simplelog.Infof("Attempting to open json file %v", jobhistoryjson)
+		rows, err := ReadHistoryJobsJSONFile(jobhistoryjson)
+		if err != nil {
+			simplelog.Errorf("failed to parse json file %v due to error %v", jobhistoryjson, err)
+			continue
 		}
+		queriesrows = append(queriesrows, rows...)
+		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", jobhistoryjson)
 	}
 	simplelog.Infof("Collected a total of %v rows of jobs history", len(queriesrows))
 	return queriesrows

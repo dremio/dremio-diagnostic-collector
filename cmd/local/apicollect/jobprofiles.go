@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -56,7 +57,9 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 		}
 		jobhistoryjsons := []string{}
 		for _, file := range files {
-			jobhistoryjsons = append(jobhistoryjsons, path.Join(c.QueriesOutDir(), file.Name()))
+			if strings.Contains(file.Name(), "project.history.jobs") {
+				jobhistoryjsons = append(jobhistoryjsons, path.Join(c.SystemTablesOutDir(), file.Name()))
+			}
 		}
 
 		if len(jobhistoryjsons) == 0 {
