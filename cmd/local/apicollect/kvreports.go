@@ -51,6 +51,6 @@ func RunCollectKvReport(c *conf.CollectConf) error {
 	if err != nil {
 		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
 	}
-	simplelog.Info("SUCCESS - Created " + filename)
+	simplelog.Debugf("SUCCESS - Created " + filename)
 	return nil
 }

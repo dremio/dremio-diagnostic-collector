@@ -32,7 +32,7 @@ import (
 )
 
 func RunCollectDremioSystemTables(c *conf.CollectConf) error {
-	simplelog.Info("Collecting results from Export System Tables...")
+	simplelog.Debugf("Collecting results from Export System Tables...")
 	err := ValidateAPICredentials(c)
 	if err != nil {
 		return err
@@ -85,7 +85,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 		if err != nil {
 			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
 		}
-		simplelog.Info("SUCCESS - Created " + filename)
+		simplelog.Debugf("SUCCESS - Created " + filename)
 	}
 
 	return nil
@@ -134,7 +134,7 @@ func downloadSysTable(c *conf.CollectConf, systable string, rowlimit int, sleepm
 		} else {
 			jobresultsurl = joburl + jobid + "/results?offset=0&limit=" + strconv.Itoa(rowlimit)
 		}
-		simplelog.Info("Retrieving job results ...")
+		simplelog.Debugf("Retrieving job results ...")
 		body, err := restclient.APIRequest(jobresultsurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
 			return nil, fmt.Errorf("unable to retrieve job results from %s due to error %v", jobresultsurl, err)

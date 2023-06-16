@@ -22,7 +22,7 @@ import (
 )
 
 func ValidateAPICredentials(c *conf.CollectConf) error {
-	simplelog.Info("Validating REST API user credentials...")
+	simplelog.Debugf("Validating REST API user credentials...")
 	var url string
 	if !c.IsDremioCloud() {
 		url = c.DremioEndpoint() + "/apiv2/login"

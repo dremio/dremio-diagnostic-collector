@@ -64,7 +64,7 @@ type Cli struct {
 // be returned as an error from this function.
 func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string) error {
 	// Log the command that's about to be run
-	simplelog.Infof("args: %v\n", strings.Join(args, " "))
+	simplelog.Debugf("args: %v\n", strings.Join(args, " "))
 
 	// Create the command based on the passed arguments
 	cmd := exec.Command(args[0], args[1:]...)
@@ -83,8 +83,10 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	}
 	stdErrScanner := bufio.NewScanner(stderr)
 
-	startScan := make(chan struct{})
-
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
+	}
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -92,7 +94,6 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	// and pass it to the outputHandler. This runs in a goroutine
 	// so that we can also read the error output at the same time.
 	go func() {
-		<-startScan // Wait for signal to start scanning
 		for stdOutScanner.Scan() {
 			c.m.Lock()
 			outputHandler(stdOutScanner.Text())
@@ -104,7 +105,6 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	// Asynchronously read the error output from the command line by line
 	// and pass it to the outputHandler.
 	go func() {
-		<-startScan // Wait for signal to start scanning
 		for stdErrScanner.Scan() {
 			c.m.Lock()
 			outputHandler(stdErrScanner.Text())
@@ -112,14 +112,6 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 		}
 		wg.Done()
 	}()
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
-	}
-
-	// Signal the goroutines to start scanning
-	close(startScan)
 
 	// Wait for the command to finish
 	if err := cmd.Wait(); err != nil {
@@ -134,7 +126,7 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 }
 
 func (c *Cli) Execute(args ...string) (string, error) {
-	simplelog.Infof("args: %v", strings.Join(args, " "))
+	simplelog.Debugf("args: %v", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()
@@ -145,7 +137,7 @@ func (c *Cli) Execute(args ...string) (string, error) {
 }
 
 func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {
-	simplelog.Infof("args: %v", strings.Join(args, " "))
+	simplelog.Debugf("args: %v", strings.Join(args, " "))
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()

@@ -26,7 +26,7 @@ var (
 )
 
 var setupThreadPool = func() {
-	tp = threading.NewThreadPool(10)
+	tp = threading.NewThreadPool(10, 1)
 }
 
 func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {

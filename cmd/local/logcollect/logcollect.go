@@ -51,12 +51,12 @@ func NewLogCollector(dremioLogDir, logsOutDir, gcLogsDir, dremioGCFilePattern, q
 }
 
 func (l *Collector) RunCollectDremioServerLog() error {
-	simplelog.Info("Collecting GC logs ...")
+	simplelog.Debug("Collecting GC logs ...")
 	var errs []error
 	if err := l.exportArchivedLogs(l.dremioLogDir, "server.log", "server", l.dremioLogsNumDays); err != nil {
 		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %v", err))
 	}
-	simplelog.Info("... collecting server.out")
+	simplelog.Debug("... collecting server.out")
 	src := path.Join(l.dremioLogDir, "server.out")
 	dest := path.Join(l.logsOutDir, "server.out")
 	if err := ddcio.CopyFile(path.Clean(src), path.Clean(dest)); err != nil {
@@ -67,7 +67,7 @@ func (l *Collector) RunCollectDremioServerLog() error {
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
-	simplelog.Info("... collecting server logs COMPLETED")
+	simplelog.Debug("... collecting server logs COMPLETED")
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (l *Collector) RunCollectGcLogs() error {
 	if l.gcLogsDir == "" {
 		simplelog.Warningf("Skipping GC Logs no gc log directory is configured set dremio-gclogs-dir in ddc.yaml")
 	} else {
-		simplelog.Info("Collecting GC logs ...")
+		simplelog.Debug("Collecting GC logs ...")
 	}
 	files, err := os.ReadDir(path.Clean(l.gcLogsDir))
 	if err != nil {
@@ -116,64 +116,58 @@ func (l *Collector) RunCollectGcLogs() error {
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
-	simplelog.Warning("GC logs from executors and scale-out coordinators must be collected separately!")
-	simplelog.Info("... collecting GC logs COMPLETED")
+	simplelog.Debug("... collecting GC logs COMPLETED")
 
 	return nil
 }
 
 func (l *Collector) RunCollectMetadataRefreshLogs() error {
-	simplelog.Info("Collecting metadata refresh logs from Coordinator(s) ...")
+	simplelog.Debug("Collecting metadata refresh logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "metadata_refresh.log", "metadata_refresh", l.dremioLogsNumDays); err != nil {
 		return fmt.Errorf("unable to collect metadata refresh logs due to error %v", err)
 	}
-	simplelog.Warning("Metadata refresh logs from scale-out coordinators must be collected separately!")
-	simplelog.Info("... collecting meta data refresh logs from Coordinator(s) COMPLETED")
+	simplelog.Debug("... collecting meta data refresh logs from Coordinator(s) COMPLETED")
 	return nil
 }
 
 func (l *Collector) RunCollectReflectionLogs() error {
-	simplelog.Info("Collecting reflection logs from Coordinator(s) ...")
+	simplelog.Debug("Collecting reflection logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "reflection.log", "reflection", l.dremioLogsNumDays); err != nil {
 		return fmt.Errorf("unable to collect reflection logs due to error %v", err)
 	}
-	simplelog.Info("... collecting reflection logs from Coordinator(s) COMPLETED")
+	simplelog.Debug("... collecting reflection logs from Coordinator(s) COMPLETED")
 
 	return nil
 }
 
 func (l *Collector) RunCollectDremioAccessLogs() error {
-	simplelog.Info("Collecting access logs from Coordinator(s) ...")
-	simplelog.Warning("Access logs from scale-out coordinators must be collected separately!")
+	simplelog.Debug("Collecting access logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "access.log", "access", l.dremioLogsNumDays); err != nil {
 		return fmt.Errorf("unable to archive access.logs due to error %v", err)
 	}
-	simplelog.Info("... collecting access logs from Coordinator(s) COMPLETED")
+	simplelog.Debug("... collecting access logs from Coordinator(s) COMPLETED")
 
 	return nil
 }
 
 func (l *Collector) RunCollectAccelerationLogs() error {
-	simplelog.Info("Collecting acceleration logs from Coordinator(s) ...")
-	simplelog.Warning("Acceleration logs from scale-out coordinators must be collected separately!")
+	simplelog.Debug("Collecting acceleration logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "acceleration.log", "acceleration", l.dremioLogsNumDays); err != nil {
 		return fmt.Errorf("unable to archive acceleration.logs due to error %v", err)
 	}
-	simplelog.Info("... collecting acceleragtion logs from Coordinator(s) COMPLETED")
+	simplelog.Debug("... collecting acceleragtion logs from Coordinator(s) COMPLETED")
 
 	return nil
 }
 
 func (l *Collector) RunCollectQueriesJSON() error {
-	simplelog.Info("Collecting queries.json ...")
+	simplelog.Debug("Collecting queries.json ...")
 	err := l.exportArchivedLogs(l.dremioLogDir, "queries.json", "queries", l.dremioQueriesJSONNumDays)
 	if err != nil {
 		return fmt.Errorf("failed to export archived logs: %v", err)
 	}
 
-	simplelog.Warning("Queries.json from scale-out coordinators must be collected separately!")
-
-	simplelog.Info("... collecting Queries JSON for Job Profiles COMPLETED")
+	simplelog.Debug("... collecting Queries JSON for Job Profiles COMPLETED")
 	return nil
 }
 
@@ -203,7 +197,7 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unarchivedFile string, 
 		//now search files for a match
 		for _, f := range files {
 			if strings.HasPrefix(f.Name(), fmt.Sprintf("%v.%v", logPrefix, processingDate)) {
-				simplelog.Info("Copying archive file for " + processingDate + ": " + f.Name())
+				simplelog.Debugf("Copying archive file for %v:%v", processingDate, f.Name())
 				src := filepath.Join(srcLogDir, "archive", f.Name())
 				dst := filepath.Join(outDir, f.Name())
 				if strings.HasSuffix(f.Name(), ".gz") {

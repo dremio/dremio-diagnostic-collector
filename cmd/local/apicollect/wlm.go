@@ -98,7 +98,7 @@ func RunCollectWLM(c *conf.CollectConf) error {
 		}
 
 		// Log a success message upon successful creation of the file
-		simplelog.Infof("SUCCESS - Created " + filename)
+		simplelog.Debugf("SUCCESS - Created " + filename)
 	}
 
 	// Return nil if the entire operation completes successfully

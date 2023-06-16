@@ -45,7 +45,12 @@ if ! type "gh" > /dev/null; then
       esac
 fi
 
-./script/release-build
+# this is also set in script/build-release and is a copy paste
+GIT_SHA=`git rev-parse --short HEAD`
+VERSION=$1
+
+./script/release-build $VERSION
+
 
 gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-amd64.zip ./bin/ddc-darwin-arm64.zip ./bin/ddc-darwin-amd64.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip 
  

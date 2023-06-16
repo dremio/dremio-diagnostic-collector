@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
@@ -55,26 +56,42 @@ func collectSystemMetrics(seconds int) (rows []SystemMetricsRow, err error) {
 	iterations := seconds
 	interval := time.Second
 
-	prevDiskIO, _ := disk.IOCounters()
+	prevDiskIO, err := disk.IOCounters()
+	if err != nil {
+		return rows, err
+	}
+	prevCPUTimes, err := cpu.Times(false)
+	if err != nil {
+		return rows, err
+	}
 	for i := 0; i < iterations; i++ {
 		// Sleep
-		if i > 0 {
-			time.Sleep(interval)
-		}
+		time.Sleep(interval)
 
 		// CPU Times
-		cpuTimes, _ := cpu.Times(false)
+		cpuTimes, err := cpu.Times(false)
+		if err != nil {
+			return rows, err
+		}
 
 		// Memory
-		memoryInfo, _ := mem.VirtualMemory()
+		memoryInfo, err := mem.VirtualMemory()
+		if err != nil {
+			return rows, err
+		}
 
 		// Disk I/O
-		diskIO, _ := disk.IOCounters()
+		diskIO, err := disk.IOCounters()
+		if err != nil {
+			return rows, err
+		}
+
 		var weightedIOTime, totalIOs uint64
 		var readBytes, writeBytes float64
-		for _, io := range diskIO {
-			weightedIOTime += io.WeightedIO
-			totalIOs += io.IoTime
+		for i, io := range diskIO {
+			p := prevDiskIO[i]
+			weightedIOTime += io.WeightedIO - p.WeightedIO
+			totalIOs += io.IoTime - p.IoTime
 
 			if prev, ok := prevDiskIO[io.Name]; ok {
 				readBytes += float64(io.ReadBytes-prev.ReadBytes) / 1024
@@ -82,30 +99,66 @@ func collectSystemMetrics(seconds int) (rows []SystemMetricsRow, err error) {
 			}
 		}
 		prevDiskIO = diskIO
-		total := getTotalTime(cpuTimes[0])
-		queueDepth := float64(weightedIOTime) / 1000
-		diskLatency := float64(weightedIOTime) / float64(totalIOs)
+		total := getTotalTime(cpuTimes[0], prevCPUTimes[0])
+		var queueDepth float64
+		var diskLatency float64
+		if weightedIOTime > 0 {
+			queueDepth = float64(weightedIOTime) / 1000
+			diskLatency = float64(weightedIOTime) / float64(totalIOs)
+		}
+
 		memoreFreeMB := float64(memoryInfo.Free) / (1024 * 1024)
 		memoryCachedMB := float64(memoryInfo.Cached) / (1024 * 1024)
 
-		row := SystemMetricsRow{
-			CollectionTimeStamp: time.Now(),
-			UserCPUPercent:      (cpuTimes[0].User / total) * 100,
-			SystemCPUPercent:    (cpuTimes[0].System / total) * 100,
-			IdleCPUPercent:      (cpuTimes[0].Idle / total) * 100,
-			NiceCPUPercent:      (cpuTimes[0].Nice / total) * 100,
-			IOWaitCPUPercent:    (cpuTimes[0].Iowait / total) * 100,
-			IRQCPUPercent:       (cpuTimes[0].Irq / total) * 100,
-			SoftIRQCPUPercent:   (cpuTimes[0].Softirq / total) * 100,
-			StealCPUPercent:     (cpuTimes[0].Steal / total) * 100,
-			GuestCPUPercent:     (cpuTimes[0].Guest / total) * 100,
-			GuestNiceCPUPercent: (cpuTimes[0].GuestNice / total) * 100,
-
-			DiskLatency: diskLatency,
-			QueueDepth:  queueDepth,
-			FreeRAMMB:   memoreFreeMB,
-			CachedRAMMB: memoryCachedMB,
+		row := SystemMetricsRow{}
+		row.CollectionTimeStamp = time.Now()
+		user := cpuTimes[0].User - prevCPUTimes[0].User
+		if user > 0 {
+			row.UserCPUPercent = (user / total) * 100
 		}
+		system := cpuTimes[0].System - prevCPUTimes[0].System
+		if system > 0 {
+			row.SystemCPUPercent = (system / total) * 100
+		}
+		idle := cpuTimes[0].Idle - prevCPUTimes[0].Idle
+		if idle > 0 {
+			row.IdleCPUPercent = (idle / total) * 100
+		}
+		nice := cpuTimes[0].Nice - prevCPUTimes[0].Nice
+		if nice > 0 {
+			row.NiceCPUPercent = (nice / total) * 100
+		}
+		iowait := cpuTimes[0].Iowait - prevCPUTimes[0].Iowait
+		if iowait > 0 {
+			row.IOWaitCPUPercent = (iowait / total) * 100
+		}
+		irq := cpuTimes[0].Irq - prevCPUTimes[0].Irq
+		if irq > 0 {
+			row.IRQCPUPercent = (irq / total) * 100
+		}
+		softIRQ := cpuTimes[0].Softirq - prevCPUTimes[0].Softirq
+		if softIRQ > 0 {
+			row.SoftIRQCPUPercent = (softIRQ / total) * 100
+		}
+		steal := cpuTimes[0].Steal - prevCPUTimes[0].Steal
+		if steal > 0 {
+			row.StealCPUPercent = (steal / total) * 100
+		}
+		guestCPU := cpuTimes[0].Guest - prevCPUTimes[0].Guest
+		if guestCPU > 0 {
+			row.GuestCPUPercent = (guestCPU / total) * 100
+		}
+		guestCPUNice := cpuTimes[0].GuestNice - prevCPUTimes[0].GuestNice
+		if guestCPUNice > 0 {
+			row.GuestNiceCPUPercent = (guestCPUNice / total) * 100
+		}
+		prevCPUTimes = cpuTimes
+
+		row.DiskLatency = diskLatency
+		row.QueueDepth = queueDepth
+		row.FreeRAMMB = memoreFreeMB
+		row.CachedRAMMB = memoryCachedMB
+
 		rows = append(rows, row)
 	}
 	return
@@ -198,7 +251,10 @@ func SystemMetrics(secondsToCollect int, nodeMetricsFile, nodeMetricsJSONFile st
 	return nil
 }
 
-func getTotalTime(c cpu.TimesStat) float64 {
-	return c.User + c.System + c.Idle + c.Nice + c.Iowait + c.Irq +
+func getTotalTime(c cpu.TimesStat, p cpu.TimesStat) float64 {
+	current := c.User + c.System + c.Idle + c.Nice + c.Iowait + c.Irq +
 		c.Softirq + c.Steal + c.Guest + c.GuestNice
+	prev := p.User + p.System + p.Idle + p.Nice + p.Iowait + p.Irq +
+		p.Softirq + p.Steal + p.Guest + p.GuestNice
+	return current - prev
 }

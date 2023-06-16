@@ -82,28 +82,26 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			Err:  fmt.Errorf("unable to copy local ddc yaml to remote path due to error: '%v' with output '%v'", err, out),
 		})
 	} else {
-		simplelog.Infof("successfully copied ddc.yaml to host %v", host)
+		simplelog.Debugf("successfully copied ddc.yaml to host %v", host)
 	}
 	//execute local-collect if skipRESTCollect is set blank the pat
 	localCollectArgs := []string{pathToDDC, "local-collect"}
 	if skipRESTCollect {
-		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "")
+		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "\"\"")
 	}
 	if err := ComposeExecuteAndStream(conf, func(line string) {
 		simplelog.HostLog(host, line)
-		//fmt.Printf("HOST %v - %v", host, line)
 	}, localCollectArgs); err != nil {
 		simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
-		//return
 	} else {
-		simplelog.Infof("on host %v capture successful", host)
+		simplelog.Debugf("on host %v capture successful", host)
 	}
 	//defer delete tar.gz
 	defer func() {
 		if out, err := ComposeExecute(conf, []string{"rm", "-fr", path.Join(ddcTmpDir)}); err != nil {
 			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
 		} else {
-			simplelog.Infof("on host %v tarballs in directory %v have been removed", host, ddcTmpDir)
+			simplelog.Debugf("on host %v tarballs in directory %v have been removed", host, ddcTmpDir)
 		}
 	}()
 
@@ -120,7 +118,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		for _, sourceFile := range foundTarGzFiles {
 			//have to use filepath for cross platform path on client
 			destFile := filepath.Join(outDir, filepath.Base(sourceFile))
-			simplelog.Infof("found %v for copying to %v", sourceFile, destFile)
+			simplelog.Debugf("found %v for copying to %v", sourceFile, destFile)
 			//but we want to use path.join here because otherwise it will be wrong for linux servers
 			//note also we do not care about sudo when copying back the archive
 			if out, err := ComposeCopyNoSudo(conf, path.Join(ddcTmpDir, sourceFile), destFile); err != nil {
