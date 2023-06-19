@@ -63,7 +63,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 		}
 
 		if len(jobhistoryjsons) == 0 {
-			simplelog.Warning("no sys.project.history.jobs.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
+			simplelog.Warning("no valid records or sys.project.history.jobs.json files found. Therefore, we are skipping collection of Job Profiles")
 			return
 		}
 
@@ -98,7 +98,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			downloadThreadPool.AddJob(func() error {
 				err := DownloadJobProfile(c, keyToDownload)
 				if err != nil {
-					simplelog.Error(err.Error()) // Print instead of Error
+					simplelog.Errorf("unable to download job profile %v, due to error %v", keyToDownload, err) // Print instead of Error
 				}
 				return nil
 			})
@@ -129,14 +129,15 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 }
 
 func DownloadJobProfile(c *conf.CollectConf, jobid string) error {
-	var apipath string
+	var url, apipath string
 	if !c.IsDremioCloud() {
 		apipath = "/apiv2/support/" + jobid + "/download"
+		url = c.DremioEndpoint() + apipath
 	} else {
 		apipath = "/ui/projects/" + c.DremioCloudProjectID() + "/support/" + jobid + "/download"
+		url = c.DremioCloudAppEndpoint() + apipath
 	}
 	filename := jobid + ".zip"
-	url := c.DremioEndpoint() + apipath
 	headers := map[string]string{"Accept": "application/octet-stream"}
 	body, err := restclient.APIRequest(url, c.DremioPATToken(), "POST", headers)
 	if err != nil {

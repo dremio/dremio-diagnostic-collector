@@ -70,10 +70,11 @@ func createAllDirs(c *conf.CollectConf) error {
 		if err := os.MkdirAll(c.NodeInfoOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create node-info directory due to error %v", err)
 		}
+		if err := os.MkdirAll(c.QueriesOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create queries directory due to error %v", err)
+		}
 	}
-	if err := os.MkdirAll(c.QueriesOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create queries directory due to error %v", err)
-	}
+
 	if err := os.MkdirAll(c.SystemTablesOutDir(), perms); err != nil {
 		return fmt.Errorf("unable to create system-tables directory due to error %v", err)
 	}

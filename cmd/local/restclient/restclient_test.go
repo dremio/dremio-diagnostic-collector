@@ -50,7 +50,8 @@ func TestPostQuery(t *testing.T) {
 
 	InitClient(true, 10)
 
-	_, err := PostQuery(server.URL, "token", map[string]string{}, "test_table")
+	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
+	_, err := PostQuery(server.URL, "token", map[string]string{}, sqlbody)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -64,7 +65,8 @@ func TestPostQueryBadStatusCode(t *testing.T) {
 
 	InitClient(true, 10)
 
-	_, err := PostQuery(server.URL, "token", map[string]string{}, "test_table")
+	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
+	_, err := PostQuery(server.URL, "token", map[string]string{}, sqlbody)
 	if err == nil {
 		t.Fatal("Expected error, got nil")
 	}
