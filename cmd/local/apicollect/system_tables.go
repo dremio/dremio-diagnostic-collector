@@ -87,13 +87,12 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 	err = checkJobState(c, jobstateurl, headers)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
-	} else {
-		jobresultsurl = joburl + jobid + "/results"
-		simplelog.Debugf("Retrieving job results ...")
-		err = retrieveJobResults(c, jobresultsurl, headers, systable)
-		if err != nil {
-			return fmt.Errorf("unable to retrieve job results due to error %v", err)
-		}
+	}
+	jobresultsurl = joburl + jobid + "/results"
+	simplelog.Debugf("Retrieving job results ...")
+	err = retrieveJobResults(c, jobresultsurl, headers, systable)
+	if err != nil {
+		return fmt.Errorf("unable to retrieve job results due to error %v", err)
 	}
 	return nil
 }
@@ -144,13 +143,12 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 		var rowcount float64
 		if err != nil {
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
+		}
+		if val, ok := dat["rowCount"]; ok {
+			rowcount = val.(float64)
 		} else {
-			if val, ok := dat["rowCount"]; ok {
-				rowcount = val.(float64)
-			} else {
-				rowcount = 0
-				simplelog.Warningf("returned json does not contain expected field 'rowCount'")
-			}
+			rowcount = 0
+			simplelog.Warningf("returned json does not contain expected field 'rowCount'")
 		}
 		sb := string(body)
 
