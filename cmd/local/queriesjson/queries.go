@@ -231,37 +231,72 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	}
 	var row = new(QueriesRow)
 	if val, ok := dat["queryId"]; ok {
-		row.QueryID = val.(string)
+		qid, ok := val.(string)
+		if ok {
+			row.QueryID = qid
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryId'")
+		}
 	} else {
 		return *new(QueriesRow), fmt.Errorf("missing field 'queryId'")
 	}
 	if val, ok := dat["queryType"]; ok {
-		row.QueryType = val.(string)
+		qt, ok := val.(string)
+		if ok {
+			row.QueryType = qt
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryType'")
+		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'queryType'")
 	}
 	if val, ok := dat["queryCost"]; ok {
-		row.QueryCost = val.(float64)
+		qc, ok := val.(float64)
+		if ok {
+			row.QueryCost = qc
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryCost'")
+		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'queryCost'")
 	}
 	if val, ok := dat["executionPlanningTime"]; ok {
-		row.ExecutionPlanningTime = val.(float64)
+		pt, ok := val.(float64)
+		if ok {
+			row.ExecutionPlanningTime = pt
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'executionPlanningTime'")
+		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'executionPlanningTime'")
 	}
 	if val, ok := dat["runningTime"]; ok {
-		row.RunningTime = val.(float64)
+		rt, ok := val.(float64)
+		if ok {
+			row.RunningTime = rt
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'runningTime'")
+		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'runningTime'")
 	}
 	if val, ok := dat["start"]; ok {
-		row.Start = val.(float64)
+		s, ok := val.(float64)
+		if ok {
+			row.Start = s
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'start'")
+		}
 	} else {
 		return *new(QueriesRow), fmt.Errorf("missing field 'start'")
 	}
 	if val, ok := dat["outcome"]; ok {
-		row.Outcome = val.(string)
+		o, ok := val.(string)
+		if ok {
+			row.Outcome = o
+		} else {
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'outcome'")
+		}
 	} else {
 		return *new(QueriesRow), fmt.Errorf("missing field 'outcome'")
 	}

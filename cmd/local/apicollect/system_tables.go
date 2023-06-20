@@ -112,11 +112,14 @@ func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]s
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
 		}
 		if val, ok := dat["jobState"]; ok {
-			jobstate = val.(string)
-			simplelog.Debugf("job state: %s", jobstate)
+			jobstate, ok = val.(string)
+			if !ok {
+				return fmt.Errorf("returned field 'jobState' does not have expected type string")
+			}
 		} else {
-			return fmt.Errorf("returned json does not contain expected field 'jobState'")
+			return fmt.Errorf("returned json does not contain required field 'jobState'")
 		}
+		simplelog.Debugf("job state: %s", jobstate)
 		if jobstate == "FAILED" || jobstate == "CANCELED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
 			return fmt.Errorf("unable to retrieve job results - job state: " + jobstate)
 		}
@@ -145,7 +148,11 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
 		}
 		if val, ok := dat["rowCount"]; ok {
-			rowcount = val.(float64)
+			rowcount, ok = val.(float64)
+			if !ok {
+				rowcount = 0
+				simplelog.Warningf("returned field 'rowCount' does not have expected type float64")
+			}
 		} else {
 			rowcount = 0
 			simplelog.Warningf("returned json does not contain expected field 'rowCount'")
