@@ -22,6 +22,8 @@ import (
 	"os"
 	"path"
 	"sync"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
 )
 
 const (
@@ -30,6 +32,8 @@ const (
 	LevelInfo
 	LevelDebug
 )
+
+const msgMax = 120
 
 var logger *Logger
 var internalDebugLogger *log.Logger
@@ -142,77 +146,77 @@ func newLogger(level int) *Logger {
 }
 
 func (l *Logger) Debug(format string) {
-	handleLogError(l.debugLogger.Output(2, format), format, "DEBUG")
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(l.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func (l *Logger) Info(format string) {
-	handleLogError(l.infoLogger.Output(2, format), format, "INFO")
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(l.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func (l *Logger) Warning(format string) {
-	handleLogError(l.warningLogger.Output(2, format), format, "WARNING")
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(l.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func (l *Logger) Error(format string) {
-	handleLogError(l.errorLogger.Output(2, format), format, "ERROR")
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(l.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func (l *Logger) Debugf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func (l *Logger) Infof(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func (l *Logger) Warningf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func (l *Logger) Errorf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 
 // package functions
 
 func Debug(format string) {
-	handleLogError(logger.debugLogger.Output(2, format), format, "DEBUG")
+	logger.Debug(format)
 }
 
 func Info(format string) {
-	handleLogError(logger.infoLogger.Output(2, format), format, "INFO")
+	logger.Info(format)
 }
 
 func Warning(format string) {
-	handleLogError(logger.warningLogger.Output(2, format), format, "WARNING")
+	logger.Warning(format)
 }
 
 func Error(format string) {
-	handleLogError(logger.errorLogger.Output(2, format), format, "ERROR")
+	logger.Error(format)
 }
 
 func Debugf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	handleLogError(logger.debugLogger.Output(2, msg), msg, "DEBUGF")
+	logger.Debugf(format, v...)
 }
 
 func Infof(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	handleLogError(logger.infoLogger.Output(2, msg), msg, "INFOF")
+	logger.Infof(format, v...)
 }
 
 func Warningf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	handleLogError(logger.warningLogger.Output(2, msg), msg, "WARNINGF")
+	logger.Warningf(format, v...)
 }
 
 func Errorf(format string, v ...interface{}) {
-	msg := fmt.Sprintf(format, v...)
-	handleLogError(logger.errorLogger.Output(2, msg), msg, "ERRORF")
+	logger.Errorf(format, v...)
 }
 
 func HostLog(host, line string) {

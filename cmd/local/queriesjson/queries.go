@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
 )
 
 type QueriesRow struct {
@@ -226,7 +227,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	dat := make(map[string]interface{})
 	err := json.Unmarshal([]byte(line), &dat)
 	if err != nil {
-		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v[...] - error: %v", i, line[:50], err)
+		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v[...] - error: %v", i, strutils.LimitString(line, 50), err)
 	}
 	var row = new(QueriesRow)
 	if val, ok := dat["queryId"]; ok {

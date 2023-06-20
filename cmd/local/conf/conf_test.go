@@ -76,7 +76,10 @@ dremio-jfr-time-seconds: 60
 collect-jstack: true
 dremio-jstack-time-seconds: 60
 dremio-jstack-freq-seconds: 10
+dremio-ttop-time-seconds: 30 
+dremio-ttop-freq-seconds: 5
 collect-wlm: true
+collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
 `
@@ -165,6 +168,17 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("Expected CollectWLM to be true, got false")
 	}
 
+	if cfg.CollectTtop() != true {
+		t.Errorf("Expected CollectTtop to be true, got false")
+	}
+
+	if cfg.DremioTtopTimeSeconds() != 30 {
+		t.Errorf("Expected to have 30 seconds for ttop time but was %v", cfg.DremioTtopTimeSeconds())
+	}
+
+	if cfg.DremioTtopFreqSeconds() != 5 {
+		t.Errorf("Expected to have 5 seconds for ttop freq but was %v", cfg.DremioTtopFreqSeconds())
+	}
 	if cfg.DremioConfDir() != "/path/to/dremio/conf" {
 		t.Errorf("Expected DremioConfDir to be '/path/to/dremio/conf', got '%s'", cfg.DremioConfDir())
 	}

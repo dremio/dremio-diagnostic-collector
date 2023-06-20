@@ -33,6 +33,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # collect-gc-logs: true
 # collect-jfr: true
 # collect-jstack: true
+# collect-ttop: true
 # collect-system-tables-export: true
 # collect-wlm: true
 # collect-kvstore-report: true
@@ -40,6 +41,8 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # dremio-jfr-time-seconds: 60
 # node-metrics-collect-duration-seconds: 60
 # dremio-jstack-freq-seconds: 1
+# dremio-ttop-time-seconds: 60
+# dremio-ttop-freq-seconds: 1
 # node-name: "" //dynamically set normally
 # is-dremio-cloud: false
 # dremio-cloud-project-id: ""

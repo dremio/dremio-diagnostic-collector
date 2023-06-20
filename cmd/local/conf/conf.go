@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// package conf provides configuration for the local-collect command
 package conf
 
 import (
@@ -51,6 +52,8 @@ type CollectConf struct {
 
 	// advanced variables setable by configuration or environement variable
 	outputDir                         string
+	dremioTtopTimeSeconds             int
+	dremioTtopFreqSeconds             int
 	dremioJFRTimeSeconds              int
 	dremioJStackFreqSeconds           int
 	dremioJStackTimeSeconds           int
@@ -76,6 +79,7 @@ type CollectConf struct {
 	systemTablesRowLimit              int
 	collectDiskUsage                  bool
 	collectGCLogs                     bool
+	collectTtop                       bool
 	collectWLM                        bool
 	nodeName                          string
 	restHTTPTimeout                   int
@@ -285,6 +289,10 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.dremioJStackTimeSeconds = viper.GetInt(KeyDremioJStackTimeSeconds)
 	c.dremioJStackFreqSeconds = viper.GetInt(KeyDremioJStackFreqSeconds)
 
+	// ttop
+	c.collectTtop = viper.GetBool(KeyCollectTtop)
+	c.dremioTtopFreqSeconds = viper.GetInt(KeyDremioTtopFreqSeconds)
+	c.dremioTtopTimeSeconds = viper.GetInt(KeyDremioTtopTimeSeconds)
 	// collect rest apis
 	personalAccessTokenPresent := c.DremioPATToken() != ""
 	if !personalAccessTokenPresent {
@@ -397,6 +405,10 @@ func (c *CollectConf) CollectAccessLogs() bool {
 	return c.collectAccessLogs
 }
 
+func (c *CollectConf) TtopOutDir() string {
+	return path.Join(c.outputDir, "ttop", c.nodeName)
+}
+
 func (c *CollectConf) HeapDumpsOutDir() string { return path.Join(c.outputDir, "heap-dumps") }
 
 func (c *CollectConf) JobProfilesOutDir() string {
@@ -485,6 +497,18 @@ func (c *CollectConf) DremioConfDir() string {
 
 func (c *CollectConf) DremioJFRTimeSeconds() int {
 	return c.dremioJFRTimeSeconds
+}
+
+func (c *CollectConf) DremioTtopTimeSeconds() int {
+	return c.dremioTtopTimeSeconds
+}
+
+func (c *CollectConf) DremioTtopFreqSeconds() int {
+	return c.dremioTtopFreqSeconds
+}
+
+func (c *CollectConf) CollectTtop() bool {
+	return c.collectTtop
 }
 
 func (c *CollectConf) DremioJStackTimeSeconds() int {

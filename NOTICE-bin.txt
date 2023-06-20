@@ -1,0 +1,34 @@
+# Jackson JSON processor
+
+Jackson is a high-performance, Free/Open Source JSON processing library.
+It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+been in development since 2007.
+It is currently developed by a community of developers.
+
+## Copyright
+
+Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+
+## Licensing
+
+Jackson 2.x core and extension components are licensed under Apache License 2.0
+To find the details that apply to this artifact see the accompanying LICENSE file.
+
+----------------------------------------------------------------------------------------------
+# Swiss Java Knife (SJK)
+
+SJK is a command line tool for JVM diagnostic, troubleshooting and profiling.
+
+SJK exploits standard diagnostic interfaces of JVM (such as JMX, JVM attach 
+and perf counters) and adds some more logic on top useful for common 
+troubleshooting cases. SJK can also be used as a library for building 
+application specific diagnostic tools or to enhance your code with self monitoring features
+
+## Copyright
+
+Copyright 2015 Alexey Ragozin
+
+## Licensing 
+
+SJK is licensed under Apache License 2.0
+----------------------------------------------------------------------------------------------

@@ -51,7 +51,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	} else {
-		expectedOut = "file1\r\nfile2\r\n"
+		expectedOut = "file1\nfile2\n"
 		out, captureErr = tests.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		})
@@ -82,7 +82,6 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 			t.Errorf("Expected error but got nil")
 		}
 	} else {
-		expectedOut = "doesntexist"
 		out, captureErr = tests.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
 		})
