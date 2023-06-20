@@ -88,7 +88,7 @@ func TarGzDir(srcDir, dest string) error {
 				}
 			}()
 			if _, err := io.Copy(tarWriter, file); err != nil {
-				return fmt.Errorf("unable to copy file %v to tar due to error %v", filePath, err)
+				return fmt.Errorf("unable to copy file %v to tar due to error %w", filePath, err)
 			}
 			// if err := file.Close(); err != nil {
 			// 	return fmt.Errorf("failed closing file %v: %v", filePath, err)
@@ -101,13 +101,13 @@ func TarGzDir(srcDir, dest string) error {
 		return err
 	}
 	if err := tarWriter.Close(); err != nil {
-		return fmt.Errorf("failed close to tar file %v", err)
+		return fmt.Errorf("failed close to tar file %w", err)
 	}
 	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed close to gz file %v", err)
+		return fmt.Errorf("failed close to gz file %w", err)
 	}
 	if err := tarGzFile.Close(); err != nil {
-		return fmt.Errorf("failed close to tgz file %v", err)
+		return fmt.Errorf("failed close to tgz file %w", err)
 	}
 	return nil
 }

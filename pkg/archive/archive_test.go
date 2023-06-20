@@ -27,9 +27,10 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 )
 
-func TarGzDirTest(t *testing.T) {
+func TestTarGzDir(t *testing.T) {
 	src := filepath.Join("testdata", "targz")
-	dest := filepath.Join(t.TempDir(), "output.tgz")
+	tmpDir := t.TempDir()
+	dest := filepath.Join(tmpDir, "output.tgz")
 	if err := archive.TarGzDir(src, dest); err != nil {
 		t.Fatalf("unable to archive file due to error %v", err)
 	}
@@ -41,7 +42,7 @@ func TarGzDirTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	outf, err := os.Open(filepath.Join(t.TempDir(), "output.tar"))
+	outf, err := os.Create(filepath.Join(tmpDir, "output.tar"))
 	if err != nil {
 		t.Fatalf("unable to open file for writing with error %v", err)
 	}
@@ -57,12 +58,12 @@ func TarGzDirTest(t *testing.T) {
 		t.Fatalf("unable to close output tar %v", err)
 	}
 
-	outt, err := os.Open(filepath.Join(t.TempDir(), "output.tar"))
+	tarFile, err := os.Open(filepath.Join(tmpDir, "output.tar"))
 	if err != nil {
 		t.Fatalf("unable to read output tar file")
 	}
 	// Open and iterate through the files in the archive.
-	tr := tar.NewReader(outt)
+	tr := tar.NewReader(tarFile)
 	for {
 		hdr, err := tr.Next()
 		if err == io.EOF {
@@ -71,27 +72,36 @@ func TarGzDirTest(t *testing.T) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		outPath := filepath.Join(t.TempDir(), hdr.Name)
-		f, err := os.Open(outPath)
+		if hdr.Typeflag == tar.TypeDir {
+			continue
+		}
+		outPath := filepath.Join(tmpDir, hdr.Name)
+		f, err := os.Create(outPath)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("unable to create path %v: %v", outPath, err)
 		}
 		if _, err := io.Copy(f, tr); err != nil {
-			log.Fatal(err)
+			log.Fatalf("unable to copy file %v out: %v", hdr.Name, err)
 		}
 	}
-
-	_, err = os.Stat(filepath.Join(t.TempDir(), "file1.txt"))
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		log.Fatalf("unable to read test dir for logging %v", err)
+	}
+	for i, e := range entries {
+		t.Logf("entry #%v - %v", i, e)
+	}
+	_, err = os.Stat(filepath.Join(tmpDir, "file1.txt"))
 	if err != nil {
 		t.Fatalf("file missing due to error %v", err)
 	}
 
-	_, err = os.Stat(filepath.Join(t.TempDir(), "file2.txt"))
+	_, err = os.Stat(filepath.Join(tmpDir, "file2.txt"))
 	if err != nil {
 		t.Fatalf("file missing due to error %v", err)
 	}
 
-	copied1, err := os.ReadFile(filepath.Join(t.TempDir(), "file1.txt"))
+	copied1, err := os.ReadFile(filepath.Join(tmpDir, "file1.txt"))
 	if err != nil {
 		t.Fatalf("not able to read coped file1.txt: %v", err)
 	}
@@ -102,7 +112,7 @@ func TarGzDirTest(t *testing.T) {
 	if !reflect.DeepEqual(copied1, original1) {
 		t.Errorf("expected '%q' but got '%q'", string(original1), string(copied1))
 	}
-	copied2, err := os.ReadFile(filepath.Join(t.TempDir(), "file2.txt"))
+	copied2, err := os.ReadFile(filepath.Join(tmpDir, "file2.txt"))
 	if err != nil {
 		t.Fatalf("not able to read coped file2.txt: %v", err)
 	}
