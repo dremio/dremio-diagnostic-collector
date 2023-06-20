@@ -22,6 +22,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -51,8 +52,13 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 			simplelog.Errorf("trying to write file %v, error was %v", filename, err)
 			continue
 		}
-
 	}
+	p, err := cs.CreatePath("kubernetes", "container-logs", "")
+	if err != nil {
+		simplelog.Errorf("trying to construct cluster config path %v with error %v", p, err)
+		return err
+	}
+	clusterLogs(namespace, p)
 	return nil
 }
 
@@ -68,4 +74,10 @@ func clusterExecute(namespace, cmd string, _ Collector, k string) ([]byte, error
 		return []byte(""), fmt.Errorf("when getting config %v error returned was %v", cmd, err)
 	}
 	return res, nil
+}
+
+func clusterLogs(namespace, outputDir string) error {
+	executor := &kubernetes.DefaultCommandExecutor{}
+	err := kubernetes.GetK8sLogs(executor, namespace, outputDir)
+	return err
 }

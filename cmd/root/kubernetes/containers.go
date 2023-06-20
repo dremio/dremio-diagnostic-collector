@@ -27,18 +27,44 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func GetK8sLogs(namespace, outputDir string) error {
-	err, pods := getPods(namespace)
+// CommandExecutor is an interface that represents the functionality of executing commands.
+type CommandExecutor interface {
+	ExecuteCommand(command string, args ...string) ([]byte, error)
+}
+
+// DefaultCommandExecutor is the default implementation of the CommandExecutor interface.
+type DefaultCommandExecutor struct{}
+
+// ExecuteCommand executes the specified command and returns the output and any error.
+func (e *DefaultCommandExecutor) ExecuteCommand(command string, args ...string) ([]byte, error) {
+	cmd := exec.Command(command, args...)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		simplelog.Errorf("cmd.Run() failed with %v\n", err)
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func GetK8sLogs(executor CommandExecutor, namespace, outputDir string) error {
+	simplelog.Infof("Getting list of pods")
+	err, pods := GetPods(executor, namespace)
 	if err != nil {
 		return fmt.Errorf("Error getting pods %v", err)
 	}
 	for _, pod := range pods {
-		err = getContainerLogs(pod, outputDir)
+		simplelog.Infof("Getting list of containers for %v", pod)
+		err = GetContainerLogs(executor, pod, outputDir)
 		if err != nil {
 			return fmt.Errorf("Error getting containers %v", err)
 
 		}
-		err = GetInitContainerLogs(pod, outputDir)
+		simplelog.Infof("Getting list of init containers for %v", pod)
+		err = GetInitContainerLogs(executor, pod, outputDir)
 		if err != nil {
 			return fmt.Errorf("Error getting init containers %v", err)
 
@@ -48,27 +74,32 @@ func GetK8sLogs(namespace, outputDir string) error {
 
 }
 
-func getPods(namespace string) (err error, pods []string) {
+func GetPods(executor CommandExecutor, namespace string) (err error, pods []string) {
 
-	getPodsCmd := fmt.Sprintf("kubectl get pods -n %s -o name", namespace)
-	cmd := exec.Command("bash", "-c", getPodsCmd)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	getPodsCmd := fmt.Sprintf("kubectl get pods -n %v -o name", namespace)
+	out, err := executor.ExecuteCommand("bash", "-c", getPodsCmd)
+	//var outBuff bytes.Buffer
+	//var stderr bytes.Buffer
+	//cmd.Stdout = &out
+	//cmd.Stderr = &stderr
+	//err = cmd.Run()
 	if err != nil {
-		simplelog.Errorf("cmd.Run() failed with %s\n", err)
+		simplelog.Errorf("cmd.Run() failed with %v\n", err)
 	}
-	podNames := out.String()
-	pods = split(podNames, " ")
+	// Convert []byte to bytes.Buffer
+	outputBuffer := bytes.NewBuffer(out)
+
+	// Convert bytes.Buffer to string
+	podNames := outputBuffer.String()
+	simplelog.Debugf("Pods found: %v", podNames)
+	pods = split(podNames, "\n")
 
 	return err, pods
 }
 
-func GetInitContainerLogs(podName, outputDir string) (err error) {
-
-	getContainerCmd := fmt.Sprintf("kubectl get pod %s -o jsonpath=\"{.spec['containers','initContainers'][*].name}\"", podName)
+func GetInitContainerLogs(executor CommandExecutor, podName, outputDir string) (err error) {
+	pod := strings.TrimPrefix(podName, "pod/")
+	getContainerCmd := fmt.Sprintf("kubectl get pod %v -o jsonpath=\"{.spec['containers','initContainers'][*].name}\"", pod)
 	cmd := exec.Command("bash", "-c", getContainerCmd)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -76,18 +107,20 @@ func GetInitContainerLogs(podName, outputDir string) (err error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		simplelog.Errorf("cmd.Run() failed with %s\n", err)
+		simplelog.Errorf("cmd.Run() %v failed with %v\n", cmd, err)
 	}
 	containerNames := out.String()
 	containers := split(containerNames, " ")
 	for _, container := range containers {
-		cLog, err := os.Create(filepath.Join(outputDir, podName+"-"+container))
+		outFile := filepath.Join(outputDir, pod+"-"+container+".out")
+		simplelog.Infof("creating file: %v", outFile)
+		cLog, err := os.Create(outFile)
 		if err != nil {
 			fmt.Println("Error creating file:", err)
 			return err
 		}
 		defer cLog.Close()
-		getLogsCmd := fmt.Sprintf("kubectl logs %s -c %s", podName, container)
+		getLogsCmd := fmt.Sprintf("kubectl logs %v -c %v", pod, container)
 		logCmd := exec.Command("bash", "-c", getLogsCmd)
 		var logs bytes.Buffer
 		var logsStderr bytes.Buffer
@@ -95,9 +128,9 @@ func GetInitContainerLogs(podName, outputDir string) (err error) {
 		logCmd.Stderr = &logsStderr
 		errLogs := logCmd.Run()
 		if errLogs != nil {
-			log.Printf("cmd.Run() failed with %s\n", errLogs)
+			log.Printf("cmd.Run() failed with %v\n", errLogs)
 		}
-		fmt.Println("Logs for container", container, "in pod", podName, ":")
+		simplelog.Infof("Logs for container %v in pod %v", container, pod)
 		// Write the contents of the buffer to the file
 		_, err = logs.WriteTo(cLog)
 		if err != nil {
@@ -108,9 +141,9 @@ func GetInitContainerLogs(podName, outputDir string) (err error) {
 	return err
 }
 
-func getContainerLogs(podName, outputDir string) (err error) {
-
-	getContainerCmd := fmt.Sprintf("kubectl get pod %s -o jsonpath=\"{.spec['containers'][*].name}\"", podName)
+func GetContainerLogs(executor CommandExecutor, podName, outputDir string) (err error) {
+	pod := strings.TrimPrefix(podName, "pod/")
+	getContainerCmd := fmt.Sprintf("kubectl get pod %v -o jsonpath=\"{.spec['containers'][*].name}\"", pod)
 	cmd := exec.Command("bash", "-c", getContainerCmd)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -118,18 +151,20 @@ func getContainerLogs(podName, outputDir string) (err error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		simplelog.Errorf("cmd.Run() failed with %s\n", err)
+		simplelog.Errorf("cmd.Run() failed with %v\n", err)
 	}
 	containerNames := out.String()
 	containers := split(containerNames, " ")
 	for _, container := range containers {
-		cLog, err := os.Create(filepath.Join(outputDir, podName+"-"+container))
+		outFile := filepath.Join(outputDir, pod+"-"+container+".out")
+		simplelog.Infof("creating file: %v", outFile)
+		cLog, err := os.Create(outFile)
 		if err != nil {
 			fmt.Println("Error creating file:", err)
 			return err
 		}
 		defer cLog.Close()
-		getLogsCmd := fmt.Sprintf("kubectl logs %s -c %s", podName, container)
+		getLogsCmd := fmt.Sprintf("kubectl logs %v -c %v", pod, container)
 		logCmd := exec.Command("bash", "-c", getLogsCmd)
 		var logs bytes.Buffer
 		var logsStderr bytes.Buffer
@@ -137,9 +172,9 @@ func getContainerLogs(podName, outputDir string) (err error) {
 		logCmd.Stderr = &logsStderr
 		errLogs := logCmd.Run()
 		if errLogs != nil {
-			log.Printf("cmd.Run() failed with %s\n", errLogs)
+			log.Printf("cmd.Run() failed with %v\n", errLogs)
 		}
-		fmt.Println("Logs for container", container, "in pod", podName, ":")
+		simplelog.Infof("Logs for container %v in pod %v", container, pod)
 		// Write the contents of the buffer to the file
 		_, err = logs.WriteTo(cLog)
 		if err != nil {

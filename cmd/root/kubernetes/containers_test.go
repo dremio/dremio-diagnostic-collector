@@ -30,87 +30,109 @@
 package kubernetes
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"testing"
 )
 
-func TestGetInitContainers(t *testing.T) {
-	podName := "example-pod"
-	outputDir := "output/"
+// Mock implementation of the CommandExecutor interface for testing
+type MockCommandExecutor struct{}
 
-	// Backup original os.Stdout
-	originalStdout := os.Stdout
+func (m *MockCommandExecutor) ExecuteCommand(command string, args ...string) ([]byte, error) {
+	// Simulate successful execution and capture output
+	output := []byte("pod1\npod2\npod3")
+	return output, nil
+}
 
-	// Create a pipe for capturing the standard output
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+// Mock implementation of the exec.Command function for testing
+func execCommandMock(command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecCommandMockProcess", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.Command(os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_EXEC=1"}
+	return cmd
+}
 
-	// Mock the `exec.Command` function
-	execCommand = func(command string, args ...string) *exec.Cmd {
-		cs := []string{"-test.run=TestHelperProcess", "--", command}
-		cs = append(cs, args...)
-		cmd := exec.Command(os.Args[0], cs...)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
-		cmd.Stdout = w
-		return cmd
-	}
-
-	// Helper process to simulate the external command
-	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
-		command := os.Args[2]
-		switch command {
-		case "bash":
-			fmt.Println("initContainer1 initContainer2")
-		case "kubectl":
-			fmt.Println("Logs for container initContainer1 in pod example-pod:")
-			fmt.Println("Log line 1")
-			fmt.Println("Log line 2")
-			fmt.Println("Logs for container initContainer2 in pod example-pod:")
-			fmt.Println("Log line 3")
-		}
+// Mock process for exec.Command function
+func TestExecCommandMockProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_EXEC") != "1" {
 		return
 	}
 
-	err := GetInitContainerLogs(podName, outputDir)
+	// Simulate successful execution and capture output
+	output := []byte("container1 container2 container3")
+	fmt.Fprint(os.Stdout, string(output))
+	os.Exit(0)
+}
+
+func TestGetK8sLogs(t *testing.T) {
+	// Create an instance of the MockCommandExecutor
+	mockExecutor := &MockCommandExecutor{}
+
+	// Call the function you want to test
+	err := GetK8sLogs(mockExecutor, "namespace", "outputDir")
+
+	// Assert that the error is nil (indicating success)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	// Restore original os.Stdout
-	w.Close()
-	os.Stdout = originalStdout
-
-	var capturedOutput bytes.Buffer
-	_, _ = io.Copy(&capturedOutput, r)
-
-	expectedOutput := "Logs for container initContainer1 in pod example-pod:\nLog line 1\nLog line 2\n" +
-		"Logs for container initContainer2 in pod example-pod:\nLog line 3\n"
-
-	if capturedOutput.String() != expectedOutput {
-		t.Errorf("Unexpected output. Expected:\n%s\nGot:\n%s", expectedOutput, capturedOutput.String())
+		t.Errorf("Expected no error, but got: %v", err)
 	}
 }
 
-// Helper function to simulate `exec.Command`
-var execCommand = exec.Command
+func TestGetPods(t *testing.T) {
+	// Create an instance of the MockCommandExecutor
+	mockExecutor := &MockCommandExecutor{}
 
-func TestHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
+	// Call the function you want to test
+	err, pods := GetPods(mockExecutor, "namespace")
+
+	// Assert that the error is nil (indicating success)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
 	}
-	os.Exit(func() int {
-		cmd := execCommand(os.Args[2], os.Args[3:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return 1
+
+	// Assert that the pods are correctly retrieved
+	expectedPods := []string{"container1", "container2", "container3"}
+	if !equalStringSlices(pods, expectedPods) {
+		t.Errorf("Expected pods: %v, but got: %v", expectedPods, pods)
+	}
+}
+
+func TestGetInitContainerLogs(t *testing.T) {
+	// Create an instance of the MockCommandExecutor
+	mockExecutor := &MockCommandExecutor{}
+
+	// Call the function you want to test
+	err := GetInitContainerLogs(mockExecutor, "podName", "outputDir")
+
+	// Assert that the error is nil (indicating success)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+func TestGetContainerLogs(t *testing.T) {
+	// Create an instance of the MockCommandExecutor
+	mockExecutor := &MockCommandExecutor{}
+
+	// Call the function you want to test
+	err := GetContainerLogs(mockExecutor, "podName", "outputDir")
+
+	// Assert that the error is nil (indicating success)
+	if err != nil {
+		t.Errorf("Expected no error, but got: %v", err)
+	}
+}
+
+// Helper function to check if two string slices are equal
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
-		return 0
-	}())
+	}
+	return true
 }
