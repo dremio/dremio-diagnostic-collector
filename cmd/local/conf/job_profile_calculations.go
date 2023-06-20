@@ -44,6 +44,8 @@ func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlo
 	return
 }
 
+// CalculateJobProfileSettingsWithViperConfig sets the job profile according to the number of job profiles and any overrides specified in the category values. This is a bit complicated so read the tests
+// to make sense of all the behavior
 func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning int) {
 	// don't bother doing any of the calculation if personal access token is not present in fact zero out everything
 	if c.DremioPATToken() == "" {

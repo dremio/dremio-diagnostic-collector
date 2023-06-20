@@ -34,6 +34,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ttopcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
@@ -73,6 +74,9 @@ func createAllDirs(c *conf.CollectConf) error {
 		if err := os.MkdirAll(c.QueriesOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create queries directory due to error %v", err)
 		}
+		if err := os.MkdirAll(c.TtopOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create ttop directory due to error %v", err)
+		}
 	}
 
 	if err := os.MkdirAll(c.SystemTablesOutDir(), perms); err != nil {
@@ -105,7 +109,11 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		} else {
 			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
 		}
-
+		if !c.CollectTtop() {
+			simplelog.Debugf("Skipping ttop collection")
+		} else {
+			t.AddJob(wrapConfigJob(ttopcollect.RunTtopCollect))
+		}
 		if !c.CollectJFR() {
 			simplelog.Debugf("Skipping Java Flight Recorder collection")
 		} else {
