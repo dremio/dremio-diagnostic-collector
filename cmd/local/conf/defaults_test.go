@@ -76,7 +76,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyNodeMetricsCollectDurationSeconds, defaultCaptureSeconds},
 		{conf.KeyDremioJStackFreqSeconds, 1},
 		{conf.KeyDremioTtopFreqSeconds, 1},
-		{conf.KeyDremioTtopTimeSeconds, 30},
+		{conf.KeyDremioTtopTimeSeconds, defaultCaptureSeconds},
 		{conf.KeyDremioGCLogsDir, ""},
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
