@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// SetViperDefaults wires up default values for viper when the ddc.yaml or the cli flags do not set the value
 func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir string) {
 	// set default config
 	viper.SetDefault(KeyVerbose, "vv")
@@ -45,6 +46,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyCollectReflectionLog, true)
 	viper.SetDefault(KeyCollectGCLogs, true)
 	viper.SetDefault(KeyCollectJFR, true)
+	viper.SetDefault(KeyCollectTtop, true)
 	viper.SetDefault(KeyCollectJStack, true)
 	viper.SetDefault(KeyCollectSystemTablesExport, true)
 	viper.SetDefault(KeySystemTablesRowLimit, 100000)
@@ -54,6 +56,8 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyDremioJFRTimeSeconds, defaultCaptureSeconds)
 	viper.SetDefault(KeyNodeMetricsCollectDurationSeconds, defaultCaptureSeconds)
 	viper.SetDefault(KeyDremioJStackFreqSeconds, 1)
+	viper.SetDefault(KeyDremioTtopFreqSeconds, 1)
+	viper.SetDefault(KeyDremioTtopTimeSeconds, defaultCaptureSeconds)
 	viper.SetDefault(KeyDremioGCLogsDir, "")
 	viper.SetDefault(KeyNodeName, hostName)
 	viper.SetDefault(KeyAcceptCollectionConsent, true)
