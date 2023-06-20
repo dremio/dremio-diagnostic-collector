@@ -15,6 +15,8 @@
 package conf
 
 const (
+	// KeyVerbose provides output verbosity when the local-collect command is running,
+	// this does not affect the log files which are always debug
 	KeyVerbose                           = "verbose"
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
@@ -41,6 +43,7 @@ const (
 	KeyCollectGCLogs                     = "collect-gc-logs"
 	KeyCollectJFR                        = "collect-jfr"
 	KeyCollectJStack                     = "collect-jstack"
+	KeyCollectTtop                       = "collect-ttop"
 	KeyCollectSystemTablesExport         = "collect-system-tables-export"
 	KeySystemTablesRowLimit              = "system-tables-row-limit"
 	KeyCollectWLM                        = "collect-wlm"
@@ -49,6 +52,8 @@ const (
 	KeyDremioJFRTimeSeconds              = "dremio-jfr-time-seconds"
 	KeyNodeMetricsCollectDurationSeconds = "node-metrics-collect-duration-seconds"
 	KeyDremioJStackFreqSeconds           = "dremio-jstack-freq-seconds"
+	KeyDremioTtopFreqSeconds             = "dremio-ttop-freq-seconds"
+	KeyDremioTtopTimeSeconds             = "dremio-ttop-time-seconds"
 	KeyDremioGCLogsDir                   = "dremio-gclogs-dir"
 	KeyNodeName                          = "node-name"
 	KeyAcceptCollectionConsent           = "accept-collection-consent"
