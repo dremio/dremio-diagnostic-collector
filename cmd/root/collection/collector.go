@@ -73,7 +73,7 @@ type HostCaptureConfiguration struct {
 	DDCfs             helpers.Filesystem
 }
 
-func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func()) error {
+func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func([]string)) error {
 	start := time.Now().UTC()
 	coordinatorStr := collectionArgs.CoordinatorStr
 	executorsStr := collectionArgs.ExecutorsStr
@@ -114,9 +114,11 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if totalNodes == 0 {
 		return fmt.Errorf("there are no nodes to connect: %v", c.HelpText())
 	}
+	hosts := append(coordinators, executors...)
+
 	//now safe to collect cluster level information
 	for _, c := range clusterCollection {
-		c()
+		c(hosts)
 	}
 	var files []helpers.CollectedFile
 	var totalFailedFiles []FailedFiles

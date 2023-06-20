@@ -16,6 +16,7 @@
 package threading
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -32,25 +33,31 @@ type ThreadPool struct {
 	mut              sync.Mutex
 }
 
-func NewThreadPool(numberThreads int, loggingFrequency int) *ThreadPool {
+func NewThreadPool(numberThreads int, loggingFrequency int) (*ThreadPool, error) {
+	if numberThreads == 0 {
+		return &ThreadPool{}, errors.New("invalid number of threads at 0")
+	}
+
 	//by default support 4 million jobs
 	jobs := make(chan func() error, 4000000)
-
 	return &ThreadPool{
 		numberThreads:    numberThreads,
 		jobs:             jobs,
 		loggingFrequency: loggingFrequency,
-	}
+	}, nil
 }
 
-func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency int) *ThreadPool {
+func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency int) (*ThreadPool, error) {
+	if numberThreads == 0 {
+		return &ThreadPool{}, errors.New("invalid number of threads at 0")
+	}
 	jobs := make(chan func() error, jobQueueSize)
 
 	return &ThreadPool{
 		numberThreads:    numberThreads,
 		jobs:             jobs,
 		loggingFrequency: loggingFrequency,
-	}
+	}, nil
 }
 
 // AddJob adds a job to the thread pool. It increases the wait group counter and sends the job to the jobs channel.
@@ -66,19 +73,18 @@ func (t *ThreadPool) AddJob(job func() error) {
 // worker listens for jobs on the jobs channel and executes them. Each job runs on its own goroutine.
 func (t *ThreadPool) worker() {
 	for job := range t.jobs {
-		go func(j func() error) {
-			err := j()
-			if err != nil {
-				simplelog.Errorf("Failed to execute job: %v", err)
-			}
-			t.mut.Lock()
-			t.pendingJobs--
-			if t.pendingJobs%t.loggingFrequency == 0 {
-				simplelog.Infof("%v/%v tasks completed", t.totalJobs-t.pendingJobs, t.totalJobs)
-			}
-			t.mut.Unlock()
-			t.wg.Done()
-		}(job)
+		err := job()
+		if err != nil {
+			simplelog.Errorf("Failed to execute job: %v", err)
+		}
+		t.mut.Lock()
+		t.pendingJobs--
+		jobsCompleted := t.totalJobs - t.pendingJobs
+		if jobsCompleted%t.loggingFrequency == 0 {
+			simplelog.Infof("%v/%v tasks completed", jobsCompleted, t.totalJobs)
+		}
+		t.mut.Unlock()
+		t.wg.Done()
 	}
 }
 

@@ -96,11 +96,6 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, so
 }
 
 func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
-	}
 	// We dont have any sudo user in the container so no addition of sudo commands used
 	return c.cli.Execute(c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
@@ -127,4 +122,8 @@ func (c *KubectlK8sActions) FindHosts(searchTerm string) (podName []string, err 
 
 func (c *KubectlK8sActions) HelpText() string {
 	return "Make sure the labels and namespace you use actually correspond to your dremio pods: try something like 'ddc -n mynamespace --coordinator app=dremio-coordinator --executor app=dremio-executor'.  You can also run 'kubectl get pods --show-labels' to see what labels are available to use for your dremio pods"
+}
+
+func (c *KubectlK8sActions) CopyLogs(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
+	return c.cli.Execute(c.kubectlPath, "logs", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }

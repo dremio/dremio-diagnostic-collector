@@ -23,4 +23,4 @@ Get-Date -Format "HH:mm:ss"
 .\script\release-build.ps1 $VERSION
 
 # Run gh release command
-gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-amd64.zip ./bin/ddc-darwin-arm64.zip ./bin/ddc-darwin-amd64.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip
+gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-amd64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip

@@ -150,6 +150,16 @@ func (l *Collector) RunCollectDremioAccessLogs() error {
 	return nil
 }
 
+func (l *Collector) RunCollectDremioAuditLogs() error {
+	simplelog.Debug("Collecting audit logs from Coordinator(s) ...")
+	if err := l.exportArchivedLogs(l.dremioLogDir, "audit.json", "audit", l.dremioLogsNumDays); err != nil {
+		return fmt.Errorf("unable to archive audit.jsons due to error %v", err)
+	}
+	simplelog.Debug("... collecting audit logs from Coordinator(s) COMPLETED")
+
+	return nil
+}
+
 func (l *Collector) RunCollectAccelerationLogs() error {
 	simplelog.Debug("Collecting acceleration logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "acceleration.log", "acceleration", l.dremioLogsNumDays); err != nil {

@@ -113,20 +113,25 @@ func Execute() {
 		}
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(os.Args, " "))
-		cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs)
+		cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
 		// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 		// which then determines whether the commands are routed to the SSH or K8s commands
 
 		//default no op
-		var clusterCollect = func() {}
+		var clusterCollect = func([]string) {}
 		var collectorStrategy collection.Collector
+
 		if isK8s {
 			simplelog.Info("using Kubernetes kubectl based collection")
 			collectorStrategy = kubernetes.NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorsContainer, namespace)
-			clusterCollect = func() {
+			clusterCollect = func(pods []string) {
 				err = collection.ClusterK8sExecute(namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubectlPath)
 				if err != nil {
 					simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+				}
+				err = collection.GetClusterLogs(namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubectlPath, pods)
+				if err != nil {
+					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 				}
 			}
 		} else {

@@ -2,10 +2,9 @@
 
 ### Dependency
 
-1. Recent verision of Docker up and running
-2. Access to the dremio-ee Docker image
-3. Log into docker using the [docker login](https://docs.docker.com/engine/reference/commandline/login/) command
-4. Pull down dremio-ee with the following command before running any tests `docker pull dremio/dremio-ee:24.0`
+Kubernetes cluster with at least 4 cpus and 8192Mi of ram free. Should be a recent enough version. Can be local or remote it doesn't matter. It should not be a production cluster, although it will create random namespaces to avoid clobbering anything in prod.
+
+NOTE: this means whenever you run tests it will be creating and delete resources on k8s
 
 ### Scripts
 

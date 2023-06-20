@@ -1,5 +1,3 @@
-//go:build !windows
-
 //	Copyright 2023 Dremio Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +18,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -55,7 +52,7 @@ accept-collection-consent: true
 allow-insecure-ssl: true
 node-name: %v
 tmp-output-dir: %v
-`, endpoint, nodeName, outDir)), 0600)
+`, endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
 	if err != nil {
 		t.Fatalf("unable to create ddc.yaml due to error %v", err)
 	}
@@ -94,8 +91,8 @@ func TestRunCollectWLM(t *testing.T) {
 		t.Errorf("RunCollectWLM() returned an error: %v", err)
 	}
 	// Define the file paths
-	queueFilePath := path.Join(c.WLMOutDir(), "queues.json")
-	ruleFilePath := path.Join(c.WLMOutDir(), "rules.json")
+	queueFilePath := filepath.Join(c.WLMOutDir(), "queues.json")
+	ruleFilePath := filepath.Join(c.WLMOutDir(), "rules.json")
 
 	// Check if the 'queues.json' file was created
 	if _, err := os.Stat(queueFilePath); os.IsNotExist(err) {

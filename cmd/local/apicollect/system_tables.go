@@ -71,11 +71,13 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 
 	simplelog.Debugf("Collecting sys." + systable + " (Limit: " + tablerowlimit + " rows)")
 	sql := "SELECT * FROM sys." + systable
+	// job history is limited by the number of days, all other sys tables are limited by the number of rows
 	if strings.Contains(systable, "project.history.jobs") {
 		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + strconv.Itoa(c.DremioQueriesJSONNumDays()) + " AS INTERVAL DAY))"
 		sql += " ORDER BY submitted_ts DESC"
+	} else {
+		sql += " LIMIT " + tablerowlimit
 	}
-	sql += " LIMIT " + tablerowlimit
 	simplelog.Debugf(sql)
 	sqlbody := "{\"sql\": \"" + sql + "\"}"
 
@@ -89,7 +91,7 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
 	}
 	jobresultsurl = joburl + jobid + "/results"
-	simplelog.Debugf("Retrieving job results ...")
+	simplelog.Debug("Retrieving job results ...")
 	err = retrieveJobResults(c, jobresultsurl, headers, systable)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve job results due to error %v", err)
@@ -112,11 +114,14 @@ func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]s
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
 		}
 		if val, ok := dat["jobState"]; ok {
-			jobstate = val.(string)
-			simplelog.Debugf("job state: %s", jobstate)
+			jobstate, ok = val.(string)
+			if !ok {
+				return fmt.Errorf("returned field 'jobState' does not have expected type string")
+			}
 		} else {
-			return fmt.Errorf("returned json does not contain expected field 'jobState'")
+			return fmt.Errorf("returned json does not contain required field 'jobState'")
 		}
+		simplelog.Debugf("job state: %s", jobstate)
 		if jobstate == "FAILED" || jobstate == "CANCELED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
 			return fmt.Errorf("unable to retrieve job results - job state: " + jobstate)
 		}
@@ -145,14 +150,17 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
 		}
 		if val, ok := dat["rowCount"]; ok {
-			rowcount = val.(float64)
+			rowcount, ok = val.(float64)
+			if !ok {
+				rowcount = 0
+				simplelog.Warningf("returned field 'rowCount' does not have expected type float64")
+			}
 		} else {
 			rowcount = 0
 			simplelog.Warningf("returned json does not contain expected field 'rowCount'")
 		}
 		sb := string(body)
-
-		filename := "sys." + strings.Replace(systable, "\\\"", "", -1) + urlsuffix + ".json"
+		filename := getSystemTableName(systable, urlsuffix)
 		systemTableFile := path.Join(c.SystemTablesOutDir(), filename)
 		simplelog.Debugf("Creating " + filename + " ...")
 		file, err := os.Create(path.Clean(systemTableFile))
@@ -176,5 +184,15 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 	}
 
 	return nil
+}
 
+func getSystemTableName(systable, urlsuffix string) string {
+	filename := strings.Join([]string{"sys.", systable, urlsuffix, ".json"}, "")
+	// the ? will not work on windows
+	filename = strings.Replace(filename, "?", "_", -1)
+	// the = will not work on windows
+	filename = strings.Replace(filename, "=", "_", -1)
+	// go ahead and remove & because it will look weird by itself in the file name
+	filename = strings.Replace(filename, "&", "_", -1)
+	return strings.Replace(filename, "\\\"", "", -1)
 }

@@ -37,13 +37,13 @@ Get-Date -Format "HH:mm:ss"
 $env:GOOS="darwin"
 $env:GOARCH="amd64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-darwin-amd64.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-mac-intel.zip
 
 Write-Output "Building darwin-os-x-arm64…"
 Get-Date -Format "HH:mm:ss"
 $env:GOARCH="arm64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-darwin-arm64.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-mac-m-series.zip
 
 Write-Output "Building windows-amd64…"
 Get-Date -Format "HH:mm:ss"

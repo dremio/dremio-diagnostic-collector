@@ -91,14 +91,17 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	tried = len(profilesToCollect)
 	if len(profilesToCollect) > 0 {
 		simplelog.Debugf("Downloading %v job profiles...", len(profilesToCollect))
-		downloadThreadPool := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100)
+		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100)
+		if err != nil {
+			return 0, 0, fmt.Errorf("invalid thread pool: %w", err)
+		}
 		for key := range profilesToCollect {
 			//because we are looping
 			keyToDownload := key
 			downloadThreadPool.AddJob(func() error {
 				err := DownloadJobProfile(c, keyToDownload)
 				if err != nil {
-					simplelog.Errorf("unable to download job profile %v, due to error %v", keyToDownload, err) // Print instead of Error
+					simplelog.Errorf("unable to download %v, err: %v", keyToDownload, err) // Print instead of Error
 				}
 				return nil
 			})
@@ -123,7 +126,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	if err != nil {
 		return err
 	}
-	simplelog.Debugf("After eliminating duplicates we are tried to collect %v profiles", tried)
+	simplelog.Debugf("After eliminating duplicates we attempted to collect %v profiles", tried)
 	simplelog.Infof("Downloaded %v job profiles", collected)
 	return nil
 }

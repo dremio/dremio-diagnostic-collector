@@ -1,4 +1,4 @@
-# script\test.ps1: Run test suite for application.
+# script/fix-license.ps1: Add license header to files missing it
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -6,8 +6,5 @@ $ErrorActionPreference = "Stop"
 # Change working directory to script's grandparents directory
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
-if ($env:DEBUG) {
-    $DebugPreference = "Continue"
-}
-
-go test -covermode atomic -coverprofile=covprofile ./...
+Write-Output "Executing license-header-check add"
+license-header-checker license_header.txt -a . go

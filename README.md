@@ -33,6 +33,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # verbose: vv
 # collect-acceleration-log: false
 # collect-access-log: false
+# collect-audit-log: false
 # collect-dremio-configuration: true # will collect dremio.conf, dremio-env, logback.xml and logback-access.xml
 # number-job-profiles: 25000 # up to this number, may have less due to duplicates NOTE: need to have the dremio-pat-token set to work
 # capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
@@ -42,19 +43,23 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 
 ## not typically recommended to change
 # tmp-output-dir: "" # dynamically set normally
+# dremio-pid: 0
 # collect-metrics: true
+# collect-os-config: true
 # collect-disk-usage: true
 # dremio-logs-num-days: 7
 # dremio-queries-json-num-days: 28
 # dremio-gc-file-pattern: "gc*.log*"
 # collect-queries-json: true
-# collect-server-logs; true
+# collect-jvm-flags: true
+# collect-server-logs: true
 # collect-meta-refresh-log: true
 # collect-reflection-log: true
 # collect-gc-logs: true
 # collect-jfr: true
 # collect-jstack: true
 # collect-system-tables-export: true
+# system-tables-row-limit: 100000
 # collect-wlm: true
 # collect-kvstore-report: true
 # dremio-jstack-time-seconds: 60
@@ -93,6 +98,19 @@ specific executors that you want to collect from with the -e flag and coordinato
 ```
 
 If you have issues consult the [ssh docs](docs/ssh.md)
+
+### dremio cloud (Preview)
+Specify the following parameters in ddc.yaml
+```is-dremio-cloud: true
+dremio-endpoint: "[eu.]dremio.cloud"    # Specify whether EU Dremio Cloud or not
+dremio-cloud-project-id: "<PROJECT_ID>"
+dremio-pat-token: "<DREMIO_PAT>"
+tmp-output-dir: /full/path/to/dir       # Specify local target directory
+```
+and run
+```sh
+./ddc local-collect
+```
 
 ## What is collected?
 

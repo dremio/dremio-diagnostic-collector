@@ -32,9 +32,9 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ttopcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
@@ -91,47 +91,18 @@ func createAllDirs(c *conf.CollectConf) error {
 	return nil
 }
 
-func collect(numberThreads int, c *conf.CollectConf) {
+func collect(c *conf.CollectConf) error {
 	if err := createAllDirs(c); err != nil {
-		fmt.Printf("unable to create directories due to error %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
-	t := threading.NewThreadPool(numberThreads, 1)
+	t, err := threading.NewThreadPool(c.NumberThreads(), 1)
+	if err != nil {
+		return fmt.Errorf("unable to spawn thread pool: %w", err)
+	}
 	wrapConfigJob := func(j func(c *conf.CollectConf) error) func() error {
 		return func() error { return j(c) }
 	}
 	if !c.IsDremioCloud() {
-		//put all things that take time up front
-
-		// os diagnostic collection
-		if !c.CollectNodeMetrics() {
-			simplelog.Debugf("Skipping node metrics collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
-		}
-		if !c.CollectTtop() {
-			simplelog.Debugf("Skipping ttop collection")
-		} else {
-			t.AddJob(wrapConfigJob(ttopcollect.RunTtopCollect))
-		}
-		if !c.CollectJFR() {
-			simplelog.Debugf("Skipping Java Flight Recorder collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectJFR))
-		}
-
-		if !c.CollectJStack() {
-			simplelog.Debugf("Skipping Java thread dumps collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectJStacks))
-		}
-
-		if !c.CaptureHeapDump() {
-			simplelog.Debugf("Skipping Java heap dump collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectHeapDump))
-		}
-
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
@@ -143,7 +114,12 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		} else {
 			t.AddJob(wrapConfigJob(runCollectDremioConfig))
 		}
-		t.AddJob(wrapConfigJob(runCollectOSConfig))
+
+		if !c.CollectOSConfig() {
+			simplelog.Info("Skipping OS config collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectOSConfig))
+		}
 
 		// log collection
 
@@ -202,14 +178,51 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			t.AddJob(logCollector.RunCollectDremioAccessLogs)
 		}
 
-		t.AddJob(wrapConfigJob(runCollectJvmConfig))
+		if !c.CollectAuditLogs() {
+			simplelog.Debug("Skipping audit log collection")
+		} else {
+			t.AddJob(logCollector.RunCollectDremioAuditLogs)
+		}
 
+		if !c.CollectJVMFlags() {
+			simplelog.Debug("Skipping JVM Flags collection")
+		} else {
+			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJVMFlags))
+		}
 		// rest call collections
 
 		if !c.CollectKVStoreReport() {
 			simplelog.Debug("Skipping KV store report collection")
 		} else {
 			t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
+		}
+		// os diagnostic collection
+		if !c.CollectNodeMetrics() {
+			simplelog.Debugf("Skipping node metrics collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
+		}
+		if !c.CollectTtop() {
+			simplelog.Debugf("Skipping ttop collection")
+		} else {
+			t.AddJob(wrapConfigJob(jvmcollect.RunTtopCollect))
+		}
+		if !c.CollectJFR() {
+			simplelog.Debugf("Skipping Java Flight Recorder collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJFR))
+		}
+
+		if !c.CollectJStack() {
+			simplelog.Debugf("Skipping Java thread dumps collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJStacks))
+		}
+
+		if !c.CaptureHeapDump() {
+			simplelog.Debugf("Skipping Java heap dump collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectHeapDump))
 		}
 	}
 
@@ -237,6 +250,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
+	return nil
 }
 
 func runCollectDiskUsage(c *conf.CollectConf) error {
@@ -281,10 +295,10 @@ func runCollectDiskUsage(c *conf.CollectConf) error {
 
 func runCollectOSConfig(c *conf.CollectConf) error {
 	simplelog.Debug("Collecting OS Information")
-	osInfoFile := path.Join(c.NodeInfoOutDir(), "os_info.txt")
-	w, err := os.Create(path.Clean(osInfoFile))
+	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
+	w, err := os.Create(filepath.Clean(osInfoFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", path.Clean(osInfoFile), err)
+		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(osInfoFile), err)
 	}
 	defer func() {
 		if err := w.Sync(); err != nil {
@@ -382,33 +396,15 @@ func runCollectDremioConfig(c *conf.CollectConf) error {
 	return nil
 }
 
-func runCollectJvmConfig(c *conf.CollectConf) error {
-	jvmSettingsFile := path.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
-	jvmSettingsFileWriter, err := os.Create(path.Clean(jvmSettingsFile))
-	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", path.Clean(jvmSettingsFile), err)
-	}
-	defer func() {
-		if err := jvmSettingsFileWriter.Sync(); err != nil {
-			simplelog.Warningf("unable to sync the os_info.txt file due to error: %v", err)
-		}
-		if err := jvmSettingsFileWriter.Close(); err != nil {
-			simplelog.Warningf("unable to close the os_info.txt file due to error: %v", err)
-		}
-	}()
-	dremioPID := c.DremioPID()
-	err = ddcio.Shell(jvmSettingsFileWriter, fmt.Sprintf("jcmd %v VM.flags", dremioPID))
-	if err != nil {
-		simplelog.Warningf("unable to write jvm_settings.txt file due to error %v", err)
-	}
-	return nil
-}
-
 func runCollectNodeMetrics(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
-	nodeMetricsFile := path.Join(c.NodeInfoOutDir(), "metrics.txt")
-	nodeMetricsJSONFile := path.Join(c.NodeInfoOutDir(), "metrics.json")
-	return nodeinfocollect.SystemMetrics(c.NodeMetricsCollectDurationSeconds(), path.Clean(nodeMetricsFile), path.Clean(nodeMetricsJSONFile))
+	nodeMetricsJSONFile := filepath.Join(c.NodeInfoOutDir(), "metrics.json")
+	args := nodeinfocollect.Args{
+		IntervalSeconds: 1,
+		DurationSeconds: c.NodeMetricsCollectDurationSeconds(),
+		OutFile:         nodeMetricsJSONFile,
+	}
+	return nodeinfocollect.SystemMetrics(args)
 }
 
 func runCollectJFR(c *conf.CollectConf) error {
@@ -450,8 +446,8 @@ func runCollectJStacks(c *conf.CollectConf) error {
 			simplelog.Warningf("unable to capture jstack of pid %v due to error %v", c.DremioPID(), err)
 		}
 		date := time.Now().Format("2006-01-02_15_04_05")
-		threadDumpFileName := path.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
-		if err := os.WriteFile(path.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
+		threadDumpFileName := filepath.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
+		if err := os.WriteFile(filepath.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
 			return fmt.Errorf("unable to write thread dump %v due to error %v", threadDumpFileName, err)
 		}
 		simplelog.Debugf("Saved %v", threadDumpFileName)
@@ -484,7 +480,7 @@ func runCollectHeapDump(c *conf.CollectConf) error {
 	if err := os.Remove(path.Clean(hprofFile)); err != nil {
 		simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
 	}
-	dest := path.Join(c.HeapDumpsOutDir(), baseName+".gz")
+	dest := filepath.Join(c.HeapDumpsOutDir(), baseName+".gz")
 	if err := os.Rename(path.Clean(hprofGzFile), path.Clean(dest)); err != nil {
 		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)
 	}
@@ -535,7 +531,10 @@ var LocalCollectCmd = &cobra.Command{
 
 		// Run application
 		simplelog.Info("Starting collection...")
-		collect(c.NumberThreads(), c)
+		if err := collect(c); err != nil {
+			simplelog.Errorf("unable to collect: %v", err)
+			os.Exit(1)
+		}
 		ddcLoc, err := os.Executable()
 		if err != nil {
 			simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
@@ -563,6 +562,7 @@ func init() {
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().Bool("collect-acceleration-log", false, "Run the Collect Acceleration Log collector")
 	LocalCollectCmd.Flags().Bool("collect-access-log", false, "Run the Collect Access Log collector")
+	LocalCollectCmd.Flags().Bool("collect-audit-log", false, "Run the Collect Audit Log collector")
 	LocalCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
 	LocalCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
 	LocalCollectCmd.Flags().IntP("number-threads", "t", 0, "control concurrency in the system")

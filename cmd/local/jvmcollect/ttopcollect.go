@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ttopcollect
+package jvmcollect
 
 import (
 	"bufio"
@@ -58,7 +58,8 @@ func (t *Ttop) StartTtop(interval, pid int) error {
 		return err
 	}
 	t.tmpDir = tmpDir
-	data, err := fs.ReadFile(f, filepath.Join("lib", "sjk.jar"))
+	// referencing a part interior to go always use / path
+	data, err := fs.ReadFile(f, "lib/sjk.jar")
 	if err != nil {
 		return err
 	}

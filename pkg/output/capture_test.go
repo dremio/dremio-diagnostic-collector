@@ -12,5 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// package nodeinfocollect has all the methods for collecting the information for nodeinfo
-package nodeinfocollect
+// output provides functinos around capturing output
+package output
+
+import (
+	"fmt"
+	"testing"
+)
+
+// TestCaptureOutput will test the CaptureOutput function with a simple print function
+func TestCaptureOutput(t *testing.T) {
+	expected := "Hello, world!\n"
+	out, err := CaptureOutput(func() {
+		fmt.Println("Hello, world!")
+	})
+
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+
+	if out != expected {
+		t.Fatalf("expected %q, got %q", expected, out)
+	}
+}

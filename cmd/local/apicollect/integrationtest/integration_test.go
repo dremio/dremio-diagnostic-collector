@@ -1,5 +1,3 @@
-//go:build !windows
-
 //	Copyright 2023 Dremio Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -54,8 +53,30 @@ type JobAPIResponse struct {
 var c *conf.CollectConf
 
 func cleanupOutput() {
-	if err := os.RemoveAll(c.OutputDir()); err != nil {
-		log.Printf("WARN unable to remove %v it may have to be manually cleaned up", c.OutputDir())
+	if c != nil {
+		if _, err := os.Stat(c.OutputDir()); err != nil {
+			if os.IsNotExist(err) {
+				return
+			}
+		}
+		if err := os.RemoveAll(c.OutputDir()); err != nil {
+			log.Printf("WARN unable to remove %v it may have to be manually cleaned up", c.OutputDir())
+		}
+	}
+
+	yamlFile := filepath.Join("testdata", "dremio.yaml")
+	cmdApply := exec.Command("kubectl", "delete", "-n", namespace, "-f", yamlFile)
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	if err := cmdApply.Run(); err != nil {
+		log.Printf("Error during kubectl apply: %v", err)
+	}
+	time.Sleep(time.Duration(15) * time.Second)
+	cmdApply = exec.Command("kubectl", "delete", "namespace", namespace)
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	if err := cmdApply.Run(); err != nil {
+		log.Printf("Error during kubectl delete: %v", err)
 	}
 }
 
@@ -76,6 +97,7 @@ func writeConf(patToken, dremioEndpoint, tmpOutputDir string) string {
 	yamlText := fmt.Sprintf(`verbose: vvvv
 collect-acceleration-log: true
 collect-access-log: true
+collect-audit-log: true
 dremio-gclogs-dir: ""
 dremio-log-dir: /opt/dremio/data/logs
 dremio-conf-dir: /opt/dremio/conf
@@ -91,84 +113,114 @@ accept-collection-consent: true
 tmp-output-dir: %v
 node-metrics-collect-duration-seconds: 10
 "
-`, dremioEndpoint, patToken, tmpOutputDir)
+`, dremioEndpoint, patToken, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
 	if _, err := w.WriteString(yamlText); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
 }
-func GetRootProjectDir() (string, error) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
-	output, err := cmd.Output()
+
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
-	rootDir := strings.TrimSpace(string(output))
-	return rootDir, nil
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-var rootDir string
+var namespace string
 
 func TestMain(m *testing.M) {
 	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
 		var err error
-		rootDir, err = GetRootProjectDir()
+
+		// Define the name and type of the resource you are waiting for.
+		ts := time.Now().Unix()
+		namespace = fmt.Sprintf("ddc-test-%v", ts)
+		cmdApply := exec.Command("kubectl", "create", "namespace", namespace)
+		cmdApply.Stderr = os.Stderr
+		cmdApply.Stdout = os.Stdout
+		err = cmdApply.Run()
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error during kubectl apply: %v", err)
 		}
-		if err := ddcio.CopyFile(filepath.Join("testdata", "conf", "dremio.conf"), filepath.Join(rootDir, "server-install", "conf", "dremio.conf")); err != nil {
-			log.Fatal(err)
+
+		yamlFile := filepath.Join("testdata", "dremio.yaml")
+		// Execute the `kubectl apply` command.
+		cmdApply = exec.Command("kubectl", "apply", "-n", namespace, "-f", yamlFile)
+		cmdApply.Stderr = os.Stderr
+		cmdApply.Stdout = os.Stdout
+		err = cmdApply.Run()
+		if err != nil {
+			log.Printf("Error during kubectl apply: %v", err)
+			return
 		}
-		dremioExec := filepath.Join(rootDir, "server-install", "bin", "dremio")
-		cmd := exec.Command(dremioExec, "start")
-		// Attach to standard output and error
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		// Start the process
+		// Give Kubernetes some extra time to get everything ready.
+		time.Sleep(5 * time.Second)
+
+		// Wait for the resource to become ready.
+
+		fmt.Println("waiting on Dremio master!")
+		cmdWait := exec.Command("kubectl", "-n", namespace, "wait", "pod", "dremio-master-0", "--for=condition=Ready", "--timeout=180s")
+		//cmdWait.Stderr = os.Stderr
+		//cmdWait.Stdout = os.Stdout
+		err = cmdWait.Run()
+		if err != nil {
+			log.Printf("Error during kubectl wait: '%v'", err)
+			return 1
+		}
+
+		// Give Kubernetes some extra time to get everything ready.
+		time.Sleep(10 * time.Second)
+
+		fmt.Println("Dremio master is now ready!")
+
+		//kubectl portforward
+
+		// Let the system choose a free port.
+		dremioTestPort, err := getFreePort()
+		if err != nil {
+			log.Printf("Failed to find a free port: %v", err)
+			return 1
+		}
+
+		// Start the port forwarding.
+		cmd := exec.Command("kubectl", "port-forward", "dremio-master-0", fmt.Sprintf("%v:9047", dremioTestPort), "-n", namespace)
 		if err := cmd.Start(); err != nil {
-			log.Fatal(err)
+			log.Printf("Failed to start command: %v", err)
+			return 1
+
 		}
 
-		fmt.Println("sleeping 60 seconds so that dremio can start")
-		time.Sleep(60 * time.Second)
-
+		// Ensure the command is stopped when main returns.
 		defer func() {
-			//send shutdown
-			shutdownCmd := exec.Command(dremioExec, "stop")
-			// Attach to standard output and error
-			shutdownCmd.Stdout = os.Stdout
-			shutdownCmd.Stderr = os.Stderr
-			// Start the process
-			if err := shutdownCmd.Start(); err != nil {
-				log.Print(err)
+			if err := cmd.Process.Kill(); err != nil {
+				log.Printf("Failed to kill process: %v", err)
 			}
 		}()
 
-		dremioTestPort := 9047
-		if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
-			log.Printf("unable to remove dremio-source do to error %v", err)
-		}
-
-		if err := os.MkdirAll("/tmp/dremio-source", 0700); err != nil {
-			log.Fatalf("need to make the source dir to do the test %v", err)
-		}
-		defer func() {
-			if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
-				log.Printf("unable to remove dremio-source do to error %v", err)
-			}
-		}()
+		//give port foward time to work
+		time.Sleep(5 * time.Second)
 
 		dremioEndpoint := fmt.Sprintf("http://localhost:%v", dremioTestPort)
 
 		res, err := http.Get(dremioEndpoint) //nolint
 		if err != nil {
-			log.Fatalf("error making http request: %s\n", err)
+			log.Printf("error making http request: %s\n", err)
+			return 1
 		}
 		expectedCode := 200
 		if res.StatusCode != expectedCode {
-			log.Fatalf("expected status code %v but instead got %v. Dremio is not ready", expectedCode, res.StatusCode)
+			log.Printf("expected status code %v but instead got %v. Dremio is not ready", expectedCode, res.StatusCode)
+			return 1
 		}
 
 		authRequest := &AuthRequest{
@@ -177,30 +229,36 @@ func TestMain(m *testing.M) {
 		}
 		body, err := json.Marshal(authRequest)
 		if err != nil {
-			log.Fatalf("Error marshaling JSON: %v", err)
+			log.Printf("Error marshaling JSON: %v", err)
+			return 1
 		}
 		res, err = http.Post(fmt.Sprintf("http://localhost:%v/apiv2/login", dremioTestPort), "application/json", bytes.NewBuffer(body))
 		if err != nil {
-			log.Fatalf("error logging in to get token : %s\n", err)
+			log.Printf("error logging in to get token : %s\n", err)
+			return 1
 		}
 		defer res.Body.Close()
 		if res.StatusCode != expectedCode {
 			text, err := io.ReadAll(res.Body)
 			if err != nil {
-				log.Fatalf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				log.Printf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				return 1
 			}
 			log.Printf("body was %s", string(text))
-			log.Fatalf("expected status code %v but instead got %v with message %v. Unable to get dremio PAT", expectedCode, res.StatusCode, res.Status)
+			log.Printf("expected status code %v but instead got %v with message %v. Unable to get dremio PAT", expectedCode, res.StatusCode, res.Status)
+			return 1
 		}
 		var authResponse AuthResponse
 		err = json.NewDecoder(res.Body).Decode(&authResponse)
 		if err != nil {
 			text, err := io.ReadAll(res.Body)
 			if err != nil {
-				log.Fatalf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				log.Printf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				return 1
 			}
 			log.Printf("body was %s", string(text))
-			log.Fatalf("fatal attempt to decode body from dremio auth %v", err)
+			log.Printf("fatal attempt to decode body from dremio auth %v", err)
+			return 1
 		}
 		dremioPATToken := authResponse.Token
 
@@ -224,29 +282,35 @@ func TestMain(m *testing.M) {
 		  }`
 		httpReq, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%v/apiv3/catalog", dremioTestPort), bytes.NewBuffer([]byte(nasSource)))
 		if err != nil {
-			log.Fatalf("unable to create data source request")
+			log.Printf("unable to create data source request")
+			return 1
 		}
 		httpReq.Header.Add("Content-Type", "application/json")
 		httpReq.Header.Add("Authorization", "_dremio"+dremioPATToken)
 		res, err = http.DefaultClient.Do(httpReq)
 		if err != nil {
-			log.Fatalf("unable to create data source due to error %v", err)
+			log.Printf("unable to create data source due to error %v", err)
+			return 1
 		}
 		if res.StatusCode != 200 {
-			log.Fatalf("expected status code 200 but instead got %v while trying to create source", res.StatusCode)
+			log.Printf("expected status code 200 but instead got %v while trying to create source", res.StatusCode)
+			return 1
 		}
 		tmpDirForConf, err := os.MkdirTemp("", "ddc")
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("unexpected error %v", err)
+			return 1
 		}
 		yamlLocation := writeConf(dremioPATToken, dremioEndpoint, tmpDirForConf)
 		c, err = conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
 		if err != nil {
-			log.Fatalf("reading config %v", err)
+			log.Printf("reading config %v", err)
+			return 1
 		}
 		_, err = submitSQLQuery("CREATE TABLE tester.table1 AS SELECT a, b FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(a, b)")
 		if err != nil {
-			log.Fatalf("unable to create table for testing %v", err)
+			log.Printf("unable to create table for testing %v", err)
+			return 1
 		}
 		return m.Run()
 	}()
@@ -329,7 +393,7 @@ func submitSQLQuery(query string) (string, error) {
 	if res.StatusCode > 299 {
 		text, err := io.ReadAll(res.Body)
 		if err != nil {
-			log.Fatalf("fatal attempt to make job api call %v and unable to read body for debugging", err)
+			return "", fmt.Errorf("fatal attempt to make job api call %v and unable to read body for debugging", err)
 		}
 		simplelog.Debugf("body was %s", string(text))
 		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to run sql %v ", res.StatusCode, query)
@@ -339,7 +403,7 @@ func submitSQLQuery(query string) (string, error) {
 	if err != nil {
 		text, err := io.ReadAll(res.Body)
 		if err != nil {
-			log.Fatalf("fatal attempt to decode body from dremio job api call %v and unable to read body for debugging", err)
+			return "", fmt.Errorf("fatal attempt to decode body from dremio job api call %v and unable to read body for debugging", err)
 		}
 		simplelog.Debugf("body was %s", string(text))
 		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
@@ -370,8 +434,19 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if err := ddcio.DeleteDirContents(c.JobProfilesOutDir()); err != nil {
 		t.Logf("failed clearing out directory %v with error %v", c.JobProfilesOutDir(), err)
 	}
-	if err := ddcio.CopyFile(filepath.Join(rootDir, "server-install", "log", "queries.json"), filepath.Join(c.QueriesOutDir(), "queries.json")); err != nil {
-		t.Errorf("failed moving queries.json to folder to allow download of jobs due to error %v", err)
+	cmdApply := exec.Command("kubectl", "--namespace", namespace, "exec", "-it", "dremio-master-0", "--", "ls", "-la", "/opt/dremio/data/logs/")
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	err := cmdApply.Run()
+	if err != nil {
+		t.Fatalf("Error during kubectl ls: %v", err)
+	}
+	cmdApply = exec.Command("kubectl", "--namespace", namespace, "cp", "dremio-master-0:/opt/dremio/data/logs/queries.json", filepath.Join(strings.Replace(c.QueriesOutDir(), "C:", "", 1), "queries.json"))
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	err = cmdApply.Run()
+	if err != nil {
+		t.Fatalf("Error during kubectl cp: %v", err)
 	}
 	defer func() {
 		if err := os.RemoveAll(c.QueriesOutDir()); err != nil {

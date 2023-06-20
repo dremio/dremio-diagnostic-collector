@@ -8,8 +8,8 @@ Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definit
 
 Write-Output "putting jar from ttop into lib dir.."
 Get-Date -Format "HH:mm:ss"
-mkdir -Force .\cmd\local\ttopcollect\lib
-Invoke-WebRequest https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar  -OutFile .\cmd\local\ttopcollect\lib\sjk.jar 
+mkdir -Force .\cmd\local\jvmcollect\lib
+Invoke-WebRequest https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar  -OutFile .\cmd\local\jvmcollect\lib\sjk.jar 
 
 Write-Output "Checking if license-header-checker is installed..."
 Get-Date -Format "HH:mm:ss"
