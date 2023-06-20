@@ -157,7 +157,7 @@ func ReadGzFile(filename string) ([]QueriesRow, error) {
 		line := scanner.Text()
 		row, err := parseLine(line, i)
 		if err != nil {
-			fmt.Println(err.Error() + `: ` + filename)
+			simplelog.Errorf(err.Error() + `: ` + filename)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
@@ -226,7 +226,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	dat := make(map[string]interface{})
 	err := json.Unmarshal([]byte(line), &dat)
 	if err != nil {
-		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v - error: %v", i, line, err)
+		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v[...] - error: %v", i, line[:50], err)
 	}
 	var row = new(QueriesRow)
 	if val, ok := dat["queryId"]; ok {
@@ -364,7 +364,7 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 		} else {
 			simplelog.Error("File is neither JSON or GZIP format.")
 		}
-		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", queriesjson)
+		simplelog.Infof("Found %v new rows in %v", strconv.Itoa(len(rows)), queriesjson)
 	}
 	simplelog.Debugf("Collected a total of %v rows of queries.json", len(queriesrows))
 	return queriesrows
