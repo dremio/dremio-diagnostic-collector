@@ -28,6 +28,8 @@ import (
 
 var secretKeywords = []string{
 	"passw",
+	"access_key",
+	"secret",
 }
 
 // checkStringForSecret inspects a given string for presence of any keyword that might indicate a secret.
