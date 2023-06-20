@@ -48,7 +48,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 	for _, systable := range systables {
 		err := downloadSysTable(c, systable)
 		if err != nil {
-			return err
+			simplelog.Errorf("%v", err) // Print instead of Error
 		}
 
 	}
