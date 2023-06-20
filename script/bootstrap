@@ -21,6 +21,7 @@ else
 fi
 
 #curl -L -o ./cmd/local/ttopcollect/lib/sjk.jar https://search.maven.org/remotecontent?filepath=org/gridkit/jvmtool/sjk/0.21/sjk-0.21.jar
+mkdir -p ./cmd/local/ttopcollect/lib/
 curl -L -o ./cmd/local/ttopcollect/lib/sjk.jar https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar
 
 echo "Checking if license-header-checker is installed"
