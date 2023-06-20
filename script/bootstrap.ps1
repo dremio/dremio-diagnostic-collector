@@ -8,7 +8,8 @@ Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definit
 
 Write-Output "putting jar from ttop into lib dir.."
 Get-Date -Format "HH:mm:ss"
-Invoke-WebRequest https://search.maven.org/remotecontent?filepath=org/gridkit/jvmtool/sjk/0.21/sjk-0.21.jar -OutFile .\lib\sjk.jar
+mkdir -Force .\cmd\local\ttopcollect\lib
+Invoke-WebRequest https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar  -OutFile .\cmd\local\ttopcollect\lib\sjk.jar 
 
 Write-Output "Checking if license-header-checker is installed..."
 Get-Date -Format "HH:mm:ss"
