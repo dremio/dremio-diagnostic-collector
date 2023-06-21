@@ -88,7 +88,7 @@ func TestGetK8sLogs(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{}
 
 	// Call the function you want to test
-	err := GetK8sLogs(mockExecutor, "namespace", "outputDir")
+	err := GetK8sLogs(mockExecutor, "namespace", t.TempDir())
 
 	// Assert that the error is nil (indicating success)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestGetInitContainerLogs(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{}
 
 	// Call the function you want to test
-	err := GetInitContainerLogs(mockExecutor, "podName", "outputDir")
+	err := GetInitContainerLogs(mockExecutor, "podName", t.TempDir())
 
 	// Assert that the error is nil (indicating success)
 	if err != nil {
@@ -133,7 +133,7 @@ func TestGetContainerLogs(t *testing.T) {
 	mockExecutor := &MockCommandExecutor{}
 
 	// Call the function you want to test
-	err := GetContainerLogs(mockExecutor, "podName", "outputDir")
+	err := GetContainerLogs(mockExecutor, "podName", t.TempDir())
 
 	// Assert that the error is nil (indicating success)
 	if err != nil {

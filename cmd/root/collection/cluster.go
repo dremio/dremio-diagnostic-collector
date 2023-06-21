@@ -58,7 +58,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 		simplelog.Errorf("trying to construct cluster config path %v with error %v", p, err)
 		return err
 	}
-	clusterLogs(namespace, p)
+	clusterLogs(ddfs, namespace, p)
 	return nil
 }
 
@@ -76,7 +76,7 @@ func clusterExecute(namespace, cmd string, _ Collector, k string) ([]byte, error
 	return res, nil
 }
 
-func clusterLogs(namespace, outputDir string) error {
+func clusterLogs(ddfs helpers.Filesystem, namespace, outputDir string) error {
 	executor := &kubernetes.DefaultCommandExecutor{}
 	err := kubernetes.GetK8sLogs(executor, namespace, outputDir)
 	return err
