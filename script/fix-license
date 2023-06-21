@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# script/fix-license: Fix the license headers 
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "executing license-header-checker license add"
+license-header-checker license_header.txt -a . go

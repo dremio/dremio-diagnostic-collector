@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 var (
@@ -188,7 +188,7 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	beforeEachContTest()
 	//should log redacted when token is present
-	out, err := tests.CaptureOutput(func() {
+	out, err := output.CaptureOutput(func() {
 		simplelog.InitLogger(4)
 		cfg, err = conf.ReadConf(overrides, tmpDir)
 		if err != nil {

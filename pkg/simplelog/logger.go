@@ -33,7 +33,7 @@ const (
 	LevelDebug
 )
 
-const msgMax = 120
+const msgMax = 1000
 
 var logger *Logger
 var internalDebugLogger *log.Logger

@@ -16,53 +16,13 @@
 package tests
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
-
-// CaptureOutput captures standard output for a function f and returns the output string
-func CaptureOutput(f func()) (string, error) {
-	// Keep the original stdout and stderr.
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	defer func() {
-		os.Stdout = oldStdout
-		os.Stderr = oldStderr
-	}()
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		return "", err
-	}
-
-	os.Stdout = w
-	os.Stderr = w
-
-	outC := make(chan string)
-
-	go func() {
-		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, r); err != nil {
-			panic(err)
-		}
-		outC <- buf.String()
-	}()
-
-	f()
-
-	if err := w.Close(); err != nil {
-		return "", fmt.Errorf("unable to capture output due to error %v", err)
-	}
-
-	out := <-outC
-
-	return out, nil
-}
 
 // Tree prints the directory structure in a tree-like format.
 func Tree(dir string) {
@@ -77,7 +37,7 @@ func Tree(dir string) {
 }
 
 func TreeToString(dir string) string {
-	out, err := CaptureOutput(func() {
+	out, err := output.CaptureOutput(func() {
 		Tree(dir)
 	})
 	if err != nil {

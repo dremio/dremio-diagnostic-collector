@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 )
 
 func TestSSHDefault(t *testing.T) {
@@ -127,7 +127,7 @@ func checkstds() {
 }
 
 func TestAllSubCommandsAreWiredUp(t *testing.T) {
-	helpText, err := tests.CaptureOutput(func() {
+	helpText, err := output.CaptureOutput(func() {
 		if err := RootCmd.Help(); err != nil {
 			t.Errorf("unable to process help text with error %v", err)
 		}

@@ -101,37 +101,6 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		return func() error { return j(c) }
 	}
 	if !c.IsDremioCloud() {
-		//put all things that take time up front
-
-		// os diagnostic collection
-		if !c.CollectNodeMetrics() {
-			simplelog.Debugf("Skipping node metrics collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
-		}
-		if !c.CollectTtop() {
-			simplelog.Debugf("Skipping ttop collection")
-		} else {
-			t.AddJob(wrapConfigJob(ttopcollect.RunTtopCollect))
-		}
-		if !c.CollectJFR() {
-			simplelog.Debugf("Skipping Java Flight Recorder collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectJFR))
-		}
-
-		if !c.CollectJStack() {
-			simplelog.Debugf("Skipping Java thread dumps collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectJStacks))
-		}
-
-		if !c.CaptureHeapDump() {
-			simplelog.Debugf("Skipping Java heap dump collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectHeapDump))
-		}
-
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
@@ -210,6 +179,34 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			simplelog.Debug("Skipping KV store report collection")
 		} else {
 			t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
+		}
+		// os diagnostic collection
+		if !c.CollectNodeMetrics() {
+			simplelog.Debugf("Skipping node metrics collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
+		}
+		if !c.CollectTtop() {
+			simplelog.Debugf("Skipping ttop collection")
+		} else {
+			t.AddJob(wrapConfigJob(ttopcollect.RunTtopCollect))
+		}
+		if !c.CollectJFR() {
+			simplelog.Debugf("Skipping Java Flight Recorder collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJFR))
+		}
+
+		if !c.CollectJStack() {
+			simplelog.Debugf("Skipping Java thread dumps collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJStacks))
+		}
+
+		if !c.CaptureHeapDump() {
+			simplelog.Debugf("Skipping Java heap dump collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectHeapDump))
 		}
 	}
 
