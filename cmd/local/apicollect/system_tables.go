@@ -160,8 +160,7 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 			simplelog.Warningf("returned json does not contain expected field 'rowCount'")
 		}
 		sb := string(body)
-
-		filename := "sys." + strings.Replace(systable, "\\\"", "", -1) + urlsuffix + ".json"
+		filename := getSystemTableName(systable, urlsuffix)
 		systemTableFile := path.Join(c.SystemTablesOutDir(), filename)
 		simplelog.Debugf("Creating " + filename + " ...")
 		file, err := os.Create(path.Clean(systemTableFile))
@@ -185,5 +184,15 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 	}
 
 	return nil
+}
 
+func getSystemTableName(systable, urlsuffix string) string {
+	filename := strings.Join([]string{"sys.", systable, urlsuffix, ".json"}, "")
+	// the ? will not work on windows
+	filename = strings.Replace(filename, "?", "_", -1)
+	// the = will not work on windows
+	filename = strings.Replace(filename, "=", "_", -1)
+	// go ahead and remove & because it will look weird by itself in the file name
+	filename = strings.Replace(filename, "&", "_", -1)
+	return strings.Replace(filename, "\\\"", "", -1)
 }
