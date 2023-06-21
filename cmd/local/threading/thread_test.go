@@ -17,6 +17,7 @@ package threading_test
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
 )
@@ -26,7 +27,7 @@ var (
 )
 
 var setupThreadPool = func() {
-	tp = threading.NewThreadPool(10, 1)
+	tp = threading.NewThreadPool(2, 1)
 }
 
 func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
@@ -110,5 +111,39 @@ func TestThreadPool_WhenWait(t *testing.T) {
 	}
 	if waitErr != nil {
 		t.Errorf("unexpected error %v", waitErr)
+	}
+}
+
+func TestConcurrentThreadsCappedAtThreadPool(t *testing.T) {
+	setupThreadPool()
+	var mut sync.Mutex
+	maxConcurrencyObserved := 0
+	concurrency := 0
+	jobFunc := func() error {
+		defer func() {
+			mut.Lock()
+			if concurrency > maxConcurrencyObserved {
+				maxConcurrencyObserved = concurrency
+			}
+			concurrency--
+			mut.Unlock()
+		}()
+		mut.Lock()
+		concurrency++
+		mut.Unlock()
+		time.Sleep(time.Millisecond * time.Duration(100))
+		return nil
+	}
+	for i := 0; i < 10; i++ {
+		tp.AddJob(jobFunc)
+	}
+	err := tp.ProcessAndWait()
+
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	//number of threads in setupThreadPool is 2
+	if maxConcurrencyObserved != 2 {
+		t.Errorf("expected %v but was %v", 2, maxConcurrencyObserved)
 	}
 }
