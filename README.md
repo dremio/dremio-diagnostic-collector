@@ -55,6 +55,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # collect-jfr: true
 # collect-jstack: true
 # collect-system-tables-export: true
+# system-tables-row-limit: 100000
 # collect-wlm: true
 # collect-kvstore-report: true
 # dremio-jstack-time-seconds: 60
@@ -93,6 +94,19 @@ specific executors that you want to collect from with the -e flag and coordinato
 ```
 
 If you have issues consult the [ssh docs](docs/ssh.md)
+
+### dremio cloud (Preview)
+Specify the following parameters in ddc.yaml
+```is-dremio-cloud: true
+dremio-endpoint: "[eu.]dremio.cloud"    # Specify whether EU Dremio Cloud or not
+dremio-cloud-project-id: "<PROJECT_ID>"
+dremio-pat-token: "<DREMIO_PAT>"
+tmp-output-dir: /full/path/to/dir       # Specify local target directory
+```
+and run
+```sh
+./ddc local-collect
+```
 
 ## What is collected?
 

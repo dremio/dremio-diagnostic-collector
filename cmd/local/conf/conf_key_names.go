@@ -59,7 +59,6 @@ const (
 	KeyAcceptCollectionConsent           = "accept-collection-consent"
 	KeyIsDremioCloud                     = "is-dremio-cloud"
 	KeyDremioCloudProjectID              = "dremio-cloud-project-id"
-	KeyDremioCloudAppEndpoint            = "dremio-cloud-app-endpoint"
 	KeyAllowInsecureSSL                  = "allow-insecure-ssl"
 	KeyJobProfilesNumHighQueryCost       = "job-profiles-num-high-query-cost"
 	KeyJobProfilesNumSlowExec            = "job-profiles-num-slow-exec"
