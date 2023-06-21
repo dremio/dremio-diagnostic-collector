@@ -66,19 +66,17 @@ func (t *ThreadPool) AddJob(job func() error) {
 // worker listens for jobs on the jobs channel and executes them. Each job runs on its own goroutine.
 func (t *ThreadPool) worker() {
 	for job := range t.jobs {
-		go func(j func() error) {
-			err := j()
-			if err != nil {
-				simplelog.Errorf("Failed to execute job: %v", err)
-			}
-			t.mut.Lock()
-			t.pendingJobs--
-			if t.pendingJobs%t.loggingFrequency == 0 {
-				simplelog.Infof("%v/%v tasks completed", t.totalJobs-t.pendingJobs, t.totalJobs)
-			}
-			t.mut.Unlock()
-			t.wg.Done()
-		}(job)
+		err := job()
+		if err != nil {
+			simplelog.Errorf("Failed to execute job: %v", err)
+		}
+		t.mut.Lock()
+		t.pendingJobs--
+		if t.pendingJobs%t.loggingFrequency == 0 {
+			simplelog.Infof("%v/%v tasks completed", t.totalJobs-t.pendingJobs, t.totalJobs)
+		}
+		t.mut.Unlock()
+		t.wg.Done()
 	}
 }
 
