@@ -35,6 +35,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # collect-jstack: true
 # collect-ttop: true
 # collect-system-tables-export: true
+# system-tables-row-limit: 100000
 # collect-wlm: true
 # collect-kvstore-report: true
 # dremio-jstack-time-seconds: 60

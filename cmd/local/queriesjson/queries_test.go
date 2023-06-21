@@ -194,7 +194,6 @@ func TestParseLine_ValidJson(t *testing.T) {
 		"outcome":"COMPLETED",
 		"queryType":"METADATA_REFRESH",
 		"queryCost":5.1003501E7,
-		"planningTime":0,
 		"executionPlanningTime":340,
 		"runningTime":4785
 	}`
@@ -238,6 +237,41 @@ func TestParseLine_ValidJsonWithMissingFields(t *testing.T) {
 	expected := *new(QueriesRow)
 	if expected != actual {
 		t.Errorf("ERROR")
+	}
+}
+
+func isField(i int, field int) int {
+	if i == field {
+		return 1
+	}
+	return 0
+}
+
+func TestParseLine_IncorrectTypes(t *testing.T) {
+	fields := [][]string{
+		{`"1b9b9629-8289-b46c-c765-455d24da7800"`, `123`},
+		{`100`, `"now"`},
+		{`"COMPLETED"`, `null`},
+		{`"METADATA_REFRESH"`, `[1,2,3]`},
+		{`5.1003501E7`, `"5.1003501E7"`},
+		{`340`, `null`},
+		{`4785`, `{"value":"4785"}`},
+	}
+	num_fields := len(fields)
+	for i := 0; i < num_fields; i++ {
+		s := `{
+		"queryId":` + fields[0][isField(i, 0)] + `,
+		"start":` + fields[1][isField(i, 1)] + `,
+		"outcome":` + fields[2][isField(i, 2)] + `,
+		"queryType":` + fields[3][isField(i, 3)] + `,
+		"queryCost":` + fields[4][isField(i, 4)] + `,
+		"executionPlanningTime":` + fields[5][isField(i, 5)] + `,
+		"runningTime":` + fields[6][isField(i, 6)] + `
+		}`
+		_, err := parseLine(s, 1)
+		if err == nil {
+			t.Errorf("There should be an error here")
+		}
 	}
 }
 
