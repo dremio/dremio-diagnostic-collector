@@ -33,6 +33,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -40,8 +42,23 @@ import (
 type MockCommandExecutor struct{}
 
 func (m *MockCommandExecutor) ExecuteCommand(command string, args ...string) ([]byte, error) {
-	// Simulate successful execution and capture output
-	output := []byte("pod1\npod2\npod3")
+	// Simulate different responses based on command and arguments
+	if command == "bash" && strings.HasPrefix(args[1], "kubectl get pods") {
+		// Return the desired output for "kubectl get pods" command
+		output := []byte("pod1\npod2\npod3")
+		return output, nil
+	} else if command == "bash" && strings.Contains(args[1], "jsonpath=\"{.spec['containers','initContainers'][*].name}\"") {
+		// Return the desired output for "kubectl get" command for containers
+		output := []byte("iContainer1 iContainer2 iContainer3")
+		return output, nil
+	} else if command == "bash" && strings.Contains(args[1], "jsonpath=\"{.spec['containers'][*].name}\"") {
+		// Return the desired output for "kubectl get" command for init containers
+		output := []byte("container1 container2 container3")
+		return output, nil
+	}
+
+	// Return a default output for other commands
+	output := []byte("default output")
 	return output, nil
 }
 
@@ -92,8 +109,8 @@ func TestGetPods(t *testing.T) {
 	}
 
 	// Assert that the pods are correctly retrieved
-	expectedPods := []string{"container1", "container2", "container3"}
-	if !equalStringSlices(pods, expectedPods) {
+	expectedPods := []string{"pod1", "pod2", "pod3"}
+	if !reflect.DeepEqual(pods, expectedPods) {
 		t.Errorf("Expected pods: %v, but got: %v", expectedPods, pods)
 	}
 }

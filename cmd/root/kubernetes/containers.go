@@ -100,16 +100,21 @@ func GetPods(executor CommandExecutor, namespace string) (err error, pods []stri
 func GetInitContainerLogs(executor CommandExecutor, podName, outputDir string) (err error) {
 	pod := strings.TrimPrefix(podName, "pod/")
 	getContainerCmd := fmt.Sprintf("kubectl get pod %v -o jsonpath=\"{.spec['containers','initContainers'][*].name}\"", pod)
-	cmd := exec.Command("bash", "-c", getContainerCmd)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	out, err := executor.ExecuteCommand("bash", "-c", getContainerCmd)
+	//cmd := exec.Command("bash", "-c", getContainerCmd)
+	//var out bytes.Buffer
+	//var stderr bytes.Buffer
+	//cmd.Stdout = &out
+	//cmd.Stderr = &stderr
+	//err = cmd.Run()
 	if err != nil {
-		simplelog.Errorf("cmd.Run() %v failed with %v\n", cmd, err)
+		simplelog.Errorf("cmd.Run() %v failed with %v\n", getContainerCmd, err)
 	}
-	containerNames := out.String()
+	// Convert []byte to bytes.Buffer
+	outputBuffer := bytes.NewBuffer(out)
+
+	// Convert bytes.Buffer to string
+	containerNames := outputBuffer.String()
 	containers := split(containerNames, " ")
 	for _, container := range containers {
 		outFile := filepath.Join(outputDir, pod+"-"+container+".out")
@@ -143,17 +148,22 @@ func GetInitContainerLogs(executor CommandExecutor, podName, outputDir string) (
 
 func GetContainerLogs(executor CommandExecutor, podName, outputDir string) (err error) {
 	pod := strings.TrimPrefix(podName, "pod/")
-	getContainerCmd := fmt.Sprintf("kubectl get pod %v -o jsonpath=\"{.spec['containers'][*].name}\"", pod)
-	cmd := exec.Command("bash", "-c", getContainerCmd)
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	getContainerCmd := fmt.Sprintf("kubectl get pod %v -o jsonpath=\"{.spec['containers','initContainers'][*].name}\"", pod)
+	out, err := executor.ExecuteCommand("bash", "-c", getContainerCmd)
+	//cmd := exec.Command("bash", "-c", getContainerCmd)
+	//var out bytes.Buffer
+	//var stderr bytes.Buffer
+	//cmd.Stdout = &out
+	//cmd.Stderr = &stderr
+	//err = cmd.Run()
 	if err != nil {
-		simplelog.Errorf("cmd.Run() failed with %v\n", err)
+		simplelog.Errorf("cmd.Run() %v failed with %v\n", getContainerCmd, err)
 	}
-	containerNames := out.String()
+	// Convert []byte to bytes.Buffer
+	outputBuffer := bytes.NewBuffer(out)
+
+	// Convert bytes.Buffer to string
+	containerNames := outputBuffer.String()
 	containers := split(containerNames, " ")
 	for _, container := range containers {
 		outFile := filepath.Join(outputDir, pod+"-"+container+".out")
