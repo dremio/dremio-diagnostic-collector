@@ -72,8 +72,9 @@ func (t *ThreadPool) worker() {
 		}
 		t.mut.Lock()
 		t.pendingJobs--
-		if t.pendingJobs%t.loggingFrequency == 0 {
-			simplelog.Infof("%v/%v tasks completed", t.totalJobs-t.pendingJobs, t.totalJobs)
+		jobsCompleted := t.totalJobs - t.pendingJobs
+		if jobsCompleted%t.loggingFrequency == 0 {
+			simplelog.Infof("%v/%v tasks completed", jobsCompleted, t.totalJobs)
 		}
 		t.mut.Unlock()
 		t.wg.Done()

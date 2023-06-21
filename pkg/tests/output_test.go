@@ -16,27 +16,12 @@
 package tests
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 )
-
-// TestCaptureOutput will test the CaptureOutput function with a simple print function
-func TestCaptureOutput(t *testing.T) {
-	expected := "Hello, world!\n"
-	out, err := CaptureOutput(func() {
-		fmt.Println("Hello, world!")
-	})
-
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-
-	if out != expected {
-		t.Fatalf("expected %q, got %q", expected, out)
-	}
-}
 
 // TestTree will create a temporary directory, create some files and directories in it
 // and then compare the output of Tree function with the expected string.
@@ -74,7 +59,7 @@ func TestTree(t *testing.T) {
 	}
 
 	expected := TreeToString(tempDir)
-	out, err := CaptureOutput(func() {
+	out, err := output.CaptureOutput(func() {
 		Tree(tempDir)
 	})
 

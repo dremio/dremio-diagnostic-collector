@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0]
+
+### Added
+
+* added "ttop" reporting for local-collect which allows reporting on the threads in java by cpu usage and gc allocation rate
+* now have dremio-cloud support 
+
+### Fixed
+
+* fixed broken thread pool that was not limiting work at all, now have test to detect this now
+* windows development now functions
+* added some type assertions around the handling of maps to prevent bugs
+
+### Changed
+
+* if table is missing from system table capture now it will just skip it, this means better handling of different versions.
+* less chatty logs and we now have simplified logging of progress in ddc
+
 ## [0.4.0]
 
 ### Added
@@ -263,6 +281,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.0...v0.3.1

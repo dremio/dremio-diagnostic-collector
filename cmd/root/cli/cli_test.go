@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 )
 
 var (
@@ -44,7 +44,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	var expectedOut string
 	if runtime.GOOS != "windows" {
 		expectedOut = "file1\nfile2\n"
-		out, captureErr = tests.CaptureOutput(func() {
+		out, captureErr = output.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "ls", "-1", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
@@ -52,7 +52,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 		}
 	} else {
 		expectedOut = "file1\nfile2\n"
-		out, captureErr = tests.CaptureOutput(func() {
+		out, captureErr = output.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
@@ -75,14 +75,14 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 	var expectedOut string
 	if runtime.GOOS != "windows" {
 		expectedOut = "No such file or directory"
-		out, captureErr = tests.CaptureOutput(func() {
+		out, captureErr = output.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
 		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
 	} else {
-		out, captureErr = tests.CaptureOutput(func() {
+		out, captureErr = output.CaptureOutput(func() {
 			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
 		})
 		if err == nil {

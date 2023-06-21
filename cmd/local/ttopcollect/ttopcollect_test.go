@@ -144,7 +144,7 @@ func TestTtopExecHasNoPidToFind(t *testing.T) {
 	if err := ttop.StartTtop(1, 89899999999); err != nil {
 		t.Error("expected an error on ttop but none happened")
 	}
-	time.Sleep(time.Duration(2000) * time.Millisecond)
+	time.Sleep(time.Duration(4000) * time.Millisecond)
 	if text, err := ttop.KillTtop(); err != nil {
 		t.Errorf("we expect ttop to still stop with bad pid: %v", err)
 	} else {
