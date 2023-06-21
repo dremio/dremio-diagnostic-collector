@@ -257,8 +257,8 @@ func TestParseLine_IncorrectTypes(t *testing.T) {
 		{`340`, `null`},
 		{`4785`, `{"value":"4785"}`},
 	}
-	num_fields := len(fields)
-	for i := 0; i < num_fields; i++ {
+	numfields := len(fields)
+	for i := 0; i < numfields; i++ {
 		s := `{
 		"queryId":` + fields[0][isField(i, 0)] + `,
 		"start":` + fields[1][isField(i, 1)] + `,
