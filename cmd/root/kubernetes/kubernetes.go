@@ -125,10 +125,5 @@ func (c *KubectlK8sActions) HelpText() string {
 }
 
 func (c *KubectlK8sActions) CopyLogs(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
-	}
 	return c.cli.Execute(c.kubectlPath, "logs", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
