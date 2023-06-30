@@ -152,6 +152,9 @@ func ReadGzFile(filename string) ([]QueriesRow, error) {
 	defer errCheck(fz.Close)
 
 	scanner := *bufio.NewScanner(fz)
+	maxFileSize := 100 * 1024 * 1024
+	buffer := make([]byte, 0, maxFileSize)
+	scanner.Buffer(buffer, maxFileSize)
 
 	i := 0
 	for scanner.Scan() {
@@ -177,6 +180,10 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 	}
 	defer errCheck(file.Close)
 	scanner := *bufio.NewScanner(file)
+	maxFileSize := 100 * 1024 * 1024
+	buffer := make([]byte, 0, maxFileSize)
+	scanner.Buffer(buffer, maxFileSize)
+
 	i := 0
 	for scanner.Scan() {
 		line := scanner.Text()
