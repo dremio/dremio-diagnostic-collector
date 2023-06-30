@@ -48,6 +48,7 @@ var beforeEachContTest = func() {
 accept-collection-consent: true
 collect-acceleration-log: true
 collect-access-log: true
+collect-audit-log: true
 dremio-gclogs-dir: "/path/to/gclogs"
 dremio-log-dir: "/path/to/dremio/logs"
 node-name: "node1"
@@ -126,6 +127,10 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 
 	if cfg.CollectAccessLogs() != true {
 		t.Errorf("Expected CollectAccessLogs to be true, got false")
+	}
+
+	if cfg.CollectAuditLogs() != true {
+		t.Errorf("Expected CollectAuditLogs to be true, got false")
 	}
 
 	if cfg.CollectDiskUsage() != true {

@@ -20,6 +20,7 @@ const (
 	KeyVerbose                           = "verbose"
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
+	KeyCollectAuditLog                   = "collect-audit-log"
 	KeyDremioLogDir                      = "dremio-log-dir"
 	KeyNumberThreads                     = "number-threads"
 	KeyDremioUsername                    = "dremio-username"

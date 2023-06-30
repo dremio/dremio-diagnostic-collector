@@ -33,6 +33,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # verbose: vv
 # collect-acceleration-log: false
 # collect-access-log: false
+# collect-audit-log: false
 # collect-dremio-configuration: true # will collect dremio.conf, dremio-env, logback.xml and logback-access.xml
 # number-job-profiles: 25000 # up to this number, may have less due to duplicates NOTE: need to have the dremio-pat-token set to work
 # capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
@@ -48,7 +49,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # dremio-queries-json-num-days: 28
 # dremio-gc-file-pattern: "gc*.log*"
 # collect-queries-json: true
-# collect-server-logs; true
+# collect-server-logs: true
 # collect-meta-refresh-log: true
 # collect-reflection-log: true
 # collect-gc-logs: true

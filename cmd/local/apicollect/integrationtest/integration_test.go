@@ -76,6 +76,7 @@ func writeConf(patToken, dremioEndpoint, tmpOutputDir string) string {
 	yamlText := fmt.Sprintf(`verbose: vvvv
 collect-acceleration-log: true
 collect-access-log: true
+collect-audit-log: true
 dremio-gclogs-dir: ""
 dremio-log-dir: /opt/dremio/data/logs
 dremio-conf-dir: /opt/dremio/conf
