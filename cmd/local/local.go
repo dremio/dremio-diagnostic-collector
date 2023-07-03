@@ -171,6 +171,12 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			t.AddJob(logCollector.RunCollectDremioAccessLogs)
 		}
 
+		if !c.CollectAuditLogs() {
+			simplelog.Debug("Skipping audit log collection")
+		} else {
+			t.AddJob(logCollector.RunCollectDremioAuditLogs)
+		}
+
 		t.AddJob(wrapConfigJob(runCollectJvmConfig))
 
 		// rest call collections
@@ -560,6 +566,7 @@ func init() {
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().Bool("collect-acceleration-log", false, "Run the Collect Acceleration Log collector")
 	LocalCollectCmd.Flags().Bool("collect-access-log", false, "Run the Collect Access Log collector")
+	LocalCollectCmd.Flags().Bool("collect-audit-log", false, "Run the Collect Audit Log collector")
 	LocalCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
 	LocalCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
 	LocalCollectCmd.Flags().IntP("number-threads", "t", 0, "control concurrency in the system")
