@@ -1,5 +1,3 @@
-//go:build !windows
-
 //	Copyright 2023 Dremio Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,7 +32,8 @@ import (
 
 func writeConf(tmpOutputDir string) string {
 
-	if err := os.MkdirAll(tmpOutputDir, 0700); err != nil {
+	cleaned := filepath.Clean(tmpOutputDir)
+	if err := os.MkdirAll(cleaned, 0700); err != nil {
 		log.Fatal(err)
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
@@ -51,14 +50,16 @@ func writeConf(tmpOutputDir string) string {
 tmp-output-dir: %v
 node-metrics-collect-duration-seconds: 10
 "
-`, tmpOutputDir)
+`, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
 	if _, err := w.WriteString(yamlText); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
 }
+
 func TestCaptureSystemMetrics(t *testing.T) {
-	tmpDirForConf, err := os.MkdirTemp("", "ddc")
+	tmpDirForConf := t.TempDir() + string(filepath.Separator) + "ddc"
+	err := os.Mkdir(tmpDirForConf, 0700)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
-
+	log.Printf("NODE INFO DIR %v", c.NodeInfoOutDir())
 	if err := os.MkdirAll(c.NodeInfoOutDir(), 0700); err != nil {
 		t.Errorf("cannot make output dir due to error %v", err)
 	}
@@ -101,6 +102,9 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		}
 		rows = append(rows, row)
 	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if len(rows) > 12 {
 		t.Errorf("%v rows created by metrics file, this is too many and the default should be around 10", len(rows))
 	}
@@ -111,7 +115,8 @@ func TestCaptureSystemMetrics(t *testing.T) {
 }
 
 func TestCreateAllDirs(t *testing.T) {
-	tmpDirForConf, err := os.MkdirTemp("", "ddc")
+	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
+	err := os.Mkdir(tmpDirForConf, 0700)
 	if err != nil {
 		log.Fatal(err)
 	}

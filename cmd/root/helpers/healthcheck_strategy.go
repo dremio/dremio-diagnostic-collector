@@ -26,14 +26,27 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func NewHCCopyStrategy(ddcfs Filesystem) *CopyStrategyHC {
-	dir := time.Now().Format("20060102-150405-DDC")
+type TimeService interface {
+	GetNow() time.Time
+}
+
+type RealTimeService struct {
+}
+
+func (r *RealTimeService) GetNow() time.Time {
+	return time.Now()
+}
+
+func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService) *CopyStrategyHC {
+	now := timeService.GetNow()
+	dir := now.Format("20060102-150405-DDC")
 	tmpDir, _ := ddcfs.MkdirTemp("", "*")
 	return &CopyStrategyHC{
 		StrategyName: "healthcheck",
 		BaseDir:      dir,
 		TmpDir:       tmpDir,
 		Fs:           ddcfs,
+		TimeService:  timeService,
 	}
 }
 
@@ -45,6 +58,7 @@ type CopyStrategyHC struct {
 	TmpDir       string     // tmp dir used for staging files
 	BaseDir      string     // the base dir of where the output is routed
 	Fs           Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
+	TimeService  TimeService
 }
 
 /*

@@ -16,22 +16,26 @@
 package nodeinfocollect
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
-	"text/tabwriter"
+	"strings"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-
-	"github.com/shirou/gopsutil/v3/cpu"
-	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect/gopsmetrics"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect/metrics"
 )
 
+type Args struct {
+	IntervalSeconds int
+	DurationSeconds int
+	OutFile         string
+}
+
+// SystemMetricsRow represents a row of system metrics data.
 type SystemMetricsRow struct {
 	CollectionTimeStamp time.Time `json:"collectionTimestamp"`
 	UserCPUPercent      float64   `json:"userCPUPercent"`
@@ -48,42 +52,58 @@ type SystemMetricsRow struct {
 	DiskLatency         float64   `json:"diskLatency"`
 	ReadBytes           int64     `json:"readBytes"`
 	WriteBytes          int64     `json:"writeBytes"`
-	FreeRAMMB           float64   `json:"freeRAMMB"`
-	CachedRAMMB         float64   `json:"cachedRAMMB"`
+	FreeRAMMB           int64     `json:"freeRAMMB"`
+	CachedRAMMB         int64     `json:"cachedRAMMB"`
 }
 
-func collectSystemMetrics(seconds int) (rows []SystemMetricsRow, err error) {
-	iterations := seconds
-	interval := time.Second
+// CollectionParams includes all the necessary parameters to complete a collection
+type CollectionParams struct {
+	IntervalSeconds int
+	DurationSeconds int
+	RowWriter       func(SystemMetricsRow) error
+}
 
-	prevDiskIO, err := disk.IOCounters()
-	if err != nil {
-		return rows, err
+func CollectSystemMetrics(params CollectionParams, sleeper func(time.Duration), metrics metrics.Collector) error {
+	if params.DurationSeconds < 1 {
+		return fmt.Errorf("duration must be at least 1 second %v", params.DurationSeconds)
 	}
-	prevCPUTimes, err := cpu.Times(false)
+	if params.IntervalSeconds < 1 {
+		return fmt.Errorf("interval must be at least 1 second %v", params.IntervalSeconds)
+	}
+	interval := time.Second * time.Duration(params.IntervalSeconds)
+	iterations := params.DurationSeconds / params.IntervalSeconds
+	if iterations < 1 {
+		return fmt.Errorf("interval of %v cannot be greater than the duration of %v", params.IntervalSeconds, params.DurationSeconds)
+	}
+
+	prevDiskIO, err := metrics.IOCounters()
 	if err != nil {
-		return rows, err
+		return err
+	}
+	prevCPUTimes, err := metrics.Times()
+	if err != nil {
+		return err
 	}
 	for i := 0; i < iterations; i++ {
 		// Sleep
-		time.Sleep(interval)
+		sleeper(interval)
 
 		// CPU Times
-		cpuTimes, err := cpu.Times(false)
+		cpuTimes, err := metrics.Times()
 		if err != nil {
-			return rows, err
+			return err
 		}
 
 		// Memory
-		memoryInfo, err := mem.VirtualMemory()
+		memoryInfo, err := metrics.VirtualMemory()
 		if err != nil {
-			return rows, err
+			return err
 		}
 
 		// Disk I/O
-		diskIO, err := disk.IOCounters()
+		diskIO, err := metrics.IOCounters()
 		if err != nil {
-			return rows, err
+			return err
 		}
 
 		var weightedIOTime, totalIOs uint64
@@ -94,164 +114,202 @@ func collectSystemMetrics(seconds int) (rows []SystemMetricsRow, err error) {
 			totalIOs += io.IoTime - p.IoTime
 
 			if prev, ok := prevDiskIO[io.Name]; ok {
-				readBytes += float64(io.ReadBytes-prev.ReadBytes) / 1024
-				writeBytes += float64(io.WriteBytes-prev.WriteBytes) / 1024
+				readBytes += float64(io.ReadBytes - prev.ReadBytes)
+				writeBytes += float64(io.WriteBytes - prev.WriteBytes)
 			}
 		}
 		prevDiskIO = diskIO
-		total := getTotalTime(cpuTimes[0], prevCPUTimes[0])
+		total := getTotalTime(cpuTimes, prevCPUTimes)
 		var queueDepth float64
 		var diskLatency float64
 		if weightedIOTime > 0 {
-			queueDepth = float64(weightedIOTime) / 1000
-			diskLatency = float64(weightedIOTime) / float64(totalIOs)
+			queueDepth = round(float64(weightedIOTime) / 1000)
+			diskLatency = round(float64(weightedIOTime) / float64(totalIOs))
 		}
-
-		memoreFreeMB := float64(memoryInfo.Free) / (1024 * 1024)
-		memoryCachedMB := float64(memoryInfo.Cached) / (1024 * 1024)
 
 		row := SystemMetricsRow{}
 		row.CollectionTimeStamp = time.Now()
-		user := cpuTimes[0].User - prevCPUTimes[0].User
+		user := cpuTimes.User - prevCPUTimes.User
 		if user > 0 {
-			row.UserCPUPercent = (user / total) * 100
+			row.UserCPUPercent = round((user / total) * 100)
 		}
-		system := cpuTimes[0].System - prevCPUTimes[0].System
+		system := cpuTimes.System - prevCPUTimes.System
 		if system > 0 {
-			row.SystemCPUPercent = (system / total) * 100
+			row.SystemCPUPercent = round((system / total) * 100)
 		}
-		idle := cpuTimes[0].Idle - prevCPUTimes[0].Idle
+		idle := cpuTimes.Idle - prevCPUTimes.Idle
 		if idle > 0 {
-			row.IdleCPUPercent = (idle / total) * 100
+			row.IdleCPUPercent = round((idle / total) * 100)
 		}
-		nice := cpuTimes[0].Nice - prevCPUTimes[0].Nice
+		nice := cpuTimes.Nice - prevCPUTimes.Nice
 		if nice > 0 {
-			row.NiceCPUPercent = (nice / total) * 100
+			row.NiceCPUPercent = round((nice / total) * 100)
 		}
-		iowait := cpuTimes[0].Iowait - prevCPUTimes[0].Iowait
+		iowait := cpuTimes.Iowait - prevCPUTimes.Iowait
 		if iowait > 0 {
-			row.IOWaitCPUPercent = (iowait / total) * 100
+			row.IOWaitCPUPercent = round((iowait / total) * 100)
 		}
-		irq := cpuTimes[0].Irq - prevCPUTimes[0].Irq
-		if irq > 0 {
-			row.IRQCPUPercent = (irq / total) * 100
-		}
-		softIRQ := cpuTimes[0].Softirq - prevCPUTimes[0].Softirq
-		if softIRQ > 0 {
-			row.SoftIRQCPUPercent = (softIRQ / total) * 100
-		}
-		steal := cpuTimes[0].Steal - prevCPUTimes[0].Steal
-		if steal > 0 {
-			row.StealCPUPercent = (steal / total) * 100
-		}
-		guestCPU := cpuTimes[0].Guest - prevCPUTimes[0].Guest
-		if guestCPU > 0 {
-			row.GuestCPUPercent = (guestCPU / total) * 100
-		}
-		guestCPUNice := cpuTimes[0].GuestNice - prevCPUTimes[0].GuestNice
-		if guestCPUNice > 0 {
-			row.GuestNiceCPUPercent = (guestCPUNice / total) * 100
-		}
-		prevCPUTimes = cpuTimes
 
+		irq := cpuTimes.Irq - prevCPUTimes.Irq
+		if irq > 0 {
+			row.IRQCPUPercent = round((irq / total) * 100)
+		}
+
+		softIRQ := cpuTimes.Softirq - prevCPUTimes.Softirq
+		if softIRQ > 0 {
+			row.SoftIRQCPUPercent = round((softIRQ / total) * 100)
+		}
+		steal := cpuTimes.Steal - prevCPUTimes.Steal
+		if steal > 0 {
+			row.StealCPUPercent = round((steal / total) * 100)
+		}
+
+		guestCPU := cpuTimes.Guest - prevCPUTimes.Guest
+		if guestCPU > 0 {
+			row.GuestCPUPercent = round((guestCPU / total) * 100)
+		}
+		guestCPUNice := cpuTimes.GuestNice - prevCPUTimes.GuestNice
+		if guestCPUNice > 0 {
+			row.GuestNiceCPUPercent = round((guestCPUNice / total) * 100)
+		}
+
+		prevCPUTimes = cpuTimes
 		row.DiskLatency = diskLatency
 		row.QueueDepth = queueDepth
-		row.FreeRAMMB = memoreFreeMB
-		row.CachedRAMMB = memoryCachedMB
 
-		rows = append(rows, row)
-	}
-	return
-}
+		var memoryFreeMB float64
+		if memoryInfo.Available > 0 {
+			memoryFreeMB = round(float64(memoryInfo.Available) / (1024 * 1024))
+		}
+		row.FreeRAMMB = int64(memoryFreeMB)
 
-func writeSystemMetrics(useTabWriter bool, nodeMetricsFile string, header string, rows []SystemMetricsRow, addRow func(SystemMetricsRow) (string, error)) error {
-	w, err := os.Create(path.Clean(nodeMetricsFile))
-	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error '%v'", nodeMetricsFile, err)
-	}
-	defer func() {
-		if err := w.Close(); err != nil {
-			simplelog.Debugf("unable to close file %v due to error '%v'. This is probably ok because we manually close the file as well", nodeMetricsFile, err)
+		var memoryCachedMB float64
+		if memoryCachedMB > 0 {
+			memoryCachedMB = round(float64(memoryInfo.Cached) / (1024 * 1024))
 		}
-	}()
-	var writer io.Writer
-	var cleanup func()
-	if useTabWriter {
-		tabWriter := tabwriter.NewWriter(w, 5, 0, 1, ' ', tabwriter.AlignRight)
-		writer = tabWriter
-		cleanup = func() {
-			if err := tabWriter.Flush(); err != nil {
-				simplelog.Warningf("unable to flush metrics file %v due to error %v", nodeMetricsFile, err)
-			}
-		}
-	} else {
-		bufWriter := bufio.NewWriter(w)
-		writer = bufWriter
-		cleanup = func() {
-			if err := bufWriter.Flush(); err != nil {
-				simplelog.Warningf("unable to flush metrics file %v due to error %v", nodeMetricsFile, err)
-			}
-		}
-	}
-	_, err = writer.Write([]byte(header))
-	if err != nil {
-		return fmt.Errorf("unable to write output string %v due to %v", header, err)
-	}
-	for _, row := range rows {
-		rowString, err := addRow(row)
-		if err != nil {
-			return fmt.Errorf("unable to convert row %#v into string due to error %v", row, err)
-		}
-		// Output
-		_, err = writer.Write([]byte(rowString + "\n"))
-		if err != nil {
-			return fmt.Errorf("unable to write output string %v due to %v", row, err)
-		}
-	}
-	cleanup()
-	return w.Close()
-}
+		row.CachedRAMMB = int64(memoryCachedMB)
 
-func SystemMetrics(secondsToCollect int, nodeMetricsFile, nodeMetricsJSONFile string) error {
-	rows, err := collectSystemMetrics(secondsToCollect)
-	if err != nil {
-		return fmt.Errorf("unable to collect system metrics with error %v", err)
-	}
-
-	//write metrics.txt file
-	txtHeader := fmt.Sprintf("Timestamp\tUser %%\tSystem %%\tIO Wait%%\tOther %%\tIdle %%\tQueue Depth\tDisk Latency (ms)\tDisk Read (MB/s)\tDisk Write (MB/s)\t\tFree Mem (GB)\n")
-	if err := writeSystemMetrics(true, nodeMetricsFile, txtHeader, rows, func(row SystemMetricsRow) (string, error) {
-		otherCPU := row.NiceCPUPercent + row.IRQCPUPercent + row.SoftIRQCPUPercent + row.StealCPUPercent + row.GuestCPUPercent + row.GuestNiceCPUPercent
-		var readBytesMB, writeBytesMB, freeRAMGB float64
-		if row.ReadBytes > 0 {
-			readBytesMB = float64(row.ReadBytes) / (1024 * 1024)
+		if err := params.RowWriter(row); err != nil {
+			return err
 		}
-		if row.WriteBytes > 0 {
-			writeBytesMB = float64(row.WriteBytes) / (1024 * 1024)
-		}
-		if row.FreeRAMMB > 0 {
-			freeRAMGB = float64(row.FreeRAMMB) / 1024.0
-		}
-		return fmt.Sprintf("%s\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f%%\t%.2f\t%.2f\t%.2f\t%.2f\t\t%.2f",
-			row.CollectionTimeStamp.Format(time.RFC3339), row.UserCPUPercent, row.SystemCPUPercent, row.IOWaitCPUPercent, otherCPU, row.IdleCPUPercent, row.QueueDepth, row.DiskLatency, readBytesMB, writeBytesMB, freeRAMGB), nil
-	}); err != nil {
-		return fmt.Errorf("unable to write metrics file %v due to error %v", nodeMetricsFile, err)
-	}
-
-	//write json file
-	if err := writeSystemMetrics(false, nodeMetricsJSONFile, "", rows, func(row SystemMetricsRow) (string, error) {
-		str, err := json.Marshal(&row)
-		if err != nil {
-			return "", fmt.Errorf("unable to marshal row %#v due to error %v", row, err)
-		}
-		return string(str), nil
-	}); err != nil {
-		return fmt.Errorf("unable to write metrics file %v due to error %v", nodeMetricsFile, err)
 	}
 	return nil
 }
 
-func getTotalTime(c cpu.TimesStat, p cpu.TimesStat) float64 {
+func SystemMetrics(args Args) error {
+	var w io.Writer
+	var rowWriter func(SystemMetricsRow) error
+	var cleanup func() error
+	outputFile := args.OutFile
+
+	if strings.HasSuffix(outputFile, ".json") {
+		f, err := os.Create(path.Clean(outputFile))
+		if err != nil {
+			return fmt.Errorf("unable to create file %v due to error '%w'", outputFile, err)
+		}
+		w = f
+		// we manually close this so we do not care that we are not handling the error
+		defer f.Close()
+
+		cleanup = func() error {
+			if err := f.Close(); err != nil {
+				return fmt.Errorf("unable to close metrics file %v due to error %w", outputFile, err)
+			}
+			return nil
+		}
+		//write json file
+		rowWriter = func(row SystemMetricsRow) error {
+			str, err := json.Marshal(&row)
+			if err != nil {
+				return fmt.Errorf("unable to marshal row %#v due to error %w", row, err)
+			}
+			txt := fmt.Sprintf("%v\n", string(str))
+			_, err = f.Write([]byte(txt))
+			if err != nil {
+				return fmt.Errorf("unable to write to json file due to error %w", err)
+			}
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("unable to write metrics file %v due to error %w", outputFile, err)
+		}
+	} else {
+		if outputFile == "" {
+			cleanup = func() error { return nil }
+			w = os.Stdout
+		} else {
+			f, err := os.Create(path.Clean(outputFile))
+			if err != nil {
+				return fmt.Errorf("unable to create file %v due to error '%w'", outputFile, err)
+			}
+			cleanup = func() error {
+				if err := f.Close(); err != nil {
+					return fmt.Errorf("unable to close metrics file %v due to error %w", outputFile, err)
+				}
+				return nil
+			}
+			w = f
+			// we don't care as this is just an emergency cleanup we manually call "cleanup" which closes the file anyway
+			defer f.Close()
+		}
+
+		//write metrics.txt file
+		template := "%25s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s\t%10s"
+		floatTemplate := "%.2f"
+		percentTemplate := "%.2f%%"
+		txtHeader := fmt.Sprintf(template, "Timestamp", "usr %%", "sys %%", "iowait %%", "other %%", "idl %%", "Queue", "Latency (ms)", "Read (MB/s)", "Write (MB/s)", "Free Mem (GB)")
+		if _, err := fmt.Fprintln(w, txtHeader); err != nil {
+			return fmt.Errorf("unable to write metrics file %v due to error %w", outputFile, err)
+		}
+		rowWriter = func(row SystemMetricsRow) error {
+			otherCPU := row.NiceCPUPercent + row.IRQCPUPercent + row.SoftIRQCPUPercent + row.StealCPUPercent + row.GuestCPUPercent + row.GuestNiceCPUPercent
+			var readBytesMB, writeBytesMB, freeRAMGB float64
+			if row.ReadBytes > 0 {
+				readBytesMB = float64(row.ReadBytes) / (1024 * 1024)
+			}
+			if row.WriteBytes > 0 {
+				writeBytesMB = float64(row.WriteBytes) / (1024 * 1024)
+			}
+			if row.FreeRAMMB > 0 {
+				freeRAMGB = float64(row.FreeRAMMB) / 1024.0
+			}
+			rowString := fmt.Sprintf(template,
+				row.CollectionTimeStamp.Format(time.RFC3339),
+				fmt.Sprintf(percentTemplate, row.UserCPUPercent),
+				fmt.Sprintf(percentTemplate, row.SystemCPUPercent),
+				fmt.Sprintf(percentTemplate, row.IOWaitCPUPercent),
+				fmt.Sprintf(percentTemplate, otherCPU),
+				fmt.Sprintf(percentTemplate, row.IdleCPUPercent),
+				fmt.Sprintf(floatTemplate, row.QueueDepth),
+				fmt.Sprintf(floatTemplate, row.DiskLatency),
+				fmt.Sprintf(floatTemplate, readBytesMB),
+				fmt.Sprintf(floatTemplate, writeBytesMB),
+				fmt.Sprintf(floatTemplate, freeRAMGB))
+			if _, err := fmt.Fprintln(w, rowString); err != nil {
+				return fmt.Errorf("unable to write metrics file %v due to error %w", outputFile, err)
+			}
+			return nil
+		}
+	}
+	params := CollectionParams{
+		DurationSeconds: args.DurationSeconds,
+		IntervalSeconds: args.IntervalSeconds,
+		RowWriter:       rowWriter,
+	}
+
+	if err := CollectSystemMetrics(params, func(d time.Duration) {
+		time.Sleep(d)
+	}, &gopsmetrics.Collector{}); err != nil {
+		return fmt.Errorf("unable to collect system metrics with error %v", err)
+	}
+	return cleanup()
+}
+
+func round(num float64) float64 {
+	factor := math.Pow(10, float64(2))
+	return math.Round(num*factor) / factor
+}
+func getTotalTime(c metrics.TimesStat, p metrics.TimesStat) float64 {
 	current := c.User + c.System + c.Idle + c.Nice + c.Iowait + c.Irq +
 		c.Softirq + c.Steal + c.Guest + c.GuestNice
 	prev := p.User + p.System + p.Idle + p.Nice + p.Iowait + p.Irq +
