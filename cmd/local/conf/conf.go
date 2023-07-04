@@ -44,6 +44,7 @@ type CollectConf struct {
 	collectAccelerationLogs    bool
 	collectAccessLogs          bool
 	collectAuditLogs           bool
+	collectJVMFlags            bool
 	captureHeapDump            bool
 	acceptCollectionConsent    bool
 	isDremioCloud              bool
@@ -255,6 +256,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.collectNodeMetrics = viper.GetBool(KeyCollectMetrics)
 	c.nodeMetricsCollectDurationSeconds = viper.GetInt(KeyNodeMetricsCollectDurationSeconds)
 	c.collectDiskUsage = viper.GetBool(KeyCollectDiskUsage)
+	c.collectJVMFlags = viper.GetBool(KeyCollectJVMFlags)
 
 	// log collect
 	c.outputDir = viper.GetString(KeyTmpOutputDir)
@@ -404,6 +406,10 @@ func (c *CollectConf) NumberJobProfilesToCollect() int {
 
 func (c *CollectConf) CollectAccessLogs() bool {
 	return c.collectAccessLogs
+}
+
+func (c *CollectConf) CollectJVMFlags() bool {
+	return c.collectJVMFlags
 }
 
 func (c *CollectConf) CollectAuditLogs() bool {

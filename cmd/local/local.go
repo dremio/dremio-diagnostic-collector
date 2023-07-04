@@ -177,8 +177,11 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			t.AddJob(logCollector.RunCollectDremioAuditLogs)
 		}
 
-		t.AddJob(wrapConfigJob(runCollectJvmConfig))
-
+		if !c.CollectJVMFlags() {
+			simplelog.Debug("Skipping JVM Flags collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectJvmConfig))
+		}
 		// rest call collections
 
 		if !c.CollectKVStoreReport() {

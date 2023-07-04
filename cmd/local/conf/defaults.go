@@ -25,6 +25,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyCollectAccelerationLog, false)
 	viper.SetDefault(KeyCollectAccessLog, false)
 	viper.SetDefault(KeyCollectAuditLog, false)
+	viper.SetDefault(KeyCollectJVMFlags, true)
 	viper.SetDefault(KeyDremioLogDir, "/var/log/dremio")
 	viper.SetDefault(KeyNumberThreads, 2)
 	viper.SetDefault(KeyDremioUsername, "dremio")

@@ -21,6 +21,7 @@ const (
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
 	KeyCollectAuditLog                   = "collect-audit-log"
+	KeyCollectJVMFlags                   = "collect-jvm-flags"
 	KeyDremioLogDir                      = "dremio-log-dir"
 	KeyNumberThreads                     = "number-threads"
 	KeyDremioUsername                    = "dremio-username"

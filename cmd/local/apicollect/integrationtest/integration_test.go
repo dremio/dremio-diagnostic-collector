@@ -179,7 +179,7 @@ func TestMain(m *testing.M) {
 		}
 
 		// Give Kubernetes some extra time to get everything ready.
-		time.Sleep(5 * time.Second)
+		time.Sleep(10 * time.Second)
 
 		fmt.Println("Dremio master is now ready!")
 
@@ -293,7 +293,7 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Fatalf("unable to create table for testing %v", err)
 		}
-		return m.Run()
+		return 0
 	}()
 
 	// handle panic
@@ -301,6 +301,8 @@ func TestMain(m *testing.M) {
 		// handle the panic and terminate gracefully
 		// ...
 		exitCode = 1
+	} else {
+		exitCode = m.Run()
 	}
 	cleanupOutput()
 	os.Exit(exitCode)

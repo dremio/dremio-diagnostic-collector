@@ -49,6 +49,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # dremio-queries-json-num-days: 28
 # dremio-gc-file-pattern: "gc*.log*"
 # collect-queries-json: true
+# collect-jvm-flags: true
 # collect-server-logs: true
 # collect-meta-refresh-log: true
 # collect-reflection-log: true

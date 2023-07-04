@@ -49,6 +49,7 @@ accept-collection-consent: true
 collect-acceleration-log: true
 collect-access-log: true
 collect-audit-log: true
+collect-jvm-flags: true
 dremio-gclogs-dir: "/path/to/gclogs"
 dremio-log-dir: "/path/to/dremio/logs"
 node-name: "node1"
@@ -125,6 +126,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("Expected CollectAccelerationLogs to be true, got false")
 	}
 
+	if cfg.CollectJVMFlags() != true {
+		t.Errorf("Expected CollectJVMConf to be true, got false")
+	}
 	if cfg.CollectAccessLogs() != true {
 		t.Errorf("Expected CollectAccessLogs to be true, got false")
 	}

@@ -45,6 +45,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
 		{conf.KeyCollectAuditLog, false},
+		{conf.KeyCollectJVMFlags, true},
 		{conf.KeyDremioLogDir, "/var/log/dremio"},
 		{conf.KeyNumberThreads, 2},
 		{conf.KeyDremioUsername, "dremio"},
