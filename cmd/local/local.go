@@ -284,10 +284,10 @@ func runCollectDiskUsage(c *conf.CollectConf) error {
 
 func runCollectOSConfig(c *conf.CollectConf) error {
 	simplelog.Debug("Collecting OS Information")
-	osInfoFile := path.Join(c.NodeInfoOutDir(), "os_info.txt")
-	w, err := os.Create(path.Clean(osInfoFile))
+	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
+	w, err := os.Create(filepath.Clean(osInfoFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", path.Clean(osInfoFile), err)
+		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(osInfoFile), err)
 	}
 	defer func() {
 		if err := w.Sync(); err != nil {
@@ -386,10 +386,10 @@ func runCollectDremioConfig(c *conf.CollectConf) error {
 }
 
 func runCollectJvmConfig(c *conf.CollectConf) error {
-	jvmSettingsFile := path.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
-	jvmSettingsFileWriter, err := os.Create(path.Clean(jvmSettingsFile))
+	jvmSettingsFile := filepath.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
+	jvmSettingsFileWriter, err := os.Create(filepath.Clean(jvmSettingsFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", path.Clean(jvmSettingsFile), err)
+		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(jvmSettingsFile), err)
 	}
 	defer func() {
 		if err := jvmSettingsFileWriter.Sync(); err != nil {
@@ -409,9 +409,13 @@ func runCollectJvmConfig(c *conf.CollectConf) error {
 
 func runCollectNodeMetrics(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
-	nodeMetricsFile := path.Join(c.NodeInfoOutDir(), "metrics.txt")
-	nodeMetricsJSONFile := path.Join(c.NodeInfoOutDir(), "metrics.json")
-	return nodeinfocollect.SystemMetrics(c.NodeMetricsCollectDurationSeconds(), path.Clean(nodeMetricsFile), path.Clean(nodeMetricsJSONFile))
+	nodeMetricsJSONFile := filepath.Join(c.NodeInfoOutDir(), "metrics.json")
+	args := nodeinfocollect.Args{
+		IntervalSeconds: 1,
+		DurationSeconds: c.NodeMetricsCollectDurationSeconds(),
+		OutFile:         nodeMetricsJSONFile,
+	}
+	return nodeinfocollect.SystemMetrics(args)
 }
 
 func runCollectJFR(c *conf.CollectConf) error {
@@ -453,8 +457,8 @@ func runCollectJStacks(c *conf.CollectConf) error {
 			simplelog.Warningf("unable to capture jstack of pid %v due to error %v", c.DremioPID(), err)
 		}
 		date := time.Now().Format("2006-01-02_15_04_05")
-		threadDumpFileName := path.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
-		if err := os.WriteFile(path.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
+		threadDumpFileName := filepath.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
+		if err := os.WriteFile(filepath.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
 			return fmt.Errorf("unable to write thread dump %v due to error %v", threadDumpFileName, err)
 		}
 		simplelog.Debugf("Saved %v", threadDumpFileName)
@@ -487,7 +491,7 @@ func runCollectHeapDump(c *conf.CollectConf) error {
 	if err := os.Remove(path.Clean(hprofFile)); err != nil {
 		simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
 	}
-	dest := path.Join(c.HeapDumpsOutDir(), baseName+".gz")
+	dest := filepath.Join(c.HeapDumpsOutDir(), baseName+".gz")
 	if err := os.Rename(path.Clean(hprofGzFile), path.Clean(dest)); err != nil {
 		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)
 	}

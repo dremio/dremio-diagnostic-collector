@@ -18,7 +18,6 @@ package conf
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -216,14 +215,14 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 				simplelog.Warningf("node name %v already included in log directory of %v make this is intentional as you do not need to put the node name in the log path", c.nodeName, c.dremioLogDir)
 			} else {
 				// ok so looks like we need to adjust this since the node name is not already in the path
-				c.dremioLogDir = path.Join(c.dremioLogDir, "executor", c.nodeName)
+				c.dremioLogDir = filepath.Join(c.dremioLogDir, "executor", c.nodeName)
 				simplelog.Debugf("AWSE detected adding the node name %v to the log directory path %v", c.nodeName, c.dremioLogDir)
 			}
 		} else {
 			if strings.Contains(c.dremioLogDir, "coordinator") {
 				simplelog.Warningf("coordinator already included in log directory of %v make this is intentional as you do not need to put the coordinator in the log path", c.dremioLogDir)
 			} else {
-				c.dremioLogDir = path.Join(c.dremioLogDir, "coordinator")
+				c.dremioLogDir = filepath.Join(c.dremioLogDir, "coordinator")
 				simplelog.Debugf("AWSE coordinator node detected adding coordinator name to log dir %v", c.dremioLogDir)
 			}
 		}
@@ -412,33 +411,39 @@ func (c *CollectConf) CollectAuditLogs() bool {
 }
 
 func (c *CollectConf) TtopOutDir() string {
-	return path.Join(c.outputDir, "ttop", c.nodeName)
+	return filepath.Join(c.outputDir, "ttop", c.nodeName)
 }
 
-func (c *CollectConf) HeapDumpsOutDir() string { return path.Join(c.outputDir, "heap-dumps") }
+func (c *CollectConf) HeapDumpsOutDir() string { return filepath.Join(c.outputDir, "heap-dumps") }
 
 func (c *CollectConf) JobProfilesOutDir() string {
-	return path.Join(c.outputDir, "job-profiles", c.nodeName)
+	return filepath.Join(c.outputDir, "job-profiles", c.nodeName)
 }
-func (c *CollectConf) KubernetesOutDir() string { return path.Join(c.outputDir, "kubernetes") }
-func (c *CollectConf) KVstoreOutDir() string    { return path.Join(c.outputDir, "kvstore", c.nodeName) }
+func (c *CollectConf) KubernetesOutDir() string { return filepath.Join(c.outputDir, "kubernetes") }
+func (c *CollectConf) KVstoreOutDir() string {
+	return filepath.Join(c.outputDir, "kvstore", c.nodeName)
+}
 func (c *CollectConf) SystemTablesOutDir() string {
-	return path.Join(c.outputDir, "system-tables", c.nodeName)
+	return filepath.Join(c.outputDir, "system-tables", c.nodeName)
 }
-func (c *CollectConf) WLMOutDir() string { return path.Join(c.outputDir, "wlm", c.nodeName) }
+func (c *CollectConf) WLMOutDir() string { return filepath.Join(c.outputDir, "wlm", c.nodeName) }
 
 // works on all nodes but includes node name in file name
-func (c *CollectConf) JFROutDir() string { return path.Join(c.outputDir, "jfr") }
+func (c *CollectConf) JFROutDir() string { return filepath.Join(c.outputDir, "jfr") }
 
 // per node out directories
 func (c *CollectConf) ConfigurationOutDir() string {
-	return path.Join(c.outputDir, "configuration", c.nodeName)
+	return filepath.Join(c.outputDir, "configuration", c.nodeName)
 }
-func (c *CollectConf) LogsOutDir() string     { return path.Join(c.outputDir, "logs", c.nodeName) }
-func (c *CollectConf) NodeInfoOutDir() string { return path.Join(c.outputDir, "node-info", c.nodeName) }
-func (c *CollectConf) QueriesOutDir() string  { return path.Join(c.outputDir, "queries", c.nodeName) }
+func (c *CollectConf) LogsOutDir() string { return filepath.Join(c.outputDir, "logs", c.nodeName) }
+func (c *CollectConf) NodeInfoOutDir() string {
+	return filepath.Join(c.outputDir, "node-info", c.nodeName)
+}
+func (c *CollectConf) QueriesOutDir() string {
+	return filepath.Join(c.outputDir, "queries", c.nodeName)
+}
 func (c *CollectConf) ThreadDumpsOutDir() string {
-	return path.Join(c.outputDir, "jfr", "thread-dumps", c.nodeName)
+	return filepath.Join(c.outputDir, "jfr", "thread-dumps", c.nodeName)
 }
 
 func (c *CollectConf) DremioEndpoint() string {

@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -77,11 +76,10 @@ func RunCollectWLM(c *conf.CollectConf) error {
 
 		// Prepare the output directory and filename
 		sb := string(body)
-		wlmFile := path.Clean(filepath.Join(c.WLMOutDir(), filename))
+		wlmFile := filepath.Join(c.WLMOutDir(), filename)
 
 		// Create a new file in the output directory
 		file, err := os.Create(filepath.Clean(wlmFile))
-
 		// Log and return if there was an error with file creation
 		if err != nil {
 			return fmt.Errorf("unable to create file %s due to error %v", filename, err)

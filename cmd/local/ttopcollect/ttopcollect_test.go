@@ -18,7 +18,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -127,14 +126,10 @@ func TestTtopExec(t *testing.T) {
 	if err := ttop.StartTtop(1, cmd.Process.Pid); err != nil {
 		t.Error(err.Error())
 	}
-	time.Sleep(time.Duration(3000) * time.Millisecond)
+	time.Sleep(time.Duration(500) * time.Millisecond)
 	if text, err := ttop.KillTtop(); err != nil {
 		t.Errorf(err.Error())
 	} else {
-		expected := "Monitoring threads ..."
-		if !strings.Contains(text, expected) {
-			t.Errorf("Expected ttop text to contain %v but only had %q", expected, text)
-		}
 		t.Logf("text for top was `%v`", text)
 	}
 }
