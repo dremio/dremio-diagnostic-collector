@@ -77,6 +77,10 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 		for _, container := range s2s(containers) {
 			kubectlArgs = []string{k, "-n", namespace, "logs", pod, "-c", string(container)}
 			out, err := clusterExecutePod(kubectlArgs)
+			if err != nil {
+				simplelog.Errorf("trying to get logs failed with error: %v", err)
+				continue
+			}
 			outFile := filepath.Join(p, pod+"-"+container+".out")
 			simplelog.Infof("getting logs for pod: %v container: %v", pod, container)
 			p, err := cs.CreatePath("kubernetes", "container-logs", "")
@@ -112,11 +116,11 @@ func clusterExecuteBytes(namespace, cmd string, _ Collector, k string) ([]byte, 
 
 // Execute commands at the cluster level
 // Returns response as a string (instead of bytes)
-func clusterExecutePod(kArgs []string) (string, error) {
+func clusterExecutePod(args []string) (string, error) {
 	cli := &cli.Cli{}
-	res, err := cli.Execute(kArgs...)
+	res, err := cli.Execute(args...)
 	if err != nil {
-		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", kArgs, err)
+		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", args, err)
 	}
 	return res, nil
 }
