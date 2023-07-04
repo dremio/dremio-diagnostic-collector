@@ -1,5 +1,3 @@
-//go:build !windows
-
 //	Copyright 2023 Dremio Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -54,6 +53,11 @@ type JobAPIResponse struct {
 var c *conf.CollectConf
 
 func cleanupOutput() {
+	if _, err := os.Stat(c.OutputDir()); err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+	}
 	if err := os.RemoveAll(c.OutputDir()); err != nil {
 		log.Printf("WARN unable to remove %v it may have to be manually cleaned up", c.OutputDir())
 	}
@@ -92,72 +96,112 @@ accept-collection-consent: true
 tmp-output-dir: %v
 node-metrics-collect-duration-seconds: 10
 "
-`, dremioEndpoint, patToken, tmpOutputDir)
+`, dremioEndpoint, patToken, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
 	if _, err := w.WriteString(yamlText); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
 }
-func GetRootProjectDir() (string, error) {
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
-	output, err := cmd.Output()
+
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
-	rootDir := strings.TrimSpace(string(output))
-	return rootDir, nil
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-var rootDir string
+var namespace string
 
 func TestMain(m *testing.M) {
 	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
 		var err error
-		rootDir, err = GetRootProjectDir()
+
+		// Define the name and type of the resource you are waiting for.
+		resourceName := "dremio-master-0"
+		resourceType := "pod" // Change this to match your resource type (e.g., "service", "pod", etc.)
+		ts := time.Now().Unix()
+		namespace = fmt.Sprintf("ddc-test-%v", ts)
+		cmdApply := exec.Command("kubectl", "create", "namespace", namespace)
+		cmdApply.Stderr = os.Stderr
+		cmdApply.Stdout = os.Stdout
+		err = cmdApply.Run()
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error during kubectl apply: %v", err)
 		}
-		if err := ddcio.CopyFile(filepath.Join("testdata", "conf", "dremio.conf"), filepath.Join(rootDir, "server-install", "conf", "dremio.conf")); err != nil {
-			log.Fatal(err)
-		}
-		dremioExec := filepath.Join(rootDir, "server-install", "bin", "dremio")
-		cmd := exec.Command(dremioExec, "start")
-		// Attach to standard output and error
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		// Start the process
-		if err := cmd.Start(); err != nil {
-			log.Fatal(err)
-		}
-
-		fmt.Println("sleeping 60 seconds so that dremio can start")
-		time.Sleep(60 * time.Second)
-
+		yamlFile := filepath.Join("testdata", "dremio.yaml")
 		defer func() {
-			//send shutdown
-			shutdownCmd := exec.Command(dremioExec, "stop")
-			// Attach to standard output and error
-			shutdownCmd.Stdout = os.Stdout
-			shutdownCmd.Stderr = os.Stderr
-			// Start the process
-			if err := shutdownCmd.Start(); err != nil {
-				log.Print(err)
+			cmdApply := exec.Command("kubectl", "delete", "-n", namespace, "-f", yamlFile)
+			cmdApply.Stderr = os.Stderr
+			cmdApply.Stdout = os.Stdout
+			err = cmdApply.Run()
+			if err != nil {
+				log.Printf("Error during kubectl apply: %v", err)
+			}
+			time.Sleep(time.Duration(15) * time.Second)
+			cmdApply = exec.Command("kubectl", "delete", "namespace", namespace)
+			cmdApply.Stderr = os.Stderr
+			cmdApply.Stdout = os.Stdout
+			err = cmdApply.Run()
+			if err != nil {
+				log.Printf("Error during kubectl delete: %v", err)
 			}
 		}()
 
-		dremioTestPort := 9047
-		if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
-			log.Printf("unable to remove dremio-source do to error %v", err)
+		// Execute the `kubectl apply` command.
+		cmdApply = exec.Command("kubectl", "apply", "-n", namespace, "-f", yamlFile)
+		cmdApply.Stderr = os.Stderr
+		cmdApply.Stdout = os.Stdout
+		err = cmdApply.Run()
+		if err != nil {
+			log.Printf("Error during kubectl apply: %v", err)
+			return
+		}
+		// Give Kubernetes some extra time to get everything ready.
+		time.Sleep(55 * time.Second)
+
+		// Wait for the resource to become ready.
+
+		cmdWait := exec.Command("kubectl", "wait", "-n", namespace, "--for=condition=Ready", "--timeout=600s", resourceType+"/"+resourceName)
+		cmdWait.Stderr = os.Stderr
+		cmdWait.Stdout = os.Stdout
+		err = cmdWait.Run()
+		if err != nil {
+			log.Fatalf("Error during kubectl wait: '%v'", err)
 		}
 
-		if err := os.MkdirAll("/tmp/dremio-source", 0700); err != nil {
-			log.Fatalf("need to make the source dir to do the test %v", err)
+		// Give Kubernetes some extra time to get everything ready.
+		time.Sleep(5 * time.Second)
+
+		fmt.Println("Dremio master is now ready!")
+
+		//kubectl portforward
+
+		// Let the system choose a free port.
+		dremioTestPort, err := getFreePort()
+		if err != nil {
+			log.Fatalf("Failed to find a free port: %v", err)
 		}
+
+		// Start the port forwarding.
+		cmd := exec.Command("kubectl", "port-forward", "dremio-master-0", fmt.Sprintf("%v:9047", dremioTestPort), "-n", namespace)
+		if err := cmd.Start(); err != nil {
+			log.Fatalf("Failed to start command: %v", err)
+
+		}
+
+		// Ensure the command is stopped when main returns.
 		defer func() {
-			if err := os.RemoveAll(filepath.Join("/tmp", "dremio-source")); err != nil {
-				log.Printf("unable to remove dremio-source do to error %v", err)
+			if err := cmd.Process.Kill(); err != nil {
+				log.Printf("Failed to kill process: %v", err)
 			}
 		}()
 
@@ -371,8 +415,19 @@ func TestValidateCollectJobProfiles(t *testing.T) {
 	if err := ddcio.DeleteDirContents(c.JobProfilesOutDir()); err != nil {
 		t.Logf("failed clearing out directory %v with error %v", c.JobProfilesOutDir(), err)
 	}
-	if err := ddcio.CopyFile(filepath.Join(rootDir, "server-install", "log", "queries.json"), filepath.Join(c.QueriesOutDir(), "queries.json")); err != nil {
-		t.Errorf("failed moving queries.json to folder to allow download of jobs due to error %v", err)
+	cmdApply := exec.Command("kubectl", "--namespace", namespace, "exec", "-it", "dremio-master-0", "--", "ls", "-la", "/opt/dremio/data/logs/")
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	err := cmdApply.Run()
+	if err != nil {
+		t.Fatalf("Error during kubectl ls: %v", err)
+	}
+	cmdApply = exec.Command("kubectl", "--namespace", namespace, "cp", "dremio-master-0:/opt/dremio/data/logs/queries.json", filepath.Join(strings.Replace(c.QueriesOutDir(), "C:", "", 1), "queries.json"))
+	cmdApply.Stderr = os.Stderr
+	cmdApply.Stdout = os.Stdout
+	err = cmdApply.Run()
+	if err != nil {
+		t.Fatalf("Error during kubectl cp: %v", err)
 	}
 	defer func() {
 		if err := os.RemoveAll(c.QueriesOutDir()); err != nil {
