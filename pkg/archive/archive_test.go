@@ -18,7 +18,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -54,6 +53,9 @@ func TestTarGzDir(t *testing.T) {
 		t.Fatalf("unable to close zip read %v", err)
 	}
 
+	if err := f.Close(); err != nil {
+		t.Fatalf("unable to close destination tar %v", err)
+	}
 	if err := outf.Close(); err != nil {
 		t.Fatalf("unable to close output tar %v", err)
 	}
@@ -70,7 +72,7 @@ func TestTarGzDir(t *testing.T) {
 			break // End of archive
 		}
 		if err != nil {
-			log.Fatal(err)
+			t.Fatal(err)
 		}
 		if hdr.Typeflag == tar.TypeDir {
 			continue
@@ -78,15 +80,21 @@ func TestTarGzDir(t *testing.T) {
 		outPath := filepath.Join(tmpDir, hdr.Name)
 		f, err := os.Create(outPath)
 		if err != nil {
-			log.Fatalf("unable to create path %v: %v", outPath, err)
+			t.Fatalf("unable to create path %v: %v", outPath, err)
 		}
 		if _, err := io.Copy(f, tr); err != nil {
-			log.Fatalf("unable to copy file %v out: %v", hdr.Name, err)
+			t.Fatalf("unable to copy file %v out: %v", hdr.Name, err)
 		}
+		if err := f.Close(); err != nil {
+			t.Fatalf("unable to close file %v", err)
+		}
+	}
+	if err := tarFile.Close(); err != nil {
+		t.Fatal(err)
 	}
 	entries, err := os.ReadDir(tmpDir)
 	if err != nil {
-		log.Fatalf("unable to read test dir for logging %v", err)
+		t.Fatalf("unable to read test dir for logging %v", err)
 	}
 	for i, e := range entries {
 		t.Logf("entry #%v - %v", i, e)
