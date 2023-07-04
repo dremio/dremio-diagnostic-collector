@@ -7,20 +7,6 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "Checking if dremio is installed"
-date "+%H:%M:%S"
-if [ -d "./server-install/bin" ]; then
-    echo "Dremio appears to be extracted already."
-else
-    echo "Dremio is not extracted."
-    cd ./server-install
-    curl -L -o dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz  https://download.dremio.com/community-server/24.0.0-202302100528110223-3a169b7c/dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
-    tar -zx --strip-components 1 -f  dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
-    rm dremio-community-24.0.0-202302100528110223-3a169b7c.tar.gz
-    cd ..
-fi
-
-#curl -L -o ./cmd/local/ttopcollect/lib/sjk.jar https://search.maven.org/remotecontent?filepath=org/gridkit/jvmtool/sjk/0.21/sjk-0.21.jar
 mkdir -p ./cmd/local/ttopcollect/lib/
 curl -L -o ./cmd/local/ttopcollect/lib/sjk.jar https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar
 
@@ -49,6 +35,6 @@ date "+%H:%M:%S"
 if ! type "gosec" > /dev/null; then
     echo "gosec not found installing…"
     date "+%H:%M:%S"
-    curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.16.0
+    go install github.com/securego/gosec/v2/cmd/gosec@v2.16.0
 fi
 
