@@ -46,10 +46,10 @@ func RunCollectJVMFlags(c *conf.CollectConf) error {
 		return fmt.Errorf("unable to write to file %v due to error: %w", filepath.Clean(jvmSettingsFile), err)
 	}
 	if err := jvmSettingsFileWriter.Sync(); err != nil {
-		return fmt.Errorf("unable to sync the os_info.txt file due to error: %w", err)
+		return fmt.Errorf("unable to sync the jvm_settings.txt file due to error: %w", err)
 	}
 	if err := jvmSettingsFileWriter.Close(); err != nil {
-		return fmt.Errorf("unable to close the os_info.txt file due to error: %w", err)
+		return fmt.Errorf("unable to close the jvm_settings.txt file due to error: %w", err)
 	}
 	return nil
 }
@@ -57,7 +57,7 @@ func RunCollectJVMFlags(c *conf.CollectConf) error {
 func CaptureFlagsFromPID(pid int) (string, error) {
 	var buf bytes.Buffer
 	if err := ddcio.Shell(&buf, fmt.Sprintf("jcmd %v VM.flags", pid)); err != nil {
-		return "", fmt.Errorf("failed getting flags: %w", err)
+		return "", fmt.Errorf("failed getting flags: '%w', output was: '%v'", err, buf.String())
 	}
 	return buf.String(), nil
 }

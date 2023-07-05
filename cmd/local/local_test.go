@@ -201,7 +201,7 @@ collect-queries-json: false
 collect-jvm-flags: true
 collect-server-logs: false
 collect-meta-refresh-log: false
-eollect-reflection-log: false
+collect-reflection-log: false
 collect-gc-logs: false
 collect-jfr: false
 collect-jstack: false
@@ -284,7 +284,7 @@ collect-queries-json: false
 collect-jvm-flags: false
 collect-server-logs: false
 collect-meta-refresh-log: false
-eollect-reflection-log: false
+collect-reflection-log: false
 collect-gc-logs: false
 collect-jfr: false
 collect-jstack: false
