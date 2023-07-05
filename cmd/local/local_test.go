@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
@@ -216,6 +217,7 @@ is-dremio-cloud: false
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
+	time.Sleep(500 * time.Millisecond)
 	if err := collect(c); err != nil {
 		t.Fatal(err)
 	}
