@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.1]
+
+### Added
+
+* flag to specify the dremio pid
+* flag to control collection of jvm flags
+* flag to control os information collection
+* now retrieve logs for each container
+
+### Changed
+
+* development for ddc now requires a kubernetes cluster
+
 ## [0.5.0]
 
 ### Added
@@ -281,6 +294,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.5.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.1...v0.3.2

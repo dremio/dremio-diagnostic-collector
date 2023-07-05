@@ -21,8 +21,10 @@ const (
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
 	KeyCollectAuditLog                   = "collect-audit-log"
+	KeyCollectJVMFlags                   = "collect-jvm-flags"
 	KeyDremioLogDir                      = "dremio-log-dir"
 	KeyNumberThreads                     = "number-threads"
+	KeyDremioPid                         = "dremio-pid"
 	KeyDremioUsername                    = "dremio-username"
 	KeyDremioPatToken                    = "dremio-pat-token" // #nosec G101
 	KeyDremioConfDir                     = "dremio-conf-dir"
@@ -33,6 +35,7 @@ const (
 	KeyDremioEndpoint                    = "dremio-endpoint"
 	KeyTmpOutputDir                      = "tmp-output-dir"
 	KeyCollectMetrics                    = "collect-metrics"
+	KeyCollectOSConfig                   = "collect-os-config"
 	KeyCollectDiskUsage                  = "collect-disk-usage"
 	KeyDremioLogsNumDays                 = "dremio-logs-num-days"
 	KeyDremioQueriesJSONNumDays          = "dremio-queries-json-num-days"

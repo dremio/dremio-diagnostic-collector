@@ -32,9 +32,9 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ttopcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
@@ -91,12 +91,14 @@ func createAllDirs(c *conf.CollectConf) error {
 	return nil
 }
 
-func collect(numberThreads int, c *conf.CollectConf) {
+func collect(c *conf.CollectConf) error {
 	if err := createAllDirs(c); err != nil {
-		fmt.Printf("unable to create directories due to error %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
-	t := threading.NewThreadPool(numberThreads, 1)
+	t, err := threading.NewThreadPool(c.NumberThreads(), 1)
+	if err != nil {
+		return fmt.Errorf("unable to spawn thread pool: %w", err)
+	}
 	wrapConfigJob := func(j func(c *conf.CollectConf) error) func() error {
 		return func() error { return j(c) }
 	}
@@ -112,7 +114,12 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		} else {
 			t.AddJob(wrapConfigJob(runCollectDremioConfig))
 		}
-		t.AddJob(wrapConfigJob(runCollectOSConfig))
+
+		if !c.CollectOSConfig() {
+			simplelog.Info("Skipping OS config collection")
+		} else {
+			t.AddJob(wrapConfigJob(runCollectOSConfig))
+		}
 
 		// log collection
 
@@ -177,8 +184,11 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			t.AddJob(logCollector.RunCollectDremioAuditLogs)
 		}
 
-		t.AddJob(wrapConfigJob(runCollectJvmConfig))
-
+		if !c.CollectJVMFlags() {
+			simplelog.Debug("Skipping JVM Flags collection")
+		} else {
+			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJVMFlags))
+		}
 		// rest call collections
 
 		if !c.CollectKVStoreReport() {
@@ -195,7 +205,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 		if !c.CollectTtop() {
 			simplelog.Debugf("Skipping ttop collection")
 		} else {
-			t.AddJob(wrapConfigJob(ttopcollect.RunTtopCollect))
+			t.AddJob(wrapConfigJob(jvmcollect.RunTtopCollect))
 		}
 		if !c.CollectJFR() {
 			simplelog.Debugf("Skipping Java Flight Recorder collection")
@@ -240,6 +250,7 @@ func collect(numberThreads int, c *conf.CollectConf) {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
+	return nil
 }
 
 func runCollectDiskUsage(c *conf.CollectConf) error {
@@ -385,28 +396,6 @@ func runCollectDremioConfig(c *conf.CollectConf) error {
 	return nil
 }
 
-func runCollectJvmConfig(c *conf.CollectConf) error {
-	jvmSettingsFile := filepath.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
-	jvmSettingsFileWriter, err := os.Create(filepath.Clean(jvmSettingsFile))
-	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(jvmSettingsFile), err)
-	}
-	defer func() {
-		if err := jvmSettingsFileWriter.Sync(); err != nil {
-			simplelog.Warningf("unable to sync the os_info.txt file due to error: %v", err)
-		}
-		if err := jvmSettingsFileWriter.Close(); err != nil {
-			simplelog.Warningf("unable to close the os_info.txt file due to error: %v", err)
-		}
-	}()
-	dremioPID := c.DremioPID()
-	err = ddcio.Shell(jvmSettingsFileWriter, fmt.Sprintf("jcmd %v VM.flags", dremioPID))
-	if err != nil {
-		simplelog.Warningf("unable to write jvm_settings.txt file due to error %v", err)
-	}
-	return nil
-}
-
 func runCollectNodeMetrics(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
 	nodeMetricsJSONFile := filepath.Join(c.NodeInfoOutDir(), "metrics.json")
@@ -542,7 +531,10 @@ var LocalCollectCmd = &cobra.Command{
 
 		// Run application
 		simplelog.Info("Starting collection...")
-		collect(c.NumberThreads(), c)
+		if err := collect(c); err != nil {
+			simplelog.Errorf("unable to collect: %v", err)
+			os.Exit(1)
+		}
 		ddcLoc, err := os.Executable()
 		if err != nil {
 			simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
