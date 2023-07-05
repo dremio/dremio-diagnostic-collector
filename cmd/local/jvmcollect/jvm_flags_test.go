@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
@@ -37,7 +38,7 @@ func TestJvmFlagCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-
+	time.Sleep(1 * time.Second)
 	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
