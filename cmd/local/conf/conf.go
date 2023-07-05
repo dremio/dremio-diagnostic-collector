@@ -78,6 +78,7 @@ type CollectConf struct {
 	collectReflectionLogs             bool
 	collectSystemTablesExport         bool
 	systemTablesRowLimit              int
+	collectOSConfig                   bool
 	collectDiskUsage                  bool
 	collectGCLogs                     bool
 	collectTtop                       bool
@@ -157,13 +158,16 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		// "project.history.events",
 		"project.history.jobs",
 	}
-	dremioPID, err := autodetect.GetDremioPID()
-	if err != nil {
-		simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
-		//return &CollectConf{}, fmt.Errorf("read config stopped due to error %v", err)
+	// if not manual pid is set detect it
+	if c.dremioPID > 0 {
+		dremioPID, err := autodetect.GetDremioPID()
+		if err != nil {
+			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
+			//return &CollectConf{}, fmt.Errorf("read config stopped due to error %v", err)
+		}
+		c.dremioPID = dremioPID
 	}
-	c.dremioPID = dremioPID
-	dremioPIDIsValid := dremioPID > 0
+	dremioPIDIsValid := c.dremioPID > 0
 
 	supportedExtensions := []string{"yaml", "json", "toml", "hcl", "env", "props"}
 	foundConfig := ParseConfig(configDir, viper.SupportedExts, overrides)
@@ -255,6 +259,7 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	// system diag
 	c.collectNodeMetrics = viper.GetBool(KeyCollectMetrics)
 	c.nodeMetricsCollectDurationSeconds = viper.GetInt(KeyNodeMetricsCollectDurationSeconds)
+	c.collectOSConfig = viper.GetBool(KeyCollectOSConfig)
 	c.collectDiskUsage = viper.GetBool(KeyCollectDiskUsage)
 	c.collectJVMFlags = viper.GetBool(KeyCollectJVMFlags)
 
@@ -350,6 +355,10 @@ func (c *CollectConf) CollectWLM() bool {
 
 func (c *CollectConf) CollectGCLogs() bool {
 	return c.collectGCLogs
+}
+
+func (c *CollectConf) CollectOSConfig() bool {
+	return c.collectOSConfig
 }
 
 func (c *CollectConf) CollectDiskUsage() bool {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ttopcollect_test
+package jvmcollect_test
 
 import (
 	"os"
@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ttopcollect"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
 
 type MockTtopService struct {
@@ -71,7 +71,7 @@ func TestTtopCollects(t *testing.T) {
 		text: "ttop file text",
 	}
 	pid := 1900
-	if err := ttopcollect.OnLoop(pid, interval, duration, outDir, ttopService, timeTicker); err != nil {
+	if err := jvmcollect.OnLoop(pid, interval, duration, outDir, ttopService, timeTicker); err != nil {
 		t.Fatalf("unable to collect %v", err)
 	}
 
@@ -108,7 +108,7 @@ func TestTtopCollects(t *testing.T) {
 }
 
 func TestTtopExec(t *testing.T) {
-	ttop := &ttopcollect.Ttop{}
+	ttop := &jvmcollect.Ttop{}
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -135,7 +135,7 @@ func TestTtopExec(t *testing.T) {
 }
 
 func TestTtopExecHasNoPidToFind(t *testing.T) {
-	ttop := &ttopcollect.Ttop{}
+	ttop := &jvmcollect.Ttop{}
 	if err := ttop.StartTtop(1, 89899999999); err != nil {
 		t.Error("expected an error on ttop but none happened")
 	}
@@ -160,7 +160,7 @@ func TestTtopHasAndInvalidInterval(t *testing.T) {
 		}
 	}()
 
-	ttop := &ttopcollect.Ttop{}
+	ttop := &jvmcollect.Ttop{}
 	if err := ttop.StartTtop(0, cmd.Process.Pid); err == nil {
 		t.Error("expected ttop start to fail with interval 0")
 	}

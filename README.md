@@ -43,7 +43,9 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 
 ## not typically recommended to change
 # tmp-output-dir: "" # dynamically set normally
+# dremio-pid: 0
 # collect-metrics: true
+# collect-os-config: true
 # collect-disk-usage: true
 # dremio-logs-num-days: 7
 # dremio-queries-json-num-days: 28

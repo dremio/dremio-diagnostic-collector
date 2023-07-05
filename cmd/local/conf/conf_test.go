@@ -63,6 +63,7 @@ collect-dremio-configuration: true
 number-job-profiles: 10
 capture-heap-dump: true
 collect-metrics: true
+collect-os-config: true
 collect-disk-usage: true
 tmp-output-dir: "/path/to/tmp"
 dremio-logs-num-days: 7
@@ -124,6 +125,10 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 
 	if cfg.CollectAccelerationLogs() != true {
 		t.Errorf("Expected CollectAccelerationLogs to be true, got false")
+	}
+
+	if cfg.CollectOSConfig() != true {
+		t.Errorf("Expected CollectJVMConf to be true, got false")
 	}
 
 	if cfg.CollectJVMFlags() != true {

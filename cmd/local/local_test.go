@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,7 +31,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func writeConf(tmpOutputDir string) string {
+func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) string {
 
 	cleaned := filepath.Clean(tmpOutputDir)
 	if err := os.MkdirAll(cleaned, 0700); err != nil {
@@ -46,15 +47,23 @@ func writeConf(tmpOutputDir string) string {
 			log.Printf("WARN: unable to close %v with reason '%v'", testDDCYaml, err)
 		}
 	}()
-	yamlText := fmt.Sprintf(`verbose: vvvv
+	yamlText := fmt.Sprintf(`
 tmp-output-dir: %v
-node-metrics-collect-duration-seconds: 10
+%v
 "
-`, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
+`, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
 	if _, err := w.WriteString(yamlText); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
+}
+
+func writeConf(tmpOutputDir string) string {
+
+	defaultText := `verbose: vvvv
+node-metrics-collect-duration-seconds: 10
+`
+	return writeConfWithYamlText(tmpOutputDir, defaultText)
 }
 
 func TestCaptureSystemMetrics(t *testing.T) {
@@ -146,5 +155,164 @@ func TestCreateAllDirs(t *testing.T) {
 	// job profiles should end with nodename
 	if !strings.HasSuffix(c.KVstoreOutDir(), c.NodeName()) {
 		t.Errorf("expected %v to end with %v", c.KVstoreOutDir(), c.NodeName())
+	}
+}
+
+func TestCollectJVMFlags(t *testing.T) {
+	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
+	err := os.Mkdir(tmpDirForConf, 0700)
+	if err != nil {
+		t.Fatalf("unable to make test dir: %v", err)
+	}
+	jarLoc := filepath.Join("testdata", "demo.jar")
+	cmd := exec.Command("java", "-jar", jarLoc)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("cmd.Start() failed with %s\n", err)
+	}
+
+	defer func() {
+		if cmd != nil && cmd.ProcessState != nil && !cmd.ProcessState.Exited() {
+			if err := cmd.Process.Kill(); err != nil {
+				t.Logf("failed to kill process: %s", err)
+			} else {
+				t.Log("Process killed successfully.")
+			}
+		}
+	}()
+
+	yaml := fmt.Sprintf(`
+dremio-log-dir: "/var/log/dremio" # where the dremio log is located
+dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
+dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
+
+collect-acceleration-log: false
+collect-access-log: false
+collect-audit-log: false
+collect-dremio-configuration: false 
+capture-heap-dump: false 
+# when true a heap dump will be captured on each node that the collector is run against
+number-threads: 2
+
+dremio-pid: %v
+collect-metrics: false
+collect-os-config: false
+collect-disk-usage: false
+collect-queries-json: false
+collect-jvm-flags: true
+collect-server-logs: false
+collect-meta-refresh-log: false
+eollect-reflection-log: false
+collect-gc-logs: false
+collect-jfr: false
+collect-jstack: false
+collect-ttop: false
+collect-system-tables-export: false
+collect-wlm: false
+collect-kvstore-report: false
+is-dremio-cloud: false
+`, cmd.Process.Pid)
+	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
+	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	if err != nil {
+		t.Fatalf("reading config %v", err)
+	}
+	if err := collect(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Process.Kill(); err != nil {
+		t.Fatalf("failed to kill process: %s", err)
+	} else {
+		t.Log("Process killed successfully.")
+	}
+
+	entries, err := os.ReadDir(c.NodeInfoOutDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var items []string
+	var found bool
+	for _, e := range entries {
+		items = append(items, e.Name())
+		if e.Name() == "jvm_settings.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("did not find jvm_settings.txt in entries '%v'", strings.Join(items, ", "))
+	}
+}
+
+func TestSkipCollect(t *testing.T) {
+	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
+	err := os.Mkdir(tmpDirForConf, 0700)
+	if err != nil {
+		t.Fatalf("unable to make test dir: %v", err)
+	}
+	jarLoc := filepath.Join("testdata", "demo.jar")
+	cmd := exec.Command("java", "-jar", jarLoc)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("cmd.Start() failed with %s\n", err)
+	}
+
+	defer func() {
+		if cmd != nil && cmd.ProcessState != nil && !cmd.ProcessState.Exited() {
+			if err := cmd.Process.Kill(); err != nil {
+				t.Logf("failed to kill process: %s", err)
+			} else {
+				t.Log("Process killed successfully.")
+			}
+		}
+	}()
+	yaml := fmt.Sprintf(`
+# please set these to match your environment
+dremio-log-dir: "/var/log/dremio" # where the dremio log is located
+dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
+dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
+
+collect-acceleration-log: false
+collect-access-log: false
+collect-audit-log: false
+collect-dremio-configuration: false 
+capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
+number-threads: 2
+dremio-pid: %v
+
+collect-metrics: false
+collect-os-config: false
+collect-disk-usage: false
+collect-queries-json: false
+collect-jvm-flags: false
+collect-server-logs: false
+collect-meta-refresh-log: false
+eollect-reflection-log: false
+collect-gc-logs: false
+collect-jfr: false
+collect-jstack: false
+collect-ttop: false
+collect-system-tables-export: false
+collect-wlm: false
+collect-kvstore-report: false
+is-dremio-cloud: false
+`, cmd.Process.Pid)
+	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
+	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	if err != nil {
+		t.Fatalf("reading config %v", err)
+	}
+	if err := collect(c); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Process.Kill(); err != nil {
+		t.Fatalf("failed to kill process: %s", err)
+	} else {
+		t.Log("Process killed successfully.")
+	}
+	entries, err := os.ReadDir(c.NodeInfoOutDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) > 0 {
+		t.Errorf("expecting no entries but there were %v", len(entries))
 	}
 }

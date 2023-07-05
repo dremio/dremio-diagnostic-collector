@@ -58,6 +58,20 @@ func OutputConsent(conf *conf.CollectConf) string {
 		builder.WriteString("\t* cpu, io and memory metrics\n")
 	}
 
+	if conf.CollectJVMFlags() {
+		simplelog.Info("collecting JVM flags for the dremio process")
+	}
+
+	if conf.CollectDiskUsage() {
+		simplelog.Info("collecting os configuration")
+		builder.WriteString("\t* /etc/*-release\n")
+		builder.WriteString("\t* /etc/issue\n")
+		builder.WriteString("\t* hostname\n")
+		builder.WriteString("\t* /proc/meminfo\n")
+		builder.WriteString("\t* lscpu\n")
+		builder.WriteString("\t* uname -r\n")
+	}
+
 	if conf.CollectDiskUsage() {
 		simplelog.Info("collecting disk usage")
 		builder.WriteString("\t* df -h output\n")

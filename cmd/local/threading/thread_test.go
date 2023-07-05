@@ -15,6 +15,7 @@
 package threading_test
 
 import (
+	"log"
 	"sync"
 	"testing"
 	"time"
@@ -27,7 +28,11 @@ var (
 )
 
 var setupThreadPool = func() {
-	tp = threading.NewThreadPool(2, 1)
+	t, err := threading.NewThreadPool(2, 1)
+	if err != nil {
+		log.Fatal(err)
+	}
+	tp = t
 }
 
 func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
