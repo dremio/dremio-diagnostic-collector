@@ -158,17 +158,6 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		// "project.history.events",
 		"project.history.jobs",
 	}
-	// if not manual pid is set detect it
-	if c.dremioPID > 0 {
-		dremioPID, err := autodetect.GetDremioPID()
-		if err != nil {
-			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
-			//return &CollectConf{}, fmt.Errorf("read config stopped due to error %v", err)
-		}
-		c.dremioPID = dremioPID
-	}
-	dremioPIDIsValid := c.dremioPID > 0
-
 	supportedExtensions := []string{"yaml", "json", "toml", "hcl", "env", "props"}
 	foundConfig := ParseConfig(configDir, viper.SupportedExts, overrides)
 	simplelog.Debugf("logging parsed configuration from ddc.yaml")
@@ -198,6 +187,18 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	} else {
 		simplelog.Debugf("found config file %v", foundConfig)
 	}
+	c.dremioPID = viper.GetInt(KeyDremioPid)
+	if c.dremioPID < 1 {
+		dremioPID, err := autodetect.GetDremioPID()
+		if err != nil {
+			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
+			//return &CollectConf{}, fmt.Errorf("read config stopped due to error %v", err)
+		} else {
+			c.dremioPID = dremioPID
+		}
+	}
+	dremioPIDIsValid := c.dremioPID > 0
+
 	c.acceptCollectionConsent = viper.GetBool(KeyAcceptCollectionConsent)
 	c.isDremioCloud = viper.GetBool(KeyIsDremioCloud)
 	c.dremioCloudProjectID = viper.GetString(KeyDremioCloudProjectID)
