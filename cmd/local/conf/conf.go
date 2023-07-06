@@ -33,6 +33,7 @@ import (
 type CollectConf struct {
 	// flags that are configurable by env or configuration
 	numberThreads              int
+	disableRESTAPI             bool
 	gcLogsDir                  string
 	dremioLogDir               string
 	dremioConfDir              string
@@ -251,6 +252,8 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 		}
 	}
 	c.dremioUsername = viper.GetString(KeyDremioUsername)
+	c.disableRESTAPI = viper.GetBool(KeyDisableRESTAPI)
+
 	c.dremioPATToken = viper.GetString(KeyDremioPatToken)
 	c.dremioRocksDBDir = viper.GetString(KeyDremioRocksdbDir)
 	c.collectDremioConfiguration = viper.GetBool(KeyCollectDremioConfiguration)
@@ -303,15 +306,15 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	c.dremioTtopFreqSeconds = viper.GetInt(KeyDremioTtopFreqSeconds)
 	c.dremioTtopTimeSeconds = viper.GetInt(KeyDremioTtopTimeSeconds)
 	// collect rest apis
-	personalAccessTokenPresent := c.DremioPATToken() != ""
-	if !personalAccessTokenPresent {
+	disableRESTAPI := c.disableRESTAPI
+	if disableRESTAPI {
 		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
 	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
-	c.collectWLM = viper.GetBool(KeyCollectWLM) && personalAccessTokenPresent
-	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && personalAccessTokenPresent
+	c.collectWLM = viper.GetBool(KeyCollectWLM) && !disableRESTAPI
+	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && !disableRESTAPI
 	c.systemTablesRowLimit = viper.GetInt(KeySystemTablesRowLimit)
-	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && personalAccessTokenPresent
+	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && !disableRESTAPI
 	c.restHTTPTimeout = viper.GetInt(KeyRestHTTPTimeout)
 	restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 
@@ -328,6 +331,10 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 func getOutputDir(now time.Time) string {
 	nowStr := now.Format("20060102-150405")
 	return filepath.Join(os.TempDir(), "ddc", nowStr)
+}
+
+func (c CollectConf) DisableRESTAPI() bool {
+	return c.disableRESTAPI
 }
 
 func (c *CollectConf) GcLogsDir() string {

@@ -22,6 +22,7 @@ import (
 func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir string) {
 	// set default config
 	viper.SetDefault(KeyVerbose, "vv")
+	viper.SetDefault(KeyDisableRESTAPI, false)
 	viper.SetDefault(KeyCollectAccelerationLog, false)
 	viper.SetDefault(KeyCollectAccessLog, false)
 	viper.SetDefault(KeyCollectAuditLog, false)

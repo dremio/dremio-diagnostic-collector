@@ -498,9 +498,26 @@ var LocalCollectCmd = &cobra.Command{
 		overrides := make(map[string]*pflag.Flag)
 		//if a cli flag was set go ahead and use those values to override the viper configuration
 		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
+			if flag.Name == conf.KeyDremioPatToken {
+				if flag.Value.String() == "" {
+					pat, err := masking.PromptForPAT()
+					if err != nil {
+						fmt.Printf("unable to get PAT due to: %v\n", err)
+						os.Exit(1)
+					}
+					if err := flag.Value.Set(pat); err != nil {
+						simplelog.Errorf("critical error unable to set %v due to %v", conf.KeyDremioPatToken, err)
+						os.Exit(1)
+					}
+				}
+				//we do not want to log the token
+				simplelog.Debugf("overriding yaml with cli flag %v and value 'REDACTED'", flag.Name)
+			} else {
+				simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
+			}
 			overrides[flag.Name] = flag
-			simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
 		})
+
 		c, err := conf.ReadConfFromExecLocation(overrides)
 		if err != nil {
 			simplelog.Errorf("unable to read configuration %v", err)
@@ -576,4 +593,5 @@ func init() {
 	LocalCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
 	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
+	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
 }

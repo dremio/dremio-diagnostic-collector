@@ -7,11 +7,18 @@
 * flag to specify the dremio pid
 * flag to control collection of jvm flags
 * flag to control os information collection
-* now retrieve logs for each container
+* flag to disable rest api calls
 
 ### Changed
 
 * development for ddc now requires a kubernetes cluster
+* when used with the main ddc command --dremio-pat-prompt one will receive a password prompt. This password will be sent to all nodes. This removes the need for adding --dremio-pat-token to the yaml
+* when using `ddc local-collect --dremio-pat-token ""` the user will receive password prompt
+* executors now have --disable-rest-api passed to them instead of a blank --dremio-pat-token
+
+### Fixed
+
+* when --dremio-pat-token was used it would show up the argument in some logs, this has been corrected
 
 ## [0.5.0]
 

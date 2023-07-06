@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -64,7 +65,7 @@ type Cli struct {
 // be returned as an error from this function.
 func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string) error {
 	// Log the command that's about to be run
-	simplelog.Debugf("args: %v\n", strings.Join(args, " "))
+	logArgs(args)
 
 	// Create the command based on the passed arguments
 	cmd := exec.Command(args[0], args[1:]...)
@@ -126,7 +127,7 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 }
 
 func (c *Cli) Execute(args ...string) (string, error) {
-	simplelog.Debugf("args: %v", strings.Join(args, " "))
+	logArgs(args)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()
@@ -136,8 +137,21 @@ func (c *Cli) Execute(args ...string) (string, error) {
 	return string(output), nil
 }
 
+func logArgs(args []string) {
+	var containsPat bool
+	for _, arg := range args {
+		if arg == fmt.Sprintf("--%v", conf.KeyDremioPatToken) {
+			containsPat = true
+		}
+	}
+	if containsPat {
+		simplelog.Debug("args: contains PAT REDACTED")
+	} else {
+		simplelog.Debugf("args: %v", strings.Join(args, " "))
+	}
+}
 func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {
-	simplelog.Debugf("args: %v", strings.Join(args, " "))
+	logArgs(args)
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stderr = os.Stderr
 	output, err := cmd.Output()

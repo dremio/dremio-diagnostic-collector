@@ -36,16 +36,18 @@ var (
 	cfg         *conf.CollectConf
 )
 
-var beforeEachContTest = func() {
+var genericConfSetup = func(cfgContent string) {
 	tmpDir, err = os.MkdirTemp("", "testdataabdc")
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
 	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
 
-	// Create a sample configuration file.
-	cfgContent := `
+	if cfgContent == "" {
+		// Create a sample configuration file.
+		cfgContent = `
 accept-collection-consent: true
+disable-rest-api: false
 collect-acceleration-log: true
 collect-access-log: true
 collect-audit-log: true
@@ -86,7 +88,7 @@ collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
 `
-
+	}
 	// Write the sample configuration to a file.
 	err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
 	if err != nil {
@@ -109,7 +111,7 @@ var afterEachConfTest = func() {
 }
 
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
-	beforeEachContTest()
+	genericConfSetup("")
 	//should parse the configuration correctly
 	cfg, err = conf.ReadConf(overrides, tmpDir)
 	if err != nil {
@@ -117,6 +119,10 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Error("invalid conf")
+	}
+
+	if cfg.DisableRESTAPI() != false {
+		t.Errorf("Expected DisableRESTAPI to be true, got false")
 	}
 
 	if cfg.AcceptCollectionConsent() != true {
@@ -199,8 +205,55 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	afterEachConfTest()
 }
 
+func TestConfReadWithDisabledRestAPIResultsInDisabledWLMJobProfileAndKVReport(t *testing.T) {
+	yaml := `
+disable-rest-api: true
+number-threads: 4
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pat-token: "your_personal_access_token"
+number-job-profiles: 10
+collect-wlm: true
+collect-system-tables-export: true
+collect-kvstore-report: true
+`
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	cfg, err = conf.ReadConf(overrides, tmpDir)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("invalid conf")
+	}
+	if cfg.CollectSystemTablesExport() == true {
+		t.Error("expected collect system tables export to be false")
+	}
+	if cfg.CollectWLM() == true {
+		t.Error("expected collect wlm to be false")
+	}
+	if cfg.CollectKVStoreReport() == true {
+		t.Error("expected collect wlm to be false")
+	}
+	if cfg.NumberJobProfilesToCollect() != 0 {
+		t.Errorf("expected number job profiles was %v but expected 0", cfg.NumberJobProfilesToCollect())
+	}
+	if cfg.JobProfilesNumHighQueryCost() != 0 {
+		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumHighQueryCost())
+	}
+	if cfg.JobProfilesNumRecentErrors() != 0 {
+		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumRecentErrors())
+	}
+	if cfg.JobProfilesNumSlowExec() != 0 {
+		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumSlowExec())
+	}
+	if cfg.JobProfilesNumSlowPlanning() != 0 {
+		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumSlowPlanning())
+	}
+}
+
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
-	beforeEachContTest()
+	genericConfSetup("")
 	//should log redacted when token is present
 	out, err := output.CaptureOutput(func() {
 		simplelog.InitLogger(4)
