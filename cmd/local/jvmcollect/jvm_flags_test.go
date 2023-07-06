@@ -17,16 +17,14 @@ package jvmcollect_test
 import (
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
 
 func TestJvmFlagCapture(t *testing.T) {
 	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", jarLoc)
+	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx512M", jarLoc)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("cmd.Start() failed with %s\n", err)
 	}
@@ -38,12 +36,12 @@ func TestJvmFlagCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	time.Sleep(1 * time.Second)
 	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
-	if !strings.Contains(flags, "-XX:MaxHeapSize=") {
-		t.Errorf("expected %v to contain 'demo.jar'", flags)
+	expected := "demo.jar -Dmyflag=1 -Xmx512M"
+	if expected != flags {
+		t.Errorf("expected %v to %v", flags, expected)
 	}
 }

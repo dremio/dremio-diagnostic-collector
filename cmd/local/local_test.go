@@ -166,7 +166,7 @@ func TestCollectJVMFlags(t *testing.T) {
 		t.Fatalf("unable to make test dir: %v", err)
 	}
 	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", jarLoc)
+	cmd := exec.Command("java", "-Dtestflag=1", "-jar", jarLoc)
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("cmd.Start() failed with %s\n", err)
 	}
@@ -181,6 +181,8 @@ func TestCollectJVMFlags(t *testing.T) {
 		}
 	}()
 
+	time.Sleep(100 * time.Millisecond)
+	fmt.Printf("pid is %v", cmd.Process.Pid)
 	yaml := fmt.Sprintf(`
 dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
@@ -191,7 +193,6 @@ collect-access-log: false
 collect-audit-log: false
 collect-dremio-configuration: false 
 capture-heap-dump: false 
-# when true a heap dump will be captured on each node that the collector is run against
 number-threads: 2
 
 dremio-pid: %v
@@ -217,14 +218,13 @@ is-dremio-cloud: false
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
-	time.Sleep(500 * time.Millisecond)
 	if err := collect(c); err != nil {
 		t.Fatal(err)
 	}
 	if err := cmd.Process.Kill(); err != nil {
 		t.Fatalf("failed to kill process: %s", err)
 	} else {
-		t.Log("Process killed successfully.")
+		t.Logf("Process %v killed successfully.", cmd.Process.Pid)
 	}
 
 	entries, err := os.ReadDir(c.NodeInfoOutDir())
@@ -233,14 +233,24 @@ is-dremio-cloud: false
 	}
 	var items []string
 	var found bool
+	var text string
 	for _, e := range entries {
 		items = append(items, e.Name())
 		if e.Name() == "jvm_settings.txt" {
 			found = true
+			r, err := os.ReadFile(filepath.Join(c.NodeInfoOutDir(), e.Name()))
+			if err != nil {
+				t.Fatalf("unable to read matching test file: %v", err)
+			}
+			text = string(r)
 		}
 	}
 	if !found {
 		t.Errorf("did not find jvm_settings.txt in entries '%v'", strings.Join(items, ", "))
+	}
+	expectedText := "demo.jar -Dtestflag=1"
+	if text != expectedText {
+		t.Errorf("expected '%q' but was '%q'", expectedText, text)
 	}
 }
 
