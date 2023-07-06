@@ -48,7 +48,7 @@ func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlo
 // to make sense of all the behavior
 func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning int) {
 	// don't bother doing any of the calculation if personal access token is not present in fact zero out everything
-	if c.DremioPATToken() == "" {
+	if c.DremioPATToken() == "" || c.DisableRESTAPI() {
 		return
 	}
 	defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost := calculateDefaultJobProfileNumbers(c)

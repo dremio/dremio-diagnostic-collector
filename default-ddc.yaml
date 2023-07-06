@@ -22,6 +22,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 
 ## not typically recommended to change
 # dremio-pid: 0
+# disable-rest-api: false
 # rest-http-timeout: 30
 # collect-metrics: true
 # collect-os-config: true

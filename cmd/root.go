@@ -28,6 +28,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/spf13/cobra"
@@ -40,6 +41,7 @@ var coordinatorStr string
 var executorsStr string
 var sshKeyLoc string
 var sshUser string
+var promptForDremioPAT bool
 
 const outputLoc = "diag.tgz"
 
@@ -57,16 +59,17 @@ var RootCmd = &cobra.Command{
 	Short: versions.GetCLIVersion() + " ddc connects via to dremio servers collects logs into an archive",
 	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
+for ssh based communication to VMs or Bare metal hardware:
 
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
-or more briefly
-ddc -c 10.0.0.19 -e 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
 
+for kubernetes deployments:
 
-ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
-or more briefly
-ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor 
+	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
 
+To sample job profiles and collect system tables information, kv reports, and Workload Manager Information add the --dremio-pat-prompt flag:
+
+	ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor --dremio-pat-prompt
 `,
 	Run: func(c *cobra.Command, args []string) {
 
@@ -88,12 +91,22 @@ func Execute() {
 			sshKeyLoc = sshDefault
 		}
 		simplelog.InitLogger(2)
+		dremioPAT := ""
+		if promptForDremioPAT {
+			pat, err := masking.PromptForPAT()
+			if err != nil {
+				fmt.Printf("unable to get PAT due to: %v\n", err)
+				os.Exit(1)
+			}
+			dremioPAT = pat
+		}
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
 			OutputLoc:      filepath.Clean(outputLoc),
 			SudoUser:       sudoUser,
 			DDCfs:          helpers.NewRealFileSystem(),
+			DremioPAT:      dremioPAT,
 		}
 
 		err := validateParameters(collectionArgs, sshKeyLoc, sshUser, isK8s)
@@ -181,10 +194,8 @@ func init() {
 	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "namespace to use for kubernetes pods")
 	RootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "kubectl", "where to find kubectl")
 	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --cordinator and --executors flags")
+	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostcs commands need a sudo user (i.e. for jcmd)")
-	// TODO implement embedded k8s and ssh support using go libs
-	//rootCmd.Flags().BoolVar(&isEmbeddedK8s, "embedded-k8s", false, "use embedded k8s client in place of kubectl binary")
-	//rootCmd.Flags().BoolVar(&isEmbeddedSSH, "embedded-ssh", false, "use embedded ssh go client in place of ssh and scp binary")
 
 	//init
 	RootCmd.AddCommand(local.LocalCollectCmd)

@@ -60,6 +60,7 @@ type Args struct {
 	OutputLoc      string
 	SudoUser       string
 	CopyStrategy   CopyStrategy
+	DremioPAT      string
 }
 
 type HostCaptureConfiguration struct {
@@ -71,6 +72,7 @@ type HostCaptureConfiguration struct {
 	SudoUser          string
 	CopyStrategy      CopyStrategy
 	DDCfs             helpers.Filesystem
+	DremioPAT         string
 }
 
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func()) error {
@@ -80,6 +82,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	outputLoc := collectionArgs.OutputLoc
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
+	dremioPAT := collectionArgs.DremioPAT
 	var ddcLoc string
 	var err error
 	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
@@ -139,6 +142,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				CopyStrategy:      s,
 				DDCfs:             ddcfs,
 				NodeCaptureOutput: "/tmp/ddc", //TODO use node output dirs from the config
+				DremioPAT:         dremioPAT,
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false

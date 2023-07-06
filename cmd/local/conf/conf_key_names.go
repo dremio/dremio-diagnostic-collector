@@ -18,6 +18,7 @@ const (
 	// KeyVerbose provides output verbosity when the local-collect command is running,
 	// this does not affect the log files which are always debug
 	KeyVerbose                           = "verbose"
+	KeyDisableRESTAPI                    = "disable-rest-api"
 	KeyCollectAccelerationLog            = "collect-acceleration-log"
 	KeyCollectAccessLog                  = "collect-access-log"
 	KeyCollectAuditLog                   = "collect-audit-log"

@@ -41,6 +41,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	ddcTmpDir := "/tmp/ddc"
 	pathToDDC := "/tmp/ddc/ddc" //nasty hard coding for now
 	pathToDDCYAML := "/tmp/ddc/ddc.yaml"
+	dremioPAT := conf.DremioPAT
 	// clear out the old
 	if out, err := ComposeExecute(conf, []string{"rm", "-fr", ddcTmpDir}); err != nil {
 		simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
@@ -87,7 +88,10 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	//execute local-collect if skipRESTCollect is set blank the pat
 	localCollectArgs := []string{pathToDDC, "local-collect"}
 	if skipRESTCollect {
-		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", "\"\"")
+		localCollectArgs = append(localCollectArgs, "--disable-rest-api")
+	} else if dremioPAT != "" {
+		//if ther dremio PAT is set go ahead and pass it
+		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
 	}
 	if err := ComposeExecuteAndStream(conf, func(line string) {
 		simplelog.HostLog(host, line)
