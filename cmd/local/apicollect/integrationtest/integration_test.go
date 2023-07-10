@@ -406,13 +406,32 @@ func TestClusterConfigCapture(t *testing.T) {
 	}
 }
 
-// TODO figure out why this is failing
-// func TestCollectDremioSystemTables(t *testing.T) {
-// 	err := collectDremioSystemTables()
-// 	if err != nil {
-// 		t.Errorf("unexpected error %v", err)
-// 	}
-// }
+func TestCollectDremioSystemTables(t *testing.T) {
+	if err := os.MkdirAll(c.SystemTablesOutDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := apicollect.RunCollectDremioSystemTables(c); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	entries, err := os.ReadDir(c.SystemTablesOutDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	//we substract 3 of the jobs that fail due to missing features in oss
+	// - sys.privileges
+	// - sys.membership
+	// - sys.roles
+	// and system.tables because it seems to not be setup
+	// - sys.\"tables\"
+	expectedEntries := len(c.Systemtables()) - 4
+	actualEntries := len(entries)
+	if actualEntries == 0 {
+		t.Error("expected more than 0 entries")
+	}
+	if actualEntries != expectedEntries {
+		t.Errorf("expected %v but was %v", expectedEntries, actualEntries)
+	}
+}
 
 func TestDownloadJobProfile(t *testing.T) {
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {
