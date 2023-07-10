@@ -16,14 +16,11 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -211,19 +208,19 @@ func collect(c *conf.CollectConf) error {
 		if !c.CollectJFR() {
 			simplelog.Debugf("Skipping Java Flight Recorder collection")
 		} else {
-			t.AddJob(wrapConfigJob(runCollectJFR))
+			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJFR))
 		}
 
 		if !c.CollectJStack() {
 			simplelog.Debugf("Skipping Java thread dumps collection")
 		} else {
-			t.AddJob(wrapConfigJob(runCollectJStacks))
+			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJStacks))
 		}
 
 		if !c.CaptureHeapDump() {
 			simplelog.Debugf("Skipping Java heap dump collection")
 		} else {
-			t.AddJob(wrapConfigJob(runCollectHeapDump))
+			t.AddJob(wrapConfigJob(jvmcollect.RunCollectHeapDump))
 		}
 	}
 
@@ -339,86 +336,6 @@ func runCollectNodeMetrics(c *conf.CollectConf) error {
 	return nodeinfocollect.SystemMetrics(args)
 }
 
-func runCollectJFR(c *conf.CollectConf) error {
-	var w bytes.Buffer
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v VM.unlock_commercial_features", c.DremioPID())); err != nil {
-		simplelog.Warningf("Error trying to unlock commercial features %v. Note: newer versions of OpenJDK do not support the call VM.unlock_commercial_features. This is usually safe to ignore", err)
-	}
-	simplelog.Debugf("node: %v - jfr unlock commerictial output - %v", c.NodeName(), w.String())
-	w = bytes.Buffer{}
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
-		return fmt.Errorf("unable to run JFR due to error %v", err)
-	}
-	simplelog.Debugf("node: %v - jfr start output - %v", c.NodeName(), w.String())
-	time.Sleep(time.Duration(c.DremioJFRTimeSeconds()) * time.Second)
-	// do not "optimize". the recording first needs to be stopped for all processes before collecting the data.
-	simplelog.Debugf("... stopping JFR %v", c.NodeName())
-	w = bytes.Buffer{}
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.dump name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
-		return fmt.Errorf("unable to dump JFR due to error %v", err)
-	}
-	simplelog.Debugf("node: %v - jfr dump output %v", c.NodeName(), w.String())
-	w = bytes.Buffer{}
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.stop name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
-		return fmt.Errorf("unable to dump JFR due to error %v", err)
-	}
-	simplelog.Debugf("node: %v - jfr stop output %v", c.NodeName(), w.String())
-
-	return nil
-}
-
-func runCollectJStacks(c *conf.CollectConf) error {
-	simplelog.Debug("Collecting GC logs ...")
-	threadDumpFreq := c.DremioJStackFreqSeconds()
-	iterations := c.DremioJStackTimeSeconds() / threadDumpFreq
-	simplelog.Debugf("Running Java thread dumps every %v second(s) for a total of %v iterations ...", threadDumpFreq, iterations)
-	for i := 0; i < iterations; i++ {
-		var w bytes.Buffer
-		if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v Thread.print -l", c.DremioPID())); err != nil {
-			simplelog.Warningf("unable to capture jstack of pid %v due to error %v", c.DremioPID(), err)
-		}
-		date := time.Now().Format("2006-01-02_15_04_05")
-		threadDumpFileName := filepath.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
-		if err := os.WriteFile(filepath.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
-			return fmt.Errorf("unable to write thread dump %v due to error %v", threadDumpFileName, err)
-		}
-		simplelog.Debugf("Saved %v", threadDumpFileName)
-		simplelog.Debugf("Waiting %v second(s) ...", threadDumpFreq)
-		time.Sleep(time.Duration(threadDumpFreq) * time.Second)
-	}
-	return nil
-}
-
-func runCollectHeapDump(c *conf.CollectConf) error {
-	simplelog.Debug("Capturing Java Heap Dump")
-	dremioPID := c.DremioPID()
-	baseName := fmt.Sprintf("%v.hprof", c.NodeName())
-	hprofFile := fmt.Sprintf("/tmp/%v.hprof", baseName)
-	hprofGzFile := fmt.Sprintf("%v.gz", hprofFile)
-	if err := os.Remove(path.Clean(hprofGzFile)); err != nil {
-		simplelog.Warningf("unable to remove hprof.gz file with error %v", err)
-	}
-	if err := os.Remove(path.Clean(hprofFile)); err != nil {
-		simplelog.Warningf("unable to remove hprof file with error %v", err)
-	}
-	var w bytes.Buffer
-	if err := ddcio.Shell(&w, fmt.Sprintf("jmap -dump:format=b,file=%v %v", hprofFile, dremioPID)); err != nil {
-		return fmt.Errorf("unable to capture heap dump %v", err)
-	}
-	simplelog.Debugf("heap dump output %v", w.String())
-	if err := ddcio.GzipFile(hprofFile, hprofGzFile); err != nil {
-		return fmt.Errorf("unable to gzip heap dump file")
-	}
-	if err := os.Remove(path.Clean(hprofFile)); err != nil {
-		simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
-	}
-	dest := filepath.Join(c.HeapDumpsOutDir(), baseName+".gz")
-	if err := os.Rename(path.Clean(hprofGzFile), path.Clean(dest)); err != nil {
-		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)
-	}
-	return nil
-}
-
 var LocalCollectCmd = &cobra.Command{
 	Use:   "local-collect",
 	Short: "retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
@@ -514,7 +431,7 @@ func init() {
 	LocalCollectCmd.Flags().Bool("collect-audit-log", false, "Run the Collect Audit Log collector")
 	LocalCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
 	LocalCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
-	LocalCollectCmd.Flags().IntP("number-threads", "t", 0, "control concurrency in the system")
+	LocalCollectCmd.Flags().IntP("number-threads", "t", 2, "control concurrency in the system")
 	// Add flags for Dremio connection information
 	LocalCollectCmd.Flags().String("dremio-endpoint", "", "Dremio REST API endpoint")
 	LocalCollectCmd.Flags().String("dremio-username", "", "Dremio username")

@@ -76,7 +76,7 @@ func GzipContainsFile(t *testing.T, expectedFile, gzipArchive string) {
 	}
 }
 
-func extraGZip(t *testing.T, gzipArchive string) string {
+func ExtractGZip(t *testing.T, gzipArchive, fileName string) string {
 	t.Helper()
 	cleanedArchiveFile := filepath.Clean(gzipArchive)
 	f, err := os.Open(cleanedArchiveFile)
@@ -93,15 +93,15 @@ func extraGZip(t *testing.T, gzipArchive string) string {
 	if err != nil {
 		t.Fatalf("unexpected error reading tar.gz file %v due to error %v", cleanedArchiveFile, err)
 	}
-	tarFile := filepath.Clean(cleanedArchiveFile + "tar")
-	newFile, err := os.Create(tarFile)
+
+	newFile, err := os.Create(fileName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		err = newFile.Close()
 		if err != nil {
-			t.Logf("WARN unable to close %v to due error %v", tarFile, err)
+			t.Logf("WARN unable to close %v to due error %v", fileName, err)
 		}
 	}()
 
@@ -120,12 +120,19 @@ func extraGZip(t *testing.T, gzipArchive string) string {
 			break
 		}
 	}
-	return tarFile
+	return fileName
+}
+
+func ExtractGZipToTar(t *testing.T, gzipArchive string) string {
+	t.Helper()
+	cleanedArchiveFile := filepath.Clean(gzipArchive)
+	tarFile := filepath.Clean(cleanedArchiveFile + "tar")
+	return ExtractGZip(t, cleanedArchiveFile, tarFile)
 }
 
 func TgzContainsFile(t *testing.T, expectedFile, archiveFile string) {
 	t.Helper()
-	tarFile := extraGZip(t, archiveFile)
+	tarFile := ExtractGZipToTar(t, archiveFile)
 	TarContainsFile(t, expectedFile, tarFile)
 }
 
