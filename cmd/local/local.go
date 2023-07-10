@@ -106,7 +106,7 @@ func collect(c *conf.CollectConf) error {
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
-			t.AddJob(wrapConfigJob(runCollectDiskUsage))
+			t.AddJob(wrapConfigJob(nodeinfocollect.RunCollectDiskUsage))
 		}
 
 		if !c.CollectDremioConfiguration() {
@@ -250,46 +250,6 @@ func collect(c *conf.CollectConf) error {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
-	return nil
-}
-
-func runCollectDiskUsage(c *conf.CollectConf) error {
-	diskWriter, err := os.Create(path.Clean(filepath.Join(c.NodeInfoOutDir(), "diskusage.txt")))
-	if err != nil {
-		return fmt.Errorf("unable to create diskusage.txt due to error %v", err)
-	}
-	defer func() {
-		if err := diskWriter.Sync(); err != nil {
-			simplelog.Warningf("unable to sync the os_info.txt file due to error: %v", err)
-		}
-		if err := diskWriter.Close(); err != nil {
-			simplelog.Warningf("unable to close the os_info.txt file due to error: %v", err)
-		}
-	}()
-	err = ddcio.Shell(diskWriter, "df -h")
-	if err != nil {
-		simplelog.Warningf("unable to read df -h due to error %v", err)
-	}
-
-	// this detection only makes sense in kubernetes TODO fix this to work with more than just kubernetes
-	if strings.Contains(c.NodeName(), "dremio-master") {
-		rocksDbDiskUsageWriter, err := os.Create(path.Clean(filepath.Join(c.NodeInfoOutDir(), "rocksdb_disk_allocation.txt")))
-		if err != nil {
-			return fmt.Errorf("unable to create rocksdb_disk_allocation.txt due to error %v", err)
-		}
-		defer func() {
-			if err := rocksDbDiskUsageWriter.Close(); err != nil {
-				simplelog.Warningf("unable to close rocksdb usage writer the file maybe incomplete %v", err)
-			}
-		}()
-		err = ddcio.Shell(rocksDbDiskUsageWriter, "du -sh /opt/dremio/data/db/*")
-		if err != nil {
-			simplelog.Warningf("unable to write du -sh to rocksdb_disk_allocation.txt due to error %v", err)
-		}
-
-	}
-	simplelog.Debugf("... Collecting Disk Usage from %v COMPLETED", c.NodeName())
-
 	return nil
 }
 
