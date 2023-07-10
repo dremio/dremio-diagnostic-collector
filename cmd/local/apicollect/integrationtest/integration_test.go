@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// apicollect provides all the methods that collect via the API, this is a substantial part of the activities of DDC so it gets it's own package
-package apicollect
+package integrationtest
 
 import (
 	"bytes"
@@ -33,6 +32,9 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/spf13/pflag"
 )
@@ -347,6 +349,60 @@ func TestCollectKVReport(t *testing.T) {
 	err = apicollect.RunCollectKvReport(c)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
+	}
+}
+
+type MockTimeService struct {
+	now time.Time
+}
+
+func (m *MockTimeService) GetNow() time.Time {
+	return m.now
+}
+
+func TestClusterConfigCapture(t *testing.T) {
+	ddcfs := helpers.NewRealFileSystem()
+	now := time.Now()
+	mockTimeService := &MockTimeService{
+		now: now,
+	}
+	tmpDir := filepath.Join(t.TempDir(), "ddc-test")
+	if err := os.MkdirAll(tmpDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	baseDir := "hc-dir"
+	if err := os.MkdirAll(filepath.Join(tmpDir, baseDir), 0700); err != nil {
+		t.Fatal(err)
+	}
+	hc := &helpers.CopyStrategyHC{
+		StrategyName: "healthcheck",
+		BaseDir:      baseDir,
+		TmpDir:       tmpDir,
+		Fs:           ddcfs,
+		TimeService:  mockTimeService,
+	}
+	k8s := kubernetes.NewKubectlK8sActions("kubectl", "", "", namespace)
+	if err := collection.ClusterK8sExecute(namespace, hc, ddcfs, k8s, "kubectl"); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(tmpDir, baseDir, "kubernetes")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 21 {
+		t.Errorf("expected to find 21 entries but found %v", len(entries))
+	}
+	for _, e := range entries {
+		fs, err := e.Info()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fs.Size() == 0 {
+			t.Errorf("file %v is empty", e.Name())
+		}
 	}
 }
 
