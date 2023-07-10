@@ -27,31 +27,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func TestJvmFlagCapture(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx512M", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
-	if err != nil {
-		t.Fatalf("expected no error but got %v", err)
-	}
-	expected := "demo.jar -Dmyflag=1 -Xmx512M"
-	if expected != flags {
-		t.Errorf("expected %v to %v", flags, expected)
-	}
-}
-
-func TestJvmFlagsAreWritten(t *testing.T) {
+func TestJFRCapture(t *testing.T) {
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -74,15 +50,17 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	nodeName := "node1"
-	nodeInfoDir := filepath.Join(tmpOutDir, "node-info", nodeName)
-	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
+	jfrOutDir := filepath.Join(tmpOutDir, "jfr")
+	if err := os.Mkdir(jfrOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
+	nodeName := "node1"
 	ddcYamlString := fmt.Sprintf(`
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
+dremio-jfr-time-seconds: 2
+
 `, strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
@@ -94,16 +72,16 @@ dremio-pid: %v
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = jvmcollect.RunCollectJVMFlags(c)
+	err = jvmcollect.RunCollectJFR(c)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
-	b, err := os.ReadFile(filepath.Join(nodeInfoDir, "jvm_settings.txt"))
+
+	f, err := os.Stat(filepath.Join(jfrOutDir, fmt.Sprintf("%v.jfr", nodeName)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "demo.jar -Dmyflag=1 -Xmx128M"
-	if expected != string(b) {
-		t.Errorf("expected %v to %v", string(b), expected)
+	if f.Size() == 0 {
+		t.Errorf("expected a non empty file for the hprof but we got one")
 	}
 }

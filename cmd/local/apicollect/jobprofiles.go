@@ -22,6 +22,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -89,6 +90,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	queriesjson.AddRowsToSet(errorqueriesrows, profilesToCollect)
 
 	tried = len(profilesToCollect)
+	var m sync.Mutex
 	if len(profilesToCollect) > 0 {
 		simplelog.Debugf("Downloading %v job profiles...", len(profilesToCollect))
 		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100)
@@ -102,10 +104,13 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 				err := DownloadJobProfile(c, keyToDownload)
 				if err != nil {
 					simplelog.Errorf("unable to download %v, err: %v", keyToDownload, err) // Print instead of Error
+					return nil
 				}
+				m.Lock()
+				collected++
+				m.Unlock()
 				return nil
 			})
-			collected++
 		}
 		if err = downloadThreadPool.ProcessAndWait(); err != nil {
 			simplelog.Errorf("job profile download thread pool wait error %v", err)

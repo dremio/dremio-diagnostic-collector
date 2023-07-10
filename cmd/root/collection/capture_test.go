@@ -15,6 +15,8 @@
 // collection package provides the interface for collection implementation and the actual collection execution
 package collection
 
+import "github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+
 type MockCollector struct {
 	Returns     [][]interface{}
 	Calls       []map[string]interface{}
@@ -23,6 +25,7 @@ type MockCollector struct {
 
 func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
+	args["call"] = "copyToHost"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
 	args["source"] = source
@@ -38,6 +41,7 @@ func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source
 }
 func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
+	args["call"] = "copyToHostSudo"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
 	args["source"] = source
@@ -52,6 +56,7 @@ func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _,
 }
 func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
+	args["call"] = "copyFromHost"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
 	args["source"] = source
@@ -67,6 +72,7 @@ func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, sour
 }
 func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
+	args["call"] = "copyFromHostSudo"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
 	args["source"] = source
@@ -101,6 +107,25 @@ func (m *MockCollector) HostExecute(hostString string, isCoordinator bool, args 
 
 	}
 	return response[0].(string), response[1].(error)
+}
+
+func (m *MockCollector) HostExecuteAndStream(hostString string, _ cli.OutputHandler, isCoordinator bool, args ...string) error {
+	capturedArgs := make(map[string]interface{})
+	capturedArgs["hostString"] = hostString
+	capturedArgs["isCoordinator"] = isCoordinator
+	capturedArgs["args"] = args
+	m.Calls = append(m.Calls, capturedArgs)
+	response := m.Returns[m.CallCounter]
+	m.CallCounter++
+	if response[0] == nil {
+		return nil
+
+	}
+	return response[0].(error)
+}
+
+func (m *MockCollector) HelpText() string {
+	return "help me"
 }
 
 // func TestFindFiles(t *testing.T) {

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// package jvmcollect handles parsing of the jvm information
 package jvmcollect_test
 
 import (
@@ -24,34 +25,11 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 	"github.com/spf13/pflag"
 )
 
-func TestJvmFlagCapture(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx512M", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
-	if err != nil {
-		t.Fatalf("expected no error but got %v", err)
-	}
-	expected := "demo.jar -Dmyflag=1 -Xmx512M"
-	if expected != flags {
-		t.Errorf("expected %v to %v", flags, expected)
-	}
-}
-
-func TestJvmFlagsAreWritten(t *testing.T) {
+func TestHeapDumpCapture(t *testing.T) {
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -74,11 +52,11 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	nodeName := "node1"
-	nodeInfoDir := filepath.Join(tmpOutDir, "node-info", nodeName)
-	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
+	heapDumpOutDir := filepath.Join(tmpOutDir, "heap-dumps")
+	if err := os.Mkdir(heapDumpOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
+	nodeName := "node1"
 	ddcYamlString := fmt.Sprintf(`
 tmp-output-dir: %v
 node-name: %v
@@ -94,16 +72,37 @@ dremio-pid: %v
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = jvmcollect.RunCollectJVMFlags(c)
+	err = jvmcollect.RunCollectHeapDump(c)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
-	b, err := os.ReadFile(filepath.Join(nodeInfoDir, "jvm_settings.txt"))
+
+	f, err := os.Stat(filepath.Join(heapDumpOutDir, fmt.Sprintf("%v.hprof.gz", nodeName)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "demo.jar -Dmyflag=1 -Xmx128M"
-	if expected != string(b) {
-		t.Errorf("expected %v to %v", string(b), expected)
+	if f.Size() == 0 {
+		t.Errorf("expected a non empty file for the hprof but we got one")
+	}
+
+	_, err = os.Stat(filepath.Join(heapDumpOutDir, fmt.Sprintf("%v.hprof", nodeName)))
+	if err == nil {
+		t.Fatal("expected no file to match this, which means it was not deleted")
+	}
+
+	actual := filepath.Join(heapDumpOutDir, "node1.hprof.gz")
+	expected := filepath.Join(heapDumpOutDir, "node1.hprof")
+
+	tests.ExtractGZip(t, actual, expected)
+	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
+		t.Errorf("expected %v file to contain %v but it did not", expected, actual)
+	}
+
+	f, err = os.Stat(filepath.Join(heapDumpOutDir, fmt.Sprintf("%v.hprof", nodeName)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Size() == 0 {
+		t.Errorf("expected a non empty file for the hprof but we got one")
 	}
 }

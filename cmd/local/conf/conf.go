@@ -576,3 +576,7 @@ func (c *CollectConf) NodeMetricsCollectDurationSeconds() int {
 func (c *CollectConf) RestHTTPTimeout() int {
 	return c.restHTTPTimeout
 }
+
+func (c *CollectConf) DremioRocksDBDir() string {
+	return c.dremioRocksDBDir
+}

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// apicollect provides all the methods that collect via the API, this is a substantial part of the activities of DDC so it gets it's own package
-package apicollect
+package integrationtest
 
 import (
 	"bytes"
@@ -33,6 +32,9 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/spf13/pflag"
 )
@@ -350,13 +352,86 @@ func TestCollectKVReport(t *testing.T) {
 	}
 }
 
-// TODO figure out why this is failing
-// func TestCollectDremioSystemTables(t *testing.T) {
-// 	err := collectDremioSystemTables()
-// 	if err != nil {
-// 		t.Errorf("unexpected error %v", err)
-// 	}
-// }
+type MockTimeService struct {
+	now time.Time
+}
+
+func (m *MockTimeService) GetNow() time.Time {
+	return m.now
+}
+
+func TestClusterConfigCapture(t *testing.T) {
+	ddcfs := helpers.NewRealFileSystem()
+	now := time.Now()
+	mockTimeService := &MockTimeService{
+		now: now,
+	}
+	tmpDir := filepath.Join(t.TempDir(), "ddc-test")
+	if err := os.MkdirAll(tmpDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	baseDir := "hc-dir"
+	if err := os.MkdirAll(filepath.Join(tmpDir, baseDir), 0700); err != nil {
+		t.Fatal(err)
+	}
+	hc := &helpers.CopyStrategyHC{
+		StrategyName: "healthcheck",
+		BaseDir:      baseDir,
+		TmpDir:       tmpDir,
+		Fs:           ddcfs,
+		TimeService:  mockTimeService,
+	}
+	k8s := kubernetes.NewKubectlK8sActions("kubectl", "", "", namespace)
+	if err := collection.ClusterK8sExecute(namespace, hc, ddcfs, k8s, "kubectl"); err != nil {
+		t.Fatal(err)
+	}
+
+	dir := filepath.Join(tmpDir, baseDir, "kubernetes")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) != 21 {
+		t.Errorf("expected to find 21 entries but found %v", len(entries))
+	}
+	for _, e := range entries {
+		fs, err := e.Info()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fs.Size() == 0 {
+			t.Errorf("file %v is empty", e.Name())
+		}
+	}
+}
+
+func TestCollectDremioSystemTables(t *testing.T) {
+	if err := os.MkdirAll(c.SystemTablesOutDir(), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := apicollect.RunCollectDremioSystemTables(c); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	entries, err := os.ReadDir(c.SystemTablesOutDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	//we substract 3 of the jobs that fail due to missing features in oss
+	// - sys.privileges
+	// - sys.membership
+	// - sys.roles
+	// and system.tables because it seems to not be setup
+	// - sys.\"tables\"
+	expectedEntries := len(c.Systemtables()) - 4
+	actualEntries := len(entries)
+	if actualEntries == 0 {
+		t.Error("expected more than 0 entries")
+	}
+	if actualEntries != expectedEntries {
+		t.Errorf("expected %v but was %v", expectedEntries, actualEntries)
+	}
+}
 
 func TestDownloadJobProfile(t *testing.T) {
 	if err := os.MkdirAll(c.JobProfilesOutDir(), 0700); err != nil {

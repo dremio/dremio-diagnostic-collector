@@ -21,37 +21,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/spf13/pflag"
 )
 
-func TestJvmFlagCapture(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx512M", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
-	if err != nil {
-		t.Fatalf("expected no error but got %v", err)
-	}
-	expected := "demo.jar -Dmyflag=1 -Xmx512M"
-	if expected != flags {
-		t.Errorf("expected %v to %v", flags, expected)
-	}
-}
-
-func TestJvmFlagsAreWritten(t *testing.T) {
+func TestJStackCapture(t *testing.T) {
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -75,14 +52,16 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
-	nodeInfoDir := filepath.Join(tmpOutDir, "node-info", nodeName)
-	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
+	threadDumpsOutDir := filepath.Join(tmpOutDir, "jfr", "thread-dumps", nodeName)
+	if err := os.MkdirAll(threadDumpsOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	ddcYamlString := fmt.Sprintf(`
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
+dremio-jstack-time-seconds: 2
+dremio-jstack-freq-seconds: 1
 `, strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
@@ -94,16 +73,39 @@ dremio-pid: %v
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = jvmcollect.RunCollectJVMFlags(c)
+	now := time.Now()
+	counter := 0
+	var times []time.Time
+	err = jvmcollect.RunCollectJStacksWithTimeService(c, func() time.Time {
+		counter++
+		current := now.Add(time.Duration(counter) * time.Second)
+		times = append(times, current)
+		return current
+	})
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
-	b, err := os.ReadFile(filepath.Join(nodeInfoDir, "jvm_settings.txt"))
+	entries, err := os.ReadDir(threadDumpsOutDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "demo.jar -Dmyflag=1 -Xmx128M"
-	if expected != string(b) {
-		t.Errorf("expected %v to %v", string(b), expected)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 but got %v", len(entries))
+	}
+
+	f, err := os.Stat(filepath.Join(threadDumpsOutDir, fmt.Sprintf("threadDump-%s-%s.txt", nodeName, times[0].Format("2006-01-02_15_04_05"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Size() == 0 {
+		t.Errorf("expected a non empty file for the hprof but we got one")
+	}
+
+	f, err = os.Stat(filepath.Join(threadDumpsOutDir, fmt.Sprintf("threadDump-%s-%s.txt", nodeName, times[1].Format("2006-01-02_15_04_05"))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Size() == 0 {
+		t.Errorf("expected a non empty file for the hprof but we got one")
 	}
 }

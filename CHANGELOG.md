@@ -19,6 +19,8 @@
 ### Fixed
 
 * when --dremio-pat-token was used it would show up the argument in some logs, this has been corrected
+* job profile collection was reporting collected profiles even when they errored out
+* dremio-env now has the correct has the correct name of dremio-env
 
 ## [0.5.0]
 
