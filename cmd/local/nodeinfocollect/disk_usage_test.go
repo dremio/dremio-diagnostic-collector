@@ -26,7 +26,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 	"github.com/shirou/gopsutil/v3/disk"
-	"github.com/spf13/pflag"
 )
 
 func createRandomFile(filename string, size int64) error {
@@ -100,7 +99,7 @@ node-name: %v
 	)), 0700); err != nil {
 		t.Fatalf("unable to write ddc.yaml for test %v", err)
 	}
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confPath)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
@@ -194,7 +193,7 @@ node-name: %v
 	)), 0700); err != nil {
 		t.Fatalf("unable to write ddc.yaml for test %v", err)
 	}
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confPath)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
@@ -294,7 +293,7 @@ node-name: %v
 	)), 0700); err != nil {
 		t.Fatalf("unable to write ddc.yaml for test %v", err)
 	}
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confPath)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)

@@ -24,7 +24,6 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/spf13/pflag"
 )
 
 func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
@@ -80,7 +79,7 @@ func TestRunCollectWLM(t *testing.T) {
 
 	confDir := setupConfigDir(t, server.URL)
 	// Prepare the configuration
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confDir)
 	if err != nil {
 		t.Fatalf("unable to read conf due to error %v", err)

@@ -57,7 +57,10 @@ func TarGzDir(srcDir, dest string) error {
 		if err != nil {
 			return err
 		}
-
+		//don't try and archive the tarbal itself
+		if filePath == dest {
+			return nil
+		}
 		// Get the relative path of the file
 		relativePath, err := filepath.Rel(srcDir, filePath)
 		if err != nil {
@@ -72,8 +75,14 @@ func TarGzDir(srcDir, dest string) error {
 		// Convert path to use forward slashes
 		header.Name = filepath.ToSlash(relativePath)
 
+		header.Size = fileInfo.Size()
+
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return err
+		}
+
+		if !fileInfo.Mode().IsRegular() { //nothing more to do for non-regular
+			return nil
 		}
 
 		if !fileInfo.IsDir() {

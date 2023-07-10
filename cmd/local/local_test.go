@@ -29,7 +29,6 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
-	"github.com/spf13/pflag"
 )
 
 func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) string {
@@ -74,7 +73,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -131,7 +130,7 @@ func TestCreateAllDirs(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -214,7 +213,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -307,7 +306,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}

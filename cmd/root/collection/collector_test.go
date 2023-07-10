@@ -283,5 +283,5 @@ func TestTgzArchive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tests.TgzContainsFile(t, testFile, archiveFile)
+	tests.TgzContainsFile(t, testFile, archiveFile, "test.txt")
 }

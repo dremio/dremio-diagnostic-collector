@@ -26,6 +26,7 @@ const (
 	KeyDremioLogDir                      = "dremio-log-dir"
 	KeyNumberThreads                     = "number-threads"
 	KeyDremioPid                         = "dremio-pid"
+	KeyDremioPidDetection                = "dremio-pid-detection"
 	KeyDremioUsername                    = "dremio-username"
 	KeyDremioPatToken                    = "dremio-pat-token" // #nosec G101
 	KeyDremioConfDir                     = "dremio-conf-dir"

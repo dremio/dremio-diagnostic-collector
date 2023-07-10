@@ -36,7 +36,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/spf13/pflag"
 )
 
 type AuthResponse struct {
@@ -304,7 +303,7 @@ func TestMain(m *testing.M) {
 			return 1
 		}
 		yamlLocation := writeConf(dremioPATToken, dremioEndpoint, tmpDirForConf)
-		c, err = conf.ReadConf(make(map[string]*pflag.Flag), filepath.Dir(yamlLocation))
+		c, err = conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
 		if err != nil {
 			log.Printf("reading config %v", err)
 			return 1
