@@ -16,6 +16,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -341,10 +342,7 @@ var LocalCollectCmd = &cobra.Command{
 	Short: "retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
-
-		simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
-		simplelog.Infof("args: %v", strings.Join(args, " "))
-		overrides := make(map[string]*pflag.Flag)
+		overrides := make(map[string]string)
 		//if a cli flag was set go ahead and use those values to override the viper configuration
 		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
 			if flag.Name == conf.KeyDremioPatToken {
@@ -364,60 +362,70 @@ var LocalCollectCmd = &cobra.Command{
 			} else {
 				simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
 			}
-			overrides[flag.Name] = flag
+			overrides[flag.Name] = flag.Value.String()
 		})
-
-		c, err := conf.ReadConfFromExecLocation(overrides)
-		if err != nil {
-			simplelog.Errorf("unable to read configuration %v", err)
+		if err := Execute(args, overrides, func() error {
+			return cobraCmd.Usage()
+		}); err != nil {
+			simplelog.Error(errors.Unwrap(err).Error())
 			os.Exit(1)
 		}
-		if !c.AcceptCollectionConsent() {
-			fmt.Println(consent.OutputConsent(c))
-			os.Exit(1)
-		}
-		//check if required flags are set
-		requiredFlags := []string{"dremio-endpoint", "dremio-username"}
-
-		failed := false
-		for _, flag := range requiredFlags {
-			if viper.GetString(flag) == "" {
-				simplelog.Errorf("required flag '--%s' not set", flag)
-				failed = true
-			}
-		}
-		if failed {
-			err := cobraCmd.Usage()
-			if err != nil {
-				simplelog.Errorf("unable to even print usage, this is critical report this bug %v", err)
-				os.Exit(1)
-			}
-			os.Exit(1)
-		}
-
-		// Run application
-		simplelog.Info("Starting collection...")
-		if err := collect(c); err != nil {
-			simplelog.Errorf("unable to collect: %v", err)
-			os.Exit(1)
-		}
-		ddcLoc, err := os.Executable()
-		if err != nil {
-			simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
-		} else {
-			ddcDir := filepath.Dir(ddcLoc)
-			if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
-				simplelog.Warningf("uanble to copy log to archive due to error %v", err)
-			}
-		}
-		tarballName := c.OutputDir() + c.NodeName() + ".tar.gz"
-		simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
-		if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
-			simplelog.Errorf("unable to compress archive exiting due to error %v", err)
-			os.Exit(1)
-		}
-		simplelog.Infof("Archive %v complete", tarballName)
 	},
+}
+
+func Execute(args []string, overrides map[string]string, usage func() error) error {
+	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
+	simplelog.Infof("args: %v", strings.Join(args, " "))
+
+	c, err := conf.ReadConfFromExecLocation(overrides)
+	if err != nil {
+		return fmt.Errorf("unable to read configuration %w", err)
+
+	}
+	if !c.AcceptCollectionConsent() {
+		fmt.Println(consent.OutputConsent(c))
+		return errors.New("no consent given")
+	}
+
+	//check if required flags are set
+	requiredFlags := []string{"dremio-endpoint", "dremio-username"}
+
+	failed := false
+	for _, flag := range requiredFlags {
+		if viper.GetString(flag) == "" {
+			simplelog.Errorf("required flag '--%s' not set", flag)
+			failed = true
+		}
+	}
+	if failed {
+		err := usage()
+		if err != nil {
+			return fmt.Errorf("unable to even print usage, this is critical report this bug %w", err)
+		}
+		return errors.New("missing flags")
+	}
+
+	// Run application
+	simplelog.Info("Starting collection...")
+	if err := collect(c); err != nil {
+		return fmt.Errorf("unable to collect: %w", err)
+	}
+	ddcLoc, err := os.Executable()
+	if err != nil {
+		simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
+	} else {
+		ddcDir := filepath.Dir(ddcLoc)
+		if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
+			simplelog.Warningf("uanble to copy log to archive due to error %v", err)
+		}
+	}
+	tarballName := filepath.Join(c.OutputDir(), c.NodeName()+".tar.gz")
+	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
+	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
+		return fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
+	}
+	simplelog.Infof("Archive %v complete", tarballName)
+	return nil
 }
 
 func init() {

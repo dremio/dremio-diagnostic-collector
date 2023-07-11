@@ -8,6 +8,7 @@
 * flag to control collection of jvm flags
 * flag to control os information collection
 * flag to disable rest api calls
+* ddc awselogs - automates log collection for awse instead of requiring remote connections one can run just this one command from any node where the /var/efs/logs diretory is located and get all logs for each node
 
 ### Changed
 

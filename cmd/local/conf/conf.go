@@ -26,7 +26,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
@@ -42,6 +41,7 @@ type CollectConf struct {
 	dremioPATToken             string
 	dremioRocksDBDir           string
 	numberJobProfilesToCollect int
+	dremioPIDDetection         bool
 	collectAccelerationLogs    bool
 	collectAccessLogs          bool
 	collectAuditLogs           bool
@@ -94,7 +94,7 @@ type CollectConf struct {
 	dremioPID               int
 }
 
-func ReadConfFromExecLocation(overrides map[string]*pflag.Flag) (*CollectConf, error) {
+func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error) {
 	//now read in viper configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
 
 	// find the location of the ddc executable
@@ -108,7 +108,7 @@ func ReadConfFromExecLocation(overrides map[string]*pflag.Flag) (*CollectConf, e
 	return ReadConf(overrides, configDir)
 }
 
-func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf, error) {
+func ReadConf(overrides map[string]string, configDir string) (*CollectConf, error) {
 	defaultCaptureSeconds := 60
 	// set node name
 	hostName, err := os.Hostname()
@@ -188,8 +188,9 @@ func ReadConf(overrides map[string]*pflag.Flag, configDir string) (*CollectConf,
 	} else {
 		simplelog.Debugf("found config file %v", foundConfig)
 	}
+	c.dremioPIDDetection = viper.GetBool(KeyDremioPidDetection)
 	c.dremioPID = viper.GetInt(KeyDremioPid)
-	if c.dremioPID < 1 {
+	if c.dremioPID < 1 && c.dremioPIDDetection {
 		dremioPID, err := autodetect.GetDremioPID()
 		if err != nil {
 			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
@@ -523,6 +524,10 @@ func (c *CollectConf) JobProfilesNumRecentErrors() int {
 
 func (c *CollectConf) DremioPID() int {
 	return c.dremioPID
+}
+
+func (c *CollectConf) DremioPIDDetection() bool {
+	return c.dremioPIDDetection
 }
 
 func (c *CollectConf) DremioConfDir() string {

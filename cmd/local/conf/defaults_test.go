@@ -50,6 +50,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyDremioLogDir, "/var/log/dremio"},
 		{conf.KeyNumberThreads, 2},
 		{conf.KeyDremioPid, 0},
+		{conf.KeyDremioPidDetection, true},
 		{conf.KeyDremioUsername, "dremio"},
 		{conf.KeyDremioPatToken, ""},
 		{conf.KeyDremioConfDir, "/opt/dremio/conf"},

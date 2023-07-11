@@ -130,13 +130,13 @@ func ExtractGZipToTar(t *testing.T, gzipArchive string) string {
 	return ExtractGZip(t, cleanedArchiveFile, tarFile)
 }
 
-func TgzContainsFile(t *testing.T, expectedFile, archiveFile string) {
+func TgzContainsFile(t *testing.T, expectedFile, archiveFile, internalPath string) {
 	t.Helper()
 	tarFile := ExtractGZipToTar(t, archiveFile)
-	TarContainsFile(t, expectedFile, tarFile)
+	TarContainsFile(t, expectedFile, tarFile, internalPath)
 }
 
-func TarContainsFile(t *testing.T, expectedFile, archiveFile string) {
+func TarContainsFile(t *testing.T, expectedFile, archiveFile, internalPath string) {
 	t.Helper()
 	cleanedExpectedFile := filepath.Clean(expectedFile)
 	cleanedArchiveFile := filepath.Clean(archiveFile)
@@ -164,7 +164,7 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(filepath.Separator)+filepath.Base(hdr.Name) == string(filepath.Separator)+filepath.Base(cleanedExpectedFile) {
+		if hdr.Name == internalPath {
 			found = true
 		} else {
 			continue

@@ -24,7 +24,6 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/spf13/pflag"
 )
 
 func TestValidateAPICredentials(t *testing.T) {
@@ -43,7 +42,7 @@ func TestValidateAPICredentials(t *testing.T) {
 	}))
 	defer server.Close()
 
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
 	if err != nil {
@@ -86,7 +85,7 @@ func TestValidateAPICredentialsWithError(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
 	if err != nil {
@@ -125,7 +124,7 @@ func TestValidateAPICredentialsWithCloud(t *testing.T) {
 	}))
 	defer server.Close()
 
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
 	if err != nil {
@@ -170,7 +169,7 @@ func TestValidateAPICredentialsWithCloudWithError(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
 	if err != nil {

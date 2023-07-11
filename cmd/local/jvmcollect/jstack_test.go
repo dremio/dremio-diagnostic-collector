@@ -25,7 +25,6 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
-	"github.com/spf13/pflag"
 )
 
 func TestJStackCapture(t *testing.T) {
@@ -42,7 +41,7 @@ func TestJStackCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	overrides := make(map[string]*pflag.Flag)
+	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
 	if err := os.Mkdir(confDir, 0700); err != nil {
 		t.Fatal(err)
