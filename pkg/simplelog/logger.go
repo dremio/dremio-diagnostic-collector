@@ -188,35 +188,43 @@ func (l *Logger) Errorf(format string, v ...interface{}) {
 // package functions
 
 func Debug(format string) {
-	logger.Debug(format)
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(logger.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func Info(format string) {
-	logger.Info(format)
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(logger.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func Warning(format string) {
-	logger.Warning(format)
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(logger.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func Error(format string) {
-	logger.Error(format)
+	trimmed := strutils.LimitString(format, msgMax)
+	handleLogError(logger.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func Debugf(format string, v ...interface{}) {
-	logger.Debugf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	handleLogError(logger.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func Infof(format string, v ...interface{}) {
-	logger.Infof(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	handleLogError(logger.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func Warningf(format string, v ...interface{}) {
-	logger.Warningf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	handleLogError(logger.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func Errorf(format string, v ...interface{}) {
-	logger.Errorf(format, v...)
+	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	handleLogError(logger.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 
 func HostLog(host, line string) {

@@ -30,6 +30,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyDremioLogDir, "/var/log/dremio")
 	viper.SetDefault(KeyNumberThreads, 2)
 	viper.SetDefault(KeyDremioPid, 0)
+	viper.SetDefault(KeyDremioPidDetection, true)
 	viper.SetDefault(KeyDremioUsername, "dremio")
 	viper.SetDefault(KeyDremioPatToken, "")
 	viper.SetDefault(KeyDremioConfDir, "/opt/dremio/conf")

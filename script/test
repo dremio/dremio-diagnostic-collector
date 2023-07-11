@@ -11,17 +11,4 @@ cd "$(dirname "$0")/.."
 ./script/clean
 ./script/build
 
-pkgs=$(go list ./... 2> /dev/null | grep -v /vendor/)
-deps=`echo ${pkgs} | tr ' ' ","`
-echo "mode: atomic" > covprofile
-
-for pkg in $pkgs; do
-    set -e
-    go test -race -cover -coverpkg "$deps" -coverprofile=profile.tmp $pkg
-    set +e
-
-    if [ -f profile.tmp ]; then
-        tail -n +2 profile.tmp >> covprofile
-        rm profile.tmp
-    fi
-done;
+ go test -race  -coverpkg=./... -coverprofile=covprofile ./...

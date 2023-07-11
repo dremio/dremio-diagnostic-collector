@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/awselogs"
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
@@ -204,6 +205,7 @@ func init() {
 	//init
 	RootCmd.AddCommand(local.LocalCollectCmd)
 	RootCmd.AddCommand(version.VersionCmd)
+	RootCmd.AddCommand(awselogs.AWSELogsCmd)
 }
 
 func validateParameters(args collection.Args, sshKeyLoc, sshUser string, isK8s bool) error {

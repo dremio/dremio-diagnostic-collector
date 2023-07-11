@@ -1,5 +1,5 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector)
-![Coverage Status](https://img.shields.io/badge/Code%20Coverage-67%25-orange)
+![Coverage Status](https://img.shields.io/badge/Code%20Coverage-69%25-orange)
 
 collect logs of dremio for analysis
 
@@ -45,6 +45,7 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # tmp-output-dir: "" # dynamically set normally
 # disable-rest-api: false
 # dremio-pid: 0
+# dremio-pid-detection: true 
 # collect-metrics: true
 # collect-os-config: true
 # collect-disk-usage: true
@@ -98,6 +99,14 @@ specific executors that you want to collect from with the -e flag and coordinato
 ./ddc -e 192.168.1.12,192.168.1.13 -c 192.168.1.19,192.168.1.2  --ssh-user ubuntu --ssh-key ~/.ssh/id_rsa 
 ```
 
+### dremio on AWSE
+
+If you want to do a log only collection of AWSE say from the coordinator the following command will produce a tarball with all the logs from each node
+
+```sh
+./ddc awselogs
+```
+
 If you have issues consult the [ssh docs](docs/ssh.md)
 
 ### dremio cloud (Preview)
@@ -124,7 +133,7 @@ As of the today the following is collected
 * Java Flight Recorder recording of 60 seconds
 * Jstack thread dump every second for approximately 60 seconds
 * server.log and 7 days of archives
-* metadata_refresh.log and 7 days of archives
+* metadata\_refresh.log and 7 days of archives
 * reflection.log and 7 days of archives
 * queries.json and up to 28 days of archives 
 * all dremio configurations
@@ -150,7 +159,6 @@ The help is pretty straight forward and comes with examples, also do not forget 
 
 ```sh
 ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
-
 examples:
 for ssh based communication to VMs or Bare metal hardware:
 
@@ -169,6 +177,7 @@ Usage:
   ddc [command]
 
 Available Commands:
+  awselogs      Log only collect of AWSE from the coordinator node
   completion    Generate the autocompletion script for the specified shell
   help          Help about any command
   local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support
@@ -178,7 +187,7 @@ Flags:
   -c, --coordinator string             coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).
       --coordinator-container string   for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators (default "dremio-master-coordinator")
   -t, --dremio-pat-prompt              Prompt for Dremio Personal Access Token (PAT)
-  -e, --executors string               either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that ma.
+  -e, --executors string               either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).
       --executors-container string     for use with -k8s flag: sets the container name to use to retrieve logs in the executors (default "dremio-executor")
   -h, --help                           help for ddc
   -k, --k8s                            use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --cordinator and --executors flags

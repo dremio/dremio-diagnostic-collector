@@ -24,7 +24,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/configcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
-	"github.com/spf13/pflag"
 )
 
 func TestCollectsConfFilesWithNoSecrets(t *testing.T) {
@@ -53,7 +52,7 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	var overrides map[string]*pflag.Flag
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confDir)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +122,7 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	var overrides map[string]*pflag.Flag
+	overrides := make(map[string]string)
 	c, err := conf.ReadConf(overrides, confDir)
 	if err != nil {
 		t.Fatal(err)

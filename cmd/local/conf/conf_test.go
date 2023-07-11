@@ -21,8 +21,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/pflag"
-
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -31,7 +29,7 @@ import (
 var (
 	tmpDir      string
 	cfgFilePath string
-	overrides   map[string]*pflag.Flag
+	overrides   map[string]string
 	err         error
 	cfg         *conf.CollectConf
 )
@@ -52,6 +50,7 @@ collect-acceleration-log: true
 collect-access-log: true
 collect-audit-log: true
 collect-jvm-flags: true
+dremio-pid-detection: false
 dremio-gclogs-dir: "/path/to/gclogs"
 dremio-log-dir: "/path/to/dremio/logs"
 node-name: "node1"
@@ -94,7 +93,7 @@ collect-kvstore-report: true
 	if err != nil {
 		log.Fatalf("unable to create conf file with error %v", err)
 	}
-	overrides = map[string]*pflag.Flag{}
+	overrides = make(map[string]string)
 }
 
 var afterEachConfTest = func() {
@@ -202,6 +201,11 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	if cfg.DremioConfDir() != "/path/to/dremio/conf" {
 		t.Errorf("Expected DremioConfDir to be '/path/to/dremio/conf', got '%s'", cfg.DremioConfDir())
 	}
+
+	if cfg.DremioPIDDetection() != false {
+		t.Errorf("expected dremio-pid-detection to be disabled")
+	}
+
 	afterEachConfTest()
 }
 

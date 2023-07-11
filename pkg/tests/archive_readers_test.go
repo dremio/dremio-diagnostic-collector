@@ -158,5 +158,5 @@ func TestTgzContainsFile(t *testing.T) {
 		}
 	}()
 
-	tests.TgzContainsFile(t, tmpfile.Name(), tgzFileName)
+	tests.TgzContainsFile(t, tmpfile.Name(), tgzFileName, tmpfile.Name())
 }

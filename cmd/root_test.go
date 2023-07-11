@@ -135,7 +135,7 @@ func TestAllSubCommandsAreWiredUp(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	expected := "Available Commands:\n  local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support\n  version       Print the version number of DDC"
+	expected := "Available Commands:\n  awselogs      Log only collect of AWSE from the coordinator node\n  local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support\n  version       Print the version number of DDC\n"
 	if !strings.Contains(helpText, expected) {
 		t.Errorf("missing command text in `%q`", helpText)
 	}

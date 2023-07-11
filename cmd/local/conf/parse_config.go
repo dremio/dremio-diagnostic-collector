@@ -19,11 +19,10 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-func ParseConfig(configDir string, supportedExtensions []string, overrides map[string]*pflag.Flag) (foundConfig string) {
+func ParseConfig(configDir string, supportedExtensions []string, overrides map[string]string) (foundConfig string) {
 
 	//read viper config
 	baseConfig := "ddc"
@@ -50,10 +49,10 @@ func ParseConfig(configDir string, supportedExtensions []string, overrides map[s
 
 	for k, v := range overrides {
 		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
-		if v.Value.String() == "\"\"" {
+		if v == "\"\"" {
 			viper.Set(k, "")
 		} else {
-			viper.Set(k, v.Value.String())
+			viper.Set(k, v)
 		}
 	}
 	return
