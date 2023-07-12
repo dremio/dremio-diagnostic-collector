@@ -589,7 +589,6 @@ func TestCollectContainerLogs(t *testing.T) {
 		TimeService:  mockTimeService,
 	}
 	pods := []string{"dremio-master-0", "dremio-executor-0"}
-	//k8s := kubernetes.NewKubectlK8sActions("kubectl", "", "", namespace)
 	if err := collection.GetClusterLogs(namespace, hc, ddcfs, "kubectl", pods); err != nil {
 		t.Fatal(err)
 	}
