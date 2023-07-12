@@ -132,15 +132,19 @@ func Execute() {
 		// which then determines whether the commands are routed to the SSH or K8s commands
 
 		//default no op
-		var clusterCollect = func() {}
+		var clusterCollect = func([]string) {}
 		var collectorStrategy collection.Collector
 		if isK8s {
 			simplelog.Info("using Kubernetes kubectl based collection")
 			collectorStrategy = kubernetes.NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorsContainer, namespace)
-			clusterCollect = func() {
+			clusterCollect = func(pods []string) {
 				err = collection.ClusterK8sExecute(namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubectlPath)
 				if err != nil {
 					simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+				}
+				err = collection.GetClusterLogs(namespace, cs, collectionArgs.DDCfs, kubectlPath, pods)
+				if err != nil {
+					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 				}
 			}
 		} else {
