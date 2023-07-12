@@ -56,7 +56,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 	return nil
 }
 
-func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, c Collector, k string, pods []string) error {
+func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string, pods []string) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster config path %v with error %v", path, err)
@@ -73,16 +73,19 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 		}
 		// Loop over each container, construct a path and log file name
 		// write the output of the kubectl logs command to a file
-		for _, container := range s2s(containers) {
-			copyContainerLog(c, cs, ddfs, k, container, namespace, path, pod)
+		for _, container := range strings.Split(containers, " ") {
+			copyContainerLog(cs, ddfs, k, container, namespace, path, pod)
 		}
 	}
 	return nil
 }
 
-func copyContainerLog(c Collector, cs CopyStrategy, ddfs helpers.Filesystem, k, container, namespace, path, pod string) error {
+func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k, container, namespace, path, pod string) {
 	kubectlArgs := []string{k, "-n", namespace, "logs", pod, "-c", string(container)}
 	out, err := clusterExecutePod(kubectlArgs)
+	if err != nil {
+		simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
+	}
 	outFile := filepath.Join(path, pod+"-"+container+".out")
 	simplelog.Debugf("getting logs for pod: %v container: %v", pod, container)
 	p, err := cs.CreatePath("kubernetes", "container-logs", "")
@@ -94,7 +97,6 @@ func copyContainerLog(c Collector, cs CopyStrategy, ddfs helpers.Filesystem, k, 
 	if err != nil {
 		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
 	}
-	return err
 }
 
 // Execute commands at the cluster level
@@ -120,9 +122,4 @@ func clusterExecutePod(args []string) (string, error) {
 		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", args, err)
 	}
 	return res, nil
-}
-
-// Convert string to a []string
-func s2s(s string) []string {
-	return (strings.Split(s, " "))
 }

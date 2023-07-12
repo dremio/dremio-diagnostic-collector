@@ -142,7 +142,7 @@ func Execute() {
 				if err != nil {
 					simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 				}
-				err = collection.GetClusterLogs(namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubectlPath, pods)
+				err = collection.GetClusterLogs(namespace, cs, collectionArgs.DDCfs, kubectlPath, pods)
 				if err != nil {
 					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 				}
