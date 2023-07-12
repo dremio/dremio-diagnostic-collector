@@ -54,6 +54,7 @@ type CollectConf struct {
 
 	// advanced variables setable by configuration or environement variable
 	outputDir                         string
+	tarballOutDir                     string
 	dremioTtopTimeSeconds             int
 	dremioTtopFreqSeconds             int
 	dremioJFRTimeSeconds              int
@@ -90,7 +91,6 @@ type CollectConf struct {
 	// variables
 	systemtables            []string
 	systemtablesdremiocloud []string
-	unableToReadConfigError error
 	dremioPID               int
 }
 
@@ -159,8 +159,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		// "project.history.events",
 		"project.history.jobs",
 	}
-	supportedExtensions := []string{"yaml", "json", "toml", "hcl", "env", "props"}
-	foundConfig := ParseConfig(configDir, viper.SupportedExts, overrides)
+	ParseConfig(configDir, overrides)
 	simplelog.Debugf("logging parsed configuration from ddc.yaml")
 	for k, v := range viper.AllSettings() {
 		if k == KeyDremioPatToken && v != "" {
@@ -183,11 +182,6 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	}
 	simplelog.InitLogger(verbose)
 
-	if foundConfig == "" {
-		simplelog.Warningf("was unable to read any of the valid config file formats (%v) due to error '%v' - falling back to defaults, command line flags and environment variables", strings.Join(supportedExtensions, ","), c.unableToReadConfigError)
-	} else {
-		simplelog.Debugf("found config file %v", foundConfig)
-	}
 	c.dremioPIDDetection = viper.GetBool(KeyDremioPidDetection)
 	c.dremioPID = viper.GetInt(KeyDremioPid)
 	if c.dremioPID < 1 && c.dremioPIDDetection {
@@ -269,6 +263,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	c.collectJVMFlags = viper.GetBool(KeyCollectJVMFlags)
 
 	// log collect
+	c.tarballOutDir = viper.GetString(KeyTarballOutDir)
 	c.outputDir = viper.GetString(KeyTmpOutputDir)
 	c.dremioLogsNumDays = viper.GetInt(KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = viper.GetInt(KeyDremioQueriesJSONNumDays)
@@ -307,7 +302,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	c.dremioTtopFreqSeconds = viper.GetInt(KeyDremioTtopFreqSeconds)
 	c.dremioTtopTimeSeconds = viper.GetInt(KeyDremioTtopTimeSeconds)
 	// collect rest apis
-	disableRESTAPI := c.disableRESTAPI
+	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
 	if disableRESTAPI {
 		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
@@ -496,6 +491,10 @@ func (c *CollectConf) DremioCloudAppEndpoint() string {
 
 func (c *CollectConf) NodeName() string {
 	return c.nodeName
+}
+
+func (c *CollectConf) TarballOutDir() string {
+	return c.tarballOutDir
 }
 
 func (c *CollectConf) OutputDir() string {

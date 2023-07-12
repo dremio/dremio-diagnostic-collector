@@ -26,7 +26,7 @@ import (
 func TestSSHExec(t *testing.T) {
 	hostName := "pod"
 	cli := &tests.MockCli{
-		StoredResponse: []string{"success"},
+		StoredResponse: []string{"Warning key not already added\nsuccess"},
 		StoredErrors:   []error{nil},
 	}
 	sshUser := "root"

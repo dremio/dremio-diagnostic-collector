@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -41,7 +42,7 @@ func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 	if err != nil {
 		t.Fatalf("unable to create wlm dir due to error %v", err)
 	}
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`verbose: v
+	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
 verbose: vvvv
 number-threads: 2
 dremio-endpoint: %v
@@ -76,7 +77,8 @@ func TestRunCollectWLM(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-
+	//allow the server to startup
+	time.Sleep(1 * time.Second)
 	confDir := setupConfigDir(t, server.URL)
 	// Prepare the configuration
 	overrides := make(map[string]string)

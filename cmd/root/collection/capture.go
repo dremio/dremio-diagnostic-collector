@@ -38,14 +38,10 @@ func (fe FindErr) Error() string {
 func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputLoc string, skipRESTCollect bool) (files []helpers.CollectedFile, failedFiles []FailedFiles, skippedFiles []string) {
 	host := conf.Host
 
-	ddcTmpDir := "/tmp/ddc"
-	pathToDDC := "/tmp/ddc/ddc" //nasty hard coding for now
-	pathToDDCYAML := "/tmp/ddc/ddc.yaml"
+	ddcTmpDir := conf.TransferDir
+	pathToDDC := filepath.Join(ddcTmpDir, "ddc")
+	pathToDDCYAML := filepath.Join(ddcTmpDir, "ddc.yaml")
 	dremioPAT := conf.DremioPAT
-	// clear out the old
-	if out, err := ComposeExecute(conf, []string{"rm", "-fr", ddcTmpDir}); err != nil {
-		simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
-	}
 	versionMatch := false
 	// //check if the version is up to date
 	// if out, err := ComposeExecute(conf, []string{pathToDDC, "version"}); err != nil {
@@ -56,21 +52,34 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	// }
 	//if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
-		//remotely make /tmp/ddc/
+		//remotely make TransferDir
 		if out, err := ComposeExecute(conf, []string{"mkdir", "-p", ddcTmpDir}); err != nil {
-			simplelog.Errorf("host %v unable to make dir %v and cannot proceed with capture due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
+			simplelog.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
 			return
 		}
-		//copy file to /tmp/ddc/ assume there is
+		//copy file to TransferDir assume there is
 		if out, err := ComposeCopyTo(conf, localDDCPath, pathToDDC); err != nil {
 			failedFiles = append(failedFiles, FailedFiles{
 				Path: localDDCPath,
 				Err:  fmt.Errorf("unable to copy local ddc to remote path due to error: '%v' with output '%v'", err, out),
 			})
 		} else {
-			simplelog.Infof("successfully copied ddc to host %v", host)
+			simplelog.Infof("successfully copied ddc to host %v at %v", host, pathToDDC)
+			defer func() {
+				// clear out when done
+				if out, err := ComposeExecute(conf, []string{"rm", pathToDDC}); err != nil {
+					simplelog.Warningf("on host %v unable to remove ddc due to error '%v' with output '%v'", host, err, out)
+				}
+			}()
+			defer func() {
+				// clear out when done
+				if out, err := ComposeExecute(conf, []string{"rm", pathToDDC + ".log"}); err != nil {
+					simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
+				}
+			}()
+
 		}
-		//make  exec /tmp/ddc/
+		//make  exec TransferDir
 		if out, err := ComposeExecute(conf, []string{"chmod", "+x", pathToDDC}); err != nil {
 			simplelog.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 			return
@@ -83,11 +92,18 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			Err:  fmt.Errorf("unable to copy local ddc yaml to remote path due to error: '%v' with output '%v'", err, out),
 		})
 	} else {
-		simplelog.Debugf("successfully copied ddc.yaml to host %v", host)
+		simplelog.Infof("successfully copied ddc.yaml to host %v at %v", host, pathToDDCYAML)
+		defer func() {
+			// clear out when done
+			if out, err := ComposeExecute(conf, []string{"rm", pathToDDCYAML}); err != nil {
+				simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
+			}
+		}()
 	}
-	//execute local-collect if skipRESTCollect is set blank the pat
-	localCollectArgs := []string{pathToDDC, "local-collect"}
+	//execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
+	localCollectArgs := []string{pathToDDC, "local-collect", "--tarball-out-dir", conf.TransferDir}
 	if skipRESTCollect {
+		//if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, "--disable-rest-api")
 	} else if dremioPAT != "" {
 		//if ther dremio PAT is set go ahead and pass it
@@ -100,86 +116,50 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	} else {
 		simplelog.Debugf("on host %v capture successful", host)
 	}
-	//defer delete tar.gz
-	defer func() {
-		if out, err := ComposeExecute(conf, []string{"rm", "-fr", path.Join(ddcTmpDir)}); err != nil {
-			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
-		} else {
-			simplelog.Debugf("on host %v tarballs in directory %v have been removed", host, ddcTmpDir)
-		}
-	}()
+	hostname, err := ComposeExecute(conf, []string{"hostname"})
+	if err != nil {
+		simplelog.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", host, err)
+		return files, failedFiles, skippedFiles
+	}
 
 	//copy tar.gz back
-	tarGZ := conf.NodeCaptureOutput
-	foundTarGzFiles, err := findFiles(conf, tarGZ, false)
+	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
+	tarGZ := filepath.Join(ddcTmpDir, tgzFileName)
 	outDir := path.Dir(outputLoc)
 	if outDir == "" {
 		outDir = fmt.Sprintf(".%v", filepath.Separator)
 	}
-	if err != nil {
-		simplelog.Errorf("ERROR: host %v unable to find tar.gz in directory %v with error %v", host, tarGZ, err)
+	//but we want to use path.join here because otherwise it will be wrong for linux servers
+	//note also we do not care about sudo when copying back the archive
+	destFile := path.Join(outDir, tgzFileName)
+	if out, err := ComposeCopyNoSudo(conf, tarGZ, destFile); err != nil {
+		failedFiles = append(failedFiles, FailedFiles{
+			Path: destFile,
+			Err:  err,
+		})
+		simplelog.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, host, outDir, err, out)
 	} else {
-		for _, sourceFile := range foundTarGzFiles {
-			//have to use filepath for cross platform path on client
-			destFile := filepath.Join(outDir, filepath.Base(sourceFile))
-			simplelog.Debugf("found %v for copying to %v", sourceFile, destFile)
-			//but we want to use path.join here because otherwise it will be wrong for linux servers
-			//note also we do not care about sudo when copying back the archive
-			if out, err := ComposeCopyNoSudo(conf, path.Join(ddcTmpDir, sourceFile), destFile); err != nil {
-				failedFiles = append(failedFiles, FailedFiles{
-					Path: destFile,
-					Err:  err,
-				})
-				simplelog.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", sourceFile, host, outDir, err, out)
-			} else {
-				fileInfo, err := conf.DDCfs.Stat(destFile)
-				//we assume a file size of zero if we are not able to retrieve the file size for some reason
-				size := int64(0)
-				if err != nil {
-					simplelog.Warningf("cannot get file size for file %v due to error %v. Storing size as 0", destFile, err)
-				} else {
-					size = fileInfo.Size()
-				}
-				files = append(files, helpers.CollectedFile{
-					Path: destFile,
-					Size: size,
-				})
-				simplelog.Infof("host %v copied %v to %v", host, sourceFile, destFile)
-			}
+		fileInfo, err := conf.DDCfs.Stat(destFile)
+		//we assume a file size of zero if we are not able to retrieve the file size for some reason
+		size := int64(0)
+		if err != nil {
+			simplelog.Warningf("cannot get file size for file %v due to error %v. Storing size as 0", destFile, err)
+		} else {
+			size = fileInfo.Size()
 		}
+		files = append(files, helpers.CollectedFile{
+			Path: destFile,
+			Size: size,
+		})
+		simplelog.Infof("host %v copied %v to %v", host, tarGZ, destFile)
+		//defer delete tar.gz
+		defer func() {
+			if out, err := ComposeExecute(conf, []string{"rm", tarGZ}); err != nil {
+				simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
+			} else {
+				simplelog.Debugf("on host %v file %v has been removed", host, ddcTmpDir)
+			}
+		}()
 	}
 	return files, failedFiles, skippedFiles
-}
-
-// findFiles runs a simple ls -1 command to find all the top level files and nothing more
-// this does mean you will have some errors.
-// it will also attempt to find the gclogs based on startup flags if there is no gclog override specified
-func findFiles(conf HostCaptureConfiguration, searchDir string, _ bool) ([]string, error) {
-	var out string
-	var err error
-
-	// Protect against wildcard search base
-	if searchDir == "*" {
-		return []string{}, FindErr{Cmd: "wildcard search bases rejected"}
-	}
-
-	out, err = ComposeExecute(conf, []string{"ls", "-1", searchDir})
-
-	// For find commands we simply ignore exit status 1 and continue
-	// since this is usually something like a "Permission denied" which, in the
-	// context of a find command can be ignored.
-	if err != nil && !strings.Contains(string(err.Error()), "exit status 1") {
-		return []string{}, fmt.Errorf("file search failed failed due to error %v", err)
-	}
-
-	rawFoundFiles := strings.Split(out, "\n")
-	var foundFiles []string
-	for _, f := range rawFoundFiles {
-		if f != "" {
-			if strings.HasSuffix(f, "tar.gz") {
-				foundFiles = append(foundFiles, f)
-			}
-		}
-	}
-	return foundFiles, nil
 }

@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -42,6 +43,7 @@ func TestValidateAPICredentials(t *testing.T) {
 	}))
 	defer server.Close()
 
+	time.Sleep(1 * time.Second)
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
@@ -49,9 +51,9 @@ func TestValidateAPICredentials(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
-    dremio-endpoint: %v
-    dremio-pat-token: my-pat-token
-	`, server.URL)), 0600)
+dremio-endpoint: %v
+dremio-pat-token: my-pat-token
+`, server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -85,6 +87,7 @@ func TestValidateAPICredentialsWithError(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
+	time.Sleep(1 * time.Second)
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
@@ -92,9 +95,9 @@ func TestValidateAPICredentialsWithError(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(`
-    dremio-endpoint: "http://localhost:9047"
-    dremio-pat-token: "my-pat-token"
-	`), 0600)
+dremio-endpoint: "http://localhost:9047"
+dremio-pat-token: "my-pat-token"
+`), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -124,6 +127,7 @@ func TestValidateAPICredentialsWithCloud(t *testing.T) {
 	}))
 	defer server.Close()
 
+	time.Sleep(1 * time.Second)
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
@@ -131,11 +135,11 @@ func TestValidateAPICredentialsWithCloud(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
-    dremio-endpoint: %v
-    dremio-pat-token: my-pat-token
-    is-dremio-cloud: true
-    dremio-cloud-project-id: 1234
-	`, server.URL)), 0600)
+dremio-endpoint: %v
+dremio-pat-token: my-pat-token
+is-dremio-cloud: true
+dremio-cloud-project-id: 1234
+`, server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -169,6 +173,7 @@ func TestValidateAPICredentialsWithCloudWithError(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
+	time.Sleep(1 * time.Second)
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
 	err := os.Mkdir(confDir, 0700)
@@ -176,11 +181,11 @@ func TestValidateAPICredentialsWithCloudWithError(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
-    dremio-endpoint: %v
-    dremio-pat-token: my-pat-token
-    is-dremio-cloud: true
-    dremio-cloud-project-id: 1234
-	`, server.URL)), 0600)
+dremio-endpoint: %v
+dremio-pat-token: my-pat-token
+is-dremio-cloud: true
+dremio-cloud-project-id: 1234
+`, server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}

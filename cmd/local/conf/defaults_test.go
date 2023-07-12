@@ -59,6 +59,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyCaptureHeapDump, false},
 		{conf.KeyNumberJobProfiles, 25000},
 		{conf.KeyDremioEndpoint, "http://localhost:9047"},
+		{conf.KeyTarballOutDir, "/tmp/ddc"},
 		{conf.KeyTmpOutputDir, outputDir},
 		{conf.KeyCollectMetrics, true},
 		{conf.KeyCollectOSConfig, true},

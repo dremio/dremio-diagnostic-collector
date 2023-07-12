@@ -19,7 +19,6 @@ package cli
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -129,8 +128,7 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 func (c *Cli) Execute(args ...string) (string, error) {
 	logArgs(args)
 	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stderr = os.Stderr
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
@@ -153,8 +151,7 @@ func logArgs(args []string) {
 func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {
 	logArgs(args)
 	cmd := exec.Command(args[0], args[1:]...)
-	cmd.Stderr = os.Stderr
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return output, UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}

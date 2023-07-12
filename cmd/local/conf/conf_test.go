@@ -55,6 +55,7 @@ dremio-gclogs-dir: "/path/to/gclogs"
 dremio-log-dir: "/path/to/dremio/logs"
 node-name: "node1"
 dremio-conf-dir: "/path/to/dremio/conf"
+tarball-out-dir: "/my-tarball-dir"
 number-threads: 4
 dremio-endpoint: "http://localhost:9047"
 dremio-username: "admin"
@@ -201,7 +202,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	if cfg.DremioConfDir() != "/path/to/dremio/conf" {
 		t.Errorf("Expected DremioConfDir to be '/path/to/dremio/conf', got '%s'", cfg.DremioConfDir())
 	}
-
+	if cfg.TarballOutDir() != "/my-tarball-dir" {
+		t.Errorf("expected /my-tarball-dir but was %v", cfg.TarballOutDir())
+	}
 	if cfg.DremioPIDDetection() != false {
 		t.Errorf("expected dremio-pid-detection to be disabled")
 	}

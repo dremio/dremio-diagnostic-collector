@@ -39,6 +39,7 @@ func SetViperDefaults(hostName string, defaultCaptureSeconds int, outputDir stri
 	viper.SetDefault(KeyCaptureHeapDump, false)
 	viper.SetDefault(KeyNumberJobProfiles, 25000)
 	viper.SetDefault(KeyDremioEndpoint, "http://localhost:9047")
+	viper.SetDefault(KeyTarballOutDir, "/tmp/ddc")
 	viper.SetDefault(KeyTmpOutputDir, outputDir)
 	viper.SetDefault(KeyCollectMetrics, true)
 	viper.SetDefault(KeyCollectOSConfig, true)
