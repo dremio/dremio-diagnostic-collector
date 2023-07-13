@@ -15,16 +15,21 @@ Write-Output "Cleaning bin folder…"
 Get-Date -Format "HH:mm:ss"
 .\script\clean
 
-Write-Output "Building linux-amd64…"
+Write-Output "Building embedded binary linux-amd64…"
 Get-Date -Format "HH:mm:ss"
+
 $env:GOOS="linux"
 $env:GOARCH="amd64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 Copy-Item -Path ./default-ddc.yaml -Destination ./bin/ddc.yaml
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-linux-amd64.zip
 Compress-Archive -Path ./bin/ddc -DestinationPath ./bin/ddc.zip
 Move-Item -Path ./bin/ddc.zip -Destination ./cmd/root/ddcbinary/output/ddc.zip
 Move-Item -Path ./bin/ddc.yaml -Destination ./bin/ddc.yaml
+
+Write-Output "Building linux-amd64…"
+Get-Date -Format "HH:mm:ss"
+go build -ldflags "$LDFLAGS" -o ./bin/ddc
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-linux-amd64.zip
 
 Write-Output "Building linux-arm64…"
 Get-Date -Format "HH:mm:ss"

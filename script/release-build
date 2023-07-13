@@ -45,14 +45,17 @@ date "+%H:%M:%S"
 ./script/clean
 
 
-echo "Building linux-amd64…"
+echo "Building embedded binary for linux-amd64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 cp ./default-ddc.yaml ./bin/ddc.yaml
-zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 mv ./bin/ddc.yaml ./bin/ddc.yaml
+echo "Building linux-amd64…"
+date "+%H:%M:%S"
+GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
