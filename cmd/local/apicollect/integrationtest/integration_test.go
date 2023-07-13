@@ -25,6 +25,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -429,6 +431,70 @@ dremio-jfr-time-seconds: 10
 	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "sc.json"))
 	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "service.json"))
 	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "statefulsets.json"))
+
+	//check k8s logs
+	// We expect to find the following logs:
+	/*
+
+		    dremio-executor-0-chown-cloudcache-directory.out
+		    dremio-executor-0-chown-data-directory.out
+		    dremio-executor-0-dremio-executor.out
+		    dremio-executor-0-wait-for-zookeeper.out
+		    dremio-master-0-chown-data-directory.out
+		    dremio-master-0-dremio-master-coordinator.out
+		    dremio-master-0-start-only-one-dremio-master.out
+		    dremio-master-0-upgrade-task.out
+		    dremio-master-0-wait-for-zookeeper.out
+
+			The following files are usually empty
+
+			dremio-executor-0-chown-cloudcache-directory.out
+		    dremio-executor-0-chown-data-directory.out
+		    dremio-master-0-chown-data-directory.out
+		    dremio-master-0-start-only-one-dremio-master.out
+
+	*/
+
+	expectedFiles := []string{"dremio-executor-0-chown-data-directory.out", "dremio-executor-0-chown-cloudcache-directory.out", "dremio-executor-0-dremio-executor.out", "dremio-executor-0-wait-for-zookeeper.out", "dremio-master-0-chown-data-directory.out", "dremio-master-0-dremio-master-coordinator.out", "dremio-master-0-start-only-one-dremio-master.out", "dremio-master-0-upgrade-task.out", "dremio-master-0-wait-for-zookeeper.out"}
+	expectedEmptyFiles := []string{"dremio-executor-0-chown-data-directory.out", "dremio-executor-0-chown-cloudcache-directory.out", "dremio-master-0-chown-data-directory.out", "dremio-master-0-start-only-one-dremio-master.out"}
+	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
+	entries, err = os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		t.Logf("directories %v", entry.Name())
+	}
+	if len(entries) != 9 {
+		t.Errorf("expected to find 9 entries but found %v", len(entries))
+	}
+	foundFiles := []string{}
+	foundEmptyFiles := []string{}
+	for _, e := range entries {
+		fs, err := e.Info()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fs.Size() == 0 {
+			foundEmptyFiles = append(foundEmptyFiles, fs.Name())
+		}
+		foundFiles = append(foundFiles, fs.Name())
+	}
+
+	// sort the strings before checking equality
+	sort.Strings(foundEmptyFiles)
+	sort.Strings(expectedEmptyFiles)
+	sort.Strings(foundFiles)
+	sort.Strings(expectedFiles)
+
+	if !reflect.DeepEqual(expectedEmptyFiles, foundEmptyFiles) {
+		t.Errorf("Expected the following files to be empty:\n %v\n But found the following:\n %v", expectedEmptyFiles, foundEmptyFiles)
+	}
+
+	if !reflect.DeepEqual(foundFiles, expectedFiles) {
+		t.Errorf("Expected the following files to be present:\n %v\n But found the following:\n %v", expectedFiles, foundFiles)
+	}
+
 	// check server.logs
 	assertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.log.gz"))
 	assertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-executor-0", "server.log.gz"))

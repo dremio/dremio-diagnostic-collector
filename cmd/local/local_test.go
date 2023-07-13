@@ -38,21 +38,12 @@ func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) strin
 		log.Fatal(err)
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
-	w, err := os.Create(testDDCYaml)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := w.Close(); err != nil {
-			log.Printf("WARN: unable to close %v with reason '%v'", testDDCYaml, err)
-		}
-	}()
 	yamlText := fmt.Sprintf(`
 tmp-output-dir: %v
 %v
-"
-`, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
-	if _, err := w.WriteString(yamlText); err != nil {
+`, strings.ReplaceAll(cleaned, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
+	fmt.Printf("yaml text is\n%q\n", yamlText)
+	if err := os.WriteFile(testDDCYaml, []byte(yamlText), 0600); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
@@ -60,7 +51,8 @@ tmp-output-dir: %v
 
 func writeConf(tmpOutputDir string) string {
 
-	defaultText := `verbose: vvvv
+	defaultText := `
+verbose: vvvv
 node-metrics-collect-duration-seconds: 10
 `
 	return writeConfWithYamlText(tmpOutputDir, defaultText)
@@ -254,7 +246,7 @@ is-dremio-cloud: false
 }
 
 func TestSkipCollect(t *testing.T) {
-	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
+	tmpDirForConf := filepath.Join(t.TempDir(), "ddcSkipCollect")
 	err := os.Mkdir(tmpDirForConf, 0700)
 	if err != nil {
 		t.Fatalf("unable to make test dir: %v", err)
@@ -275,7 +267,6 @@ func TestSkipCollect(t *testing.T) {
 		}
 	}()
 	yaml := fmt.Sprintf(`
-# please set these to match your environment
 dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
 dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore

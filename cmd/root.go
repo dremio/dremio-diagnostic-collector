@@ -95,15 +95,19 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	// which then determines whether the commands are routed to the SSH or K8s commands
 
 	//default no op
-	var clusterCollect = func() {}
+	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if k8sEnabled {
 		simplelog.Info("using Kubernetes kubectl based collection")
 		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
-		clusterCollect = func() {
+		clusterCollect = func(pods []string) {
 			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+			}
+			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath, pods)
+			if err != nil {
+				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 			}
 		}
 	} else {
