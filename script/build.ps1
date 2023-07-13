@@ -13,6 +13,7 @@ $GIT_SHA = git rev-parse --short HEAD
 $VERSION = git rev-parse --abbrev-ref HEAD
 $LDFLAGS = "-X github.com/dremio/dremio-diagnostic-collector/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION"
 
+New-Item -ItemType File -Path ./cmd/root/ddcbinary/output/ddc.zip -Force
 # This assumes that you have 'go' installed in your environment
 $env:GOOS="linux"
 $env:GOARCH="amd64"
