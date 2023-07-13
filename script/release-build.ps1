@@ -20,9 +20,11 @@ Get-Date -Format "HH:mm:ss"
 
 $env:GOOS="linux"
 $env:GOARCH="amd64"
+New-Item -ItemType File -Path ./cmd/root/ddcbinary/output/ddc.zip -Force
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 Copy-Item -Path ./default-ddc.yaml -Destination ./bin/ddc.yaml
 Compress-Archive -Path ./bin/ddc -DestinationPath ./bin/ddc.zip
+Remove-Item ./bin/ddc
 Move-Item -Path ./bin/ddc.zip -Destination ./cmd/root/ddcbinary/output/ddc.zip
 Move-Item -Path ./bin/ddc.yaml -Destination ./bin/ddc.yaml
 

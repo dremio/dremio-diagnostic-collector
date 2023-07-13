@@ -47,9 +47,11 @@ date "+%H:%M:%S"
 
 echo "Building embedded binary for linux-amd64…"
 date "+%H:%M:%S"
+touch ./cmd/root/ddcbinary/output/ddc.zip
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
+rm ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 mv ./bin/ddc.yaml ./bin/ddc.yaml
 echo "Building linux-amd64…"
