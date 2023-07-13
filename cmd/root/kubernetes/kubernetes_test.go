@@ -179,7 +179,12 @@ func TestNewKubectlK8sActions(t *testing.T) {
 	coordinatorContainer := "main"
 	executorContainer := "exec"
 	namespace := "mynamespace"
-	actions := NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorContainer, namespace)
+	actions := NewKubectlK8sActions(KubeArgs{
+		KubectlPath:          kubectlPath,
+		CoordinatorContainer: coordinatorContainer,
+		ExecutorsContainer:   executorContainer,
+		Namespace:            namespace,
+	})
 	if actions.namespace != namespace {
 		t.Errorf("expected %v but got %v", namespace, actions.namespace)
 	}
@@ -202,7 +207,13 @@ func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
 	coordinatorContainer := "main"
 	executorContainer := "exec"
 	namespace := "mynamespace"
-	actions := NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorContainer, namespace)
+	actions := NewKubectlK8sActions(
+		KubeArgs{
+			KubectlPath:          kubectlPath,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorContainer,
+			Namespace:            namespace,
+		})
 	containerName := actions.getContainerName(true)
 	if containerName != coordinatorContainer {
 		t.Errorf("expected %v but got %v", coordinatorContainer, containerName)
@@ -214,7 +225,13 @@ func TestGetContainerNameWhenIsExecutor(t *testing.T) {
 	coordinatorContainer := "main"
 	executorContainer := "exec"
 	namespace := "mynamespace"
-	actions := NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorContainer, namespace)
+	actions := NewKubectlK8sActions(
+		KubeArgs{
+			KubectlPath:          kubectlPath,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorContainer,
+			Namespace:            namespace,
+		})
 	containerName := actions.getContainerName(false)
 	if containerName != executorContainer {
 		t.Errorf("expected %v but got %v", executorContainer, containerName)

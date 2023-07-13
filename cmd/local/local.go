@@ -47,7 +47,7 @@ func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
 	if !c.IsDremioCloud() {
 		if err := os.MkdirAll(c.ConfigurationOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create configuration directory due to error %v", err)
+			return fmt.Errorf("unable to create configuration directory %v due to error %v", c.ConfigurationOutDir(), err)
 		}
 		if err := os.MkdirAll(c.JFROutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create jfr directory due to error %v", err)
@@ -419,7 +419,7 @@ func Execute(args []string, overrides map[string]string, usage func() error) err
 			simplelog.Warningf("uanble to copy log to archive due to error %v", err)
 		}
 	}
-	tarballName := filepath.Join(c.OutputDir(), c.NodeName()+".tar.gz")
+	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
 	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
 	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
 		return fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
@@ -446,6 +446,7 @@ func init() {
 	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
 	LocalCollectCmd.Flags().String("dremio-rocksdb-dir", "", "Path to Dremio RocksDB directory")
 	LocalCollectCmd.Flags().String("dremio-conf-dir", "", "Directory where to find the configuration files")
+	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool("collect-dremio-configuration", true, "Collect Dremio Configuration collector")
 	LocalCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
 	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")

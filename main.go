@@ -17,6 +17,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -30,5 +31,5 @@ func main() {
 			log.Printf("unable to close log due to error %v", err)
 		}
 	}()
-	cmd.Execute()
+	cmd.Execute(os.Args)
 }

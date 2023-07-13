@@ -37,7 +37,7 @@ func RunCollectDremioConfig(c *conf.CollectConf) error {
 	}
 	err = ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "dremio-env"), filepath.Join(c.ConfigurationOutDir(), "dremio-env"))
 	if err != nil {
-		simplelog.Warningf("unable to copy dremio.env due to error %v", err)
+		simplelog.Warningf("unable to copy dremio-env due to error %v", err)
 	}
 	err = ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "logback.xml"), filepath.Join(c.ConfigurationOutDir(), "logback.xml"))
 	if err != nil {

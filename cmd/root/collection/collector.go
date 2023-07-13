@@ -61,18 +61,20 @@ type Args struct {
 	SudoUser       string
 	CopyStrategy   CopyStrategy
 	DremioPAT      string
+	TransferDir    string
+	DDCYamlLoc     string
 }
 
 type HostCaptureConfiguration struct {
-	NodeCaptureOutput string
-	IsCoordinator     bool
-	Collector         Collector
-	Host              string
-	OutputLocation    string
-	SudoUser          string
-	CopyStrategy      CopyStrategy
-	DDCfs             helpers.Filesystem
-	DremioPAT         string
+	IsCoordinator  bool
+	Collector      Collector
+	Host           string
+	OutputLocation string
+	SudoUser       string
+	CopyStrategy   CopyStrategy
+	DDCfs          helpers.Filesystem
+	DremioPAT      string
+	TransferDir    string
 }
 
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func([]string)) error {
@@ -83,6 +85,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
 	dremioPAT := collectionArgs.DremioPAT
+	transferDir := collectionArgs.TransferDir
+	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	var ddcLoc string
 	var err error
 	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
@@ -98,11 +102,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if err != nil {
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
-	execLoc, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	ddcYamlFilePath := filepath.Join(filepath.Dir(execLoc), "ddc.yaml")
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err
@@ -115,7 +114,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 
 	totalNodes := len(executors) + len(coordinators)
 	if totalNodes == 0 {
-		return fmt.Errorf("there are no nodes to connect: %v", c.HelpText())
+		return fmt.Errorf("coordinator string '%v' and executor string '%v' did not es to connect: %v ", coordinatorStr, executorsStr, c.HelpText())
 	}
 	hosts := append(coordinators, executors...)
 
@@ -136,15 +135,15 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			coordinatorCaptureConf := HostCaptureConfiguration{
-				Collector:         c,
-				IsCoordinator:     true,
-				Host:              host,
-				OutputLocation:    s.GetTmpDir(),
-				SudoUser:          sudoUser,
-				CopyStrategy:      s,
-				DDCfs:             ddcfs,
-				NodeCaptureOutput: "/tmp/ddc", //TODO use node output dirs from the config
-				DremioPAT:         dremioPAT,
+				Collector:      c,
+				IsCoordinator:  true,
+				Host:           host,
+				OutputLocation: s.GetTmpDir(),
+				SudoUser:       sudoUser,
+				CopyStrategy:   s,
+				DDCfs:          ddcfs,
+				TransferDir:    transferDir,
+				DremioPAT:      dremioPAT,
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
@@ -163,14 +162,14 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			executorCaptureConf := HostCaptureConfiguration{
-				Collector:         c,
-				IsCoordinator:     false,
-				Host:              host,
-				OutputLocation:    s.GetTmpDir(),
-				SudoUser:          sudoUser,
-				CopyStrategy:      s,
-				DDCfs:             ddcfs,
-				NodeCaptureOutput: "/tmp/ddc",
+				Collector:      c,
+				IsCoordinator:  false,
+				Host:           host,
+				OutputLocation: s.GetTmpDir(),
+				SudoUser:       sudoUser,
+				CopyStrategy:   s,
+				DDCfs:          ddcfs,
+				TransferDir:    transferDir,
 			}
 			//always skip executor calls
 			skipRESTCalls := true

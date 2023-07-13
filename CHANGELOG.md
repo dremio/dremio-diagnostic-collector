@@ -1,14 +1,17 @@
 # Changelog
 
-## [0.5.1]
+## [0.6.0]
 
 ### Added
 
 * flag to specify the dremio pid
 * flag to control collection of jvm flags
 * flag to control os information collection
+* flag to pick up ddc.yaml from a specified directory when running the remote collecting `ddc` command
 * flag to disable rest api calls
 * ddc awselogs - automates log collection for awse instead of requiring remote connections one can run just this one command from any node where the /var/efs/logs diretory is located and get all logs for each node
+* we now store the output of kubectl log from each container on all pods that are matched
+* added --transfer-flag to change the output directory for ddc and tarball captures. This should allow dealing with limits in partition size to be dealt with
 
 ### Changed
 
@@ -16,12 +19,15 @@
 * when used with the main ddc command --dremio-pat-prompt one will receive a password prompt. This password will be sent to all nodes. This removes the need for adding --dremio-pat-token to the yaml
 * when using `ddc local-collect --dremio-pat-token ""` the user will receive password prompt
 * executors now have --disable-rest-api passed to them instead of a blank --dremio-pat-token
+* we now only look for ddc.yaml before we considered a bunch of different configuration file types, this will allow us to simplify out configuration code at a later date
+* with the new ability to specify where the transfer files are stored, we no longer brute force delete the transfer folder (which was /tmp/ddc and therefore very safe to delete), we now only delete ddc, ddc.yaml and the tarball that matches the host name from the remote node, this will prevent people from deleting all of their data directory for example)
 
 ### Fixed
 
 * when --dremio-pat-token was used it would show up the argument in some logs, this has been corrected
 * job profile collection was reporting collected profiles even when they errored out
 * dremio-env now has the correct has the correct name of dremio-env
+* parsing was silently failed when ddc.yaml had an incorrect format or syntax error, this has been resolved.
 
 ## [0.5.0]
 
@@ -304,7 +310,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
-[0.5.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.5.0...v0.5.1
+[0.6.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.3.1...v0.3.2

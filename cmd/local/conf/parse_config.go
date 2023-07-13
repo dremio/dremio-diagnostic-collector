@@ -16,33 +16,39 @@ package conf
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/spf13/viper"
 )
 
-func ParseConfig(configDir string, supportedExtensions []string, overrides map[string]string) (foundConfig string) {
+func ParseConfig(configDir string, overrides map[string]string) {
 
 	//read viper config
 	baseConfig := "ddc"
 	viper.SetConfigName(baseConfig) // Name of config file (without extension)
 	viper.AddConfigPath(configDir)
-
-	var confFiles []string
-	for _, e := range supportedExtensions {
-		confFiles = append(confFiles, fmt.Sprintf("%v.%v", baseConfig, e))
-	}
-
-	simplelog.Debugf("searching in directory %v for the following: %v", configDir, strings.Join(confFiles, ", "))
-	//searching for all known
-	for _, ext := range supportedExtensions {
-		viper.SetConfigType(ext)
-		unableToReadConfigError := viper.ReadInConfig()
-		if unableToReadConfigError == nil {
-			foundConfig = fmt.Sprintf("%v.%v", baseConfig, ext)
-			break
+	viper.SetConfigType("yaml")
+	expectedLoc := filepath.Join(baseConfig, fmt.Sprintf("%v.%v", baseConfig, "yaml"))
+	err := viper.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		// Config file not found; ignore error if desired
+		if entries, err := os.ReadDir(configDir); err != nil {
+			simplelog.Errorf("conf %v not found, and cannot read directory %v due to error %v. falling back to defaults", expectedLoc, configDir, err)
+		} else {
+			var names []string
+			for _, e := range entries {
+				names = append(names, e.Name())
+			}
+			simplelog.Errorf("conf %v not found, in that directory are the files: '%v'. falling back to defaults", expectedLoc, strings.Join(names, ", "))
 		}
+	} else if err == nil {
+		simplelog.Debugf("conf %v parsed successfully", expectedLoc)
+	} else {
+		// Config file was found but another error was produced
+		simplelog.Errorf("conf %v not found due to error %v", expectedLoc, err)
 	}
 
 	viper.AutomaticEnv() // Automatically read environment variables
@@ -55,5 +61,4 @@ func ParseConfig(configDir string, supportedExtensions []string, overrides map[s
 			viper.Set(k, v)
 		}
 	}
-	return
 }

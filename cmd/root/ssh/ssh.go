@@ -16,6 +16,7 @@
 package ssh
 
 import (
+	"bufio"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -26,11 +27,16 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewCmdSSHActions(sshKey, sshUser string) *CmdSSHActions {
+type Args struct {
+	SSHKeyLoc string
+	SSHUser   string
+}
+
+func NewCmdSSHActions(sshArgs Args) *CmdSSHActions {
 	return &CmdSSHActions{
 		cli:     &cli.Cli{},
-		sshKey:  sshKey,
-		sshUser: sshUser,
+		sshKey:  sshArgs.SSHKeyLoc,
+		sshUser: sshArgs.SSHUser,
 	}
 }
 
@@ -112,7 +118,11 @@ func (c *CmdSSHActions) HostExecute(hostName string, _ bool, args ...string) (st
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
-	return c.cli.Execute(sshArgs...)
+	out, err := c.cli.Execute(sshArgs...)
+	if err != nil {
+		return out, err
+	}
+	return CleanOut(out), nil
 }
 
 func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args ...string) (string, error) {
@@ -121,7 +131,29 @@ func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args .
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
 	sshArgs = append(sshArgs, strings.Join(sudoArgs, " "))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
-	return c.cli.Execute(sshArgs...)
+	out, err := c.cli.Execute(sshArgs...)
+	if err != nil {
+		return out, err
+	}
+	return CleanOut(out), nil
+}
+
+func CleanOut(out string) string {
+	//we expect there it be a warning with ssh that we will clean here
+	// Create a scanner to split the output into lines
+	scanner := bufio.NewScanner(strings.NewReader(out))
+
+	var lines []string
+	var counter int
+	// Iterate over each line but skip the first one due to the Warning which is always present when using ssh
+	for scanner.Scan() {
+		if counter > 0 {
+			lines = append(lines, scanner.Text())
+		}
+		counter++
+	}
+	cleanedOut := strings.Join(lines, "\n")
+	return cleanedOut
 }
 
 func (c *CmdSSHActions) FindHosts(searchTerm string) (hosts []string, err error) {

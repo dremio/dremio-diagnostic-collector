@@ -35,6 +35,7 @@ const (
 	KeyCaptureHeapDump                   = "capture-heap-dump"
 	KeyNumberJobProfiles                 = "number-job-profiles"
 	KeyDremioEndpoint                    = "dremio-endpoint"
+	KeyTarballOutDir                     = "tarball-out-dir"
 	KeyTmpOutputDir                      = "tmp-output-dir"
 	KeyCollectMetrics                    = "collect-metrics"
 	KeyCollectOSConfig                   = "collect-os-config"

@@ -22,15 +22,22 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 )
 
+type KubeArgs struct {
+	Namespace            string
+	CoordinatorContainer string
+	ExecutorsContainer   string
+	KubectlPath          string
+}
+
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorContainer, namespace string) *KubectlK8sActions {
+func NewKubectlK8sActions(kubeArgs KubeArgs) *KubectlK8sActions {
 	return &KubectlK8sActions{
 		cli:                  &cli.Cli{},
-		kubectlPath:          kubectlPath,
-		coordinatorContainer: coordinatorContainer,
-		executorContainer:    executorContainer,
-		namespace:            namespace,
+		kubectlPath:          kubeArgs.KubectlPath,
+		coordinatorContainer: kubeArgs.CoordinatorContainer,
+		executorContainer:    kubeArgs.ExecutorsContainer,
+		namespace:            kubeArgs.Namespace,
 	}
 }
 

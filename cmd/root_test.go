@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 )
 
@@ -42,7 +43,10 @@ func TestSSHDefault(t *testing.T) {
 func TestValidateParameters(t *testing.T) {
 	tc := makeTestCollection()
 	tc.CoordinatorStr = ""
-	err := validateParameters(tc, "/home/dremio/.ssh", "dremio", true)
+	err := validateParameters(tc, ssh.Args{
+		SSHKeyLoc: "/home/dremio/.ssh",
+		SSHUser:   "dremio",
+	}, true)
 	expectedError := "the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\""
 	if expectedError != err.Error() {
 		t.Errorf("expected: %v but was %v", expectedError, err.Error())
@@ -50,21 +54,32 @@ func TestValidateParameters(t *testing.T) {
 
 	tc = makeTestCollection()
 	tc.ExecutorsStr = ""
-	err = validateParameters(tc, "/home/dremio/.ssh", "dremio", true)
+	err = validateParameters(tc,
+		ssh.Args{
+			SSHKeyLoc: "/home/dremio/.ssh",
+			SSHUser:   "dremio",
+		},
+		true)
 	expectedError = "the executor string was empty you must pass a label that will match your executors --executor or -e arguments. Example: -e \"mylabel=executor\""
 	if expectedError != err.Error() {
 		t.Errorf("expected: %v but was %v", expectedError, err.Error())
 	}
 
 	tc = makeTestCollection()
-	err = validateParameters(tc, "", "dremio", false)
+	err = validateParameters(tc, ssh.Args{
+		SSHKeyLoc: "",
+		SSHUser:   "dremio",
+	}, false)
 	expectedError = "the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa"
 	if expectedError != err.Error() {
 		t.Errorf("expected: %v but was %v", expectedError, err.Error())
 	}
 
 	tc = makeTestCollection()
-	err = validateParameters(tc, "/home/dremio/.ssh", "", false)
+	err = validateParameters(tc, ssh.Args{
+		SSHKeyLoc: "/home/dremio/.ssh",
+		SSHUser:   "",
+	}, false)
 	expectedError = "the ssh user was empty, pass --ssh-user or -u with the user name you want to use to get past this error. Example --ssh-user ubuntu"
 
 	if expectedError != err.Error() {

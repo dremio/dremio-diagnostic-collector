@@ -43,8 +43,10 @@ var executorsStr string
 var sshKeyLoc string
 var sshUser string
 var promptForDremioPAT bool
+var transferDir string
+var ddcYamlLoc string
 
-const outputLoc = "diag.tgz"
+var outputLoc string
 
 var kubectlPath string
 var isK8s bool
@@ -77,12 +79,61 @@ To sample job profiles and collect system tables information, kv reports, and Wo
 	},
 }
 
+func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, k8sEnabled bool) error {
+	err := validateParameters(collectionArgs, sshArgs, k8sEnabled)
+	if err != nil {
+		fmt.Println("COMMAND HELP TEXT:")
+		fmt.Println("")
+		helpErr := RootCmd.Help()
+		if helpErr != nil {
+			return fmt.Errorf("unable to print help %w", helpErr)
+		}
+		return fmt.Errorf("Invalid command flag detected: %w", err)
+	}
+	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
+	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
+	// which then determines whether the commands are routed to the SSH or K8s commands
+
+	//default no op
+	var clusterCollect = func([]string) {}
+	var collectorStrategy collection.Collector
+	if k8sEnabled {
+		simplelog.Info("using Kubernetes kubectl based collection")
+		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
+		clusterCollect = func(pods []string) {
+			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
+			if err != nil {
+				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+			}
+			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath, pods)
+			if err != nil {
+				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
+			}
+		}
+	} else {
+		simplelog.Info("using SSH based collection")
+		collectorStrategy = ssh.NewCmdSSHActions(sshArgs)
+	}
+
+	// Launch the collection
+	err = collection.Execute(collectorStrategy,
+		cs,
+		collectionArgs,
+		clusterCollect,
+	)
+	if err != nil {
+		simplelog.Errorf("unexpected error running collection '%v'", err)
+		os.Exit(1)
+	}
+	return nil
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	foundCmd, _, err := RootCmd.Find(os.Args[1:])
+func Execute(args []string) {
+	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
-	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(os.Args[1:]) != pflag.ErrHelp {
+	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
@@ -101,6 +152,9 @@ func Execute() {
 			}
 			dremioPAT = pat
 		}
+
+		simplelog.Info(versions.GetCLIVersion())
+		simplelog.Infof("cli command: %v", strings.Join(args, " "))
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
@@ -108,58 +162,21 @@ func Execute() {
 			SudoUser:       sudoUser,
 			DDCfs:          helpers.NewRealFileSystem(),
 			DremioPAT:      dremioPAT,
+			TransferDir:    transferDir,
+			DDCYamlLoc:     ddcYamlLoc,
 		}
-
-		err := validateParameters(collectionArgs, sshKeyLoc, sshUser, isK8s)
-		if err != nil {
-			fmt.Println("COMMAND HELP TEXT:")
-			fmt.Println("")
-			err := RootCmd.Help()
-			if err != nil {
-				simplelog.Errorf("unable to print help %v", err)
-				os.Exit(1)
-			}
-			fmt.Println("")
-			fmt.Println("")
-			fmt.Printf("Invalid command flag detected: %v\n", err)
-			fmt.Println("")
-			os.Exit(1)
+		sshArgs := ssh.Args{
+			SSHKeyLoc: sshKeyLoc,
+			SSHUser:   sshUser,
 		}
-		simplelog.Info(versions.GetCLIVersion())
-		simplelog.Infof("cli command: %v", strings.Join(os.Args, " "))
-		cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
-		// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
-		// which then determines whether the commands are routed to the SSH or K8s commands
-
-		//default no op
-		var clusterCollect = func([]string) {}
-		var collectorStrategy collection.Collector
-		if isK8s {
-			simplelog.Info("using Kubernetes kubectl based collection")
-			collectorStrategy = kubernetes.NewKubectlK8sActions(kubectlPath, coordinatorContainer, executorsContainer, namespace)
-			clusterCollect = func(pods []string) {
-				err = collection.ClusterK8sExecute(namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubectlPath)
-				if err != nil {
-					simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
-				}
-				err = collection.GetClusterLogs(namespace, cs, collectionArgs.DDCfs, kubectlPath, pods)
-				if err != nil {
-					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
-				}
-			}
-		} else {
-			simplelog.Info("using SSH based collection")
-			collectorStrategy = ssh.NewCmdSSHActions(sshKeyLoc, sshUser)
+		kubeArgs := kubernetes.KubeArgs{
+			Namespace:            namespace,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorsContainer,
+			KubectlPath:          kubectlPath,
 		}
-
-		// Launch the collection
-		err = collection.Execute(collectorStrategy,
-			cs,
-			collectionArgs,
-			clusterCollect,
-		)
-		if err != nil {
-			simplelog.Errorf("unexpected error running collection '%v'", err)
+		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, isK8s); err != nil {
+			fmt.Println(err)
 			os.Exit(1)
 		}
 	}
@@ -201,6 +218,15 @@ func init() {
 	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --cordinator and --executors flags")
 	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostcs commands need a sudo user (i.e. for jcmd)")
+	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc", "directory to use for communication between the local-collect command and this one")
+	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name of tgz file to output the diagnotic collection to")
+	execLoc, err := os.Executable()
+	if err != nil {
+		fmt.Printf("unable to find ddc, critical error %v", err)
+		os.Exit(1)
+	}
+	execLocDir := filepath.Dir(execLoc)
+	RootCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transfered to remote nodes for colleciton configuration")
 
 	//init
 	RootCmd.AddCommand(local.LocalCollectCmd)
@@ -208,7 +234,7 @@ func init() {
 	RootCmd.AddCommand(awselogs.AWSELogsCmd)
 }
 
-func validateParameters(args collection.Args, sshKeyLoc, sshUser string, isK8s bool) error {
+func validateParameters(args collection.Args, sshArgs ssh.Args, isK8s bool) error {
 	if args.CoordinatorStr == "" {
 		if isK8s {
 			return errors.New("the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\"")
@@ -223,10 +249,10 @@ func validateParameters(args collection.Args, sshKeyLoc, sshUser string, isK8s b
 	}
 
 	if !isK8s {
-		if sshKeyLoc == "" {
+		if sshArgs.SSHKeyLoc == "" {
 			return errors.New("the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa")
 		}
-		if sshUser == "" {
+		if sshArgs.SSHUser == "" {
 			return errors.New("the ssh user was empty, pass --ssh-user or -u with the user name you want to use to get past this error. Example --ssh-user ubuntu")
 		}
 	}

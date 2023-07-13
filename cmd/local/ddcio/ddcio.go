@@ -99,7 +99,7 @@ func CopyFile(srcPath, dstPath string) error {
 	// Open the source file
 	srcFile, err := os.Open(path.Clean(srcPath))
 	if err != nil {
-		return fmt.Errorf("unable to find file %v due to error %v", srcFile, err)
+		return fmt.Errorf("unable to copy file %v due to error %w", path.Clean(srcPath), err)
 	}
 	defer func() {
 		if err := srcFile.Close(); err != nil {
