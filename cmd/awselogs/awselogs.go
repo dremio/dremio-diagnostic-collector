@@ -83,6 +83,7 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 	overrides[conf.KeyDremioPidDetection] = "false"
 	overrides[conf.KeyCollectTtop] = "false"
 	overrides[conf.KeyTmpOutputDir] = outDir
+	overrides[conf.KeyTarballOutDir] = outDir
 	overrides[conf.KeyNodeName] = coordinatorNode
 	overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, coordinatorNode)
 	overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, coordinatorNode)
