@@ -100,6 +100,7 @@ specific executors that you want to collect from with the -e flag and coordinato
 ```sh
 ./ddc -e 192.168.1.12,192.168.1.13 -c 192.168.1.19,192.168.1.2  --ssh-user ubuntu --ssh-key ~/.ssh/id_rsa 
 ```
+If you have issues consult the [ssh docs](docs/ssh.md)
 
 ### dremio on AWSE
 
@@ -108,8 +109,6 @@ If you want to do a log only collection of AWSE say from the coordinator the fol
 ```sh
 ./ddc awselogs
 ```
-
-If you have issues consult the [ssh docs](docs/ssh.md)
 
 ### dremio cloud (Preview)
 Specify the following parameters in ddc.yaml
