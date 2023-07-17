@@ -14,11 +14,10 @@ if (-Not (Get-Command "gh" -ErrorAction SilentlyContinue)) {
     Write-Output "gh not found. Please install gh and try again https://github.com/cli/cli/releases"
     Exit 1
 }
-# Get Git SHA and Version
-$GIT_SHA = git rev-parse --short HEAD
+# Set Version
 $VERSION = $args[0]
 
-Write-Output "Running release-build script…"
+Write-Output "Running release-build script"
 Get-Date -Format "HH:mm:ss"
 .\script\release-build.ps1 $VERSION
 
