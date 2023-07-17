@@ -15,21 +15,49 @@
 package tests
 
 import (
-	"fmt"
-
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"bufio"
+	"os"
+	"strings"
 )
 
-func MatchFile(expectedFile string, actual interface{}) (success bool, err error) {
-	filePath, ok := actual.(string)
-	if !ok {
-		return false, fmt.Errorf("MatchFile matcher expects a string (file path) as actual, but got %T", actual)
-	}
+func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 
-	areSame, err := ddcio.CompareFiles(expectedFile, filePath)
+	expectedLines, err := readLines(expectedFile)
 	if err != nil {
 		return false, err
 	}
 
-	return areSame, nil
+	actualLines, err := readLines(actualFile)
+	if err != nil {
+		return false, err
+	}
+	//remove cross platform line endings to make the tests work on windows and linux
+	expectedText := normalizeText(expectedLines)
+	actualText := normalizeText(actualLines)
+
+	return expectedText == actualText, nil
+}
+
+func readLines(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return lines, nil
+}
+
+func normalizeText(lines []string) string {
+	return strings.Join(lines, "\n")
 }

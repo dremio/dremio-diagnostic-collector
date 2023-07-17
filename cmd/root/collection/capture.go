@@ -39,8 +39,10 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	host := conf.Host
 
 	ddcTmpDir := conf.TransferDir
-	pathToDDC := filepath.Join(ddcTmpDir, "ddc")
-	pathToDDCYAML := filepath.Join(ddcTmpDir, "ddc.yaml")
+	// we cannot use filepath.join here as it will break everything during the transfer
+	pathToDDC := path.Join(ddcTmpDir, "ddc")
+	// we cannot use filepath.join here as it will break everything during the transfer
+	pathToDDCYAML := path.Join(ddcTmpDir, "ddc.yaml")
 	dremioPAT := conf.DremioPAT
 	versionMatch := false
 	// //check if the version is up to date
@@ -124,14 +126,14 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 
 	//copy tar.gz back
 	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
-	tarGZ := filepath.Join(ddcTmpDir, tgzFileName)
+	//IMPORTANT we must use path.join and not filepath.join or everything will break
+	tarGZ := path.Join(ddcTmpDir, tgzFileName)
 	outDir := path.Dir(outputLoc)
 	if outDir == "" {
 		outDir = fmt.Sprintf(".%v", filepath.Separator)
 	}
-	//but we want to use path.join here because otherwise it will be wrong for linux servers
-	//note also we do not care about sudo when copying back the archive
-	destFile := path.Join(outDir, tgzFileName)
+	//IMPORTANT we want filepath.Join here for the destination because it may be copying back to windows
+	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := ComposeCopyNoSudo(conf, tarGZ, destFile); err != nil {
 		failedFiles = append(failedFiles, FailedFiles{
 			Path: destFile,

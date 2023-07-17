@@ -339,7 +339,7 @@ node-name: %v
 		t.Errorf("unable to read df -h equivalent %v", err)
 	} else {
 		str := string(b)
-		expected := fmt.Sprintf("1.0K\t%v%c", rocksDBDir, filepath.Separator)
+		expected := fmt.Sprintf("1.0K\t%v%c", strings.ReplaceAll(rocksDBDir, "\\", "\\\\"), filepath.Separator)
 		if str != expected {
 			t.Errorf("expected %q but was %q", expected, str)
 		}

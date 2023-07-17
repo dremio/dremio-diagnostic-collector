@@ -14,13 +14,12 @@ if (-Not (Get-Command "gh" -ErrorAction SilentlyContinue)) {
     Write-Output "gh not found. Please install gh and try again https://github.com/cli/cli/releases"
     Exit 1
 }
-# Get Git SHA and Version
-$GIT_SHA = git rev-parse --short HEAD
+# Set Version
 $VERSION = $args[0]
 
-Write-Output "Running release-build script…"
+Write-Output "Running release-build script"
 Get-Date -Format "HH:mm:ss"
 .\script\release-build.ps1 $VERSION
 
 # Run gh release command
-gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-amd64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip
+gh release create $VERSION --title $VERSION -F changelog.md ./bin/ddc-windows-arm64.zip ./bin/ddc-windows-amd64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip

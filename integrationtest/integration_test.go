@@ -15,6 +15,7 @@
 package integrationtest
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -51,6 +52,7 @@ type JobAPIResponse struct {
 }
 
 var c *conf.CollectConf
+var setupIsRun = false
 
 func cleanupOutput() {
 	if c != nil {
@@ -145,10 +147,39 @@ func TestMain(m *testing.M) {
 	exitCode := func() (exitCode int) {
 		var err error
 
+		var buf bytes.Buffer
+		// check to see if there is already a namespaces that matches the formula and delete it
+		cmdApply := exec.Command("kubectl", "get", "namespace")
+		cmdApply.Stderr = os.Stderr
+		cmdApply.Stdout = &buf
+		err = cmdApply.Run()
+		if err != nil {
+			simplelog.Errorf("Error during kubectl apply: %v", err)
+			return 1
+		}
+		nsScanner := bufio.NewScanner(&buf)
+		for nsScanner.Scan() {
+			line := nsScanner.Text()
+			tokens := strings.Split(line, " ")
+			if len(tokens) > 0 {
+				existingNS := tokens[0]
+				if strings.HasPrefix(existingNS, "ddc-test-") {
+					//delete it
+					simplelog.Infof("found an existing namespace %v deleting it", existingNS)
+					cmdApply = exec.Command("kubectl", "delete", "namespace", existingNS)
+					cmdApply.Stderr = os.Stderr
+					cmdApply.Stdout = os.Stdout
+					err = cmdApply.Run()
+					if err != nil {
+						simplelog.Warningf("Error during kubectl delete ns: %v", err)
+					}
+				}
+			}
+		}
 		// Define the name and type of the resource you are waiting for.
 		ts := time.Now().Unix()
 		namespace = fmt.Sprintf("ddc-test-%v", ts)
-		cmdApply := exec.Command("kubectl", "create", "namespace", namespace)
+		cmdApply = exec.Command("kubectl", "create", "namespace", namespace)
 		cmdApply.Stderr = os.Stderr
 		cmdApply.Stdout = os.Stdout
 		err = cmdApply.Run()
@@ -339,6 +370,7 @@ func TestMain(m *testing.M) {
 				return 1
 			}
 		}
+		setupIsRun = true
 		return m.Run()
 	}()
 
@@ -352,6 +384,11 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+func TestValidateTestWasCorrectlyRun(t *testing.T) {
+	if !setupIsRun {
+		t.Error("integration tests broken, nothing was run, if all other tests are passing this means there is an error in setup")
+	}
+}
 func TestRemoteCollectOnK8s(t *testing.T) {
 	var err error
 	transferDir := "/opt/dremio/data/ddc-transfer"
@@ -383,15 +420,18 @@ dremio-jfr-time-seconds: 10
 
 	args := []string{"ddc", "-k", "-n", namespace, "-c", "app=dremio-coordinator", "-e", "app=dremio-executor", "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile}
 	cmd.Execute(args)
-
+	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
 	err = os.Mkdir(testOut, 0700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
+	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
+
 	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
+	simplelog.Infof("now we are reading the %v dir", testOut)
 	entries, err := os.ReadDir(testOut)
 	if err != nil {
 		t.Fatal(err)
@@ -402,6 +442,7 @@ dremio-jfr-time-seconds: 10
 		names = append(names, e.Name())
 		if e.IsDir() {
 			hcDir = filepath.Join(testOut, e.Name())
+			simplelog.Infof("now found the health check directory which is %v", hcDir)
 		}
 	}
 
@@ -436,27 +477,27 @@ dremio-jfr-time-seconds: 10
 	// We expect to find the following logs:
 	/*
 
-		    dremio-executor-0-chown-cloudcache-directory.out
-		    dremio-executor-0-chown-data-directory.out
-		    dremio-executor-0-dremio-executor.out
-		    dremio-executor-0-wait-for-zookeeper.out
-		    dremio-master-0-chown-data-directory.out
-		    dremio-master-0-dremio-master-coordinator.out
-		    dremio-master-0-start-only-one-dremio-master.out
-		    dremio-master-0-upgrade-task.out
-		    dremio-master-0-wait-for-zookeeper.out
+		    dremio-executor-0-chown-cloudcache-directory.txt
+		    dremio-executor-0-chown-data-directory.txt
+		    dremio-executor-0-dremio-executor.txt
+		    dremio-executor-0-wait-for-zookeeper.txt
+		    dremio-master-0-chown-data-directory.txt
+		    dremio-master-0-dremio-master-coordinator.txt
+		    dremio-master-0-start-only-one-dremio-master.txt
+		    dremio-master-0-upgrade-task.txt
+		    dremio-master-0-wait-for-zookeeper.txt
 
 			The following files are usually empty
 
-			dremio-executor-0-chown-cloudcache-directory.out
-		    dremio-executor-0-chown-data-directory.out
-		    dremio-master-0-chown-data-directory.out
-		    dremio-master-0-start-only-one-dremio-master.out
+			dremio-executor-0-chown-cloudcache-directory.txt
+		    dremio-executor-0-chown-data-directory.txt
+		    dremio-master-0-chown-data-directory.txt
+		    dremio-master-0-start-only-one-dremio-master.txt
 
 	*/
 
-	expectedFiles := []string{"dremio-executor-0-chown-data-directory.out", "dremio-executor-0-chown-cloudcache-directory.out", "dremio-executor-0-dremio-executor.out", "dremio-executor-0-wait-for-zookeeper.out", "dremio-master-0-chown-data-directory.out", "dremio-master-0-dremio-master-coordinator.out", "dremio-master-0-start-only-one-dremio-master.out", "dremio-master-0-upgrade-task.out", "dremio-master-0-wait-for-zookeeper.out"}
-	expectedEmptyFiles := []string{"dremio-executor-0-chown-data-directory.out", "dremio-executor-0-chown-cloudcache-directory.out", "dremio-master-0-chown-data-directory.out", "dremio-master-0-start-only-one-dremio-master.out"}
+	expectedFiles := []string{"dremio-executor-0-chown-data-directory.txt", "dremio-executor-0-chown-cloudcache-directory.txt", "dremio-executor-0-dremio-executor.txt", "dremio-executor-0-wait-for-zookeeper.txt", "dremio-master-0-chown-data-directory.txt", "dremio-master-0-dremio-master-coordinator.txt", "dremio-master-0-start-only-one-dremio-master.txt", "dremio-master-0-upgrade-task.txt", "dremio-master-0-wait-for-zookeeper.txt"}
+	expectedEmptyFiles := []string{"dremio-executor-0-chown-data-directory.txt", "dremio-executor-0-chown-cloudcache-directory.txt", "dremio-master-0-chown-data-directory.txt", "dremio-master-0-start-only-one-dremio-master.txt"}
 	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
 	entries, err = os.ReadDir(dir)
 	if err != nil {
