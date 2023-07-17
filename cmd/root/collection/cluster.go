@@ -86,7 +86,7 @@ func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k, container, na
 	if err != nil {
 		simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
 	}
-	outFile := filepath.Join(path, pod+"-"+container+".out")
+	outFile := filepath.Join(path, pod+"-"+container+".txt")
 	simplelog.Debugf("getting logs for pod: %v container: %v", pod, container)
 	p, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {

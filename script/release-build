@@ -53,7 +53,6 @@ cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 rm ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
-mv ./bin/ddc.yaml ./bin/ddc.yaml
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
@@ -74,3 +73,7 @@ echo "Building windows-amd64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
 zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml
+echo "Building windows-arm64…"
+date "+%H:%M:%S"
+GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
+zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./bin/ddc.yaml

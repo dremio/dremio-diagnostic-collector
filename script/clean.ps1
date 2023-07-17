@@ -7,6 +7,9 @@ $ErrorActionPreference = "Stop"
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "Removing bin folder and .\cmd\root\ddcbinary\output folder contents..."
-Remove-Item -Path .\cmd\root\ddcbinary\output\* -Recurse -Force
+Remove-Item -Path .\cmd\root\ddcbinary\output\*.zip
 
-Remove-Item -Path .\bin -Recurse -Force
+if (Test-Path .\bin\) {
+    Remove-Item -Path .\bin\* -Recurse -Force
+}
+
