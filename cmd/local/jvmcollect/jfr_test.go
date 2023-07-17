@@ -19,8 +19,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
@@ -34,6 +36,10 @@ func TestJFRCapture(t *testing.T) {
 	}
 
 	defer func() {
+		//in windows we may need a bit more time to kill the process
+		if runtime.GOOS == "windows" {
+			time.Sleep(500 * time.Millisecond)
+		}
 		if err := cmd.Process.Kill(); err != nil {
 			t.Fatalf("failed to kill process: %s", err)
 		} else {
