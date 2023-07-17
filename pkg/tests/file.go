@@ -17,6 +17,7 @@ package tests
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -39,7 +40,7 @@ func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 }
 
 func readLines(filePath string) ([]string, error) {
-	file, err := os.Open(filePath)
+	file, err := os.Open(filepath.Clean(filePath))
 	if err != nil {
 		return nil, err
 	}
