@@ -2,8 +2,8 @@
 
 $ErrorActionPreference = "Stop"
 
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location -Path $scriptPath
+Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
+
 
 if ($env:DEBUG) {
     $DebugPreference = "Continue"
@@ -12,4 +12,5 @@ if ($env:DEBUG) {
 .\script\clean.ps1
 .\script\build.ps1
 
-go test -race -coverpkg=./... -coverprofile=covprofile ./...
+
+go test ./...

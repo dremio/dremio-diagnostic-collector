@@ -16,14 +16,13 @@
 package ddcio
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -134,43 +133,6 @@ func CopyFile(srcPath, dstPath string) error {
 	return nil
 }
 
-// CompareFiles checks if two files have the same content by comparing their hash values.
-// It returns true if the files have the same content, or false otherwise.
-// An error is returned if there is a problem reading the files or calculating the hashes.
-func CompareFiles(file1, file2 string) (bool, error) {
-	hash1, err := CalculateFileHash(file1)
-	if err != nil {
-		return false, err
-	}
-
-	hash2, err := CalculateFileHash(file2)
-	if err != nil {
-		return false, err
-	}
-
-	return bytes.Equal(hash1, hash2), nil
-
-}
-
-// CalculateFileHash calculates the MD5 hash value for the given file.
-// It opens the file, reads its contents, and computes the hash value.
-// The calculated hash value is returned as a slice of bytes.
-// An error is returned if there is a problem opening or reading the file.
-func CalculateFileHash(file string) ([]byte, error) {
-	f, err := os.Open(filepath.Clean(file))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, f); err != nil {
-		return nil, err
-	}
-
-	return hash.Sum(nil), nil
-}
-
 // GetFilesInDir retrieves a list of directory entries for the given directory.
 // It returns a slice of os.DirEntry representing the files and subdirectories in the directory.
 // An error is returned if there is a problem reading the directory.
@@ -185,7 +147,15 @@ func GetFilesInDir(dir string) ([]os.DirEntry, error) {
 
 // Shell executes a shell command with shell expansion and appends its output to the provided io.Writer.
 func Shell(writer io.Writer, commandLine string) error {
-	cmd := exec.Command("bash", "-c", commandLine)
+	//this is a hack before we can do a longer term improvement of separating local-collect
+	// and the ddc command into different clis
+	shell := "bash"
+	fileArg := "-c"
+	if runtime.GOOS == "windows" {
+		shell = "cmd.exe"
+		fileArg = "/C"
+	}
+	cmd := exec.Command(shell, fileArg, commandLine)
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 

@@ -25,8 +25,7 @@ go build -ldflags "$LDFLAGS" -o ./bin/ddc
 Copy-Item -Path ./default-ddc.yaml -Destination ./bin/ddc.yaml
 Compress-Archive -Path ./bin/ddc -DestinationPath ./bin/ddc.zip
 Remove-Item ./bin/ddc
-Move-Item -Path ./bin/ddc.zip -Destination ./cmd/root/ddcbinary/output/ddc.zip
-Move-Item -Path ./bin/ddc.yaml -Destination ./bin/ddc.yaml
+Move-Item -Force -Path ./bin/ddc.zip -Destination ./cmd/root/ddcbinary/output/ddc.zip
 
 Write-Output "Building linux-amd64…"
 Get-Date -Format "HH:mm:ss"
@@ -58,3 +57,10 @@ $env:GOOS="windows"
 $env:GOARCH="amd64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
 Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml -DestinationPath ./bin/ddc-windows-amd64.zip
+
+Write-Output "Building windows-arm64…"
+Get-Date -Format "HH:mm:ss"
+$env:GOOS="windows"
+$env:GOARCH="arm64"
+go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
+Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml -DestinationPath ./bin/ddc-windows-arm64.zip

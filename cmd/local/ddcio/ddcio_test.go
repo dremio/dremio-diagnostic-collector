@@ -15,48 +15,158 @@
 package ddcio_test
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func TestCompareFiles_WhenCompareingFilesWithTheSameContent(t *testing.T) {
-	//It("should return true", func() {
-	file1 := "testdata/file1.txt"
-	file2 := "testdata/file1_copy.txt"
-	areSame, err := ddcio.CompareFiles(file1, file2)
+func TestCopyFile(t *testing.T) {
+	srcContent := []byte("This is the source file content")
+
+	// Create a temporary source file
+	srcFile, err := os.CreateTemp("", "source-file")
 	if err != nil {
-		t.Errorf("unexpected error %v", err)
+		t.Fatalf("Failed to create temporary source file: %v", err)
 	}
-	if !areSame {
-		t.Error("the files don't match but they should")
+	defer os.Remove(srcFile.Name())
+	defer srcFile.Close()
+
+	// Write content to the source file
+	_, err = srcFile.Write(srcContent)
+	if err != nil {
+		t.Fatalf("Failed to write content to source file: %v", err)
+	}
+
+	// Create a temporary destination file
+	dstFile, err := os.CreateTemp("", "destination-file")
+	if err != nil {
+		t.Fatalf("Failed to create temporary destination file: %v", err)
+	}
+	defer os.Remove(dstFile.Name())
+	defer dstFile.Close()
+
+	// Call the method under test
+	err = ddcio.CopyFile(srcFile.Name(), dstFile.Name())
+	if err != nil {
+		t.Fatalf("CopyFile failed: %v", err)
+	}
+
+	// Read the content of the destination file
+	dstContent, err := os.ReadFile(dstFile.Name())
+	if err != nil {
+		t.Fatalf("Failed to read destination file: %v", err)
+	}
+
+	// Compare the content of the source and destination files
+	if string(dstContent) != string(srcContent) {
+		t.Errorf("Copied content doesn't match source content")
 	}
 }
 
-func TestCompareFiles_WhenComparingFilesWithDifferentContent(t *testing.T) {
-	//It("should return false", func() {
-	file1 := "testdata/file1.txt"
-	file2 := "testdata/file2.txt"
-
-	areSame, err := ddcio.CompareFiles(file1, file2)
+func TestCopyDir(t *testing.T) {
+	srcDir, err := os.MkdirTemp("", "source-dir")
 	if err != nil {
-		t.Errorf("unexpected error %v", err)
+		t.Fatalf("Failed to create temporary source directory: %v", err)
 	}
-	if areSame {
-		t.Error("the files match but they should not")
+	defer os.RemoveAll(srcDir)
+
+	// Create a subdirectory within the source directory
+	subDir := filepath.Join(srcDir, "subdir")
+	err = os.Mkdir(subDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	// Create a temporary file within the source directory
+	srcFile := filepath.Join(srcDir, "file.txt")
+	file, err := os.Create(srcFile)
+	if err != nil {
+		t.Fatalf("Failed to create source file: %v", err)
+	}
+	defer file.Close()
+
+	_, err = file.WriteString("This is the source file content")
+	if err != nil {
+		t.Fatalf("Failed to write content to source file: %v", err)
+	}
+
+	dstDir, err := os.MkdirTemp("", "destination-dir")
+	if err != nil {
+		t.Fatalf("Failed to create temporary destination directory: %v", err)
+	}
+	defer os.RemoveAll(dstDir)
+
+	// Call the method under test
+	err = ddcio.CopyDir(srcDir, dstDir)
+	if err != nil {
+		t.Fatalf("CopyDir failed: %v", err)
+	}
+
+	// Verify the copied directory structure
+	subDirExists, err := exists(filepath.Join(dstDir, "subdir"))
+	if err != nil {
+		t.Fatalf("Failed to check subdirectory existence: %v", err)
+	}
+	if !subDirExists {
+		t.Errorf("Copied subdirectory does not exist")
+	}
+
+	dstFileExists, err := exists(filepath.Join(dstDir, "file.txt"))
+	if err != nil {
+		t.Fatalf("Failed to check destination file existence: %v", err)
+	}
+	if !dstFileExists {
+		t.Errorf("Copied file does not exist")
 	}
 }
 
-func TestCompareFiles_WhenComparingNonExistentFiles(t *testing.T) {
-	//It("should return an error", func() {
-	file1 := "testdata/nonexistent1.txt"
-	file2 := "testdata/nonexistent2.txt"
-
-	areSame, err := ddcio.CompareFiles(file1, file2)
+func exists(path string) (bool, error) {
+	_, err := os.Stat(path)
 	if err == nil {
-		t.Errorf("expected error but there was none")
+		return true, nil
 	}
-	if areSame {
-		t.Error("the files match but they should not")
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func TestEnsureClose(t *testing.T) {
+	closed := false
+	ddcio.EnsureClose("myTest", func() error {
+		closed = true
+		return nil
+	})
+	if !closed {
+		t.Error("expected the close to be executed but it was not")
+	}
+
+	expectedText := "FAILED BADLY!!!!"
+	failedClose := func() error {
+		return errors.New(expectedText)
+	}
+	expectedFile := "my_long_file_name.txt"
+
+	out, err := output.CaptureOutput(func() {
+		// so the simplelogger output will be captured
+		simplelog.InitLogger(2)
+		ddcio.EnsureClose(expectedFile, failedClose)
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, expectedText) {
+		t.Error("expected error text was not captured")
+	}
+
+	if !strings.Contains(out, expectedFile) {
+		t.Error("expected error text was not captured")
 	}
 }

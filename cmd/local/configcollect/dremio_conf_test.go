@@ -24,6 +24,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/configcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/rogpeppe/go-internal/diff"
 )
 
 func TestCollectsConfFilesWithNoSecrets(t *testing.T) {
@@ -70,12 +71,18 @@ node-name: %v
 		t.Error("expected dremio-env to match but it did not")
 	}
 
-	match, err = tests.MatchFile(filepath.Join("testdata", "dremio.conf"), filepath.Join(confDestination, "dremio.conf"))
+	actual := filepath.Join(confDestination, "dremio.conf")
+	expected := filepath.Join("testdata", "dremio.conf")
+	match, err = tests.MatchFile(expected, actual)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !match {
-		t.Error("expected dremio.conf to match but it did not")
+		diff, err := DiffText(actual, expected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Errorf("expected dremio.conf to match but it did not diff is \n%v", diff)
 	}
 
 	match, err = tests.MatchFile(filepath.Join("testdata", "logback.xml"), filepath.Join(confDestination, "logback.xml"))
@@ -93,6 +100,21 @@ node-name: %v
 	if !match {
 		t.Error("expected dremio.conf to match but it did not")
 	}
+}
+
+func DiffText(expected, actual string) (string, error) {
+	e, err := os.ReadFile(expected)
+	if err != nil {
+		return "", fmt.Errorf("unable to read expected file: %v", err)
+	}
+
+	a, err := os.ReadFile(actual)
+	if err != nil {
+		return "", fmt.Errorf("unable to read actual file: %v", err)
+	}
+	diffResult := diff.Diff(expected, e, actual, a)
+
+	return string(diffResult), nil
 }
 
 func TestCollectsConfFilesAndRedactDremioConf(t *testing.T) {
