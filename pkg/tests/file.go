@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 )
 
 func MatchFile(expectedFile, actualFile string) (success bool, err error) {
@@ -61,4 +62,14 @@ func readLines(filePath string) ([]string, error) {
 
 func normalizeText(lines []string) string {
 	return strings.Join(lines, "\n")
+}
+
+func AssertFileHasContent(t *testing.T, filePath string) {
+	if f, err := os.Stat(filePath); err != nil {
+		t.Errorf("file %v failed %v", filePath, err)
+	} else {
+		if !(f.Size() > 0) {
+			t.Errorf("file %v is empty", filePath)
+		}
+	}
 }

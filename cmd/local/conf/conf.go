@@ -94,31 +94,8 @@ type CollectConf struct {
 	dremioPID               int
 }
 
-func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error) {
-	//now read in viper configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
-
-	// find the location of the ddc executable
-	execPath, err := os.Executable()
-	if err != nil {
-		simplelog.Errorf("Error getting executable path: '%v'. Falling back to working directory for search location", err)
-		execPath = "."
-	}
-	// use that as the default location of the configuration
-	configDir := filepath.Dir(execPath)
-	return ReadConf(overrides, configDir)
-}
-
-func ReadConf(overrides map[string]string, configDir string) (*CollectConf, error) {
-	defaultCaptureSeconds := 60
-	// set node name
-	hostName, err := os.Hostname()
-	if err != nil {
-		hostName = fmt.Sprintf("unknown-%v", uuid.New())
-	}
-	SetViperDefaults(hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
-
-	c := &CollectConf{}
-	c.systemtables = []string{
+func SystemTableList() []string {
+	return []string{
 		"\\\"tables\\\"",
 		"boot",
 		"fragments",
@@ -144,6 +121,32 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		"cache.objects",
 		"cache.storage_plugins",
 	}
+}
+func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error) {
+	//now read in viper configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
+
+	// find the location of the ddc executable
+	execPath, err := os.Executable()
+	if err != nil {
+		simplelog.Errorf("Error getting executable path: '%v'. Falling back to working directory for search location", err)
+		execPath = "."
+	}
+	// use that as the default location of the configuration
+	configDir := filepath.Dir(execPath)
+	return ReadConf(overrides, configDir)
+}
+
+func ReadConf(overrides map[string]string, configDir string) (*CollectConf, error) {
+	defaultCaptureSeconds := 60
+	// set node name
+	hostName, err := os.Hostname()
+	if err != nil {
+		hostName = fmt.Sprintf("unknown-%v", uuid.New())
+	}
+	SetViperDefaults(hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
+
+	c := &CollectConf{}
+	c.systemtables = SystemTableList()
 	c.systemtablesdremiocloud = []string{
 		"organization.clouds",
 		"organization.privileges",

@@ -30,7 +30,7 @@ func RunCollectJFR(c *conf.CollectConf) error {
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v VM.unlock_commercial_features", c.DremioPID())); err != nil {
 		simplelog.Warningf("Error trying to unlock commercial features %v. Note: newer versions of OpenJDK do not support the call VM.unlock_commercial_features. This is usually safe to ignore", err)
 	}
-	simplelog.Debugf("node: %v - jfr unlock commerictial output - %v", c.NodeName(), w.String())
+	simplelog.Debugf("node: %v - jfr unlock commercial output - %v", c.NodeName(), w.String())
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
 		return fmt.Errorf("unable to run JFR due to error %v", err)

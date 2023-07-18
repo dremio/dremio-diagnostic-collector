@@ -114,7 +114,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 
 	totalNodes := len(executors) + len(coordinators)
 	if totalNodes == 0 {
-		return fmt.Errorf("coordinator string '%v' and executor string '%v' did not es to connect: %v ", coordinatorStr, executorsStr, c.HelpText())
+		return fmt.Errorf("coordinator string '%v' and executor string '%v' were not able to connect: %v ", coordinatorStr, executorsStr, c.HelpText())
 	}
 	hosts := append(coordinators, executors...)
 

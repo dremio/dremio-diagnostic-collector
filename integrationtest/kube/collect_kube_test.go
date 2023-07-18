@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package integrationtest
+package kube
 
 import (
 	"bufio"
@@ -36,6 +36,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 type AuthResponse struct {
@@ -449,29 +450,29 @@ dremio-jfr-time-seconds: 10
 	if len(names) != 2 {
 		t.Fatalf("expected 1 entry but had %v", strings.Join(names, ","))
 	}
-	assertFileHasContent(t, filepath.Join(testOut, "summary.json"))
+	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
 	//check k8s files
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "endpoints.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "events.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "hpa.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "ingress.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "job.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "limitrange.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pc.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pdb.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pods.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pv.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pvc.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "replicaset.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "resourcequota.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "sc.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "service.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "statefulsets.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "endpoints.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "events.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "hpa.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "ingress.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "job.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "limitrange.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pdb.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pods.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pv.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pvc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "replicaset.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "resourcequota.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "sc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "service.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "statefulsets.json"))
 
 	//check k8s logs
 	// We expect to find the following logs:
@@ -537,44 +538,44 @@ dremio-jfr-time-seconds: 10
 	}
 
 	// check server.logs
-	assertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.log.gz"))
-	assertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-executor-0", "server.log.gz"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.log.gz"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-executor-0", "server.log.gz"))
 	// check queries.json
-	assertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
 	// check conf files
 
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio.conf"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio-env"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback.xml"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback-access.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio.conf"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio-env"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback-access.xml"))
 
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "dremio.conf"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "dremio-env"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "logback.xml"))
-	assertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "logback-access.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "dremio.conf"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "dremio-env"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "logback.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-executor-0", "logback-access.xml"))
 
 	// check nodeinfo files
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "diskusage.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "jvm_settings.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "metrics.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "rocksdb_disk_allocation.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "diskusage.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "jvm_settings.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "metrics.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "rocksdb_disk_allocation.txt"))
 
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "diskusage.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "jvm_settings.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "metrics.json"))
-	assertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "diskusage.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "jvm_settings.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "metrics.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
 	//kvstore report
-	assertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
 
 	//ttop files
-	assertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-master-0", "ttop.txt"))
-	assertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-executor-0", "ttop.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-master-0", "ttop.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-executor-0", "ttop.txt"))
 
 	//jfr files
-	assertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-master-0.jfr"))
-	assertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-executor-0.jfr"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-master-0.jfr"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-executor-0.jfr"))
 
 	//thread dump files
 	entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", "dremio-executor-0"))
@@ -598,42 +599,42 @@ dremio-jfr-time-seconds: 10
 
 	// System tables
 
-	//we substract 3 of the jobs that fail due to missing features in oss
-	// - sys.privileges
-	// - sys.membership
-	// - sys.roles
-	// and system.tables because it seems to not be setup
-	// - sys.\"tables\"
-	expectedEntries := len(c.Systemtables()) - 4
-	entries, err = os.ReadDir(filepath.Join(hcDir, "system-tables", "dremio-master-0"))
-	if err != nil {
-		t.Fatalf("cannot read system-tables dir for the dremio-master-0 due to: %v", err)
+	// System tables
+	var systemTables []string
+	for _, e := range conf.SystemTableList() {
+		//we skip the known ones we don't care about when using oss for testing
+		if e == "roles" || e == "membership" || e == "privileges" || e == "tables" {
+			continue
+		}
+		if e == "options" {
+			//we double up for options since it's big
+			systemTables = append(systemTables, "sys.options_offset_500_limit_500")
+		}
+		//we do the trim because sys.\"tables\" becomes sys.tables on the filesystem
+		fullFileName := fmt.Sprintf("sys.%v_offset_0_limit_500.json", e)
+		systemTables = append(systemTables, strings.ReplaceAll(fullFileName, "\\\"", ""))
 	}
-	actualEntries := len(entries)
-	if actualEntries == 0 {
+	sort.Strings(systemTables)
+
+	coordinator := "dremio-master-0"
+	entries, err = os.ReadDir(filepath.Join(hcDir, "system-tables", coordinator))
+	if err != nil {
+		t.Fatalf("cannot read system-tables dir for the "+coordinator+" due to: %v", err)
+	}
+	actualEntriesCount := len(entries)
+	if actualEntriesCount == 0 {
 		t.Error("expected more than 0 entries")
 	}
-	if actualEntries != expectedEntries {
-		var missingEntries []string
-		for _, e := range c.Systemtables() {
-			//we skip the known ones we don't care about
-			if e == "roles" || e == "membership" || e == "privileges" || e == "\"tables\"" {
-				continue
-			}
-			found := false
-			for _, actualEntry := range entries {
-				if actualEntry.Name() == fmt.Sprintf("sys.%v._offset_0_limit_500.json", e) {
-					found = true
-					break
-				}
-			}
-			if found {
-				simplelog.Infof("system table output %v present", fmt.Sprintf("sys.%v._offset_0_limit_500.json", e))
-			} else {
-				missingEntries = append(missingEntries, e)
-			}
-		}
-		t.Errorf("expected %v but was %v we had the following entries missing %v", expectedEntries, actualEntries, strings.Join(missingEntries, ", "))
+	var actualEntries []string
+	for _, e := range entries {
+		actualEntries = append(actualEntries, e.Name())
+	}
+	sort.Strings(actualEntries)
+
+	uniqueOnFileSystem, uniqueToSystemTables := tests.FindUniqueElements(actualEntries, systemTables)
+
+	if len(uniqueOnFileSystem) == 0 && len(uniqueToSystemTables) == 0 {
+		t.Errorf("we had the following entries missing:\n\n%v\n\nextra entries on filesystem:\n\n%v\n", strings.Join(uniqueToSystemTables, "\n"), strings.Join(uniqueOnFileSystem, "\n"))
 	}
 
 	//validate job downloads
@@ -647,16 +648,6 @@ dremio-jfr-time-seconds: 10
 	expected := 10
 	if len(entries) < 10 {
 		t.Errorf("there were %v job profiles downloaded, we expected at least %v", len(entries), expected)
-	}
-}
-
-func assertFileHasContent(t *testing.T, filePath string) {
-	if f, err := os.Stat(filePath); err != nil {
-		t.Errorf("file %v failed %v", filePath, err)
-	} else {
-		if !(f.Size() > 0) {
-			t.Errorf("file %v is empty", filePath)
-		}
 	}
 }
 
