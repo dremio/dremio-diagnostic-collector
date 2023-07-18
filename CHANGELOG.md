@@ -9,6 +9,7 @@
 ### Changed
 
 * Invalid or missing ddc.yaml will now stop execution
+* earlier exit of remote execution of ddc if copying of ddc or ddc.yaml fails
 
 ## [0.6.1]
 

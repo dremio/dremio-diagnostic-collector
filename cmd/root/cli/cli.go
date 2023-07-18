@@ -143,9 +143,9 @@ func logArgs(args []string) {
 		}
 	}
 	if containsPat {
-		simplelog.Debug("args: contains PAT REDACTED")
+		simplelog.Info("args: contains PAT REDACTED")
 	} else {
-		simplelog.Debugf("args: %v", strings.Join(args, " "))
+		simplelog.Infof("args: %v", strings.Join(args, " "))
 	}
 }
 func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {

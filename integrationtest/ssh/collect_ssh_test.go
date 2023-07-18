@@ -101,10 +101,6 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
 
-	if err := os.WriteFile("/Users/ryan.svihla/Downloads/test.yaml", []byte(yamlText), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
-	}
-
 	privateKey := filepath.Join(t.TempDir(), "ssh_key")
 	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
 		t.Fatalf("unable to write ssh private key: %v", err)

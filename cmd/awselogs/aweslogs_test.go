@@ -30,6 +30,25 @@ func TestAWSELogs(t *testing.T) {
 	if err := os.Mkdir(tmpDir, 0700); err != nil {
 		t.Fatal(errors.Unwrap(err))
 	}
+
+	exeLoc, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exeDir := filepath.Dir(exeLoc)
+	yamlFile := filepath.Join(exeDir, "ddc.yaml")
+	defer func() {
+		if err := os.Remove(yamlFile); err != nil {
+			t.Logf("cant remove yaml dir %v", yamlFile)
+		}
+	}()
+	if err := os.WriteFile(yamlFile, []byte(`dremio-gclogs-dir: /path/to/gclogs
+dremio-log-dir: /path/to/dremio/logs
+node-name: node1
+dremio-conf-dir: /path/to/dremio/conf
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
 	outFile := filepath.Join(t.TempDir(), "diag.tgz")
 	if err := awselogs.Execute(efsDir, tmpDir, outFile); err != nil {
 		t.Fatal(errors.Unwrap(err))

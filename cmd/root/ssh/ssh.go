@@ -64,10 +64,11 @@ func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, sour
 	sourceFileName := filepath.Base(source)
 	// create a tmp dir for scp
 	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
-	_, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
+	out, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
 	if err != nil {
-		return "", err
+		return out, err
 	}
+
 	// cleanup the tmp dir
 	defer func() {
 		_, err = c.HostExecute(hostName, false, "rm", "-rf", tmpDir)
@@ -77,9 +78,9 @@ func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, sour
 	}()
 	// first move to tmp dir from source as sudo
 	tmpFilePath := path.Join(tmpDir, sourceFileName)
-	_, err = c.HostExecuteSudo(hostName, sudoUser, "cp", source, tmpFilePath)
+	out, err = c.HostExecuteSudo(hostName, sudoUser, "cp", source, tmpFilePath)
 	if err != nil {
-		return "", err
+		return out, err
 	}
 	// next copy from tmp dir as non-sudo
 	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpFilePath, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
@@ -93,9 +94,9 @@ func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source
 	sourceFileName := filepath.Base(source)
 	// create a tmp dir for scp
 	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
-	_, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
+	out, err := c.HostExecute(hostName, false, "mkdir", "-p", tmpDir)
 	if err != nil {
-		return "", err
+		return out, err
 	}
 	// cleanup the tmp dir
 	defer func() {
@@ -106,10 +107,18 @@ func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source
 	}()
 	tmpFilePath := path.Join(tmpDir, sourceFileName)
 	// first copy to tmp dir as non-sudo
-	_, err = c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
+
+	out, err = c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
 	if err != nil {
-		return "", err
+		return out, err
 	}
+
+	// chmod dir for sudo user to be able to read it even if the two users cannot
+	out, err = c.HostExecute(hostName, false, "chmod", "777", "-R", tmpDir)
+	if err != nil {
+		return out, err
+	}
+
 	// next move from tmp dir to destination as sudo
 	return c.HostExecuteSudo(hostName, sudoUser, "cp", tmpFilePath, destination)
 }

@@ -35,15 +35,15 @@ func ParseConfig(configDir string, overrides map[string]string) error {
 	err := viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 		// Config file not found; ignore error if desired
-		if entries, err := os.ReadDir(configDir); err != nil {
+		entries, err := os.ReadDir(configDir)
+		if err != nil {
 			return fmt.Errorf("conf %v not found, and cannot read directory %v due to error %w", expectedLoc, configDir, err)
-		} else {
-			var names []string
-			for _, e := range entries {
-				names = append(names, e.Name())
-			}
-			return fmt.Errorf("conf %v not found, in that directory are the files: '%v'", expectedLoc, strings.Join(names, ", "))
 		}
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		return fmt.Errorf("conf %v not found, in that directory are the files: '%v'", expectedLoc, strings.Join(names, ", "))
 	} else if err == nil {
 		simplelog.Debugf("conf %v parsed successfully", expectedLoc)
 	} else {
