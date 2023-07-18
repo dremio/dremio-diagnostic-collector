@@ -66,8 +66,8 @@ you must make one with the following format:
     "dremio-rocksdb-dir": "/opt/dremio/cm/db/",
     "dremio-username": "dremio",
     "dremio-pat": "mytoken",
-	"dremio-endpoint": "http://localhost:9047",
-	"is-enterprise": true
+    "dremio-endpoint": "http://localhost:9047",
+    "is-enterprise": true
 }
 
 
@@ -83,21 +83,25 @@ Error was: %v`, err)
 		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
-	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
-verbose: vvvv
+	yamlText := fmt.Sprintf(`verbose: vvvv
 dremio-log-dir: %v
 dremio-conf-dir: %v
 dremio-rocksdb-dir: %v
 number-threads: 2
-dremio-endpoint: %v
+dremio-endpoint: '%v'
 dremio-username: %v
-dremio-pat-token: %v
+dremio-pat-token: '%v'
 collect-dremio-configuration: true
 number-job-profiles: 25
 node-metrics-collect-duration-seconds: 10
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername, sshConf.DremioPAT)), 0600); err != nil {
+`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername, sshConf.DremioPAT)
+	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
+		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	}
+
+	if err := os.WriteFile("/Users/ryan.svihla/Downloads/test.yaml", []byte(yamlText), 0600); err != nil {
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
 

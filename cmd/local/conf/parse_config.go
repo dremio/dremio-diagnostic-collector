@@ -24,31 +24,31 @@ import (
 	"github.com/spf13/viper"
 )
 
-func ParseConfig(configDir string, overrides map[string]string) {
+func ParseConfig(configDir string, overrides map[string]string) error {
 
 	//read viper config
 	baseConfig := "ddc"
 	viper.SetConfigName(baseConfig) // Name of config file (without extension)
 	viper.AddConfigPath(configDir)
 	viper.SetConfigType("yaml")
-	expectedLoc := filepath.Join(baseConfig, fmt.Sprintf("%v.%v", baseConfig, "yaml"))
+	expectedLoc := filepath.Join(configDir, fmt.Sprintf("%v.%v", baseConfig, "yaml"))
 	err := viper.ReadInConfig()
 	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 		// Config file not found; ignore error if desired
 		if entries, err := os.ReadDir(configDir); err != nil {
-			simplelog.Errorf("conf %v not found, and cannot read directory %v due to error %v. falling back to defaults", expectedLoc, configDir, err)
+			return fmt.Errorf("conf %v not found, and cannot read directory %v due to error %w", expectedLoc, configDir, err)
 		} else {
 			var names []string
 			for _, e := range entries {
 				names = append(names, e.Name())
 			}
-			simplelog.Errorf("conf %v not found, in that directory are the files: '%v'. falling back to defaults", expectedLoc, strings.Join(names, ", "))
+			return fmt.Errorf("conf %v not found, in that directory are the files: '%v'", expectedLoc, strings.Join(names, ", "))
 		}
 	} else if err == nil {
 		simplelog.Debugf("conf %v parsed successfully", expectedLoc)
 	} else {
 		// Config file was found but another error was produced
-		simplelog.Errorf("conf %v not found due to error %v", expectedLoc, err)
+		return fmt.Errorf("conf %v not readable: %w", expectedLoc, err)
 	}
 
 	viper.AutomaticEnv() // Automatically read environment variables
@@ -61,4 +61,5 @@ func ParseConfig(configDir string, overrides map[string]string) {
 			viper.Set(k, v)
 		}
 	}
+	return nil
 }

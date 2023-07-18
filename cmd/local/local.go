@@ -380,7 +380,6 @@ func Execute(args []string, overrides map[string]string, usage func() error) err
 	c, err := conf.ReadConfFromExecLocation(overrides)
 	if err != nil {
 		return fmt.Errorf("unable to read configuration %w", err)
-
 	}
 	if !c.AcceptCollectionConsent() {
 		fmt.Println(consent.OutputConsent(c))

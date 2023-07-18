@@ -162,7 +162,9 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		// "project.history.events",
 		"project.history.jobs",
 	}
-	ParseConfig(configDir, overrides)
+	if err := ParseConfig(configDir, overrides); err != nil {
+		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
+	}
 	simplelog.Debugf("logging parsed configuration from ddc.yaml")
 	for k, v := range viper.AllSettings() {
 		if k == KeyDremioPatToken && v != "" {
