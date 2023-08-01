@@ -47,7 +47,6 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # disable-rest-api: false
 # dremio-pid: 0
 # dremio-pid-detection: true 
-# collect-metrics: true
 # collect-os-config: true
 # collect-disk-usage: true
 # dremio-logs-num-days: 7
@@ -67,7 +66,6 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # collect-kvstore-report: true
 # dremio-jstack-time-seconds: 60
 # dremio-jfr-time-seconds: 60
-# node-metrics-collect-duration-seconds: 60
 # dremio-jstack-freq-seconds: 1
 # node-name: "" //dynamically set normally
 # is-dremio-cloud: false

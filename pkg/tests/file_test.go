@@ -17,7 +17,7 @@ package tests_test
 import (
 	"testing"
 
-	. "github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 func TestMatchFile(t *testing.T) {
@@ -26,12 +26,12 @@ func TestMatchFile(t *testing.T) {
 	file2 := "testdata/file2.txt"
 	expectedFile := "testdata/expected.txt"
 	// Expect file1 to match the expected file
-	if match, err := MatchFile(file1, expectedFile); !match && err != nil {
+	if match, err := tests.MatchFile(file1, expectedFile); !match && err != nil {
 		t.Errorf("expected %v to equal %v", file1, expectedFile)
 	}
 
 	// Expect file2 to not match the expected file
-	if match, err := MatchFile(file2, expectedFile); match && err != nil {
+	if match, err := tests.MatchFile(file2, expectedFile); match && err != nil {
 		t.Errorf("expected %v to equal %v", file2, expectedFile)
 	}
 
@@ -39,7 +39,7 @@ func TestMatchFile(t *testing.T) {
 	file3 := "testdata/file3.txt"
 
 	// Expect file3 to match the expected file
-	if match, err := MatchFile(file3, expectedFile); !match && err != nil {
+	if match, err := tests.MatchFile(file3, expectedFile); !match && err != nil {
 		t.Errorf("expected %v to equal %v", file3, expectedFile)
 	}
 }

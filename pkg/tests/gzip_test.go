@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
 func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {
@@ -27,7 +27,7 @@ func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {
 	expectedFile := filepath.Join("testdata", "file1.txt")
 
 	// Expect the gzip file to contain the expected file
-	isValid, err := ContainThisFileInTheGzip(expectedFile, gzipFile)
+	isValid, err := tests.ContainThisFileInTheGzip(expectedFile, gzipFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -40,7 +40,7 @@ func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {
 	expectedFile = filepath.Join("testdata", "file3.txt")
 
 	// Expect the gzip file not to contain the different file
-	isValid, err = ContainThisFileInTheGzip(expectedFile, gzipFile)
+	isValid, err = tests.ContainThisFileInTheGzip(expectedFile, gzipFile)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}

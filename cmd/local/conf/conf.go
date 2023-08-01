@@ -26,8 +26,29 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
-	"github.com/spf13/viper"
+	"github.com/spf13/cast"
 )
+
+func GetString(confData map[string]interface{}, key string) string {
+	if v, ok := confData[key]; ok {
+		return cast.ToString(v)
+	}
+	return ""
+}
+
+func GetInt(confData map[string]interface{}, key string) int {
+	if v, ok := confData[key]; ok {
+		return cast.ToInt(v)
+	}
+	return 0
+}
+
+func GetBool(confData map[string]interface{}, key string) bool {
+	if v, ok := confData[key]; ok {
+		return cast.ToBool(v)
+	}
+	return false
+}
 
 type CollectConf struct {
 	// flags that are configurable by env or configuration
@@ -53,38 +74,38 @@ type CollectConf struct {
 	dremioCloudAppEndpoint     string
 
 	// advanced variables setable by configuration or environement variable
-	outputDir                         string
-	tarballOutDir                     string
-	dremioTtopTimeSeconds             int
-	dremioTtopFreqSeconds             int
-	dremioJFRTimeSeconds              int
-	dremioJStackFreqSeconds           int
-	dremioJStackTimeSeconds           int
-	dremioLogsNumDays                 int
-	dremioGCFilePattern               string
-	dremioQueriesJSONNumDays          int
-	jobProfilesNumSlowExec            int
-	jobProfilesNumHighQueryCost       int
-	jobProfilesNumSlowPlanning        int
-	jobProfilesNumRecentErrors        int
-	allowInsecureSSL                  bool
-	collectJFR                        bool
-	collectJStack                     bool
-	collectKVStoreReport              bool
-	collectServerLogs                 bool
-	collectMetaRefreshLogs            bool
-	collectQueriesJSON                bool
-	collectDremioConfiguration        bool
-	collectReflectionLogs             bool
-	collectSystemTablesExport         bool
-	systemTablesRowLimit              int
-	collectOSConfig                   bool
-	collectDiskUsage                  bool
-	collectGCLogs                     bool
-	collectTtop                       bool
-	collectWLM                        bool
-	nodeName                          string
-	restHTTPTimeout                   int
+	outputDir                   string
+	tarballOutDir               string
+	dremioTtopTimeSeconds       int
+	dremioTtopFreqSeconds       int
+	dremioJFRTimeSeconds        int
+	dremioJStackFreqSeconds     int
+	dremioJStackTimeSeconds     int
+	dremioLogsNumDays           int
+	dremioGCFilePattern         string
+	dremioQueriesJSONNumDays    int
+	jobProfilesNumSlowExec      int
+	jobProfilesNumHighQueryCost int
+	jobProfilesNumSlowPlanning  int
+	jobProfilesNumRecentErrors  int
+	allowInsecureSSL            bool
+	collectJFR                  bool
+	collectJStack               bool
+	collectKVStoreReport        bool
+	collectServerLogs           bool
+	collectMetaRefreshLogs      bool
+	collectQueriesJSON          bool
+	collectDremioConfiguration  bool
+	collectReflectionLogs       bool
+	collectSystemTablesExport   bool
+	systemTablesRowLimit        int
+	collectOSConfig             bool
+	collectDiskUsage            bool
+	collectGCLogs               bool
+	collectTtop                 bool
+	collectWLM                  bool
+	nodeName                    string
+	restHTTPTimeout             int
 
 	// variables
 	systemtables            []string
@@ -121,7 +142,7 @@ func SystemTableList() []string {
 	}
 }
 func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error) {
-	//now read in viper configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
+	//now read in configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
 
 	// find the location of the ddc executable
 	execPath, err := os.Executable()
@@ -135,13 +156,19 @@ func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error)
 }
 
 func ReadConf(overrides map[string]string, configDir string) (*CollectConf, error) {
+	confData, err := ParseConfig(configDir, overrides)
+	if err != nil {
+		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
+	}
+	simplelog.Debugf("logging parsed configuration from ddc.yaml")
 	defaultCaptureSeconds := 60
 	// set node name
 	hostName, err := os.Hostname()
 	if err != nil {
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
-	SetViperDefaults(hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
+
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
 
 	c := &CollectConf{}
 	c.systemtables = SystemTableList()
@@ -160,11 +187,8 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		// "project.history.events",
 		"project.history.jobs",
 	}
-	if err := ParseConfig(configDir, overrides); err != nil {
-		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
-	}
-	simplelog.Debugf("logging parsed configuration from ddc.yaml")
-	for k, v := range viper.AllSettings() {
+
+	for k, v := range confData {
 		if k == KeyDremioPatToken && v != "" {
 			simplelog.Debugf("conf key '%v':'REDACTED'", k)
 		} else {
@@ -172,7 +196,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		}
 	}
 	// now we can setup verbosity as we are parsing it in the ParseConfig function
-	verboseString := viper.GetString("verbose")
+	verboseString := GetString(confData, "verbose")
 	verbose := strings.Count(verboseString, "v")
 	if verbose >= 3 {
 		fmt.Println("verbosity level DEBUG")
@@ -185,8 +209,8 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	}
 	simplelog.InitLogger(verbose)
 
-	c.dremioPIDDetection = viper.GetBool(KeyDremioPidDetection)
-	c.dremioPID = viper.GetInt(KeyDremioPid)
+	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
+	c.dremioPID = GetInt(confData, KeyDremioPid)
 	if c.dremioPID < 1 && c.dremioPIDDetection {
 		dremioPID, err := autodetect.GetDremioPID()
 		if err != nil {
@@ -198,15 +222,15 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	}
 	dremioPIDIsValid := c.dremioPID > 0
 
-	c.acceptCollectionConsent = viper.GetBool(KeyAcceptCollectionConsent)
-	c.isDremioCloud = viper.GetBool(KeyIsDremioCloud)
-	c.dremioCloudProjectID = viper.GetString(KeyDremioCloudProjectID)
-	c.collectAccelerationLogs = viper.GetBool(KeyCollectAccelerationLog)
-	c.collectAccessLogs = viper.GetBool(KeyCollectAccessLog)
-	c.collectAuditLogs = viper.GetBool(KeyCollectAuditLog)
-	c.gcLogsDir = viper.GetString(KeyDremioGCLogsDir)
-	c.dremioLogDir = viper.GetString(KeyDremioLogDir)
-	c.nodeName = viper.GetString(KeyNodeName)
+	c.acceptCollectionConsent = GetBool(confData, KeyAcceptCollectionConsent)
+	c.isDremioCloud = GetBool(confData, KeyIsDremioCloud)
+	c.dremioCloudProjectID = GetString(confData, KeyDremioCloudProjectID)
+	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
+	c.collectAccessLogs = GetBool(confData, KeyCollectAccessLog)
+	c.collectAuditLogs = GetBool(confData, KeyCollectAuditLog)
+	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+	c.dremioLogDir = GetString(confData, KeyDremioLogDir)
+	c.nodeName = GetString(confData, KeyNodeName)
 	isAWSE, err := autodetect.IsAWSE()
 	if err != nil {
 		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
@@ -232,9 +256,9 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 			}
 		}
 	}
-	c.dremioConfDir = viper.GetString(KeyDremioConfDir)
-	c.numberThreads = viper.GetInt(KeyNumberThreads)
-	c.dremioEndpoint = viper.GetString(KeyDremioEndpoint)
+	c.dremioConfDir = GetString(confData, KeyDremioConfDir)
+	c.numberThreads = GetInt(confData, KeyNumberThreads)
+	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
 	if c.isDremioCloud {
 		if len(c.dremioCloudProjectID) != 36 {
 			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the following provided id may be incorrect: %v", c.dremioCloudProjectID)
@@ -249,32 +273,32 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 			simplelog.Warningf("unexpected dremio cloud endpoint: %v - Known endpoints are https://app.dremio.cloud and https://app.eu.dremio.cloud", c.dremioEndpoint)
 		}
 	}
-	c.dremioUsername = viper.GetString(KeyDremioUsername)
-	c.disableRESTAPI = viper.GetBool(KeyDisableRESTAPI)
+	c.dremioUsername = GetString(confData, KeyDremioUsername)
+	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
-	c.dremioPATToken = viper.GetString(KeyDremioPatToken)
-	c.dremioRocksDBDir = viper.GetString(KeyDremioRocksdbDir)
-	c.collectDremioConfiguration = viper.GetBool(KeyCollectDremioConfiguration)
-	c.numberJobProfilesToCollect = viper.GetInt(KeyNumberJobProfiles)
-	c.captureHeapDump = viper.GetBool(KeyCaptureHeapDump) && dremioPIDIsValid
+	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
+	c.dremioRocksDBDir = GetString(confData, KeyDremioRocksdbDir)
+	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
+	c.numberJobProfilesToCollect = GetInt(confData, KeyNumberJobProfiles)
+	c.captureHeapDump = GetBool(confData, KeyCaptureHeapDump) && dremioPIDIsValid
 
 	// system diag
-	c.collectOSConfig = viper.GetBool(KeyCollectOSConfig)
-	c.collectDiskUsage = viper.GetBool(KeyCollectDiskUsage)
-	c.collectJVMFlags = viper.GetBool(KeyCollectJVMFlags)
+	c.collectOSConfig = GetBool(confData, KeyCollectOSConfig)
+	c.collectDiskUsage = GetBool(confData, KeyCollectDiskUsage)
+	c.collectJVMFlags = GetBool(confData, KeyCollectJVMFlags)
 
 	// log collect
-	c.tarballOutDir = viper.GetString(KeyTarballOutDir)
-	c.outputDir = viper.GetString(KeyTmpOutputDir)
-	c.dremioLogsNumDays = viper.GetInt(KeyDremioLogsNumDays)
-	c.dremioQueriesJSONNumDays = viper.GetInt(KeyDremioQueriesJSONNumDays)
-	c.dremioGCFilePattern = viper.GetString(KeyDremioGCFilePattern)
-	c.collectQueriesJSON = viper.GetBool(KeyCollectQueriesJSON)
-	c.collectServerLogs = viper.GetBool(KeyCollectServerLogs)
-	c.collectMetaRefreshLogs = viper.GetBool(KeyCollectMetaRefreshLog)
-	c.collectReflectionLogs = viper.GetBool(KeyCollectReflectionLog)
-	c.collectGCLogs = viper.GetBool(KeyCollectGCLogs)
-	c.gcLogsDir = viper.GetString(KeyDremioGCLogsDir)
+	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
+	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
+	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
+	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
+	c.collectQueriesJSON = GetBool(confData, KeyCollectQueriesJSON)
+	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
+	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
+	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
+	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
+	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	parsedGCLogDir, err := autodetect.FindGCLogLocation()
 	if err != nil {
 		if c.gcLogsDir == "" {
@@ -291,28 +315,28 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	}
 
 	// jfr config
-	c.collectJFR = viper.GetBool(KeyCollectJFR) && dremioPIDIsValid
-	c.dremioJFRTimeSeconds = viper.GetInt(KeyDremioJFRTimeSeconds)
+	c.collectJFR = GetBool(confData, KeyCollectJFR) && dremioPIDIsValid
+	c.dremioJFRTimeSeconds = GetInt(confData, KeyDremioJFRTimeSeconds)
 	// jstack config
-	c.collectJStack = viper.GetBool(KeyCollectJStack) && dremioPIDIsValid
-	c.dremioJStackTimeSeconds = viper.GetInt(KeyDremioJStackTimeSeconds)
-	c.dremioJStackFreqSeconds = viper.GetInt(KeyDremioJStackFreqSeconds)
+	c.collectJStack = GetBool(confData, KeyCollectJStack) && dremioPIDIsValid
+	c.dremioJStackTimeSeconds = GetInt(confData, KeyDremioJStackTimeSeconds)
+	c.dremioJStackFreqSeconds = GetInt(confData, KeyDremioJStackFreqSeconds)
 
 	// ttop
-	c.collectTtop = viper.GetBool(KeyCollectTtop)
-	c.dremioTtopFreqSeconds = viper.GetInt(KeyDremioTtopFreqSeconds)
-	c.dremioTtopTimeSeconds = viper.GetInt(KeyDremioTtopTimeSeconds)
+	c.collectTtop = GetBool(confData, KeyCollectTtop)
+	c.dremioTtopFreqSeconds = GetInt(confData, KeyDremioTtopFreqSeconds)
+	c.dremioTtopTimeSeconds = GetInt(confData, KeyDremioTtopTimeSeconds)
 	// collect rest apis
 	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
 	if disableRESTAPI {
 		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 	}
-	c.allowInsecureSSL = viper.GetBool(KeyAllowInsecureSSL)
-	c.collectWLM = viper.GetBool(KeyCollectWLM) && !disableRESTAPI
-	c.collectSystemTablesExport = viper.GetBool(KeyCollectSystemTablesExport) && !disableRESTAPI
-	c.systemTablesRowLimit = viper.GetInt(KeySystemTablesRowLimit)
-	c.collectKVStoreReport = viper.GetBool(KeyCollectKVStoreReport) && !disableRESTAPI
-	c.restHTTPTimeout = viper.GetInt(KeyRestHTTPTimeout)
+	c.allowInsecureSSL = GetBool(confData, KeyAllowInsecureSSL)
+	c.collectWLM = GetBool(confData, KeyCollectWLM) && !disableRESTAPI
+	c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport) && !disableRESTAPI
+	c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
+	c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport) && !disableRESTAPI
+	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
 	restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 
 	numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)

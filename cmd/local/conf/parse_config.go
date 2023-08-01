@@ -18,48 +18,35 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
-func ParseConfig(configDir string, overrides map[string]string) error {
+func ParseConfig(configDir string, overrides map[string]string) (map[string]interface{}, error) {
 
-	//read viper config
-	baseConfig := "ddc"
-	viper.SetConfigName(baseConfig) // Name of config file (without extension)
-	viper.AddConfigPath(configDir)
-	viper.SetConfigType("yaml")
-	expectedLoc := filepath.Join(configDir, fmt.Sprintf("%v.%v", baseConfig, "yaml"))
-	err := viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		// Config file not found; ignore error if desired
-		entries, err := os.ReadDir(configDir)
-		if err != nil {
-			return fmt.Errorf("conf %v not found, and cannot read directory %v due to error %w", expectedLoc, configDir, err)
-		}
-		var names []string
-		for _, e := range entries {
-			names = append(names, e.Name())
-		}
-		return fmt.Errorf("conf %v not found, in that directory are the files: '%v'", expectedLoc, strings.Join(names, ", "))
-	} else if err == nil {
-		simplelog.Debugf("conf %v parsed successfully", expectedLoc)
-	} else {
-		// Config file was found but another error was produced
-		return fmt.Errorf("conf %v not readable: %w", expectedLoc, err)
+	data := make(map[string]interface{})
+	expectedLoc := filepath.Join(configDir, "ddc.yaml")
+	confFile, err := os.ReadFile(expectedLoc)
+	if err != nil {
+		return data, fmt.Errorf("conf %v not found, and cannot read directory %v due to error %w", expectedLoc, configDir, err)
 	}
 
-	viper.AutomaticEnv() // Automatically read environment variables
+	err = yaml.Unmarshal(confFile, &data)
+
+	if err != nil {
+		return data, fmt.Errorf("unable to parse yaml: %w", err)
+	}
+
+	simplelog.Debugf("conf %v parsed successfully", expectedLoc)
 
 	for k, v := range overrides {
 		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
 		if v == "\"\"" {
-			viper.Set(k, "")
+			data[k] = ""
 		} else {
-			viper.Set(k, v)
+			data[k] = v
 		}
 	}
-	return nil
+	return data, nil
 }

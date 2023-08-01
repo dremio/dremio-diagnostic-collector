@@ -51,7 +51,7 @@ dremio-conf-dir: /path/to/dremio/conf
 	}
 	outFile := filepath.Join(t.TempDir(), "diag.tgz")
 	if err := awselogs.Execute(efsDir, tmpDir, outFile); err != nil {
-		t.Fatal(errors.Unwrap(err))
+		t.Fatal(err)
 	}
 	tests.TgzContainsFile(t, filepath.Join(efsDir, "coordinator", "server.out"), outFile, "logs/coordinator/server.out")
 	tests.TgzContainsFile(t, filepath.Join(efsDir, "executor", "node1", "server.out"), outFile, "logs/node1/server.out")

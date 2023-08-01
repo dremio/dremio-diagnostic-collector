@@ -16,8 +16,6 @@ package conf
 
 import (
 	"testing"
-
-	"github.com/spf13/viper"
 )
 
 func TestCalculateDefaultJobProfileSettingsWithLessThan4Jobs(t *testing.T) {
@@ -110,7 +108,6 @@ func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfigAndNoPat(t *
 		dremioPATToken:             "",
 		numberJobProfilesToCollect: 25000,
 	}
-	viper.Reset()
 	//put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 0 {
@@ -135,7 +132,6 @@ func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfig(t *testing.
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 25000,
 	}
-	viper.Reset()
 	//put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 25000 {
@@ -157,14 +153,14 @@ func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfig(t *testing.
 
 func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverride(t *testing.T) {
 	c := &CollectConf{
-		dremioPATToken:             "abc",
-		numberJobProfilesToCollect: 25000,
+		dremioPATToken:              "abc",
+		numberJobProfilesToCollect:  25000,
+		jobProfilesNumSlowExec:      50,
+		jobProfilesNumRecentErrors:  150,
+		jobProfilesNumSlowPlanning:  250,
+		jobProfilesNumHighQueryCost: 350,
 	}
-	viper.Reset()
-	viper.Set(KeyJobProfilesNumSlowExec, 50)
-	viper.Set(KeyJobProfilesNumRecentErrors, 150)
-	viper.Set(KeyJobProfilesNumSlowPlanning, 250)
-	viper.Set(KeyJobProfilesNumHighQueryCost, 350)
+
 	//put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 800 {
@@ -186,14 +182,13 @@ func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverride(t *testing
 
 func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverrideAndNoPat(t *testing.T) {
 	c := &CollectConf{
-		dremioPATToken:             "",
-		numberJobProfilesToCollect: 25000,
+		dremioPATToken:              "",
+		numberJobProfilesToCollect:  25000,
+		jobProfilesNumSlowExec:      50,
+		jobProfilesNumRecentErrors:  150,
+		jobProfilesNumSlowPlanning:  250,
+		jobProfilesNumHighQueryCost: 350,
 	}
-	viper.Reset()
-	viper.Set(KeyJobProfilesNumSlowExec, 50)
-	viper.Set(KeyJobProfilesNumRecentErrors, 150)
-	viper.Set(KeyJobProfilesNumSlowPlanning, 250)
-	viper.Set(KeyJobProfilesNumHighQueryCost, 350)
 	//put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 0 {

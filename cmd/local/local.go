@@ -25,7 +25,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -327,7 +326,7 @@ var LocalCollectCmd = &cobra.Command{
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
 		overrides := make(map[string]string)
-		//if a cli flag was set go ahead and use those values to override the viper configuration
+		//if a cli flag was set go ahead and use those values to override the yaml configuration
 		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
 			if flag.Name == conf.KeyDremioPatToken {
 				if flag.Value.String() == "" {
@@ -348,16 +347,14 @@ var LocalCollectCmd = &cobra.Command{
 			}
 			overrides[flag.Name] = flag.Value.String()
 		})
-		if err := Execute(args, overrides, func() error {
-			return cobraCmd.Usage()
-		}); err != nil {
+		if err := Execute(args, overrides); err != nil {
 			simplelog.Error(errors.Unwrap(err).Error())
 			os.Exit(1)
 		}
 	},
 }
 
-func Execute(args []string, overrides map[string]string, usage func() error) error {
+func Execute(args []string, overrides map[string]string) error {
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 	simplelog.Infof("args: %v", strings.Join(args, " "))
 
@@ -368,24 +365,6 @@ func Execute(args []string, overrides map[string]string, usage func() error) err
 	if !c.AcceptCollectionConsent() {
 		fmt.Println(consent.OutputConsent(c))
 		return errors.New("no consent given")
-	}
-
-	//check if required flags are set
-	requiredFlags := []string{"dremio-endpoint", "dremio-username"}
-
-	failed := false
-	for _, flag := range requiredFlags {
-		if viper.GetString(flag) == "" {
-			simplelog.Errorf("required flag '--%s' not set", flag)
-			failed = true
-		}
-	}
-	if failed {
-		err := usage()
-		if err != nil {
-			return fmt.Errorf("unable to even print usage, this is critical report this bug %w", err)
-		}
-		return errors.New("missing flags")
 	}
 
 	// Run application

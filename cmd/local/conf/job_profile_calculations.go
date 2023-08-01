@@ -16,7 +16,6 @@ package conf
 
 import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/spf13/viper"
 )
 
 func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost int) {
@@ -53,7 +52,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 	}
 	defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost := calculateDefaultJobProfileNumbers(c)
 	// job profile specific numbers
-	jobProfilesNumHighQueryCost = viper.GetInt(KeyJobProfilesNumHighQueryCost)
+	jobProfilesNumHighQueryCost = c.JobProfilesNumHighQueryCost()
 	if jobProfilesNumHighQueryCost == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumHighQueryCost = defaultJobProfilesNumHighQueryCost
@@ -61,7 +60,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumHighQueryCost, jobProfilesNumHighQueryCost)
 	}
 
-	jobProfilesNumSlowExec = viper.GetInt(KeyJobProfilesNumSlowExec)
+	jobProfilesNumSlowExec = c.JobProfilesNumSlowExec()
 	if jobProfilesNumSlowExec == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumSlowExec = defaultJobProfilesNumSlowExec
@@ -69,7 +68,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowExec, jobProfilesNumSlowExec)
 	}
 
-	jobProfilesNumRecentErrors = viper.GetInt(KeyJobProfilesNumRecentErrors)
+	jobProfilesNumRecentErrors = c.JobProfilesNumRecentErrors()
 	if jobProfilesNumRecentErrors == 0 {
 		//nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumRecentErrors = defaultJobProfilesNumRecentErrors
@@ -77,7 +76,8 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumRecentErrors, jobProfilesNumRecentErrors)
 	}
 
-	jobProfilesNumSlowPlanning = viper.GetInt(KeyJobProfilesNumSlowPlanning)
+	c.JobProfilesNumSlowPlanning()
+	jobProfilesNumSlowPlanning = c.JobProfilesNumSlowPlanning()
 	if jobProfilesNumSlowPlanning == 0 {
 		jobProfilesNumSlowPlanning = defaultJobProfilesNumSlowPlanning
 	} else if jobProfilesNumSlowPlanning != defaultJobProfilesNumSlowPlanning {

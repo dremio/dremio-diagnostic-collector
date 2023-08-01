@@ -110,6 +110,71 @@ var afterEachConfTest = func() {
 	}
 }
 
+func TestConfReadingWithEUDremioCloud(t *testing.T) {
+	genericConfSetup(`
+is-dremio-cloud: true
+dremio-cloud-project-id: "224653935291683895642623390599291234"
+dremio-endpoint: eu.dremio.cloud
+`)
+	//should parse the configuration correctly
+	cfg, err = conf.ReadConf(overrides, tmpDir)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Error("invalid conf")
+	}
+
+	if cfg.IsDremioCloud() != true {
+		t.Error("expected is-dremio-cloud to be true")
+	}
+	expected := "224653935291683895642623390599291234"
+	if cfg.DremioCloudProjectID() != expected {
+		t.Errorf("expected dreimo-cloud-project-id to be %v but was %v", expected, cfg.DremioCloudProjectID())
+	}
+
+	if cfg.DremioEndpoint() != "https://api.eu.dremio.cloud" {
+		t.Errorf("expected dremio-endpoint to be https://api.eu.dremio.cloud but was %v", cfg.DremioEndpoint())
+	}
+
+	if cfg.DremioCloudAppEndpoint() != "https://app.eu.dremio.cloud" {
+		t.Errorf("expected dremio-cloud-app-endpoint to be https://app.eu.dremio.cloud but was %v", cfg.DremioCloudAppEndpoint())
+	}
+	afterEachConfTest()
+}
+func TestConfReadingWithDremioCloud(t *testing.T) {
+	genericConfSetup(`
+is-dremio-cloud: true
+dremio-cloud-project-id: "224653935291683895642623390599291234"
+dremio-endpoint: dremio.cloud
+`)
+	//should parse the configuration correctly
+	cfg, err = conf.ReadConf(overrides, tmpDir)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Error("invalid conf")
+	}
+
+	if cfg.IsDremioCloud() != true {
+		t.Error("expected is-dremio-cloud to be true")
+	}
+
+	expected := "224653935291683895642623390599291234"
+	if cfg.DremioCloudProjectID() != expected {
+		t.Errorf("expected dreimo-cloud-project-id to be %v but was %v", expected, cfg.DremioCloudProjectID())
+	}
+
+	if cfg.DremioEndpoint() != "https://api.dremio.cloud" {
+		t.Errorf("expected dremio-endpoint to be https://api.dremio.cloud but was %v", cfg.DremioEndpoint())
+	}
+
+	if cfg.DremioCloudAppEndpoint() != "https://app.dremio.cloud" {
+		t.Errorf("expected dremio-cloud-app-endpoint to be https://app.dremio.cloud but was %v", cfg.DremioCloudAppEndpoint())
+	}
+	afterEachConfTest()
+}
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	genericConfSetup("")
 	//should parse the configuration correctly

@@ -20,23 +20,21 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/spf13/viper"
 )
 
-func setupTestSetViperDefaults() (string, int, string) {
+func setupTestSetViperDefaults() (map[string]interface{}, string, int, string) {
 	hostName := "test-host"
 	defaultCaptureSeconds := 30
 	outputDir := "/tmp"
-
-	viper.Reset()
+	confData := make(map[string]interface{})
 	// Run the function.
-	conf.SetViperDefaults(hostName, defaultCaptureSeconds, outputDir)
+	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds, outputDir)
 
-	return hostName, defaultCaptureSeconds, outputDir
+	return confData, hostName, defaultCaptureSeconds, outputDir
 }
 
 func TestSetViperDefaults(t *testing.T) {
-	hostName, defaultCaptureSeconds, outputDir := setupTestSetViperDefaults()
+	confData, hostName, defaultCaptureSeconds, outputDir := setupTestSetViperDefaults()
 
 	checks := []struct {
 		key      string
@@ -89,8 +87,9 @@ func TestSetViperDefaults(t *testing.T) {
 	}
 
 	for _, check := range checks {
-		if viper.Get(check.key) != check.expected {
-			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, viper.Get(check.key), check.expected)
+		actual := confData[check.key]
+		if actual != check.expected {
+			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, actual, check.expected)
 		}
 	}
 }

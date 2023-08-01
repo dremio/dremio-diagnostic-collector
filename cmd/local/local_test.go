@@ -75,7 +75,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 			t.Logf("error cleaning up dir %v due to error %v", c.NodeInfoOutDir(), err)
 		}
 	}()
-	}
+}
 
 func TestCreateAllDirs(t *testing.T) {
 	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
