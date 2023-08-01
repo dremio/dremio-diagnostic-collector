@@ -94,7 +94,6 @@ dremio-username: %v
 dremio-pat-token: '%v'
 collect-dremio-configuration: true
 number-job-profiles: 25
-node-metrics-collect-duration-seconds: 10
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
 `, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername, sshConf.DremioPAT)
@@ -172,13 +171,11 @@ dremio-jfr-time-seconds: 10
 	// check nodeinfo files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "diskusage.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "jvm_settings.txt"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "metrics.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "rocksdb_disk_allocation.txt"))
 
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "diskusage.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "jvm_settings.txt"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "metrics.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 
 	//kvstore report

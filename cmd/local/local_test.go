@@ -16,8 +16,6 @@
 package cmd
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -28,7 +26,6 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 )
 
 func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) string {
@@ -78,42 +75,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 			t.Logf("error cleaning up dir %v due to error %v", c.NodeInfoOutDir(), err)
 		}
 	}()
-	if err := runCollectNodeMetrics(c); err != nil {
-		t.Errorf("expected no errors but had %v", err)
 	}
-	metricsFile := filepath.Join(c.NodeInfoOutDir(), "metrics.json")
-	fs, err := os.Stat(metricsFile)
-	if err != nil {
-		t.Errorf("expected to find file but got error %v", err)
-	}
-	if fs.Size() == 0 {
-		t.Errorf("should not have an empty file")
-	}
-	f, err := os.Open(metricsFile)
-	if err != nil {
-		t.Errorf("while opening file %v we had error %v", metricsFile, err)
-	}
-	scanner := bufio.NewScanner(f)
-	var rows []nodeinfocollect.SystemMetricsRow
-	for scanner.Scan() {
-		var row nodeinfocollect.SystemMetricsRow
-		text := scanner.Text()
-		if err := json.Unmarshal([]byte(text), &row); err != nil {
-			t.Errorf("unable to convert text %v to json due to error %v", text, err)
-		}
-		rows = append(rows, row)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if len(rows) > 12 {
-		t.Errorf("%v rows created by metrics file, this is too many and the default should be around 10", len(rows))
-	}
-	if len(rows) < 8 {
-		t.Errorf("%v rows created by metrics file, this is too few and the default should be around 10", len(rows))
-	}
-	t.Logf("%v rows of metrics captured", len(rows))
-}
 
 func TestCreateAllDirs(t *testing.T) {
 	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")

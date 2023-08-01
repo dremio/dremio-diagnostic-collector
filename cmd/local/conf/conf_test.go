@@ -164,10 +164,6 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("Expected CollectMetaRefreshLogs to be true, got false")
 	}
 
-	if cfg.CollectNodeMetrics() != true {
-		t.Errorf("Expected CollectNodeMetrics to be true, got false")
-	}
-
 	if cfg.CollectQueriesJSON() != true {
 		t.Errorf("Expected CollectQueriesJSON to be true, got false")
 	}

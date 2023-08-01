@@ -53,11 +53,6 @@ func OutputConsent(conf *conf.CollectConf) string {
 
 `)
 
-	if conf.CollectNodeMetrics() {
-		simplelog.Info("collecting node metrics")
-		builder.WriteString("\t* cpu, io and memory metrics\n")
-	}
-
 	if conf.CollectJVMFlags() {
 		simplelog.Info("collecting JVM flags for the dremio process")
 	}

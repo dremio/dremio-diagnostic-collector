@@ -117,7 +117,6 @@ number-job-profiles: 25
 capture-heap-dump: false
 accept-collection-consent: true
 tmp-output-dir: %v
-node-metrics-collect-duration-seconds: 10
 `, dremioEndpoint, patToken, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
 	if _, err := w.WriteString(yamlText); err != nil {
 		log.Fatal(err)
@@ -412,7 +411,6 @@ dremio-pat-token: %v
 collect-dremio-configuration: true
 number-job-profiles: 25
 tmp-output-dir: %v
-node-metrics-collect-duration-seconds: 10
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
 `, dremioPATToken, tmpOutputDir)), 0600); err != nil {
@@ -557,13 +555,11 @@ dremio-jfr-time-seconds: 10
 	// check nodeinfo files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "diskusage.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "jvm_settings.txt"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "metrics.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "rocksdb_disk_allocation.txt"))
 
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "diskusage.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "jvm_settings.txt"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "metrics.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
 	//kvstore report

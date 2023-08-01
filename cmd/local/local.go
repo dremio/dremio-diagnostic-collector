@@ -195,12 +195,7 @@ func collect(c *conf.CollectConf) error {
 		} else {
 			t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
 		}
-		// os diagnostic collection
-		if !c.CollectNodeMetrics() {
-			simplelog.Debugf("Skipping node metrics collection")
-		} else {
-			t.AddJob(wrapConfigJob(runCollectNodeMetrics))
-		}
+
 		if !c.CollectTtop() {
 			simplelog.Debugf("Skipping ttop collection")
 		} else {
@@ -324,17 +319,6 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 
 	simplelog.Debugf("... Collecting OS Information from %v COMPLETED", c.NodeName())
 	return nil
-}
-
-func runCollectNodeMetrics(c *conf.CollectConf) error {
-	simplelog.Debugf("Collecting Node Metrics for %v seconds ....", c.NodeMetricsCollectDurationSeconds())
-	nodeMetricsJSONFile := filepath.Join(c.NodeInfoOutDir(), "metrics.json")
-	args := nodeinfocollect.Args{
-		IntervalSeconds: 1,
-		DurationSeconds: c.NodeMetricsCollectDurationSeconds(),
-		OutFile:         nodeMetricsJSONFile,
-	}
-	return nodeinfocollect.SystemMetrics(args)
 }
 
 var LocalCollectCmd = &cobra.Command{

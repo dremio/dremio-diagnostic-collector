@@ -67,9 +67,7 @@ type CollectConf struct {
 	jobProfilesNumHighQueryCost       int
 	jobProfilesNumSlowPlanning        int
 	jobProfilesNumRecentErrors        int
-	nodeMetricsCollectDurationSeconds int
 	allowInsecureSSL                  bool
-	collectNodeMetrics                bool
 	collectJFR                        bool
 	collectJStack                     bool
 	collectKVStoreReport              bool
@@ -261,8 +259,6 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	c.captureHeapDump = viper.GetBool(KeyCaptureHeapDump) && dremioPIDIsValid
 
 	// system diag
-	c.collectNodeMetrics = viper.GetBool(KeyCollectMetrics)
-	c.nodeMetricsCollectDurationSeconds = viper.GetInt(KeyNodeMetricsCollectDurationSeconds)
 	c.collectOSConfig = viper.GetBool(KeyCollectOSConfig)
 	c.collectDiskUsage = viper.GetBool(KeyCollectDiskUsage)
 	c.collectJVMFlags = viper.GetBool(KeyCollectJVMFlags)
@@ -340,10 +336,6 @@ func (c CollectConf) DisableRESTAPI() bool {
 
 func (c *CollectConf) GcLogsDir() string {
 	return c.gcLogsDir
-}
-
-func (c *CollectConf) CollectNodeMetrics() bool {
-	return c.collectNodeMetrics
 }
 
 func (c *CollectConf) CollectJFR() bool {
@@ -576,10 +568,6 @@ func (c *CollectConf) DremioQueriesJSONNumDays() int {
 
 func (c *CollectConf) DremioLogsNumDays() int {
 	return c.dremioLogsNumDays
-}
-
-func (c *CollectConf) NodeMetricsCollectDurationSeconds() int {
-	return c.nodeMetricsCollectDurationSeconds
 }
 
 func (c *CollectConf) RestHTTPTimeout() int {
