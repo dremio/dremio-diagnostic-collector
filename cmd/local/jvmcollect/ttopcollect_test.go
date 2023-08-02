@@ -209,8 +209,8 @@ func TestTtopExec(t *testing.T) {
 func TestTtopExecHasNoPidToFind(t *testing.T) {
 	ttop := &jvmcollect.Ttop{}
 	ttopArgs := jvmcollect.TtopArgs{
-		PID:      1,
-		Interval: 89899999999,
+		PID:      89899999999,
+		Interval: 1,
 	}
 	if err := ttop.StartTtop(ttopArgs); err != nil {
 		t.Error("expected an error on ttop but none happened")
