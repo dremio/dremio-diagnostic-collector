@@ -15,13 +15,16 @@
 package jvmcollect_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
 
@@ -35,13 +38,13 @@ type MockTtopService struct {
 	pid        int
 }
 
-func (m *MockTtopService) StartTtop(pid, interval int) error {
+func (m *MockTtopService) StartTtop(args jvmcollect.TtopArgs) error {
 	if m.writeError != nil {
 		return m.writeError
 	}
-	m.interval = interval
+	m.interval = args.Interval
 	m.started = true
-	m.pid = pid
+	m.pid = args.PID
 	return nil
 }
 
@@ -72,7 +75,11 @@ func TestTtopCollects(t *testing.T) {
 		text: "ttop file text",
 	}
 	pid := 1900
-	if err := jvmcollect.OnLoop(pid, interval, duration, outDir, ttopService, timeTicker); err != nil {
+	ttopArgs := jvmcollect.TtopArgs{
+		PID:      pid,
+		Interval: interval,
+	}
+	if err := jvmcollect.OnLoop(ttopArgs, duration, outDir, ttopService, timeTicker); err != nil {
 		t.Fatalf("unable to collect %v", err)
 	}
 
@@ -105,7 +112,63 @@ func TestTtopCollects(t *testing.T) {
 	if string(b) != ttopService.text {
 		t.Errorf("expected %q but was %q", ttopService.text, string(b))
 	}
+}
 
+func TestTtopCollectsIntegrationTest(t *testing.T) {
+	jarLoc := filepath.Join("testdata", "demo.jar")
+	cmd := exec.Command("java", "-jar", jarLoc)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("cmd.Start() failed with %s\n", err)
+	}
+	defer func() {
+		//in windows we may need a bit more time to kill the process
+		if runtime.GOOS == "windows" {
+			time.Sleep(500 * time.Millisecond)
+		}
+		if err := cmd.Process.Kill(); err != nil {
+			t.Fatalf("failed to kill process: %s", err)
+		} else {
+			t.Log("Process killed successfully.")
+		}
+	}()
+	pid := cmd.Process.Pid
+
+	tmpDir := t.TempDir()
+	ddcYaml := filepath.Join(tmpDir, "ddc.yaml")
+
+	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
+dremio-pid: %v
+dremio-ttop-freq-seconds: 1
+dremio-ttop-time-seconds: 2
+node-name: node1
+tmp-output-dir: %v
+
+`, pid, tmpDir)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ttopOutDir := filepath.Join(tmpDir, "ttop", "node1")
+	if err := os.MkdirAll(ttopOutDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	overrides := make(map[string]string)
+	c, err := conf.ReadConf(overrides, tmpDir)
+	if err != nil {
+		t.Fatalf("Unable to read conf: %v", err)
+	}
+	if err := jvmcollect.RunTtopCollect(c); err != nil {
+		t.Fatalf("unable to collect %v", err)
+	}
+
+	ttopFile := filepath.Join(ttopOutDir, "ttop.txt")
+	b, err := os.ReadFile(ttopFile)
+	if err != nil {
+		t.Error(err)
+	}
+	txt := string(b)
+	expected := "Monitoring threads ..."
+	if !strings.Contains(txt, expected) {
+		t.Errorf("expected text '%v' to be found in '%v'", expected, txt)
+	}
 }
 
 func TestTtopExec(t *testing.T) {
@@ -128,7 +191,11 @@ func TestTtopExec(t *testing.T) {
 		}
 	}()
 
-	if err := ttop.StartTtop(1, cmd.Process.Pid); err != nil {
+	ttopArgs := jvmcollect.TtopArgs{
+		PID:      cmd.Process.Pid,
+		Interval: 1,
+	}
+	if err := ttop.StartTtop(ttopArgs); err != nil {
 		t.Error(err.Error())
 	}
 	time.Sleep(time.Duration(500) * time.Millisecond)
@@ -141,7 +208,11 @@ func TestTtopExec(t *testing.T) {
 
 func TestTtopExecHasNoPidToFind(t *testing.T) {
 	ttop := &jvmcollect.Ttop{}
-	if err := ttop.StartTtop(1, 89899999999); err != nil {
+	ttopArgs := jvmcollect.TtopArgs{
+		PID:      1,
+		Interval: 89899999999,
+	}
+	if err := ttop.StartTtop(ttopArgs); err != nil {
 		t.Error("expected an error on ttop but none happened")
 	}
 	time.Sleep(time.Duration(500) * time.Millisecond)
@@ -170,7 +241,11 @@ func TestTtopHasAndInvalidInterval(t *testing.T) {
 	}()
 
 	ttop := &jvmcollect.Ttop{}
-	if err := ttop.StartTtop(0, cmd.Process.Pid); err == nil {
+	ttopArgs := jvmcollect.TtopArgs{
+		PID:      cmd.Process.Pid,
+		Interval: 0,
+	}
+	if err := ttop.StartTtop(ttopArgs); err == nil {
 		t.Error("expected ttop start to fail with interval 0")
 	}
 }

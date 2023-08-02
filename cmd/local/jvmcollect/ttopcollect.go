@@ -31,7 +31,7 @@ import (
 )
 
 type TtopService interface {
-	StartTtop(int, int) error
+	StartTtop(TtopArgs) error
 	KillTtop() (string, error)
 }
 
@@ -47,7 +47,14 @@ type Ttop struct {
 	tmpMu  sync.Mutex //mutext for tmpDir
 }
 
-func (t *Ttop) StartTtop(interval, pid int) error {
+type TtopArgs struct {
+	Interval int
+	PID      int
+}
+
+func (t *Ttop) StartTtop(args TtopArgs) error {
+	interval := args.Interval
+	pid := args.PID
 	if interval == 0 {
 		return errors.New("invalid interval of 0 seconds")
 	}
@@ -137,14 +144,19 @@ func (d *DateTimeTicker) WaitSeconds(interval int) {
 
 func RunTtopCollect(c *conf.CollectConf) error {
 	simplelog.Debug("Starting ttop collection")
-	return OnLoop(c.DremioPID(), c.DremioTtopFreqSeconds(), c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
+	ttopArgs := TtopArgs{
+		Interval: c.DremioTtopFreqSeconds(),
+		PID:      c.DremioPID(),
+	}
+	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
 }
 
-func OnLoop(pid, interval, duration int, outDir string, ttopService TtopService, timeTicker TimeTicker) error {
-	err := ttopService.StartTtop(pid, interval)
+func OnLoop(ttopArgs TtopArgs, duration int, outDir string, ttopService TtopService, timeTicker TimeTicker) error {
+	err := ttopService.StartTtop(ttopArgs)
 	if err != nil {
 		return fmt.Errorf("unable to start ttop: %w", err)
 	}
+	interval := ttopArgs.Interval
 	times := duration / interval
 	for i := 0; i < times; i++ {
 		timeTicker.WaitSeconds(interval)
