@@ -231,7 +231,7 @@ dremio-jfr-time-seconds: 10
 	if sshConf.IsEnterprise {
 		expectedEntriesCount = len(systemTables)
 	} else {
-		//we substract 3 of the jobs that fail due to missing features in oss
+		//we subtract 3 of the jobs that fail due to missing features in oss
 		// - sys.privileges
 		// - sys.membership
 		// - sys.roles

@@ -230,7 +230,7 @@ func TestMain(m *testing.M) {
 		// Start the port forwarding.
 		cmd := exec.Command("kubectl", "port-forward", "dremio-master-0", fmt.Sprintf("%v:9047", dremioTestPort), "-n", namespace)
 		if err := cmd.Start(); err != nil {
-			simplelog.Errorf("Failed to start port-foward command due to error: %v", err)
+			simplelog.Errorf("Failed to start port-forward command due to error: %v", err)
 			return 1
 		}
 		simplelog.Infof("port-forward to port %v successful", dremioTestPort)
@@ -242,7 +242,7 @@ func TestMain(m *testing.M) {
 			}
 		}()
 
-		//give port foward time to work
+		//give port forward time to work
 		time.Sleep(5 * time.Second)
 
 		dremioEndpoint := fmt.Sprintf("http://localhost:%v", dremioTestPort)

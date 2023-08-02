@@ -110,7 +110,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		//if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, "--disable-rest-api")
 	} else if dremioPAT != "" {
-		//if ther dremio PAT is set go ahead and pass it
+		//if the dremio PAT is set go ahead and pass it in
 		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
 	}
 	if err := ComposeExecuteAndStream(conf, func(line string) {
