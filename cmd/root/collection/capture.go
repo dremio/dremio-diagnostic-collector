@@ -33,6 +33,18 @@ func (fe FindErr) Error() string {
 	return fmt.Sprintf("find failed due to error %v:", fe.Cmd)
 }
 
+// Some installations will have SSH banners, this means any response from a SSH command
+// is after the banner. Therefore we take the last line
+func stripBanner(response string) string {
+	simplelog.Debugf("SSH response: %v", response)
+	if strings.Contains(response, "\n") {
+		mlresp := strings.Split(response, "\n")
+		return (mlresp[len(mlresp)-1]) // returns the last slice
+	} else {
+		return response
+	}
+}
+
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
 // are first logged and then returned at the end with the reason for the failure.
 func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputLoc string, skipRESTCollect bool) (files []helpers.CollectedFile, failedFiles []FailedFiles, skippedFiles []string) {
@@ -127,7 +139,8 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	}
 
 	//copy tar.gz back
-	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
+	rawHostname := stripBanner(hostname)
+	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(rawHostname))
 	//IMPORTANT we must use path.join and not filepath.join or everything will break
 	tarGZ := path.Join(ddcTmpDir, tgzFileName)
 	outDir := path.Dir(outputLoc)
