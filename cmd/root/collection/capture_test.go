@@ -15,7 +15,11 @@
 // collection package provides the interface for collection implementation and the actual collection execution
 package collection
 
-import "github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+import (
+	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+)
 
 type MockCollector struct {
 	Returns     [][]interface{}
@@ -126,6 +130,21 @@ func (m *MockCollector) HostExecuteAndStream(hostString string, _ cli.OutputHand
 
 func (m *MockCollector) HelpText() string {
 	return "help me"
+}
+
+func TestStripBanner(t *testing.T) {
+	banner := `*********************
+**                 **
+** Test SSH Banner **
+**                 **
+*********************
+coordinator-100.dremio.com`
+
+	expected := "coordinator-100.dremio.com"
+	returned := stripBanner(banner)
+	if expected != returned {
+		t.Errorf("expected %v but was %v", expected, returned)
+	}
 }
 
 // func TestFindFiles(t *testing.T) {

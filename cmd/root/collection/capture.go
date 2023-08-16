@@ -40,9 +40,10 @@ func stripBanner(response string) string {
 	if strings.Contains(response, "\n") {
 		mlresp := strings.Split(response, "\n")
 		return (mlresp[len(mlresp)-1]) // returns the last slice
-	} else {
-		return response
 	}
+	// If not multiline then just return the single line as received
+	return response
+
 }
 
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
