@@ -26,7 +26,7 @@ import (
 func TestSSHExec(t *testing.T) {
 	hostName := "pod"
 	cli := &tests.MockCli{
-		StoredResponse: []string{"Warning key not already added\nsuccess"},
+		StoredResponse: []string{"success"},
 		StoredErrors:   []error{nil},
 	}
 	sshUser := "root"
@@ -47,7 +47,7 @@ func TestSSHExec(t *testing.T) {
 	if len(calls) != 1 {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
-	expectedCall := []string{"ssh", "-i", "id_rsa", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v", sshUser, hostName), "ls -l"}
+	expectedCall := []string{"ssh", "-i", "id_rsa", "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v", sshUser, hostName), "ls -l"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("expected %v call but got %v", expectedCall, calls[0])
 	}
@@ -79,7 +79,7 @@ func TestSCP(t *testing.T) {
 	if len(calls) != 1 {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
-	expectedCall := []string{"scp", "-i", "id_rsa", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", sshUser, hostName, source), destination}
+	expectedCall := []string{"scp", "-i", "id_rsa", "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", sshUser, hostName, source), destination}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("expected %v call but got %v", expectedCall, calls[0])
 	}

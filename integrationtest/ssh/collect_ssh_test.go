@@ -278,7 +278,7 @@ dremio-jfr-time-seconds: 10
 func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) {
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
-	c := exec.Command("ssh", "-i", sshKey, fmt.Sprintf("%v@%v", sshConf.User, ip), "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "hostname")
+	c := exec.Command("ssh", "-i", sshKey, fmt.Sprintf("%v@%v", sshConf.User, ip), "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "hostname")
 	c.Stdout = &stdOut
 	c.Stderr = &stdErr
 	if err := c.Start(); err != nil {

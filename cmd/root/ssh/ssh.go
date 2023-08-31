@@ -50,14 +50,14 @@ type CmdSSHActions struct {
 }
 
 func (c *CmdSSHActions) HostExecuteAndStream(hostString string, output cli.OutputHandler, _ bool, args ...string) (err error) {
-	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostString))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
 	return c.cli.ExecuteAndStreamOutput(output, sshArgs...)
 }
 
 func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
+	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
 }
 
 func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
@@ -83,11 +83,11 @@ func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, sour
 		return out, err
 	}
 	// next copy from tmp dir as non-sudo
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpFilePath, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpFilePath, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
 func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination string) (string, error) {
-	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+	return c.cli.Execute("scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
 func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
@@ -108,7 +108,7 @@ func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source
 	tmpFilePath := path.Join(tmpDir, sourceFileName)
 	// first copy to tmp dir as non-sudo
 
-	out, err = c.cli.Execute("scp", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
+	out, err = c.cli.Execute("scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
 	if err != nil {
 		return out, err
 	}
@@ -124,19 +124,20 @@ func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source
 }
 
 func (c *CmdSSHActions) HostExecute(hostName string, _ bool, args ...string) (string, error) {
-	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
 	out, err := c.cli.Execute(sshArgs...)
 	if err != nil {
 		return out, err
 	}
-	return CleanOut(out), nil
+	//return CleanOut(out), nil
+	return out, nil
 }
 
 func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args ...string) (string, error) {
 	sudoArgs := []string{"sudo", "-u", sudoUser}
-	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
 	sshArgs = append(sshArgs, strings.Join(sudoArgs, " "))
 	sshArgs = append(sshArgs, strings.Join(args, " "))
@@ -144,7 +145,9 @@ func (c *CmdSSHActions) HostExecuteSudo(hostName string, sudoUser string, args .
 	if err != nil {
 		return out, err
 	}
-	return CleanOut(out), nil
+	//return CleanOut(out), nil
+	return out, nil
+
 }
 
 func CleanOut(out string) string {
