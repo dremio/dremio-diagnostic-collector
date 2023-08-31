@@ -291,11 +291,11 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write /etc/issue for os_info.txt due to error %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> hostname\n"))
+	_, err = w.Write([]byte("___\n>>> cat /proc/sys/kernel/hostname\n"))
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "hostname")
+	err = ddcio.Shell(w, "cat /proc/sys/kernel/hostname")
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}

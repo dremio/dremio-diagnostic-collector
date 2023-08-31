@@ -133,7 +133,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	} else {
 		simplelog.Debugf("on host %v capture successful", host)
 	}
-	hostname, err := ComposeExecute(conf, []string{"hostname"})
+	hostname, err := ComposeExecute(conf, []string{"cat", "/proc/sys/kernel/hostname"})
 	if err != nil {
 		simplelog.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", host, err)
 		return files, failedFiles, skippedFiles
