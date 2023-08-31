@@ -33,35 +33,6 @@ func (fe FindErr) Error() string {
 	return fmt.Sprintf("find failed due to error %v:", fe.Cmd)
 }
 
-// Looks for env var HOSTNAME (which should be present) or runs the command 'hostname'
-func getHostName(host string, conf HostCaptureConfiguration) (string, error) {
-	var hostname string
-	// Check the env output first
-	env, err := ComposeExecute(conf, []string{"env"})
-	if err != nil {
-		simplelog.Errorf("on host %v error when getting env output: %v", host, err)
-		// dont return on err here since there is a fallback option
-	}
-	// debug log all env output
-	simplelog.Debugf("env output: %v", env)
-	evs := strings.Split(env, "\n")
-	for _, ev := range evs {
-		// If the env var HOSTNAME is found trim out the value and use that
-		if strings.Contains(ev, "HOSTNAME=") {
-			simplelog.Debugf("found hostname in env output: %v", ev)
-			hostname = strings.TrimPrefix(ev, "HOSTNAME=")
-			return hostname, nil
-		}
-	}
-	// Fallback to 'hostname' command
-	hostname, err = ComposeExecute(conf, []string{"hostname"})
-	if err != nil {
-		simplelog.Errorf("on host %v error running \"hostname\": %v", host, err)
-		return "", err // return on err here since this is the last option
-	}
-	return hostname, err
-}
-
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
 // are first logged and then returned at the end with the reason for the failure.
 func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputLoc string, skipRESTCollect bool) (files []helpers.CollectedFile, failedFiles []FailedFiles, skippedFiles []string) {
@@ -149,8 +120,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	} else {
 		simplelog.Debugf("on host %v capture successful", host)
 	}
-	//hostname, err := ComposeExecute(conf, []string{"hostname"})
-	hostname, err := getHostName(host, conf)
+	hostname, err := ComposeExecute(conf, []string{"cat", "/proc/sys/kernel/hostname"})
 	if err != nil {
 		simplelog.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", host, err)
 		return files, failedFiles, skippedFiles
