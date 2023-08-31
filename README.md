@@ -120,6 +120,10 @@ and run
 ```sh
 ./ddc local-collect
 ```
+### Windows Users
+
+If you are running ddc from windows, always run in a shell from the `C:` drive prompt. 
+This is because of a limitation of kubectl ( see https://github.com/kubernetes/kubernetes/issues/77310 )
 
 ## What is collected?
 
