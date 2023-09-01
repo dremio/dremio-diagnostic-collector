@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.1]
+
+### Fixed
+
+* SSH banner was breaking file naming for scp transfers from nodes
+
+### Changed
+
+* hostname detection changed to use file under /proc instead of command
+
 ## [0.7.0]
 
 ### Fixed 
