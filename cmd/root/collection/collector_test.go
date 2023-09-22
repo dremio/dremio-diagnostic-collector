@@ -197,9 +197,7 @@ func (m *MockCapCollector) HostExecute(_ bool, hostString string, _ bool, args .
 }
 
 func (m *MockCapCollector) GzipAllFiles(hostString string, _ bool, args ...string) (response string, err error) {
-
 	fullCmd := strings.Join(args, " ")
-
 	response = "Mock execute for " + hostString + " command: " + fullCmd
 	return response, err
 }
