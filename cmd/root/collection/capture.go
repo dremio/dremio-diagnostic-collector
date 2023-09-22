@@ -37,7 +37,6 @@ func (fe FindErr) Error() string {
 // are first logged and then returned at the end with the reason for the failure.
 func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputLoc string, skipRESTCollect bool) (files []helpers.CollectedFile, failedFiles []FailedFiles, skippedFiles []string) {
 	host := conf.Host
-
 	ddcTmpDir := conf.TransferDir
 	// we cannot use filepath.join here as it will break everything during the transfer
 	pathToDDC := path.Join(ddcTmpDir, "ddc")
@@ -104,7 +103,9 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
 		}
 	}()
+
 	//execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
+	var mask bool // to mask PAT token in logs
 	localCollectArgs := []string{pathToDDC, "local-collect", "--tarball-out-dir", conf.TransferDir}
 	if skipRESTCollect {
 		//if skipRESTCollect is set blank the pat
@@ -112,22 +113,16 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	} else if dremioPAT != "" {
 		//if the dremio PAT is set, mask its logging then go ahead and pass it in
 		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
-		if err := ComposeExecuteAndStream(true, conf, func(line string) {
-			//simplelog.HostLog(host, line)
-		}, localCollectArgs); err != nil {
-			simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
-		} else {
-			simplelog.Debugf("on host %v capture successful", host)
-		}
+		mask = true
 	} else {
-		//if the dremio PAT isnt set just log the line normally then execute
-		if err := ComposeExecuteAndStream(false, conf, func(line string) {
-			simplelog.HostLog(host, line)
-		}, localCollectArgs); err != nil {
-			simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
-		} else {
-			simplelog.Debugf("on host %v capture successful", host)
-		}
+		mask = false
+	}
+	if err := ComposeExecuteAndStream(mask, conf, func(line string) {
+		//simplelog.HostLog(host, line)
+	}, localCollectArgs); err != nil {
+		simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
+	} else {
+		simplelog.Debugf("on host %v capture successful", host)
 	}
 
 	hostname, err := ComposeExecute(false, conf, []string{"cat", "/proc/sys/kernel/hostname"})
