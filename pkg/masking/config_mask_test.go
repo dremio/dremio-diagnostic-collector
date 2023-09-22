@@ -98,3 +98,13 @@ func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
 		t.Errorf("trustStorePassword was not masked")
 	}
 }
+
+func TestPATMask(t *testing.T) {
+	token := `AAABBBCCCDDD`
+	cmd := `ddc -k -c app=dremio-executor -e app=dremio-executor --dremio-pat-token ` + token
+	expected := `ddc -k -c app=dremio-executor -e app=dremio-executor "<REMOVED_PAT_TOKEN>"`
+	returned := masking.MaskPAT(cmd)
+	if strings.Compare(returned, expected) != 0 {
+		t.Errorf("\nexpected %v\nreturned %v\n", expected, returned)
+	}
+}
