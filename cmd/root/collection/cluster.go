@@ -120,7 +120,7 @@ func clusterExecuteBytes(namespace, resource string, _ Collector, k string) ([]b
 	cli := &cli.Cli{}
 	kubectlArgs := []string{k, "-n", namespace, "get", resource}
 	kubectlArgs = append(kubectlArgs, "-o", "json")
-	res, err := cli.ExecuteBytes(kubectlArgs...)
+	res, err := cli.ExecuteBytes(false, kubectlArgs...)
 	if err != nil {
 		return []byte(""), fmt.Errorf("when getting config %v error returned was %v", resource, err)
 	}
@@ -131,7 +131,7 @@ func clusterExecuteBytes(namespace, resource string, _ Collector, k string) ([]b
 // Returns response as a string (instead of bytes)
 func clusterExecutePod(args []string) (string, error) {
 	cli := &cli.Cli{}
-	res, err := cli.Execute(args...)
+	res, err := cli.Execute(false, args...)
 	if err != nil {
 		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", args, err)
 	}

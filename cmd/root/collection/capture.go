@@ -55,7 +55,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	//if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
 		//remotely make TransferDir
-		if out, err := ComposeExecute(conf, []string{"mkdir", "-p", ddcTmpDir}); err != nil {
+		if out, err := ComposeExecute(false, conf, []string{"mkdir", "-p", ddcTmpDir}); err != nil {
 			simplelog.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
 			return
 		}
@@ -71,19 +71,19 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		simplelog.Infof("successfully copied ddc to host %v at %v", host, pathToDDC)
 		defer func() {
 			// clear out when done
-			if out, err := ComposeExecute(conf, []string{"rm", pathToDDC}); err != nil {
+			if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC}); err != nil {
 				simplelog.Warningf("on host %v unable to remove ddc due to error '%v' with output '%v'", host, err, out)
 			}
 		}()
 		defer func() {
 			// clear out when done
-			if out, err := ComposeExecute(conf, []string{"rm", pathToDDC + ".log"}); err != nil {
+			if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC + ".log"}); err != nil {
 				simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
 			}
 		}()
 
 		//make  exec TransferDir
-		if out, err := ComposeExecute(conf, []string{"chmod", "+x", pathToDDC}); err != nil {
+		if out, err := ComposeExecute(false, conf, []string{"chmod", "+x", pathToDDC}); err != nil {
 			simplelog.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 			return
 		}
@@ -100,7 +100,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	simplelog.Infof("successfully copied ddc.yaml to host %v at %v", host, pathToDDCYAML)
 	defer func() {
 		// clear out when done
-		if out, err := ComposeExecute(conf, []string{"rm", pathToDDCYAML}); err != nil {
+		if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDCYAML}); err != nil {
 			simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
 		}
 	}()
@@ -110,17 +110,27 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		//if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, "--disable-rest-api")
 	} else if dremioPAT != "" {
-		//if the dremio PAT is set go ahead and pass it in
+		//if the dremio PAT is set, mask its logging then go ahead and pass it in
 		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
-	}
-	if err := ComposeExecuteAndStream(conf, func(line string) {
-		simplelog.HostLog(host, line)
-	}, localCollectArgs); err != nil {
-		simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
+		if err := ComposeExecuteAndStream(true, conf, func(line string) {
+			//simplelog.HostLog(host, line)
+		}, localCollectArgs); err != nil {
+			simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
+		} else {
+			simplelog.Debugf("on host %v capture successful", host)
+		}
 	} else {
-		simplelog.Debugf("on host %v capture successful", host)
+		//if the dremio PAT isnt set just log the line normally then execute
+		if err := ComposeExecuteAndStream(false, conf, func(line string) {
+			simplelog.HostLog(host, line)
+		}, localCollectArgs); err != nil {
+			simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
+		} else {
+			simplelog.Debugf("on host %v capture successful", host)
+		}
 	}
-	hostname, err := ComposeExecute(conf, []string{"cat", "/proc/sys/kernel/hostname"})
+
+	hostname, err := ComposeExecute(false, conf, []string{"cat", "/proc/sys/kernel/hostname"})
 	if err != nil {
 		simplelog.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", host, err)
 		return files, failedFiles, skippedFiles
@@ -158,7 +168,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		simplelog.Infof("host %v copied %v to %v", host, tarGZ, destFile)
 		//defer delete tar.gz
 		defer func() {
-			if out, err := ComposeExecute(conf, []string{"rm", tarGZ}); err != nil {
+			if out, err := ComposeExecute(false, conf, []string{"rm", tarGZ}); err != nil {
 				simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
 			} else {
 				simplelog.Debugf("on host %v file %v has been removed", host, ddcTmpDir)

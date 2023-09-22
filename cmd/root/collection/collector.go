@@ -48,8 +48,8 @@ type Collector interface {
 	CopyFromHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination string) (out string, err error)
 	CopyToHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination string) (out string, err error)
 	FindHosts(searchTerm string) (podName []string, err error)
-	HostExecute(hostString string, isCoordinator bool, args ...string) (stdOut string, err error)
-	HostExecuteAndStream(hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) error
+	HostExecute(mask bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error)
+	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) error
 	HelpText() string
 }
 

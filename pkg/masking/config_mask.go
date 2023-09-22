@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -69,6 +70,19 @@ func maskConfigSecret(line string) string {
 		secret := matches[1]
 		// Replace the secret with the masking text
 		line = strings.Replace(line, secret, "\"<REMOVED_POTENTIAL_SECRET>\"", -1)
+	}
+	return line
+}
+
+func MaskPAT(line string) string {
+	regexPattern := `--` + conf.KeyDremioPatToken + ` .*`
+	re := regexp.MustCompile(regexPattern)
+	matches := re.FindStringSubmatch(line)
+	// If there is more than one match, the secret will be the second element in the slice (at index 1)
+	if len(matches) >= 1 {
+		secret := matches[0]
+		// Replace the secret with the masking text
+		line = strings.Replace(line, secret, "\"<REMOVED_PAT_TOKEN>\"", -1)
 	}
 	return line
 }

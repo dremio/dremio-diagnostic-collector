@@ -35,7 +35,7 @@ func TestSSHExec(t *testing.T) {
 		sshKey:  "id_rsa",
 		sshUser: sshUser,
 	}
-	out, err := k.HostExecute(hostName, true, "ls", "-l")
+	out, err := k.HostExecute(false, hostName, true, "ls", "-l")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}

@@ -37,7 +37,7 @@ func TestComposeExecuteAndStreamWithSudo(t *testing.T) {
 		outputCaptured = append(outputCaptured, line)
 	}
 	command := []string{"ls", "-la", "/"}
-	if err := collection.ComposeExecuteAndStream(conf, output, command); err != nil {
+	if err := collection.ComposeExecuteAndStream(false, conf, output, command); err != nil {
 		t.Fatal(err)
 	}
 	firstCall := mockCollect.Calls[0]
@@ -63,7 +63,7 @@ func TestComposeExecuteAndStreamWithoutSudo(t *testing.T) {
 		outputCaptured = append(outputCaptured, line)
 	}
 	command := []string{"ls", "-la", "/"}
-	if err := collection.ComposeExecuteAndStream(conf, output, command); err != nil {
+	if err := collection.ComposeExecuteAndStream(false, conf, output, command); err != nil {
 		t.Fatal(err)
 	}
 	firstCall := mockCollect.Calls[0]
@@ -89,7 +89,7 @@ func TestComposeExecuteAndStreamWithSudoWithError(t *testing.T) {
 		outputCaptured = append(outputCaptured, line)
 	}
 	command := []string{"ls", "-la", "/"}
-	if err := collection.ComposeExecuteAndStream(conf, output, command); err == nil {
+	if err := collection.ComposeExecuteAndStream(false, conf, output, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {
@@ -119,7 +119,7 @@ func TestComposeExecuteAndStreamWithoutSudoWithError(t *testing.T) {
 		outputCaptured = append(outputCaptured, line)
 	}
 	command := []string{"ls", "-la", "/"}
-	if err := collection.ComposeExecuteAndStream(conf, output, command); err == nil {
+	if err := collection.ComposeExecuteAndStream(false, conf, output, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {
@@ -146,7 +146,7 @@ func TestComposeExecuteWithSudo(t *testing.T) {
 		SudoUser:      "serviceUser",
 	}
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecute(conf, command); err != nil {
+	if txt, err := collection.ComposeExecute(false, conf, command); err != nil {
 		t.Fatal(err)
 	} else {
 		if txt != expected {
@@ -174,7 +174,7 @@ func TestComposeExecuteWithoutSudo(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecute(conf, command); err != nil {
+	if txt, err := collection.ComposeExecute(false, conf, command); err != nil {
 		t.Fatal(err)
 	} else {
 		if txt != expected {
@@ -201,7 +201,7 @@ func TestComposeExecuteWithSudoWithError(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecute(conf, command); err == nil {
+	if txt, err := collection.ComposeExecute(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {
@@ -231,7 +231,7 @@ func TestComposeExecuteWithoutSudoWithError(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecute(conf, command); err == nil {
+	if txt, err := collection.ComposeExecute(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {
@@ -262,7 +262,7 @@ func TestComposeNoSudoExecute(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecuteNoSudo(conf, command); err != nil {
+	if txt, err := collection.ComposeExecuteNoSudo(false, conf, command); err != nil {
 		t.Fatal(err)
 	} else {
 		if txt != expected {
@@ -289,7 +289,7 @@ func TestComposeNoSudoExecuteWithError(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecuteNoSudo(conf, command); err == nil {
+	if txt, err := collection.ComposeExecuteNoSudo(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {
@@ -538,7 +538,7 @@ func TestComposeNoSudoCopyWithError(t *testing.T) {
 	}
 
 	command := []string{"ls", "-la", "/"}
-	if txt, err := collection.ComposeExecuteNoSudo(conf, command); err == nil {
+	if txt, err := collection.ComposeExecuteNoSudo(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
 		if err.Error() != "silly error 1" {

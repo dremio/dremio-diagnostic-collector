@@ -21,7 +21,7 @@ import (
 )
 
 // Adds the sudo part into the HostExecute call
-func ComposeExecuteAndStream(conf HostCaptureConfiguration, output cli.OutputHandler, command []string) error {
+func ComposeExecuteAndStream(mask bool, conf HostCaptureConfiguration, output cli.OutputHandler, command []string) error {
 	host := conf.Host
 	c := conf.Collector
 	isCoordinator := conf.IsCoordinator
@@ -29,13 +29,13 @@ func ComposeExecuteAndStream(conf HostCaptureConfiguration, output cli.OutputHan
 	var err error
 
 	if sudoUser == "" {
-		err = c.HostExecuteAndStream(host, output, isCoordinator, command...)
+		err = c.HostExecuteAndStream(mask, host, output, isCoordinator, command...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error '%v'", host, err)
 		}
 	} else {
 		sudoCommand := append([]string{"sudo", "-u", sudoUser}, command...)
-		err = c.HostExecuteAndStream(host, output, isCoordinator, sudoCommand...)
+		err = c.HostExecuteAndStream(mask, host, output, isCoordinator, sudoCommand...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error '%v'", host, err)
 		}
@@ -44,20 +44,20 @@ func ComposeExecuteAndStream(conf HostCaptureConfiguration, output cli.OutputHan
 }
 
 // Adds the sudo part into the HostExecute call
-func ComposeExecute(conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
+func ComposeExecute(mask bool, conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
 	isCoordinator := conf.IsCoordinator
 	sudoUser := conf.SudoUser
 
 	if sudoUser == "" {
-		stdOut, err = c.HostExecute(host, isCoordinator, command...)
+		stdOut, err = c.HostExecute(mask, host, isCoordinator, command...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error %v: output was: '%v'", host, err, stdOut)
 		}
 	} else {
 		sudoCommand := append([]string{"sudo", "-u", sudoUser}, command...)
-		stdOut, err = c.HostExecute(host, isCoordinator, sudoCommand...)
+		stdOut, err = c.HostExecute(mask, host, isCoordinator, sudoCommand...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v; output was '%v'", host, err, stdOut)
 		}
@@ -66,12 +66,12 @@ func ComposeExecute(conf HostCaptureConfiguration, command []string) (stdOut str
 }
 
 // Some execute actions should never change regardless of the sudo user being passed or not
-func ComposeExecuteNoSudo(conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
+func ComposeExecuteNoSudo(mask bool, conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
 	isCoordinator := conf.IsCoordinator
 
-	stdOut, err = c.HostExecute(host, isCoordinator, command...)
+	stdOut, err = c.HostExecute(mask, host, isCoordinator, command...)
 	if err != nil {
 		simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 	}

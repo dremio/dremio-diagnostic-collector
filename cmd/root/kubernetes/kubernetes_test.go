@@ -52,7 +52,7 @@ func TestKubectlExec(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	out, err := k.HostExecute(podName, true, "ls", "-l")
+	out, err := k.HostExecute(false, podName, true, "ls", "-l")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
