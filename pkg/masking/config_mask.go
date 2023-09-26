@@ -75,12 +75,21 @@ func maskConfigSecret(line string) string {
 }
 
 func MaskPAT(line string) string {
-	regexPattern := `--` + conf.KeyDremioPatToken + ` .*`
+	regexPattern := `--` + conf.KeyDremioPatToken + ` [^ ]+`
+	regexPattern2 := `-t [^ ]+`
 	re := regexp.MustCompile(regexPattern)
+	re2 := regexp.MustCompile(regexPattern2)
 	matches := re.FindStringSubmatch(line)
 	// If there is more than one match, the secret will be the second element in the slice (at index 1)
 	if len(matches) >= 1 {
 		secret := matches[0]
+		// Replace the secret with the masking text
+		line = strings.Replace(line, secret, "\"<REMOVED_PAT_TOKEN>\"", -1)
+	}
+	matches2 := re2.FindStringSubmatch(line)
+	// If there is more than one match, the secret will be the second element in the slice (at index 1)
+	if len(matches2) >= 1 {
+		secret := matches2[0]
 		// Replace the secret with the masking text
 		line = strings.Replace(line, secret, "\"<REMOVED_PAT_TOKEN>\"", -1)
 	}
