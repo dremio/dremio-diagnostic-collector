@@ -24,6 +24,7 @@ import (
 
 type KubeArgs struct {
 	Namespace            string
+	MasterContainer      string
 	CoordinatorContainer string
 	ExecutorsContainer   string
 	KubectlPath          string
@@ -33,21 +34,21 @@ type KubeArgs struct {
 // one must pass the path to kubectl
 func NewKubectlK8sActions(kubeArgs KubeArgs) *KubectlK8sActions {
 	return &KubectlK8sActions{
-		cli:                  &cli.Cli{},
-		kubectlPath:          kubeArgs.KubectlPath,
-		coordinatorContainer: kubeArgs.CoordinatorContainer,
-		executorContainer:    kubeArgs.ExecutorsContainer,
-		namespace:            kubeArgs.Namespace,
+		cli:               &cli.Cli{},
+		kubectlPath:       kubeArgs.KubectlPath,
+		masterContainer:   kubeArgs.MasterContainer,
+		executorContainer: kubeArgs.ExecutorsContainer,
+		namespace:         kubeArgs.Namespace,
 	}
 }
 
 // KubectlK8sActions provides a way to collect and copy files using kubectl
 type KubectlK8sActions struct {
-	cli                  cli.CmdExecutor
-	kubectlPath          string
-	coordinatorContainer string
-	executorContainer    string
-	namespace            string
+	cli               cli.CmdExecutor
+	kubectlPath       string
+	masterContainer   string
+	executorContainer string
+	namespace         string
 }
 
 func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
@@ -57,7 +58,7 @@ func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
 
 func (c *KubectlK8sActions) getContainerName(isCoordinator bool) string {
 	if isCoordinator {
-		return c.coordinatorContainer
+		return c.masterContainer
 	}
 	return c.executorContainer
 }
