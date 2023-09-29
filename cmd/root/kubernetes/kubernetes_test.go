@@ -46,11 +46,12 @@ func TestKubectlExec(t *testing.T) {
 		StoredErrors:   []error{nil},
 	}
 	k := KubectlK8sActions{
-		cli:               cli,
-		kubectlPath:       "kubectl",
-		masterContainer:   "dremio-master-coordinator",
-		executorContainer: "dremio-executor",
-		namespace:         namespace,
+		cli:                  cli,
+		kubectlPath:          "kubectl",
+		masterContainer:      "dremio-master-coordinator",
+		coordinatorContainer: "dremio-coordinator",
+		executorContainer:    "dremio-executor",
+		namespace:            namespace,
 	}
 	out, err := k.HostExecute(false, podName, true, "ls", "-l")
 	if err != nil {
@@ -114,11 +115,12 @@ func TestKubectCopyFrom(t *testing.T) {
 		StoredErrors:   []error{nil},
 	}
 	k := KubectlK8sActions{
-		cli:               cli,
-		kubectlPath:       "kubectl",
-		masterContainer:   "dremio-master-coordinator",
-		executorContainer: "dremio-executor",
-		namespace:         namespace,
+		cli:                  cli,
+		kubectlPath:          "kubectl",
+		masterContainer:      "dremio-master-coordinator",
+		coordinatorContainer: "dremio-coordinator",
+		executorContainer:    "dremio-executor",
+		namespace:            namespace,
 	}
 	out, err := k.CopyFromHost(podName, true, source, destination)
 	if err != nil {
@@ -148,11 +150,12 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 		StoredErrors:   []error{nil},
 	}
 	k := KubectlK8sActions{
-		cli:               cli,
-		kubectlPath:       "kubectl",
-		masterContainer:   "dremio-master-coordinator",
-		executorContainer: "dremio-executor",
-		namespace:         namespace,
+		cli:                  cli,
+		kubectlPath:          "kubectl",
+		masterContainer:      "dremio-master-coordinator",
+		coordinatorContainer: "dremio-coordinator",
+		executorContainer:    "dremio-executor",
+		namespace:            namespace,
 	}
 	out, err := k.CopyFromHost(podName, true, source, destination)
 	if err != nil {
@@ -176,14 +179,16 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 
 func TestNewKubectlK8sActions(t *testing.T) {
 	kubectlPath := "kubectlPath"
+	masterContainer := "main"
 	coordinatorContainer := "main"
 	executorContainer := "exec"
 	namespace := "mynamespace"
 	actions := NewKubectlK8sActions(KubeArgs{
-		KubectlPath:        kubectlPath,
-		MasterContainer:    coordinatorContainer,
-		ExecutorsContainer: executorContainer,
-		Namespace:          namespace,
+		KubectlPath:          kubectlPath,
+		MasterContainer:      masterContainer,
+		CoordinatorContainer: coordinatorContainer,
+		ExecutorsContainer:   executorContainer,
+		Namespace:            namespace,
 	})
 	if actions.namespace != namespace {
 		t.Errorf("expected %v but got %v", namespace, actions.namespace)
@@ -202,19 +207,41 @@ func TestNewKubectlK8sActions(t *testing.T) {
 	}
 }
 
-func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
+func TestGetContainerNameWhenIsMaster(t *testing.T) {
 	kubectlPath := "kubectlPath"
-	coordinatorContainer := "main"
-	executorContainer := "exec"
+	masterContainer := "dremio-master-coordinator"
+	coordinatorContainer := "dremio-coordinator"
+	executorContainer := "dremio-executor"
 	namespace := "mynamespace"
 	actions := NewKubectlK8sActions(
 		KubeArgs{
-			KubectlPath:        kubectlPath,
-			MasterContainer:    coordinatorContainer,
-			ExecutorsContainer: executorContainer,
-			Namespace:          namespace,
+			KubectlPath:          kubectlPath,
+			MasterContainer:      masterContainer,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorContainer,
+			Namespace:            namespace,
 		})
-	containerName := actions.getContainerName(true)
+	containerName := actions.getContainerName("dremio-master-0", true)
+	if containerName != coordinatorContainer {
+		t.Errorf("expected %v but got %v", coordinatorContainer, containerName)
+	}
+}
+
+func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
+	kubectlPath := "kubectlPath"
+	masterContainer := "dremio-master-coordinator"
+	coordinatorContainer := "dremio-coordinator"
+	executorContainer := "dremio-executor"
+	namespace := "mynamespace"
+	actions := NewKubectlK8sActions(
+		KubeArgs{
+			KubectlPath:          kubectlPath,
+			MasterContainer:      masterContainer,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorContainer,
+			Namespace:            namespace,
+		})
+	containerName := actions.getContainerName("dremio-coordinator-0", true)
 	if containerName != coordinatorContainer {
 		t.Errorf("expected %v but got %v", coordinatorContainer, containerName)
 	}
@@ -222,17 +249,19 @@ func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
 
 func TestGetContainerNameWhenIsExecutor(t *testing.T) {
 	kubectlPath := "kubectlPath"
-	coordinatorContainer := "main"
-	executorContainer := "exec"
+	masterContainer := "dremio-master-coordinator"
+	coordinatorContainer := "dremio-coordinator"
+	executorContainer := "dremio-executor"
 	namespace := "mynamespace"
 	actions := NewKubectlK8sActions(
 		KubeArgs{
-			KubectlPath:        kubectlPath,
-			MasterContainer:    coordinatorContainer,
-			ExecutorsContainer: executorContainer,
-			Namespace:          namespace,
+			KubectlPath:          kubectlPath,
+			MasterContainer:      masterContainer,
+			CoordinatorContainer: coordinatorContainer,
+			ExecutorsContainer:   executorContainer,
+			Namespace:            namespace,
 		})
-	containerName := actions.getContainerName(false)
+	containerName := actions.getContainerName("dremio-executor-0", false)
 	if containerName != executorContainer {
 		t.Errorf("expected %v but got %v", executorContainer, containerName)
 	}

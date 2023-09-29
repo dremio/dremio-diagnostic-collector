@@ -102,6 +102,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if err != nil {
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
+
 	coordinators, err := c.FindHosts(coordinatorStr)
 	if err != nil {
 		return err
