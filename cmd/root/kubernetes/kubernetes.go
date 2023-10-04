@@ -60,7 +60,7 @@ func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator bool)
 		kubectlArgs := []string{c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
 		conts, _ := c.cli.Execute(false, kubectlArgs...)
 		containers := strings.Split(conts, " ")
-		expectedContainers := strings.Split(c.coordinatorContainer, " ")
+		expectedContainers := strings.Split(c.coordinatorContainer, ",")
 		for _, container := range containers {
 			for _, expectedContainer := range expectedContainers {
 				if container == expectedContainer {
