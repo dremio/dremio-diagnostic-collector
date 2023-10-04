@@ -23,34 +23,31 @@ import (
 )
 
 type KubeArgs struct {
-	Namespace                    string
-	ScaleoutCoordinatorContainer string
-	CoordinatorContainer         string
-	ExecutorsContainer           string
-	KubectlPath                  string
+	Namespace            string
+	CoordinatorContainer string
+	ExecutorsContainer   string
+	KubectlPath          string
 }
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
 func NewKubectlK8sActions(kubeArgs KubeArgs) *KubectlK8sActions {
 	return &KubectlK8sActions{
-		cli:                          &cli.Cli{},
-		kubectlPath:                  kubeArgs.KubectlPath,
-		scaleoutCoordinatorContainer: kubeArgs.ScaleoutCoordinatorContainer,
-		coordinatorContainer:         kubeArgs.CoordinatorContainer,
-		executorContainer:            kubeArgs.ExecutorsContainer,
-		namespace:                    kubeArgs.Namespace,
+		cli:                  &cli.Cli{},
+		kubectlPath:          kubeArgs.KubectlPath,
+		coordinatorContainer: kubeArgs.CoordinatorContainer,
+		executorContainer:    kubeArgs.ExecutorsContainer,
+		namespace:            kubeArgs.Namespace,
 	}
 }
 
 // KubectlK8sActions provides a way to collect and copy files using kubectl
 type KubectlK8sActions struct {
-	cli                          cli.CmdExecutor
-	kubectlPath                  string
-	scaleoutCoordinatorContainer string
-	coordinatorContainer         string
-	executorContainer            string
-	namespace                    string
+	cli                  cli.CmdExecutor
+	kubectlPath          string
+	coordinatorContainer string
+	executorContainer    string
+	namespace            string
 }
 
 func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
@@ -63,12 +60,14 @@ func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator bool)
 		kubectlArgs := []string{c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
 		conts, _ := c.cli.Execute(false, kubectlArgs...)
 		containers := strings.Split(conts, " ")
+		expectedContainers := strings.Split(c.coordinatorContainer, " ")
 		for _, container := range containers {
-			if container == c.scaleoutCoordinatorContainer {
-				return c.scaleoutCoordinatorContainer
-			} else if container == c.coordinatorContainer {
-				return c.coordinatorContainer
+			for _, expectedContainer := range expectedContainers {
+				if container == expectedContainer {
+					return container
+				}
 			}
+
 		}
 	}
 	// All other pod types are executors
