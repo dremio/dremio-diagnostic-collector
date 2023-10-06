@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.2]
+
+### Fixed
+
+* Check PID doesn't return 0 and fail gracefully if it does
+* Fixed collections for scale out coordinator(s) for kubernetes
+* Fixed issue where PAT token was not being masked in the `ddc.log`
+
+### Changed
+
+* Changed K8s container log collection to be multi-threaded 
+
 ## [0.7.1]
 
 ### Fixed
