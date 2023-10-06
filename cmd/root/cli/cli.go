@@ -23,13 +23,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type CmdExecutor interface {
-	Execute(args ...string) (out string, err error)
-	ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string) error
+	Execute(mask bool, args ...string) (out string, err error)
+	ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, args ...string) error
 }
 
 type UnableToStartErr struct {
@@ -62,9 +62,9 @@ type Cli struct {
 // If the command runs successfully, the function will return nil. If there's an error executing the command,
 // it will return an error. Note that an error from the command itself (e.g., a non-zero exit status) will also
 // be returned as an error from this function.
-func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string) error {
+func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, args ...string) error {
 	// Log the command that's about to be run
-	logArgs(args)
+	logArgs(mask, args)
 
 	// Create the command based on the passed arguments
 	cmd := exec.Command(args[0], args[1:]...)
@@ -125,8 +125,9 @@ func (c *Cli) ExecuteAndStreamOutput(outputHandler OutputHandler, args ...string
 	return nil
 }
 
-func (c *Cli) Execute(args ...string) (string, error) {
-	logArgs(args)
+func (c *Cli) Execute(mask bool, args ...string) (string, error) {
+	// Log the command that's about to be run
+	logArgs(mask, args)
 	cmd := exec.Command(args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -135,21 +136,18 @@ func (c *Cli) Execute(args ...string) (string, error) {
 	return string(output), nil
 }
 
-func logArgs(args []string) {
-	var containsPat bool
-	for _, arg := range args {
-		if arg == fmt.Sprintf("--%v", conf.KeyDremioPatToken) {
-			containsPat = true
-		}
-	}
-	if containsPat {
-		simplelog.Info("args: contains PAT REDACTED")
+func logArgs(mask bool, args []string) {
+	// log out args, mask if needed
+	if mask {
+		maskedOutput := masking.MaskPAT(strings.Join(args, " "))
+		simplelog.Infof("args: %v", maskedOutput)
 	} else {
 		simplelog.Infof("args: %v", strings.Join(args, " "))
 	}
 }
-func (c *Cli) ExecuteBytes(args ...string) ([]byte, error) {
-	logArgs(args)
+
+func (c *Cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
+	logArgs(mask, args)
 	cmd := exec.Command(args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

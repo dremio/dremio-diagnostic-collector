@@ -36,6 +36,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// var scaleoutCoordinatorContainer string
 var coordinatorContainer string
 var executorsContainer string
 var coordinatorStr string
@@ -170,7 +171,8 @@ func Execute(args []string) {
 			SSHUser:   sshUser,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace:            namespace,
+			Namespace: namespace,
+			//ScaleoutCoordinatorContainer: scaleoutCoordinatorContainer,
 			CoordinatorContainer: coordinatorContainer,
 			ExecutorsContainer:   executorsContainer,
 			KubectlPath:          kubectlPath,
@@ -207,7 +209,7 @@ func sshDefault() (string, error) {
 func init() {
 	// command line flags
 
-	RootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
+	RootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator,dremio-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
 	RootCmd.Flags().StringVar(&executorsContainer, "executors-container", "dremio-executor", "for use with -k8s flag: sets the container name to use to retrieve logs in the executors")
 	RootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
 	RootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")

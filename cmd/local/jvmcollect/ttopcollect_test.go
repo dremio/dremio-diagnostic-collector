@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -219,6 +220,22 @@ func TestTtopExecHasNoPidToFind(t *testing.T) {
 	if _, err := ttop.KillTtop(); err != nil {
 		t.Errorf("we expect ttop to still not return an error with a bad pid: %v", err)
 	}
+}
+
+func TestTtopExecHasNoPid(t *testing.T) {
+	ttop := &jvmcollect.Ttop{}
+	ttopArgs := jvmcollect.TtopArgs{
+		PID:      -2,
+		Interval: 1,
+	}
+	resp := ttop.StartTtop(ttopArgs)
+	time.Sleep(time.Duration(500) * time.Millisecond)
+	actual := fmt.Sprint(resp)
+	expected := fmt.Sprintf("invalid pid of '%v'", ttopArgs.PID)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("expected '%v' but was '%v'", expected, actual)
+	}
+
 }
 
 func TestTtopHasAndInvalidInterval(t *testing.T) {

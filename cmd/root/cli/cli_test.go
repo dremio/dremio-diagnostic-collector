@@ -45,7 +45,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		expectedOut = "file1\nfile2\n"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(outputHandler, "ls", "-1", filepath.Join("testdata", "ls"))
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "ls", "-1", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -53,7 +53,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	} else {
 		expectedOut = "file1\nfile2\n"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -76,14 +76,14 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		expectedOut = "No such file or directory"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(outputHandler, "cat", "nonexistentfile")
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "cat", "nonexistentfile")
 		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
 	} else {
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
 		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
@@ -99,7 +99,7 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 
 func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 	setupTestCLI()
-	err := c.ExecuteAndStreamOutput(outputHandler, "22JIDJMJMHHF")
+	err := c.ExecuteAndStreamOutput(false, outputHandler, "22JIDJMJMHHF")
 	if err == nil {
 		t.Errorf("Expected error but got nil")
 	}
@@ -115,10 +115,10 @@ func TestExecute_WhenCommandIsValid(t *testing.T) {
 	var out string
 	var err error
 	if runtime.GOOS != "windows" {
-		out, err = c.Execute("ls", "-1", filepath.Join("testdata", "ls"))
+		out, err = c.Execute(false, "ls", "-1", filepath.Join("testdata", "ls"))
 		expectedOut = "file1\nfile2\n"
 	} else {
-		out, err = c.Execute("cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
+		out, err = c.Execute(false, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		expectedOut = "file1\r\nfile2\r\n"
 	}
 	if err != nil {
@@ -135,10 +135,10 @@ func TestExecute_WhenNoArgumentsProvidedForCommand(t *testing.T) {
 	var out string
 	var err error
 	if runtime.GOOS == "windows" {
-		out, err = c.Execute("cmd.exe")
+		out, err = c.Execute(false, "cmd.exe")
 		expectedOut = "Microsoft"
 	} else {
-		out, err = c.Execute("ls")
+		out, err = c.Execute(false, "ls")
 		expectedOut = "cli.go"
 	}
 	if err != nil {
@@ -151,7 +151,7 @@ func TestExecute_WhenNoArgumentsProvidedForCommand(t *testing.T) {
 
 func TestExecute_WhenCommandIsInvalid(t *testing.T) {
 	setupTestCLI()
-	_, err := c.Execute("22JIDJMJMHHF")
+	_, err := c.Execute(false, "22JIDJMJMHHF")
 	if err == nil {
 		t.Errorf("Expected error but got nil")
 	}

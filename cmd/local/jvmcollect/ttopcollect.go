@@ -58,6 +58,9 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 	if interval == 0 {
 		return errors.New("invalid interval of 0 seconds")
 	}
+	if pid <= 0 {
+		return fmt.Errorf("invalid pid of '%v'", pid)
+	}
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
 	tmpDir, err := os.MkdirTemp("", "ddc-sjkttop")

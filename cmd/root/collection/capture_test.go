@@ -96,7 +96,7 @@ func (m *MockCollector) FindHosts(searchTerm string) (podName []string, err erro
 	m.CallCounter++
 	return response[0].([]string), response[1].(error)
 }
-func (m *MockCollector) HostExecute(hostString string, isCoordinator bool, args ...string) (stdOut string, err error) {
+func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error) {
 	capturedArgs := make(map[string]interface{})
 	capturedArgs["hostString"] = hostString
 	capturedArgs["isCoordinator"] = isCoordinator
@@ -111,7 +111,7 @@ func (m *MockCollector) HostExecute(hostString string, isCoordinator bool, args 
 	return response[0].(string), response[1].(error)
 }
 
-func (m *MockCollector) HostExecuteAndStream(hostString string, _ cli.OutputHandler, isCoordinator bool, args ...string) error {
+func (m *MockCollector) HostExecuteAndStream(_ bool, hostString string, _ cli.OutputHandler, isCoordinator bool, args ...string) error {
 	capturedArgs := make(map[string]interface{})
 	capturedArgs["hostString"] = hostString
 	capturedArgs["isCoordinator"] = isCoordinator

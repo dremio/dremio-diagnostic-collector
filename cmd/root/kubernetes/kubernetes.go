@@ -55,23 +55,35 @@ func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
 	return strings.TrimPrefix(rawDest, "C:")
 }
 
-func (c *KubectlK8sActions) getContainerName(isCoordinator bool) string {
+func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator bool) string {
 	if isCoordinator {
-		return c.coordinatorContainer
+		kubectlArgs := []string{c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
+		conts, _ := c.cli.Execute(false, kubectlArgs...)
+		containers := strings.Split(conts, " ")
+		expectedContainers := strings.Split(c.coordinatorContainer, ",")
+		for _, container := range containers {
+			for _, expectedContainer := range expectedContainers {
+				if container == expectedContainer {
+					return container
+				}
+			}
+
+		}
 	}
+	// All other pod types are executors
 	return c.executorContainer
 }
 
-func (c *KubectlK8sActions) HostExecuteAndStream(hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) (err error) {
-	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), hostString, "--"}
+func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) (err error) {
+	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), hostString, "--"}
 	kubectlArgs = append(kubectlArgs, args...)
-	return c.cli.ExecuteAndStreamOutput(output, kubectlArgs...)
+	return c.cli.ExecuteAndStreamOutput(mask, output, kubectlArgs...)
 }
 
-func (c *KubectlK8sActions) HostExecute(hostString string, isCoordinator bool, args ...string) (out string, err error) {
-	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), hostString, "--"}
+func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, isCoordinator bool, args ...string) (out string, err error) {
+	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), hostString, "--"}
 	kubectlArgs = append(kubectlArgs, args...)
-	return c.cli.Execute(kubectlArgs...)
+	return c.cli.Execute(mask, kubectlArgs...)
 }
 
 func (c *KubectlK8sActions) CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
@@ -80,7 +92,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, isCoordinator bool, 
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	return c.cli.Execute(c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *KubectlK8sActions) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
@@ -90,7 +102,7 @@ func (c *KubectlK8sActions) CopyFromHostSudo(hostString string, isCoordinator bo
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
@@ -99,7 +111,7 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, so
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	return c.cli.Execute(c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
@@ -109,11 +121,11 @@ func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *KubectlK8sActions) FindHosts(searchTerm string) (podName []string, err error) {
-	out, err := c.cli.Execute(c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", searchTerm, "-o", "name")
+	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", searchTerm, "-o", "name")
 	if err != nil {
 		return []string{}, err
 	}

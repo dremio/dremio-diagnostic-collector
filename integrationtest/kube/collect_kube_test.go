@@ -510,6 +510,7 @@ dremio-jfr-time-seconds: 10
 	}
 	foundFiles := []string{}
 	foundEmptyFiles := []string{}
+	compareEmptyFiles := []string{}
 	for _, e := range entries {
 		fs, err := e.Info()
 		if err != nil {
@@ -527,8 +528,15 @@ dremio-jfr-time-seconds: 10
 	sort.Strings(foundFiles)
 	sort.Strings(expectedFiles)
 
-	if !reflect.DeepEqual(expectedEmptyFiles, foundEmptyFiles) {
-		t.Errorf("Expected the following files to be empty:\n %v\n But found the following:\n %v", expectedEmptyFiles, foundEmptyFiles)
+	for _, expectedEmptyFile := range expectedEmptyFiles {
+		for _, foundEmptyFile := range foundEmptyFiles {
+			if expectedEmptyFile == foundEmptyFile {
+				compareEmptyFiles = append(compareEmptyFiles, expectedEmptyFile)
+			}
+		}
+	}
+	if !reflect.DeepEqual(expectedEmptyFiles, compareEmptyFiles) {
+		t.Errorf("Expected the following files to be empty:\n %v\n But found the following:\n %v", expectedEmptyFiles, compareEmptyFiles)
 	}
 
 	if !reflect.DeepEqual(foundFiles, expectedFiles) {

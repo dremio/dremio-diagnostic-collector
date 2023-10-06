@@ -183,25 +183,21 @@ func (m *MockCapCollector) CopyFromHostSudo(hostString string, isCoordinator boo
 	return response, err
 }
 
-func (m *MockCapCollector) HostExecuteAndStream(hostString string, output cli.OutputHandler, _ bool, args ...string) error {
+func (m *MockCapCollector) HostExecuteAndStream(_ bool, hostString string, output cli.OutputHandler, _ bool, args ...string) error {
 	fullCmd := strings.Join(args, " ")
 	response := "Mock execute for " + hostString + " command: " + fullCmd
 	output(response)
 	return nil
 }
 
-func (m *MockCapCollector) HostExecute(hostString string, _ bool, args ...string) (response string, err error) {
-
+func (m *MockCapCollector) HostExecute(_ bool, hostString string, _ bool, args ...string) (response string, err error) {
 	fullCmd := strings.Join(args, " ")
-
 	response = "Mock execute for " + hostString + " command: " + fullCmd
 	return response, err
 }
 
 func (m *MockCapCollector) GzipAllFiles(hostString string, _ bool, args ...string) (response string, err error) {
-
 	fullCmd := strings.Join(args, " ")
-
 	response = "Mock execute for " + hostString + " command: " + fullCmd
 	return response, err
 }
