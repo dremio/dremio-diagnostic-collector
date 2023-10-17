@@ -315,6 +315,22 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write lscpu for os_info.txt due to error %v", err)
 	}
+	_, err = w.Write([]byte("___\n>>> mount\n"))
+	if err != nil {
+		simplelog.Warningf("unable to write mount header for os_info.txt due to error %v", err)
+	}
+	err = ddcio.Shell(w, "mount")
+	if err != nil {
+		simplelog.Warningf("unable to write mount for os_info.txt due to error %v", err)
+	}
+	_, err = w.Write([]byte("___\n>>> lsblk\n"))
+	if err != nil {
+		simplelog.Warningf("unable to write lsblk header for os_info.txt due to error %v", err)
+	}
+	err = ddcio.Shell(w, "lsblk")
+	if err != nil {
+		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
+	}
 
 	simplelog.Debugf("... Collecting OS Information from %v COMPLETED", c.NodeName())
 	return nil
