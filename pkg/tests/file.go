@@ -16,10 +16,13 @@ package tests
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func MatchFile(expectedFile, actualFile string) (success bool, err error) {
@@ -38,6 +41,39 @@ func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 	actualText := normalizeText(actualLines)
 
 	return expectedText == actualText, nil
+}
+
+func MatchLines(expectedLines []string, actualFile string) (success bool, err error) {
+
+	actualLines, err := readLines(actualFile)
+	if err != nil {
+		return false, err
+	}
+	//remove cross platform line endings to make the tests work on windows and linux
+	//expectedText := normalizeText(expectedLines)
+	//actualText := normalizeText(actualLines)
+
+	// We take each expected line and check for matches
+	matches := 0
+	for _, expectedLine := range expectedLines {
+		for _, actualLine := range actualLines {
+			fmt.Println(expectedLine)
+			simplelog.Info(expectedLine)
+			fmt.Println(actualLine)
+			simplelog.Info(actualLine)
+			if strings.Contains(actualLine, expectedLine) {
+				matches = matches + 1
+			}
+		}
+	}
+	// We should ideally have the same number of matches
+	if len(expectedLines) == matches {
+		success = true
+	} else {
+		success = false
+	}
+
+	return success, nil
 }
 
 func readLines(filePath string) ([]string, error) {
@@ -71,5 +107,12 @@ func AssertFileHasContent(t *testing.T, filePath string) {
 		if !(f.Size() > 0) {
 			t.Errorf("file %v is empty", filePath)
 		}
+	}
+}
+
+func AssertFileHasExpectedLines(t *testing.T, expectedLines []string, filePath string) {
+	success, _ := MatchLines(expectedLines, filePath)
+	if !success {
+		t.Errorf("file %v did not contain expected lines %v", filePath, expectedLines)
 	}
 }

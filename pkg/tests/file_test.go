@@ -43,3 +43,18 @@ func TestMatchFile(t *testing.T) {
 		t.Errorf("expected %v to equal %v", file3, expectedFile)
 	}
 }
+func TestFileContents(t *testing.T) {
+	//should match files with the same content
+	testFile := "testdata/test_os_info.txt"
+	expectedText := []string{">>> mount", ">>> lsblk"}
+
+	var match bool
+	// Expect testFile to contain the expected lines
+	match, err := tests.MatchLines(expectedText, testFile)
+	if !match {
+		t.Errorf("expected %v to contain %v", testFile, expectedText)
+	}
+	if err != nil {
+		t.Errorf("error matching lines in  %v error was %v", testFile, err)
+	}
+}

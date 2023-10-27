@@ -570,6 +570,10 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "jvm_settings.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
+	// check file contents
+	// TODO - add more checks here
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, "os_info.txt")
+
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
 
