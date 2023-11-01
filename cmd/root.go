@@ -39,8 +39,10 @@ import (
 // var scaleoutCoordinatorContainer string
 var coordinatorContainer string
 var executorsContainer string
+var zookeeperContainer string
 var coordinatorStr string
 var executorsStr string
+var zookeeperStr string
 var sshKeyLoc string
 var sshUser string
 var promptForDremioPAT bool
@@ -175,6 +177,7 @@ func Execute(args []string) {
 			//ScaleoutCoordinatorContainer: scaleoutCoordinatorContainer,
 			CoordinatorContainer: coordinatorContainer,
 			ExecutorsContainer:   executorsContainer,
+			ZookeeperContainers:  zookeeperContainer,
 			KubectlPath:          kubectlPath,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, isK8s); err != nil {
@@ -211,8 +214,10 @@ func init() {
 
 	RootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator,dremio-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
 	RootCmd.Flags().StringVar(&executorsContainer, "executors-container", "dremio-executor", "for use with -k8s flag: sets the container name to use to retrieve logs in the executors")
+	RootCmd.Flags().StringVar(&zookeeperContainer, "zookeeper-container", "kubernetes-zookeeper", "for use with -k8s flag: sets the container name to use to retrieve logs in the zookeepers")
 	RootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
 	RootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
+	RootCmd.Flags().StringVarP(&zookeeperStr, "zookeepers", "z", "app=zk", "K8s only, a list of zookeeper pods to connect to, use a label that matches to the pod(s).")
 	RootCmd.Flags().StringVarP(&sshKeyLoc, "ssh-key", "s", "", "location of ssh key to use to login")
 	RootCmd.Flags().StringVarP(&sshUser, "ssh-user", "u", "", "user to use during ssh operations to login")
 	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "namespace to use for kubernetes pods")

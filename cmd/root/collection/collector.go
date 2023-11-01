@@ -43,13 +43,13 @@ type CopyStrategy interface {
 }
 
 type Collector interface {
-	CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error)
-	CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error)
-	CopyFromHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination string) (out string, err error)
-	CopyToHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination string) (out string, err error)
+	CopyFromHost(hostString string, isCoordinator, isZookeeper bool, source, destination string) (out string, err error)
+	CopyToHost(hostString string, isCoordinator, isZookeeper bool, source, destination string) (out string, err error)
+	CopyFromHostSudo(hostString string, isCoordinator, isZookeeper bool, sudoUser, source, destination string) (out string, err error)
+	CopyToHostSudo(hostString string, isCoordinator, isZookeeper bool, sudoUser, source, destination string) (out string, err error)
 	FindHosts(searchTerm string) (podName []string, err error)
-	HostExecute(mask bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error)
-	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) error
+	HostExecute(mask bool, hostString string, isCoordinator, isZookeeper bool, args ...string) (stdOut string, err error)
+	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator, isZookeeper bool, args ...string) error
 	HelpText() string
 }
 
@@ -57,6 +57,7 @@ type Args struct {
 	DDCfs          helpers.Filesystem
 	CoordinatorStr string
 	ExecutorsStr   string
+	ZookeeperStr   string
 	OutputLoc      string
 	SudoUser       string
 	CopyStrategy   CopyStrategy
@@ -67,6 +68,7 @@ type Args struct {
 
 type HostCaptureConfiguration struct {
 	IsCoordinator  bool
+	IsZookeeper    bool
 	Collector      Collector
 	Host           string
 	OutputLocation string
@@ -81,6 +83,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	start := time.Now().UTC()
 	coordinatorStr := collectionArgs.CoordinatorStr
 	executorsStr := collectionArgs.ExecutorsStr
+	zookeeperStr := collectionArgs.ZookeeperStr
 	outputLoc := collectionArgs.OutputLoc
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
@@ -113,11 +116,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		return err
 	}
 
-	totalNodes := len(executors) + len(coordinators)
+	zookeepers, err := c.FindHosts(zookeeperStr)
+	if err != nil {
+		return err
+	}
+
+	totalNodes := len(executors) + len(coordinators) + len(zookeepers)
 	if totalNodes == 0 {
-		return fmt.Errorf("coordinator string '%v' and executor string '%v' were not able to connect: %v ", coordinatorStr, executorsStr, c.HelpText())
+		return fmt.Errorf("coordinator string '%v', executor string '%v', and zookeper string '%v', were not able to connect: %v ", coordinatorStr, executorsStr, zookeeperStr, c.HelpText())
 	}
 	hosts := append(coordinators, executors...)
+	hosts = append(hosts, zookeepers...)
 
 	//now safe to collect cluster level information
 	for _, c := range clusterCollection {
@@ -138,6 +147,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			coordinatorCaptureConf := HostCaptureConfiguration{
 				Collector:      c,
 				IsCoordinator:  true,
+				IsZookeeper:    false,
 				Host:           host,
 				OutputLocation: s.GetTmpDir(),
 				SudoUser:       sudoUser,
@@ -165,6 +175,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			executorCaptureConf := HostCaptureConfiguration{
 				Collector:      c,
 				IsCoordinator:  false,
+				IsZookeeper:    false,
 				Host:           host,
 				OutputLocation: s.GetTmpDir(),
 				SudoUser:       sudoUser,
@@ -174,13 +185,44 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
 			m.Lock()
+			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			//m.Lock()
 			totalFailedFiles = append(totalFailedFiles, failedFiles...)
 			totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
 			files = append(files, writtenFiles...)
 			m.Unlock()
 		}(executor)
+	}
+
+	if len(zookeepers) > 0 {
+		for _, zookeeper := range zookeepers {
+			nodesConnectedTo++
+			wg.Add(1)
+			go func(host string) {
+				defer wg.Done()
+				zookeperCaptureConf := HostCaptureConfiguration{
+					Collector:      c,
+					IsCoordinator:  false,
+					IsZookeeper:    true,
+					Host:           host,
+					OutputLocation: s.GetTmpDir(),
+					SudoUser:       sudoUser,
+					CopyStrategy:   s,
+					DDCfs:          ddcfs,
+					TransferDir:    transferDir,
+				}
+				//always skip executor calls
+				skipRESTCalls := true
+				m.Lock()
+				writtenFiles, failedFiles, skippedFiles := Capture(zookeperCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+				//m.Lock()
+				totalFailedFiles = append(totalFailedFiles, failedFiles...)
+				totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
+				files = append(files, writtenFiles...)
+				m.Unlock()
+			}(zookeeper)
+		}
 	}
 	wg.Wait()
 	end := time.Now().UTC()
@@ -189,7 +231,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.StartTimeUTC = start
 	seconds := end.Unix() - start.Unix()
 	collectionInfo.TotalRuntimeSeconds = seconds
-	collectionInfo.ClusterInfo.TotalNodesAttempted = len(coordinators) + len(executors)
+	collectionInfo.ClusterInfo.TotalNodesAttempted = len(coordinators) + len(executors) + len(zookeepers)
 	collectionInfo.ClusterInfo.NumberNodesContacted = nodesConnectedTo
 	collectionInfo.CollectedFiles = files
 	totalBytes := int64(0)

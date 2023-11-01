@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
@@ -52,7 +53,7 @@ func TestKubectlExec(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	out, err := k.HostExecute(false, podName, false, "ls", "-l")
+	out, err := k.HostExecute(false, podName, false, false, "ls", "-l")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -119,7 +120,7 @@ func TestKubectCopyFrom(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	out, err := k.CopyFromHost(podName, false, source, destination)
+	out, err := k.CopyFromHost(podName, false, false, source, destination)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -153,7 +154,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	out, err := k.CopyFromHost(podName, false, source, destination)
+	out, err := k.CopyFromHost(podName, false, false, source, destination)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -177,11 +178,13 @@ func TestNewKubectlK8sActions(t *testing.T) {
 	kubectlPath := "kubectlPath"
 	coordinatorContainer := "main"
 	executorContainer := "exec"
+	zookeeperContainer := "zk"
 	namespace := "mynamespace"
 	actions := NewKubectlK8sActions(KubeArgs{
 		KubectlPath:          kubectlPath,
 		CoordinatorContainer: coordinatorContainer,
 		ExecutorsContainer:   executorContainer,
+		ZookeeperContainers:  zookeeperContainer,
 		Namespace:            namespace,
 	})
 	if actions.namespace != namespace {
@@ -214,7 +217,7 @@ func TestGetContainerNameWhenIsMaster(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	containerName := k.getContainerName("dremio-master-0", true)
+	containerName := k.getContainerName("dremio-master-0", true, false)
 	if containerName != k.coordinatorContainer {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", k.coordinatorContainer, containerName)
 	}
@@ -233,7 +236,7 @@ func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	containerName := k.getContainerName("dremio-coordinator-0", true)
+	containerName := k.getContainerName("dremio-coordinator-0", true, false)
 	if containerName != k.coordinatorContainer {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", k.coordinatorContainer, containerName)
 	}
@@ -252,8 +255,88 @@ func TestGetContainerNameWhenIsExecutor(t *testing.T) {
 		executorContainer:    "dremio-executor",
 		namespace:            namespace,
 	}
-	containerName := k.getContainerName("dremio-executor-0", false)
+	containerName := k.getContainerName("dremio-executor-0", false, false)
 	if containerName != k.executorContainer {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", k.executorContainer, containerName)
+	}
+}
+
+func TestGetContainerNameWhenIsZookeeper(t *testing.T) {
+	namespace := "testns"
+	cli := &tests.MockCli{
+		StoredResponse: []string{"kubernetes-zookeeper"},
+		StoredErrors:   []error{nil},
+	}
+	k := KubectlK8sActions{
+		cli:                  cli,
+		kubectlPath:          "kubectl",
+		coordinatorContainer: "dremio-coordinator",
+		executorContainer:    "dremio-executor",
+		zookeeperContainer:   "kubernetes-zookeeper",
+		namespace:            namespace,
+	}
+	containerName := k.getContainerName("zk-0", false, true)
+	if containerName != k.zookeeperContainer {
+		t.Errorf("\nexpected:\n%v\nbut got:\n%v", k.zookeeperContainer, containerName)
+	}
+}
+
+func TestContainerNameMT(t *testing.T) {
+	pods := []string{"dremio-master-0", "dremio-executor-0", "zk-0"}
+	cli := &tests.MockCli{
+		StoredResponse: []string{"noop"},
+		StoredErrors:   []error{nil},
+	}
+	var wg sync.WaitGroup
+	coordinator := true
+	zookeeper := true
+
+	for _, pod := range pods {
+		t.Logf("pod: %v\n", pod)
+		wg.Add(1)
+		go func(pod string) {
+			defer wg.Done()
+			namespace := "testns"
+			if pod == pods[0] { // master pod
+				cli = &tests.MockCli{
+					StoredResponse: []string{"dremio-master-coordinator"},
+					StoredErrors:   []error{nil},
+				}
+				coordinator = true
+				zookeeper = false
+			} else if pod == pods[1] { // executor pod
+				cli = &tests.MockCli{
+					StoredResponse: []string{"dremio-executor"},
+					StoredErrors:   []error{nil},
+				}
+				coordinator = false
+				zookeeper = false
+			} else {
+				cli = &tests.MockCli{
+					StoredResponse: []string{"kubernetes-zookeeper"},
+					StoredErrors:   []error{nil},
+				}
+				coordinator = false
+				zookeeper = true
+			}
+
+			k := KubectlK8sActions{
+				cli:                  cli,
+				kubectlPath:          "kubectl",
+				coordinatorContainer: "dremio-master-coordinator",
+				executorContainer:    "dremio-executor",
+				zookeeperContainer:   "kubernetes-zookeeper",
+				namespace:            namespace,
+			}
+			containerName := k.getContainerName(pod, coordinator, zookeeper)
+			if pod == pods[0] && containerName != cli.StoredResponse[0] {
+				t.Errorf("\nexpected:\n%v\nbut got:\n%v", cli.StoredResponse[0], containerName)
+			} else if pod == pods[1] && containerName != cli.StoredResponse[0] {
+				t.Errorf("\nexpected:\n%v\nbut got:\n%v", pod, pods[1])
+				t.Errorf("\nexpected:\n%v\nbut got:\n%v", cli.StoredResponse[0], containerName)
+			} else if pod == pods[2] && containerName != cli.StoredResponse[0] {
+				t.Errorf("\nexpected:\n%v\nbut got:\n%v", cli.StoredResponse[0], containerName)
+			}
+		}(pod)
 	}
 }

@@ -34,6 +34,7 @@ type SummaryInfo struct {
 	TotalBytesCollected int64                   `json:"totalBytesCollected"`
 	Executors           []string                `json:"executors"`
 	Coordinators        []string                `json:"coordinators"`
+	Zookeepers          []string                `json:"zookeepers"`
 }
 
 type ClusterInfo struct {

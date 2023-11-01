@@ -25,11 +25,12 @@ type MockCollector struct {
 	CallCounter int
 }
 
-func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyToHost(hostString string, isCoordinator, isZookeeper bool, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyToHost"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
+	args["isZookeeper"] = isZookeeper
 	args["source"] = source
 	args["destination"] = destination
 	m.Calls = append(m.Calls, args)
@@ -41,7 +42,7 @@ func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source
 	}
 	return response[0].(string), response[1].(error)
 }
-func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator, isZookeeper bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyToHostSudo"
 	args["hostString"] = hostString
@@ -56,7 +57,7 @@ func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _,
 	}
 	return response[0].(string), response[1].(error)
 }
-func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyFromHost(hostString string, isCoordinator, isZookeeper bool, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyFromHost"
 	args["hostString"] = hostString
@@ -72,7 +73,7 @@ func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, sour
 	}
 	return response[0].(string), response[1].(error)
 }
-func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator, isZookeeper bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyFromHostSudo"
 	args["hostString"] = hostString
@@ -96,7 +97,7 @@ func (m *MockCollector) FindHosts(searchTerm string) (podName []string, err erro
 	m.CallCounter++
 	return response[0].([]string), response[1].(error)
 }
-func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error) {
+func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator, isZookeeper bool, args ...string) (stdOut string, err error) {
 	capturedArgs := make(map[string]interface{})
 	capturedArgs["hostString"] = hostString
 	capturedArgs["isCoordinator"] = isCoordinator
@@ -111,7 +112,7 @@ func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator boo
 	return response[0].(string), response[1].(error)
 }
 
-func (m *MockCollector) HostExecuteAndStream(_ bool, hostString string, _ cli.OutputHandler, isCoordinator bool, args ...string) error {
+func (m *MockCollector) HostExecuteAndStream(_ bool, hostString string, _ cli.OutputHandler, isCoordinator, isZookeeper bool, args ...string) error {
 	capturedArgs := make(map[string]interface{})
 	capturedArgs["hostString"] = hostString
 	capturedArgs["isCoordinator"] = isCoordinator
