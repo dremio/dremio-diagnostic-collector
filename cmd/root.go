@@ -161,6 +161,7 @@ func Execute(args []string) {
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
+			ZookeeperStr:   zookeeperStr,
 			OutputLoc:      filepath.Clean(outputLoc),
 			SudoUser:       sudoUser,
 			DDCfs:          helpers.NewRealFileSystem(),
@@ -173,8 +174,7 @@ func Execute(args []string) {
 			SSHUser:   sshUser,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace: namespace,
-			//ScaleoutCoordinatorContainer: scaleoutCoordinatorContainer,
+			Namespace:            namespace,
 			CoordinatorContainer: coordinatorContainer,
 			ExecutorsContainer:   executorsContainer,
 			ZookeeperContainers:  zookeeperContainer,

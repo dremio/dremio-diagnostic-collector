@@ -24,19 +24,17 @@ import (
 func ComposeExecuteAndStream(mask bool, conf HostCaptureConfiguration, output cli.OutputHandler, command []string) error {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 	sudoUser := conf.SudoUser
 	var err error
 
 	if sudoUser == "" {
-		err = c.HostExecuteAndStream(mask, host, output, isCoordinator, isZookeeper, command...)
+		err = c.HostExecuteAndStream(mask, host, output, conf.IsCoordinator, conf.IsZookeeper, command...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error '%v'", host, err)
 		}
 	} else {
 		sudoCommand := append([]string{"sudo", "-u", sudoUser}, command...)
-		err = c.HostExecuteAndStream(mask, host, output, isCoordinator, isZookeeper, sudoCommand...)
+		err = c.HostExecuteAndStream(mask, host, output, conf.IsCoordinator, conf.IsZookeeper, sudoCommand...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error '%v'", host, err)
 		}
@@ -48,18 +46,16 @@ func ComposeExecuteAndStream(mask bool, conf HostCaptureConfiguration, output cl
 func ComposeExecute(mask bool, conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 	sudoUser := conf.SudoUser
 
 	if sudoUser == "" {
-		stdOut, err = c.HostExecute(mask, host, isCoordinator, isZookeeper, command...)
+		stdOut, err = c.HostExecute(mask, host, conf.IsCoordinator, conf.IsZookeeper, command...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error %v: output was: '%v'", host, err, stdOut)
 		}
 	} else {
 		sudoCommand := append([]string{"sudo", "-u", sudoUser}, command...)
-		stdOut, err = c.HostExecute(mask, host, isCoordinator, isZookeeper, sudoCommand...)
+		stdOut, err = c.HostExecute(mask, host, conf.IsCoordinator, conf.IsZookeeper, sudoCommand...)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v; output was '%v'", host, err, stdOut)
 		}
@@ -71,10 +67,8 @@ func ComposeExecute(mask bool, conf HostCaptureConfiguration, command []string) 
 func ComposeExecuteNoSudo(mask bool, conf HostCaptureConfiguration, command []string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 
-	stdOut, err = c.HostExecute(mask, host, isCoordinator, isZookeeper, command...)
+	stdOut, err = c.HostExecute(mask, host, conf.IsCoordinator, conf.IsZookeeper, command...)
 	if err != nil {
 		simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 	}
@@ -86,17 +80,15 @@ func ComposeExecuteNoSudo(mask bool, conf HostCaptureConfiguration, command []st
 func ComposeCopy(conf HostCaptureConfiguration, source, destination string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 	sudoUser := conf.SudoUser
 
 	if sudoUser == "" {
-		stdOut, err = c.CopyFromHost(host, isCoordinator, isZookeeper, source, destination)
+		stdOut, err = c.CopyFromHost(host, conf.IsCoordinator, conf.IsZookeeper, source, destination)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 		}
 	} else {
-		stdOut, err = c.CopyFromHostSudo(host, isCoordinator, isZookeeper, sudoUser, source, destination)
+		stdOut, err = c.CopyFromHostSudo(host, conf.IsCoordinator, conf.IsZookeeper, sudoUser, source, destination)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v; output was '%v'", host, err, stdOut)
 		}
@@ -108,10 +100,8 @@ func ComposeCopy(conf HostCaptureConfiguration, source, destination string) (std
 func ComposeCopyNoSudo(conf HostCaptureConfiguration, source, destination string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 
-	stdOut, err = c.CopyFromHost(host, isCoordinator, isZookeeper, source, destination)
+	stdOut, err = c.CopyFromHost(host, conf.IsCoordinator, conf.IsZookeeper, source, destination)
 	if err != nil {
 		simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 	}
@@ -123,17 +113,15 @@ func ComposeCopyNoSudo(conf HostCaptureConfiguration, source, destination string
 func ComposeCopyTo(conf HostCaptureConfiguration, source, destination string) (stdOut string, err error) {
 	host := conf.Host
 	c := conf.Collector
-	isCoordinator := conf.IsCoordinator
-	isZookeeper := conf.IsZookeeper
 	sudoUser := conf.SudoUser
 
 	if sudoUser == "" {
-		stdOut, err = c.CopyToHost(host, isCoordinator, isZookeeper, source, destination)
+		stdOut, err = c.CopyToHost(host, conf.IsCoordinator, conf.IsZookeeper, source, destination)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 		}
 	} else {
-		stdOut, err = c.CopyToHostSudo(host, isCoordinator, isZookeeper, sudoUser, source, destination)
+		stdOut, err = c.CopyToHostSudo(host, conf.IsCoordinator, conf.IsZookeeper, sudoUser, source, destination)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v: output '%v'", host, err, stdOut)
 		}

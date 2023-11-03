@@ -185,9 +185,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			m.Lock()
 			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
-			//m.Lock()
+			m.Lock()
 			totalFailedFiles = append(totalFailedFiles, failedFiles...)
 			totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
 			files = append(files, writtenFiles...)
@@ -214,9 +213,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				}
 				//always skip executor calls
 				skipRESTCalls := true
-				m.Lock()
 				writtenFiles, failedFiles, skippedFiles := Capture(zookeperCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
-				//m.Lock()
+				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, failedFiles...)
 				totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
 				files = append(files, writtenFiles...)

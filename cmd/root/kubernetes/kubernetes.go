@@ -59,7 +59,6 @@ func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
 }
 
 func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator, isZookeeper bool) string {
-	fmt.Printf("host %v, crd: %v, zk: %v\n", podName, isCoordinator, isZookeeper)
 	if isCoordinator {
 		kubectlArgs := []string{c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
 		conts, _ := c.cli.Execute(false, kubectlArgs...)
