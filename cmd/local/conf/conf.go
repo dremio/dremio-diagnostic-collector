@@ -50,6 +50,11 @@ func GetBool(confData map[string]interface{}, key string) bool {
 	return false
 }
 
+// We just strip suffix at the moment. More checks can be added here
+func SanitiseURL(url string) string {
+	return strings.TrimSuffix(url, "/")
+}
+
 type CollectConf struct {
 	// flags that are configurable by env or configuration
 	numberThreads              int
@@ -487,7 +492,7 @@ func (c *CollectConf) ThreadDumpsOutDir() string {
 }
 
 func (c *CollectConf) DremioEndpoint() string {
-	return c.dremioEndpoint
+	return SanitiseURL(c.dremioEndpoint)
 }
 
 func (c *CollectConf) DremioPATToken() string {
