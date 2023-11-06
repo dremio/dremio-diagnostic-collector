@@ -194,7 +194,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		}(executor)
 	}
 
-	if len(zookeepers) > 0 {
+	/*if len(zookeepers) > 0 {
 		for _, zookeeper := range zookeepers {
 			nodesConnectedTo++
 			wg.Add(1)
@@ -221,7 +221,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				m.Unlock()
 			}(zookeeper)
 		}
-	}
+	}*/
 	wg.Wait()
 	end := time.Now().UTC()
 	var collectionInfo SummaryInfo
