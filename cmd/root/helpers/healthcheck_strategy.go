@@ -37,17 +37,17 @@ func (r *RealTimeService) GetNow() time.Time {
 	return time.Now()
 }
 
-func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService) *CopyStrategyHC {
+func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService) (*CopyStrategyHC, error) {
 	now := timeService.GetNow()
 	dir := now.Format("20060102-150405-DDC")
-	tmpDir, _ := ddcfs.MkdirTemp("", "*")
+	tmpDir, err := ddcfs.MkdirTemp("", "*")
 	return &CopyStrategyHC{
 		StrategyName: "healthcheck",
 		BaseDir:      dir,
 		TmpDir:       tmpDir,
 		Fs:           ddcfs,
 		TimeService:  timeService,
-	}
+	}, err
 }
 
 /*

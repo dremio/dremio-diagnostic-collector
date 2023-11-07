@@ -36,7 +36,10 @@ func TestBaseDirHC(t *testing.T) {
 	timeService := MockTimeService{
 		Time: now,
 	}
-	testStrat := NewHCCopyStrategy(ddcfs, &timeService)
+	testStrat, err := NewHCCopyStrategy(ddcfs, &timeService)
+	if err != nil {
+		t.Errorf("error when creating copy strategy: %v", err)
+	}
 	expected := now.Format("20060102-150405-DDC")
 	actual := testStrat.BaseDir
 	// Check the base dir is set on creation
@@ -48,9 +51,12 @@ func TestBaseDirHC(t *testing.T) {
 // Tests the constructor is setting a temp dir
 func TestTmpDirHC(t *testing.T) {
 	ddcfs := NewFakeFileSystem()
-	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{
+	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{
 		Time: time.Now(),
 	})
+	if err != nil {
+		t.Errorf("error when creating copy strategy: %v", err)
+	}
 	expected := filepath.Join("tmp", "dir1", "random")
 	actual := testStrat.TmpDir
 	// Check the base dir is set on creation
@@ -62,7 +68,10 @@ func TestTmpDirHC(t *testing.T) {
 // Tests the method returns the correct path
 func TestGetPathHC(t *testing.T) {
 	ddcfs := NewFakeFileSystem()
-	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
+	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
+	if err != nil {
+		t.Errorf("error when creating copy strategy: %v", err)
+	}
 	// Test path for coordinators
 	expected := filepath.Join("tmp", "dir1", "random", testStrat.BaseDir, "log", "node1-C")
 	actual, _ := testStrat.CreatePath("log", "node1", "coordinator")
@@ -81,7 +90,10 @@ func TestGetPathHC(t *testing.T) {
 // it tests the call via the selected strategy
 func TestArchiveDiagHC(t *testing.T) {
 	ddcfs := NewRealFileSystem()
-	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
+	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
+	if err != nil {
+		t.Errorf("error when creating copy strategy: %v", err)
+	}
 	tmpDir := t.TempDir()
 	testFileRaw := filepath.Join("testdata", "test.txt")
 	if testFile, err := filepath.Abs(testFileRaw); err != nil {
