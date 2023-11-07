@@ -115,12 +115,6 @@ func (f RealFileSystem) Mkdir(name string, perms os.FileMode) error {
 }
 
 // MkdirTemp
-/*func (f RealFileSystem) MkdirTemp(name string, pattern string) (string, error) {
-	dir, err := os.MkdirTemp(name, pattern)
-	return dir, err
-}
-*/
-
 func (f RealFileSystem) MkdirTemp(name string, pattern string) (dir string, err error) {
 	if conf.KeyTmpOutputDir == "" {
 		dir, err = os.MkdirTemp(name, pattern)
