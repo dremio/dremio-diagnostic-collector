@@ -351,7 +351,7 @@ func TestURLsuffix(t *testing.T) {
 	}
 
 	testURL = "http://localhost:9047/some/path"
-	expected = "http://localhost:9047/some/path/"
+	expected = "http://localhost:9047/some/path"
 	actual = conf.SanitiseURL(testURL)
 	if expected != actual {
 		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
