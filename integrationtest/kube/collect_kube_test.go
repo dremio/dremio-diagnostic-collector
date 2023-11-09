@@ -144,7 +144,7 @@ var dremioPATToken string
 
 func TestMain(m *testing.M) {
 	isIntegration := os.Getenv("SKIP_INTEGRATION_SETUP")
-	if isIntegration != "" {
+	if isIntegration == "true" {
 		return
 	}
 
