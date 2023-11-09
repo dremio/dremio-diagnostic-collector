@@ -63,7 +63,7 @@ func (l *Collector) RunCollectDremioServerLog() error {
 		errs = append(errs, fmt.Errorf("unable to copy %v to %v due to error %v", src, dest, err))
 	}
 	if len(errs) > 1 {
-		return fmt.Errorf("serveral errors while copying dremio server logs: %v", errors.Join(errs...))
+		return fmt.Errorf("several errors while copying dremio server logs: %v", errors.Join(errs...))
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
@@ -112,7 +112,7 @@ func (l *Collector) RunCollectGcLogs() error {
 		}
 	}
 	if len(errs) > 1 {
-		return fmt.Errorf("serveral errors while copying dremio server logs: %v", errors.Join(errs...))
+		return fmt.Errorf("several errors while copying dremio server logs: %v", errors.Join(errs...))
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
@@ -153,7 +153,7 @@ func (l *Collector) RunCollectDremioAccessLogs() error {
 func (l *Collector) RunCollectDremioAuditLogs() error {
 	simplelog.Debug("Collecting audit logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "audit.json", "audit", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to archive audit.jsons due to error %v", err)
+		return fmt.Errorf("unable to archive audit.json files due to error %v", err)
 	}
 	simplelog.Debug("... collecting audit logs from Coordinator(s) COMPLETED")
 
@@ -165,7 +165,7 @@ func (l *Collector) RunCollectAccelerationLogs() error {
 	if err := l.exportArchivedLogs(l.dremioLogDir, "acceleration.log", "acceleration", l.dremioLogsNumDays); err != nil {
 		return fmt.Errorf("unable to archive acceleration.logs due to error %v", err)
 	}
-	simplelog.Debug("... collecting acceleragtion logs from Coordinator(s) COMPLETED")
+	simplelog.Debug("... collecting acceleration logs from Coordinator(s) COMPLETED")
 
 	return nil
 }
@@ -181,19 +181,29 @@ func (l *Collector) RunCollectQueriesJSON() error {
 	return nil
 }
 
-func (l *Collector) exportArchivedLogs(srcLogDir string, unarchivedFile string, logPrefix string, archiveDays int) error {
+func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, logPrefix string, archiveDays int) error {
 	var errs []error
-	src := path.Join(srcLogDir, unarchivedFile)
+	src := path.Join(srcLogDir, unzippedFile)
 	var outDir string
 	if logPrefix == "queries" {
 		outDir = l.queriesOutDir
 	} else {
 		outDir = l.logsOutDir
 	}
-	dest := path.Join(outDir, unarchivedFile)
-	//instead of copying it we just archive it to a new location
-	if err := ddcio.GzipFile(path.Clean(src), path.Clean(dest+".gz")); err != nil {
-		errs = append(errs, fmt.Errorf("archiving of log file %v failed due to error %v", unarchivedFile, err))
+	unzippedFileDest := path.Join(outDir, unzippedFile)
+	//we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
+	if err := ddcio.CopyFile(path.Clean(src), path.Clean(unzippedFileDest)); err != nil {
+		errs = append(errs, fmt.Errorf("copying of log file %v failed due to error %v", unzippedFile, err))
+	} else {
+		// if this is successful go ahead and gzip it
+		if err := ddcio.GzipFile(path.Clean(unzippedFileDest), path.Clean(unzippedFileDest+".gz")); err != nil {
+			errs = append(errs, fmt.Errorf("archiving of log file %v failed due to error %v", unzippedFile, err))
+		} else {
+			//if we've successfully gzipped the file we can safely delete the source
+			if err := os.Remove(path.Clean(unzippedFileDest)); err != nil {
+				errs = append(errs, fmt.Errorf("cleanup of old log file %v failed due to error %v", unzippedFile, err))
+			}
+		}
 	}
 
 	today := time.Now()
@@ -210,17 +220,23 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unarchivedFile string, 
 				simplelog.Debugf("Copying archive file for %v:%v", processingDate, f.Name())
 				src := filepath.Join(srcLogDir, "archive", f.Name())
 				dst := filepath.Join(outDir, f.Name())
-				if strings.HasSuffix(f.Name(), ".gz") {
-					if err := ddcio.CopyFile(path.Clean(src), path.Clean(dst)); err != nil {
-						errs = append(errs, fmt.Errorf("unable to move file %v to %v due to error %v", src, dst, err))
-						continue
-					}
-				} else {
-					//instead of copying it we just archive it to a new location
-					if err := ddcio.GzipFile(path.Clean(src), path.Clean(dst+".gz")); err != nil {
+
+				//we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
+				if err := ddcio.CopyFile(path.Clean(src), path.Clean(dst)); err != nil {
+					errs = append(errs, fmt.Errorf("unable to move file %v to %v due to error %v", src, dst, err))
+					continue
+				}
+				if !strings.HasSuffix(f.Name(), ".gz") {
+					//go ahead and archive the file since it's not already
+					if err := ddcio.GzipFile(path.Clean(dst), path.Clean(dst+".gz")); err != nil {
 						errs = append(errs, fmt.Errorf("unable to archive file %v to %v due to error %v", src, dst, err))
 						continue
 					}
+					//if we've successfully gzipped the file we can safely delete the source (the continue above will guard against executing this)
+					if err := os.Remove(path.Clean(dst)); err != nil {
+						errs = append(errs, fmt.Errorf("cleanup of old log file %v failed due to error %v", unzippedFile, err))
+					}
+
 				}
 			}
 		}

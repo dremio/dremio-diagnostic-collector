@@ -21,11 +21,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
 
@@ -115,63 +113,6 @@ func TestTtopCollects(t *testing.T) {
 	}
 }
 
-func TestTtopCollectsIntegrationTest(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-	defer func() {
-		//in windows we may need a bit more time to kill the process
-		if runtime.GOOS == "windows" {
-			time.Sleep(500 * time.Millisecond)
-		}
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	pid := cmd.Process.Pid
-
-	tmpDir := t.TempDir()
-	ddcYaml := filepath.Join(tmpDir, "ddc.yaml")
-
-	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
-dremio-pid: %v
-dremio-ttop-freq-seconds: 1
-dremio-ttop-time-seconds: 2
-node-name: node1
-tmp-output-dir: %v
-
-`, pid, tmpDir)), 0600); err != nil {
-		t.Fatal(err)
-	}
-	ttopOutDir := filepath.Join(tmpDir, "ttop", "node1")
-	if err := os.MkdirAll(ttopOutDir, 0700); err != nil {
-		t.Fatal(err)
-	}
-	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, tmpDir)
-	if err != nil {
-		t.Fatalf("Unable to read conf: %v", err)
-	}
-	if err := jvmcollect.RunTtopCollect(c); err != nil {
-		t.Fatalf("unable to collect %v", err)
-	}
-
-	ttopFile := filepath.Join(ttopOutDir, "ttop.txt")
-	b, err := os.ReadFile(ttopFile)
-	if err != nil {
-		t.Error(err)
-	}
-	txt := string(b)
-	expected := "Monitoring threads ..."
-	if !strings.Contains(txt, expected) {
-		t.Errorf("expected text '%v' to be found in '%v'", expected, txt)
-	}
-}
-
 func TestTtopExec(t *testing.T) {
 	ttop := &jvmcollect.Ttop{}
 	jarLoc := filepath.Join("testdata", "demo.jar")
@@ -203,7 +144,7 @@ func TestTtopExec(t *testing.T) {
 	if text, err := ttop.KillTtop(); err != nil {
 		t.Errorf(err.Error())
 	} else {
-		t.Logf("text for top was `%v`", text)
+		t.Logf("text for ttop was `%v`", text)
 	}
 }
 

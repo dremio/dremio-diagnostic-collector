@@ -50,6 +50,9 @@ type SSHTestConf struct {
 }
 
 func TestSSHBasedRemoteCollect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 
 	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
 	if err != nil {
