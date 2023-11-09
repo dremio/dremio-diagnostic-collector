@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3]
+### Fixed
+
+* now copy, archive, and delete copy instead of archive in place log files #130
+* unexpected use of tmp path #123
+* clean rest API URL by adding check for trailing slash #127 
+
 ## [0.7.2]
 
 ### Fixed
@@ -365,6 +372,9 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.7.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.0...v0.6.1
