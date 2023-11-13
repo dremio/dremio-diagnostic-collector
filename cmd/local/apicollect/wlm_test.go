@@ -29,16 +29,17 @@ import (
 
 func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 	t.Helper()
-	confDir, err := os.MkdirTemp("", "ddc-tester-wlm-test")
-	if err != nil {
-		t.Fatalf("unable to create tmp dir due to error %v", err)
+	confDir = filepath.Join(t.TempDir(), "ddc-tester-wlm-test")
+	if err := os.MkdirAll(confDir, 0700); err != nil {
+		t.Fatalf("unable to create directory %v due to error %v", confDir, err)
 	}
-	outDir, err := os.MkdirTemp("", "ddc-tester-wlm-test-out")
-	if err != nil {
-		t.Fatalf("unable to create tmp dir due to error %v", err)
+	outDir := filepath.Join(t.TempDir(), "ddc-tester-wlm-test")
+	if err := os.MkdirAll(outDir, 0700); err != nil {
+		t.Fatalf("unable to create directory %v due to error %v", outDir, err)
 	}
+
 	nodeName := "tester-node-1"
-	err = os.MkdirAll(filepath.Join(outDir, "wlm", nodeName), 0700)
+	err := os.MkdirAll(filepath.Join(outDir, "wlm", nodeName), 0700)
 	if err != nil {
 		t.Fatalf("unable to create wlm dir due to error %v", err)
 	}

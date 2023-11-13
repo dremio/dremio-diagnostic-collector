@@ -109,6 +109,7 @@ func TarGzDir(srcDir, dest string) error {
 	}); err != nil {
 		return err
 	}
+
 	if err := tarWriter.Close(); err != nil {
 		return fmt.Errorf("failed close to tar file %w", err)
 	}

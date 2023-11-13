@@ -70,15 +70,15 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestCopyDir(t *testing.T) {
-	srcDir, err := os.MkdirTemp("", "source-dir")
-	if err != nil {
-		t.Fatalf("Failed to create temporary source directory: %v", err)
+	srcDir := filepath.Join(t.TempDir(), "source-dir")
+	if err := os.MkdirAll(srcDir, 0700); err != nil {
+		t.Fatalf("unable to create directory %v due to error %v", srcDir, err)
 	}
 	defer os.RemoveAll(srcDir)
 
 	// Create a subdirectory within the source directory
 	subDir := filepath.Join(srcDir, "subdir")
-	err = os.Mkdir(subDir, 0755)
+	err := os.Mkdir(subDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
@@ -96,10 +96,11 @@ func TestCopyDir(t *testing.T) {
 		t.Fatalf("Failed to write content to source file: %v", err)
 	}
 
-	dstDir, err := os.MkdirTemp("", "destination-dir")
-	if err != nil {
-		t.Fatalf("Failed to create temporary destination directory: %v", err)
+	dstDir := filepath.Join(t.TempDir(), "destination-dir")
+	if err := os.MkdirAll(dstDir, 0700); err != nil {
+		t.Fatalf("unable to create directory %v due to error %v", srcDir, err)
 	}
+
 	defer os.RemoveAll(dstDir)
 
 	// Call the method under test

@@ -50,6 +50,7 @@ type Ttop struct {
 type TtopArgs struct {
 	Interval int
 	PID      int
+	TmpDir   string
 }
 
 func (t *Ttop) StartTtop(args TtopArgs) error {
@@ -63,10 +64,7 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 	}
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
-	tmpDir, err := os.MkdirTemp("", "ddc-sjkttop")
-	if err != nil {
-		return err
-	}
+	tmpDir := filepath.Join(args.TmpDir, "ddc-sjkttop")
 	t.tmpDir = tmpDir
 	// referencing a part interior to go always use / path
 	data, err := fs.ReadFile(f, "lib/sjk.jar")
@@ -74,7 +72,12 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 		return err
 	}
 
+	if err := os.MkdirAll(t.tmpDir, 0700); err != nil {
+		return fmt.Errorf("unable to create directory %v due to error %v", t.tmpDir, err)
+	}
+
 	sjk := filepath.Join(t.tmpDir, "sjk.jar")
+
 	if err := os.WriteFile(sjk, data, 0600); err != nil {
 		return err
 	}
@@ -150,6 +153,7 @@ func RunTtopCollect(c *conf.CollectConf) error {
 	ttopArgs := TtopArgs{
 		Interval: c.DremioTtopFreqSeconds(),
 		PID:      c.DremioPID(),
+		TmpDir:   c.OutputDir(),
 	}
 	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
 }

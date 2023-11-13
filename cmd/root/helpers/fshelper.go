@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 // fshelper provides functions to wrapper os file system calls
@@ -116,12 +117,23 @@ func (f RealFileSystem) Mkdir(name string, perms os.FileMode) error {
 
 // MkdirTemp
 func (f RealFileSystem) MkdirTemp(name string, pattern string) (dir string, err error) {
-	if conf.KeyTmpOutputDir == "" {
-		dir, err = os.MkdirTemp(name, pattern)
+	// Read config
+	overrides := make(map[string]string)
+	c, err := conf.ReadConfFromExecLocation(overrides)
+	if err != nil {
+		// just warn, fallback to os tmp dir
+		simplelog.Warningf("unable to read configuration \n%v", err)
 	} else {
-		dir = conf.KeyTmpOutputDir
+		dir = filepath.Join(c.OutputDir(), pattern)
 	}
-	return dir, err
+	// fallback to using default OS tmp dir call
+	if dir == "" {
+		dir, err = os.MkdirTemp(name, pattern)
+		if err != nil {
+			return "", fmt.Errorf("unable to read create tmpDir \n%w", err)
+		}
+	}
+	return dir, nil
 }
 
 // MkdirAll

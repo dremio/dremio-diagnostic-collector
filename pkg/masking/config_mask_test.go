@@ -64,10 +64,8 @@ func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
 				}
 			}
 			`
-	tmpDir, err := os.MkdirTemp("", "ddctester")
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
+
+	tmpDir := filepath.Join(t.TempDir(), "ddctester")
 	tmpfile := filepath.Join(tmpDir, "dremio.conf")
 	defer func() {
 		if err := os.RemoveAll(tmpDir); err != nil {
@@ -75,7 +73,11 @@ func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
 		}
 	}()
 
-	err = os.WriteFile(tmpfile, []byte(conf), 0700)
+	if err := os.MkdirAll(tmpDir, 0700); err != nil {
+		t.Fatalf("unable to create directory %v due to error %v", tmpDir, err)
+	}
+
+	err := os.WriteFile(tmpfile, []byte(conf), 0700)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}

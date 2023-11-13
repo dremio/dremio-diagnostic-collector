@@ -39,6 +39,7 @@ var genericConfSetup = func(cfgContent string) {
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
+
 	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {
@@ -340,4 +341,21 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 		t.Errorf("expected dremio-pat-token to be redacted in '%v' but it was not", out)
 	}
 	afterEachConfTest()
+}
+
+func TestURLsuffix(t *testing.T) {
+	testURL := "http://localhost:9047/some/path/"
+	expected := "http://localhost:9047/some/path"
+	actual := conf.SanitiseURL(testURL)
+	if expected != actual {
+		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
+	}
+
+	testURL = "http://localhost:9047/some/path"
+	expected = "http://localhost:9047/some/path"
+	actual = conf.SanitiseURL(testURL)
+	if expected != actual {
+		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
+	}
+
 }

@@ -50,6 +50,11 @@ func GetBool(confData map[string]interface{}, key string) bool {
 	return false
 }
 
+// We just strip suffix at the moment. More checks can be added here
+func SanitiseURL(url string) string {
+	return strings.TrimSuffix(url, "/")
+}
+
 type CollectConf struct {
 	// flags that are configurable by env or configuration
 	numberThreads              int
@@ -168,9 +173,9 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
 
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
-
 	c := &CollectConf{}
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(c.outputDir, time.Now()))
+
 	c.systemtables = SystemTableList()
 	c.systemtablesdremiocloud = []string{
 		"organization.clouds",
@@ -349,9 +354,12 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	return c, nil
 }
 
-func getOutputDir(now time.Time) string {
-	nowStr := now.Format("20060102-150405")
-	return filepath.Join(os.TempDir(), "ddc", nowStr)
+func getOutputDir(outputDir string, t time.Time) string {
+	nowStr := t.Format("20060102-150405")
+	if outputDir == "" {
+		return filepath.Join(os.TempDir(), "ddc", nowStr)
+	}
+	return filepath.Join(outputDir, "ddc", nowStr)
 }
 
 func (c CollectConf) DisableRESTAPI() bool {
@@ -487,7 +495,7 @@ func (c *CollectConf) ThreadDumpsOutDir() string {
 }
 
 func (c *CollectConf) DremioEndpoint() string {
-	return c.dremioEndpoint
+	return SanitiseURL(c.dremioEndpoint)
 }
 
 func (c *CollectConf) DremioPATToken() string {
