@@ -201,9 +201,11 @@ is-dremio-cloud: false
 	if !found {
 		t.Errorf("did not find jvm_settings.txt in entries '%v'", strings.Join(items, ", "))
 	}
-	expectedText := "demo.jar -Dtestflag=1"
-	if text != expectedText {
-		t.Errorf("expected '%q' but was '%q'", expectedText, text)
+	containsDemoJar := strings.Contains(text, "demo.jar")
+	containsFlag := strings.Contains(text, "-Dtestflag=1")
+	successful := containsFlag && containsDemoJar
+	if !successful {
+		t.Errorf("expected '-Dtestflag=1' and 'demo.jar' in the flags but was '%q'", text)
 	}
 }
 

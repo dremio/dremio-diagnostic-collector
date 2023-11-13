@@ -143,6 +143,11 @@ var namespace string
 var dremioPATToken string
 
 func TestMain(m *testing.M) {
+	isIntegration := os.Getenv("SKIP_INTEGRATION_SETUP")
+	if isIntegration == "true" {
+		return
+	}
+
 	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
 		var err error
@@ -385,11 +390,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestValidateTestWasCorrectlyRun(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 	if !setupIsRun {
 		t.Error("integration tests broken, nothing was run, if all other tests are passing this means there is an error in setup")
 	}
 }
 func TestRemoteCollectOnK8s(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 	var err error
 	transferDir := "/opt/dremio/data/ddc-transfer"
 	tmpOutputDir := "/opt/dremio/data/ddc-tmp-out"
