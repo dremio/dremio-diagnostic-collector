@@ -27,10 +27,7 @@ import (
 // and then compare the output of Tree function with the expected string.
 func TestTree(t *testing.T) {
 	// Creating a temporary directory
-	tempDir, err := os.MkdirTemp("", "TestTree")
-	if err != nil {
-		t.Fatalf("Cannot create temporary directory: %v", err)
-	}
+	tempDir := filepath.Join(t.TempDir(), "TestTree")
 
 	defer func() {
 		err := os.RemoveAll(tempDir) // clean up
@@ -41,7 +38,7 @@ func TestTree(t *testing.T) {
 
 	// Creating a dummy structure
 	dirPath := filepath.Join(tempDir, "dir1/dir2")
-	err = os.MkdirAll(dirPath, 0755)
+	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
 		t.Fatalf("Cannot create directories: %v", err)
 	}

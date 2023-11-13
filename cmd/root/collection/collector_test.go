@@ -218,7 +218,8 @@ func TestFindHostsCoordinators(t *testing.T) {
 
 	fakeFS := helpers.NewFakeFileSystem()
 	mockStrategy := NewMockStrategy(fakeFS)
-	fakeTmp := mockStrategy.TmpDir
+	mockStrategy.TmpDir = t.TempDir()
+	fakeTmp := t.TempDir()
 	fakeArgs := Args{
 		DDCfs:          fakeFS,
 		CoordinatorStr: "10.1.2.3-nok",

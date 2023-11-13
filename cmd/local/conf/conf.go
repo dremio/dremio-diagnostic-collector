@@ -173,9 +173,9 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
 
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
-
 	c := &CollectConf{}
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(c.outputDir, time.Now()))
+
 	c.systemtables = SystemTableList()
 	c.systemtablesdremiocloud = []string{
 		"organization.clouds",
@@ -354,9 +354,12 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	return c, nil
 }
 
-func getOutputDir(now time.Time) string {
-	nowStr := now.Format("20060102-150405")
-	return filepath.Join(os.TempDir(), "ddc", nowStr)
+func getOutputDir(outputDir string, t time.Time) string {
+	nowStr := t.Format("20060102-150405")
+	if outputDir == "" {
+		return filepath.Join(os.TempDir(), "ddc", nowStr)
+	}
+	return filepath.Join(outputDir, "ddc", nowStr)
 }
 
 func (c CollectConf) DisableRESTAPI() bool {

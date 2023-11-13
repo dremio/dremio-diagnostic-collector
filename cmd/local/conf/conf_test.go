@@ -39,6 +39,7 @@ var genericConfSetup = func(cfgContent string) {
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
+
 	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {

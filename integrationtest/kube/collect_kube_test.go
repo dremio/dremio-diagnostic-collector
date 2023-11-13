@@ -335,8 +335,8 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Printf("unexpected error %v", err)
 			return 1
-
 		}
+
 		defer func() {
 			if err := os.RemoveAll(tmpDirForConf); err != nil {
 				simplelog.Warningf("unable to clean up dir %v due to error %v", tmpDirForConf, err)

@@ -89,7 +89,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	var ddcLoc string
 	var err error
-	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
+	tmpIinstallDir := filepath.Join(s.GetTmpDir(), "ddcex-output")
 	if err != nil {
 		return err
 	}
@@ -211,6 +211,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if err != nil {
 		return err
 	}
+
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {

@@ -36,6 +36,9 @@ func WriteOutDDC(targetDir string) (string, error) {
 		return "", err
 	}
 	outFileName := filepath.Join(targetDir, "ddc.zip")
+	if err := os.MkdirAll(targetDir, 0700); err != nil {
+		return "", fmt.Errorf("unable to create directory %v due to error %v", targetDir, err)
+	}
 	if err := os.WriteFile(outFileName, data, 0600); err != nil {
 		return "", fmt.Errorf("unable to write file %v due to error %v", outFileName, err)
 	}

@@ -16,6 +16,7 @@ package autodetect_test
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
@@ -42,7 +43,7 @@ func TestIsAWSEFromText(t *testing.T) {
 		t.Error("expected to be AWSE but was detected as not AWSE")
 	}
 
-	// AWSE can show two DremioDaemon processes but one is the preview engine, this gives us indication of AWSE
+	//AWSE can show two DremioDaemon processes but one is the preview engine, this gives us indication of AWSE
 	//should return true when DremioDaemon and preview is found in the text
 	jpsText = `27059 Jps -Dapplication.home=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.362.b08-1.amzn2.0.1.x86_64 -Xms8m
 31577 DremioDaemon -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/dremio/preview/server.gc -Ddremio.log.path=/var/log/dremio/preview -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio/preview -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -Xloggc:/var/log/dremio/server-%t.gc -XX:+UseG1GC -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2000 -XX:GCLogFileSize=50M -XX:+StartAttachListener -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC
@@ -65,9 +66,9 @@ func TestIsAWSEExecutorUsingDir(t *testing.T) {
 	)
 
 	beforeEach := func() {
-		testDir, err = os.MkdirTemp("", "example")
-		if err != nil {
-			t.Errorf("unexpected error %v", err)
+		testDir = filepath.Join(t.TempDir(), "example")
+		if err := os.MkdirAll(testDir, 0700); err != nil {
+			t.Errorf("unable to create directory %v due to error %v", testDir, err)
 		}
 		nodeName = "TestNode"
 
