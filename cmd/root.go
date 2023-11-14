@@ -221,7 +221,7 @@ func init() {
 	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --coordinator and --executors flags")
 	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostics commands need a sudo user (i.e. for jcmd)")
-	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc", "directory to use for communication between the local-collect command and this one")
+	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc/", "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name of tgz file to save the diagnostic collection to")
 	execLoc, err := os.Executable()
 	if err != nil {

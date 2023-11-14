@@ -147,7 +147,7 @@ func (m *MockCapCollector) CopyToHost(hostString string, isCoordinator bool, sou
 	return response, err
 }
 
-func (m *MockCapCollector) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (response string, err error) {
+func (m *MockCapCollector) CopyToHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination, tmpDir string) (response string, err error) {
 	copyCall := MockCapCopy{
 		HostString:    hostString,
 		IsCoordinator: isCoordinator,
@@ -165,7 +165,7 @@ func (m *MockCapCollector) CopyToHostSudo(hostString string, isCoordinator bool,
 	return response, err
 }
 
-func (m *MockCapCollector) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (response string, err error) {
+func (m *MockCapCollector) CopyFromHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination, tmpdir string) (response string, err error) {
 	copyCall := MockCapCopy{
 		HostString:    hostString,
 		IsCoordinator: isCoordinator,

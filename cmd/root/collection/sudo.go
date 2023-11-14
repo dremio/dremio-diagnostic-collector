@@ -92,7 +92,7 @@ func ComposeCopy(conf HostCaptureConfiguration, source, destination string) (std
 			simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 		}
 	} else {
-		stdOut, err = c.CopyFromHostSudo(host, isCoordinator, sudoUser, source, destination)
+		stdOut, err = c.CopyFromHostSudo(host, isCoordinator, sudoUser, source, destination, conf.TransferDir)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v; output was '%v'", host, err, stdOut)
 		}
@@ -105,6 +105,8 @@ func ComposeCopyNoSudo(conf HostCaptureConfiguration, source, destination string
 	host := conf.Host
 	c := conf.Collector
 	isCoordinator := conf.IsCoordinator
+	simplelog.Infof("source: %v", source)
+	simplelog.Infof("destination: %v", destination)
 
 	stdOut, err = c.CopyFromHost(host, isCoordinator, source, destination)
 	if err != nil {
@@ -127,7 +129,7 @@ func ComposeCopyTo(conf HostCaptureConfiguration, source, destination string) (s
 			simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)
 		}
 	} else {
-		stdOut, err = c.CopyToHostSudo(host, isCoordinator, sudoUser, source, destination)
+		stdOut, err = c.CopyToHostSudo(host, isCoordinator, sudoUser, source, destination, conf.TransferDir)
 		if err != nil {
 			simplelog.Errorf("host %v failed to run sudo command with error %v: output '%v'", host, err, stdOut)
 		}

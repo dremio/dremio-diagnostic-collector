@@ -378,7 +378,7 @@ func Execute(args []string, overrides map[string]string) error {
 	} else {
 		ddcDir := filepath.Dir(ddcLoc)
 		if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
-			simplelog.Warningf("uanble to copy log to archive due to error %v", err)
+			simplelog.Warningf("unable to copy log to archive due to error %v", err)
 		}
 	}
 	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")

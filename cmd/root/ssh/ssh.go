@@ -60,10 +60,10 @@ func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destinatio
 	return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
 }
 
-func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination, transferDir string) (string, error) {
 	sourceFileName := filepath.Base(source)
 	// create a tmp dir for scp
-	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
+	tmpDir := path.Join(transferDir, "ddc-scp-"+uuid.New().String())
 	out, err := c.HostExecute(false, hostName, false, "mkdir", "-p", tmpDir)
 	if err != nil {
 		return out, err
@@ -77,7 +77,7 @@ func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, sour
 		}
 	}()
 	// first move to tmp dir from source as sudo
-	tmpFilePath := path.Join(tmpDir, sourceFileName)
+	tmpFilePath := path.Join(transferDir, sourceFileName)
 	out, err = c.HostExecuteSudo(false, hostName, sudoUser, "cp", source, tmpFilePath)
 	if err != nil {
 		return out, err
@@ -90,7 +90,7 @@ func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination 
 	return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 }
 
-func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
+func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination, transferDir string) (string, error) {
 	sourceFileName := filepath.Base(source)
 	// create a tmp dir for scp
 	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())

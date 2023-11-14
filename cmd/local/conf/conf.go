@@ -167,14 +167,20 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	}
 	simplelog.Debugf("logging parsed configuration from ddc.yaml")
 	defaultCaptureSeconds := 60
+	// set config struct
+	c := &CollectConf{}
 	// set node name
 	hostName, err := os.Hostname()
 	if err != nil {
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
-
-	c := &CollectConf{}
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(c.outputDir, time.Now()))
+	//set default tmp dir (if its not in the conifg, use the OS default)
+	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	if c.outputDir == "" {
+		c.outputDir = filepath.Join(os.TempDir(), getOutputDir(time.Now()))
+	}
+	//read in defaults
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, c.outputDir)
 
 	c.systemtables = SystemTableList()
 	c.systemtablesdremiocloud = []string{
@@ -294,7 +300,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	//c.outputDir = GetString(confData, KeyTmpOutputDir)
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
 	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
@@ -354,12 +360,9 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	return c, nil
 }
 
-func getOutputDir(outputDir string, t time.Time) string {
+func getOutputDir(t time.Time) string {
 	nowStr := t.Format("20060102-150405")
-	if outputDir == "" {
-		return filepath.Join(os.TempDir(), "ddc", nowStr)
-	}
-	return filepath.Join(outputDir, "ddc", nowStr)
+	return filepath.Join("ddc", nowStr)
 }
 
 func (c CollectConf) DisableRESTAPI() bool {

@@ -68,19 +68,6 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			return
 		}
 		simplelog.Infof("successfully copied ddc to host %v at %v", host, pathToDDC)
-		defer func() {
-			// clear out when done
-			if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC}); err != nil {
-				simplelog.Warningf("on host %v unable to remove ddc due to error '%v' with output '%v'", host, err, out)
-			}
-		}()
-		defer func() {
-			// clear out when done
-			if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC + ".log"}); err != nil {
-				simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
-			}
-		}()
-
 		//make  exec TransferDir
 		if out, err := ComposeExecute(false, conf, []string{"chmod", "+x", pathToDDC}); err != nil {
 			simplelog.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
@@ -97,12 +84,33 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		return
 	}
 	simplelog.Infof("successfully copied ddc.yaml to host %v at %v", host, pathToDDCYAML)
+
 	defer func() {
 		// clear out when done
 		if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDCYAML}); err != nil {
 			simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
 		}
 	}()
+	defer func() {
+		// clear out when done
+		if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC + ".log"}); err != nil {
+			simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
+		}
+	}()
+
+	/*defer func() {
+		// clear out when done
+		if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC}); err != nil {
+			simplelog.Warningf("on host %v unable to remove ddc due to error '%v' with output '%v'", host, err, out)
+		}
+	}()
+	defer func() {
+		// clear out when done
+		if out, err := ComposeExecute(false, conf, []string{"rm", pathToDDC + ".log"}); err != nil {
+			simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
+		}
+	}()
+	*/
 
 	//execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
 	var mask bool // to mask PAT token in logs

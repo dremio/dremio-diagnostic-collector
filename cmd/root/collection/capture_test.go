@@ -41,7 +41,7 @@ func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source
 	}
 	return response[0].(string), response[1].(error)
 }
-func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination, transferDir string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyToHostSudo"
 	args["hostString"] = hostString
@@ -72,13 +72,14 @@ func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, sour
 	}
 	return response[0].(string), response[1].(error)
 }
-func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
+func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator bool, sudoUser, source, destination, tmpdir string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyFromHostSudo"
 	args["hostString"] = hostString
 	args["isCoordinator"] = isCoordinator
 	args["source"] = source
 	args["destination"] = destination
+	args["tmpdir"] = tmpdir
 	m.Calls = append(m.Calls, args)
 	response := m.Returns[m.CallCounter]
 	m.CallCounter++
