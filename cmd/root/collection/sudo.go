@@ -105,9 +105,6 @@ func ComposeCopyNoSudo(conf HostCaptureConfiguration, source, destination string
 	host := conf.Host
 	c := conf.Collector
 	isCoordinator := conf.IsCoordinator
-	simplelog.Infof("source: %v", source)
-	simplelog.Infof("destination: %v", destination)
-
 	stdOut, err = c.CopyFromHost(host, isCoordinator, source, destination)
 	if err != nil {
 		simplelog.Errorf("host %v failed to run command with error %v: output was '%v'", host, err, stdOut)

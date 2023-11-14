@@ -300,7 +300,6 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	//c.outputDir = GetString(confData, KeyTmpOutputDir)
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
 	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
