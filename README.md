@@ -4,9 +4,10 @@
 
 collect logs of Dremio for analysis
 
-## Docs
+## User Docs
 
-While the docs here will provide you with what you need to run Dremio Diagnostic Collector the Dremio KB article is more polished and can be [here](https://support.dremio.com/hc/en-us/articles/15560006579739-Using-DDC-to-collect-files-for-Support-Tickets)
+Read the [Dremio Diagnostic Collector KB Article](https://support.dremio.com/hc/en-us/articles/15560006579739-Using-DDC-to-collect-files-for-Support-Tickets)
+
 ### Install
 
 Download the [latest release binaries](https://github.com/dremio/dremio-diagnostic-collector/releases/latest):
