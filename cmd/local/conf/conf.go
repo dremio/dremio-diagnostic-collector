@@ -236,29 +236,19 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	c.dremioLogDir = GetString(confData, KeyDremioLogDir)
 	c.nodeName = GetString(confData, KeyNodeName)
-	isAWSE, err := autodetect.IsAWSE()
+	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()
 	if err != nil {
 		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
 	}
-	if isAWSE {
-		isExec, err := autodetect.IsAWSEExecutor(c.nodeName)
+	if IsAWSEfromLogDirs {
+		isCoord, logPath, err := autodetect.IsAWSECoordinator()
 		if err != nil {
-			simplelog.Errorf("unable to detect if this was an executor so will not apply AWSE log path fix this may mean no log collection %v", err)
-		} else if isExec {
-			if strings.Contains(c.dremioLogDir, c.nodeName) {
-				simplelog.Warningf("node name %v already included in log directory of %v make this is intentional as you do not need to put the node name in the log path", c.nodeName, c.dremioLogDir)
-			} else {
-				// ok so looks like we need to adjust this since the node name is not already in the path
-				c.dremioLogDir = filepath.Join(c.dremioLogDir, "executor", c.nodeName)
-				simplelog.Debugf("AWSE detected adding the node name %v to the log directory path %v", c.nodeName, c.dremioLogDir)
-			}
+			simplelog.Errorf("unable to detect if this node %v was a coordinator so will not apply AWSE log path fix this may mean no log collection %v", c.nodeName, err)
+		}
+		if isCoord {
+			simplelog.Debugf("AWSE coordinator node detected, using log dir %v, sylinked to %v", c.dremioLogDir, logPath)
 		} else {
-			if strings.Contains(c.dremioLogDir, "coordinator") {
-				simplelog.Warningf("coordinator already included in log directory of %v make this is intentional as you do not need to put the coordinator in the log path", c.dremioLogDir)
-			} else {
-				c.dremioLogDir = filepath.Join(c.dremioLogDir, "coordinator")
-				simplelog.Debugf("AWSE coordinator node detected adding coordinator name to log dir %v", c.dremioLogDir)
-			}
+			simplelog.Debugf("AWSE executor node detected, using log dir %v, sylinked to %v", c.dremioLogDir, logPath)
 		}
 	}
 	c.dremioConfDir = GetString(confData, KeyDremioConfDir)

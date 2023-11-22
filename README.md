@@ -33,7 +33,8 @@ dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastor
 # dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
 # dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
 # dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir
-# verbose: vv
+# dremio-logs-num-days: 7
+# dremio-queries-json-num-days: 28
 # collect-acceleration-log: false
 # collect-access-log: false
 # collect-audit-log: false
