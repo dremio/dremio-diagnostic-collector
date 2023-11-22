@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.4]
+### Fixed
+
+* AWSE coordinator/executor detection changed - now checks for coordinator first
+
 ## [0.7.3]
 ### Fixed
 
