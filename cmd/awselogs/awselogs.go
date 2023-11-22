@@ -37,6 +37,8 @@ var AWSELogsCmd = &cobra.Command{
 	Long:  `Log only collect of AWSE from the coordinator node`,
 	Run: func(cmd *cobra.Command, args []string) {
 		simplelog.InitLogger(2)
+		simplelog.LogStartMessage()
+		defer simplelog.LogEndMessage()
 		if err := Execute(EFSLogDir, OutDir, OutFile); err != nil {
 			simplelog.Errorf("exiting %v", err)
 			os.Exit(1)
@@ -45,7 +47,6 @@ var AWSELogsCmd = &cobra.Command{
 }
 
 func Execute(efsLogDir string, outDir string, outFile string) error {
-	simplelog.InitLogger(2)
 	entries, err := os.ReadDir(filepath.Join(efsLogDir, "executor"))
 	if err != nil {
 		return fmt.Errorf("failed listing EFS log dir: %w", err)

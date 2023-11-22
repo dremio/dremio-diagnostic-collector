@@ -145,6 +145,7 @@ func Execute(args []string) {
 			sshKeyLoc = sshDefault
 		}
 		simplelog.InitLogger(2)
+		simplelog.LogStartMessage()
 		dremioPAT := ""
 		if promptForDremioPAT {
 			pat, err := masking.PromptForPAT()
@@ -182,6 +183,7 @@ func Execute(args []string) {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+		simplelog.LogEndMessage()
 	}
 	if err := RootCmd.Execute(); err != nil {
 		fmt.Println(err)

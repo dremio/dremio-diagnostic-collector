@@ -54,11 +54,52 @@ func init() {
 }
 
 func InitLogger(level int) {
+	createLog(level)
+	adjustedLevel := level
 	if level > 3 {
-		logger = newLogger(LevelDebug)
-	} else {
-		logger = newLogger(level)
+		adjustedLevel = LevelDebug
 	}
+	logger = newLogger(adjustedLevel)
+}
+
+func LogStartMessage() {
+	if GetLogLoc() != "" {
+		fmt.Printf("logging to file: %v\n", GetLogLoc())
+	}
+	fmt.Println("logging to STDOUT due to lack of permissions to write ddc.log")
+}
+
+func LogEndMessage() {
+	if GetLogLoc() != "" {
+		fmt.Printf("for any troubleshooting consult log: %v\n", GetLogLoc())
+	}
+	fmt.Println("due to lack of permissions no logging enabled, for troubleshooting rerun command with --ddc-log /mydir/ddc.log using a location that is writeable")
+}
+
+func createLog(adjustedLevel int) {
+	ddcLoc, err := os.Executable()
+	if err != nil {
+		log.Fatalf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
+	}
+	mut.Lock()
+	if ddcLog != nil {
+		internalDebug(adjustedLevel, "closing log")
+		if err := Close(); err != nil {
+			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
+		}
+	}
+	ddcLog, err = os.OpenFile(path.Join(path.Dir(ddcLoc), "ddc.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mut.Unlock()
+}
+
+func GetLogLoc() string {
+	if ddcLog != nil {
+		return ddcLog.Name()
+	}
+	return ""
 }
 
 func Close() error {
@@ -68,8 +109,10 @@ func Close() error {
 	logger.warningLogger = log.New(io.Discard, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile)
 	logger.errorLogger = log.New(io.Discard, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 	logger.hostLog = log.New(io.Discard, "", 0)
-	if err := ddcLog.Close(); err != nil {
-		return fmt.Errorf("unable to close ddc.log with error %v", err)
+	if ddcLog != nil {
+		if err := ddcLog.Close(); err != nil {
+			return fmt.Errorf("unable to close ddc.log with error %v", err)
+		}
 	}
 	return nil
 }
@@ -89,22 +132,6 @@ func newLogger(level int) *Logger {
 	var infoOut io.Writer
 	var warningOut io.Writer
 	var errorOut io.Writer
-	ddcLoc, err := os.Executable()
-	if err != nil {
-		log.Fatalf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
-	}
-	mut.Lock()
-	if ddcLog != nil {
-		internalDebug(adjustedLevel, "closing log")
-		if err := Close(); err != nil {
-			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
-		}
-	}
-	ddcLog, err = os.OpenFile(path.Join(path.Dir(ddcLoc), "ddc.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mut.Unlock()
 
 	var stringLevelText = "UNKNOWN"
 	switch adjustedLevel {
@@ -118,24 +145,34 @@ func newLogger(level int) *Logger {
 		stringLevelText = "ERROR"
 	}
 	internalDebug(adjustedLevel, fmt.Sprintf("initialized log with level %v", stringLevelText))
-
-	debugOut, infoOut, warningOut, errorOut = ddcLog, ddcLog, ddcLog, ddcLog
+	var output io.Writer
+	mut.Lock()
+	if ddcLog != nil {
+		output = ddcLog
+		// we log debug to log every time so we can figure out problems
+		debugOut, infoOut, warningOut, errorOut = ddcLog, ddcLog, ddcLog, ddcLog
+	} else {
+		output = os.Stdout
+		// we are putting everything out to discard since there is no valid file to write too
+		debugOut, infoOut, warningOut, errorOut = io.Discard, io.Discard, io.Discard, io.Discard
+	}
+	mut.Unlock()
 	//set logger levels because we rely on fall through we cannot use the above switch easily
 	switch adjustedLevel {
 	case LevelDebug:
-		debugOut = io.MultiWriter(os.Stdout, ddcLog)
+		debugOut = io.MultiWriter(os.Stdout, output)
 		fallthrough
 	case LevelInfo:
-		infoOut = io.MultiWriter(os.Stdout, ddcLog)
+		infoOut = io.MultiWriter(os.Stdout, output)
 		fallthrough
 	case LevelWarning:
-		warningOut = io.MultiWriter(os.Stdout, ddcLog)
+		warningOut = io.MultiWriter(os.Stdout, output)
 		fallthrough
 	case LevelError:
-		errorOut = io.MultiWriter(os.Stdout, ddcLog)
+		errorOut = io.MultiWriter(os.Stdout, output)
 	}
 	//always add this
-	hostOut := io.MultiWriter(os.Stdout, ddcLog)
+	hostOut := io.MultiWriter(os.Stdout, output)
 	return &Logger{
 		debugLogger:   log.New(debugOut, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
 		infoLogger:    log.New(infoOut, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),

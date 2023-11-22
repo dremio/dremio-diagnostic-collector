@@ -213,6 +213,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		fmt.Println("verbosity level ERROR")
 	}
 	simplelog.InitLogger(verbose)
+	simplelog.LogStartMessage()
 
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
 	c.dremioPID = GetInt(confData, KeyDremioPid)

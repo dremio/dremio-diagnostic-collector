@@ -1,4 +1,8 @@
 # Changelog
+## [0.8.0]
+
+### Added
+* ddc.log file location on command start and on command end
 
 ## [0.7.4]
 ### Fixed
