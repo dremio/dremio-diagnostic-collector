@@ -4,6 +4,7 @@
 ### Fixed
 
 * AWSE coordinator/executor detection changed - now checks for coordinator first
+* JFR now attempts a silent stop for existing DDC JFR recordings, this will clean up any collections that had not been properly stopped
 
 ## [0.7.3]
 ### Fixed
