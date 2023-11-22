@@ -64,13 +64,15 @@ func InitLogger(level int) {
 }
 
 func LogStartMessage() {
+	var logLine string
 	if GetLogLoc() != "" {
-		logLine := fmt.Sprintf("### logging to file: %v ###", GetLogLoc())
-		padding := PaddingForStr(logLine)
-		fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
-		return
+		logLine = fmt.Sprintf("### logging to file: %v ###", GetLogLoc())
+
+	} else {
+		logLine = "### unable to write ddc.log using STDOUT ###"
 	}
-	fmt.Println("logging to STDOUT due to lack of permissions to write ddc.log")
+	padding := PaddingForStr(logLine)
+	fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
 }
 
 func PaddingForStr(str string) string {
@@ -82,36 +84,55 @@ func PaddingForStr(str string) string {
 }
 
 func LogEndMessage() {
+	var logLine string
 	if GetLogLoc() != "" {
-		logLine := fmt.Sprintf("### for any troubleshooting consult log: %v ###", GetLogLoc())
-		padding := PaddingForStr(logLine)
-		fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
-		return
+		logLine = fmt.Sprintf("### for any troubleshooting consult log: %v ###", GetLogLoc())
+
+	} else {
+		logLine = "### no log written ###"
 	}
-	fmt.Println("due to lack of permissions no logging enabled, for troubleshooting rerun command with --ddc-log /mydir/ddc.log using a location that is writeable")
+	padding := PaddingForStr(logLine)
+	fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
 }
 
 func createLog(adjustedLevel int) {
-	ddcLoc, err := os.Executable()
-	if err != nil {
-		log.Fatalf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
-	}
 	mut.Lock()
+	defer mut.Unlock()
 	if ddcLog != nil {
 		internalDebug(adjustedLevel, "closing log")
 		if err := Close(); err != nil {
 			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
 		}
+		defaultLog, err := getDefaultLogLoc()
+		if err != nil {
+			fallbackPath := filepath.Clean(filepath.Join(os.TempDir(), "ddc.log"))
+			fallbackLog, err := os.OpenFile(fallbackPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+			if err != nil {
+				fmt.Println("falling back to standard out")
+			} else {
+				ddcLog = fallbackLog
+				fmt.Printf("falling back to %v\n", fallbackPath)
+			}
+		} else {
+			ddcLog = defaultLog
+		}
+	}
+}
+
+func getDefaultLogLoc() (*os.File, error) {
+	ddcLoc, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
 	}
 	ddcLogPath, err := filepath.Abs(path.Join(path.Dir(ddcLoc), "ddc.log"))
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("unable to get absolute path of ddc log %v", err)
 	}
-	ddcLog, err = os.OpenFile(filepath.Clean(ddcLogPath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(ddcLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("unable to open ddc log %v", err)
 	}
-	mut.Unlock()
+	return f, nil
 }
 
 func GetLogLoc() string {
