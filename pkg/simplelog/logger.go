@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
@@ -64,14 +65,28 @@ func InitLogger(level int) {
 
 func LogStartMessage() {
 	if GetLogLoc() != "" {
-		fmt.Printf("logging to file: %v\n", GetLogLoc())
+		logLine := fmt.Sprintf("### logging to file: %v ###", GetLogLoc())
+		padding := PaddingForStr(logLine)
+		fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
+		return
 	}
 	fmt.Println("logging to STDOUT due to lack of permissions to write ddc.log")
 }
 
+func PaddingForStr(str string) string {
+	newStr := ""
+	for i := 0; i < len(str); i++ {
+		newStr += "#"
+	}
+	return newStr
+}
+
 func LogEndMessage() {
 	if GetLogLoc() != "" {
-		fmt.Printf("for any troubleshooting consult log: %v\n", GetLogLoc())
+		logLine := fmt.Sprintf("### for any troubleshooting consult log: %v ###", GetLogLoc())
+		padding := PaddingForStr(logLine)
+		fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
+		return
 	}
 	fmt.Println("due to lack of permissions no logging enabled, for troubleshooting rerun command with --ddc-log /mydir/ddc.log using a location that is writeable")
 }
@@ -88,7 +103,11 @@ func createLog(adjustedLevel int) {
 			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
 		}
 	}
-	ddcLog, err = os.OpenFile(path.Join(path.Dir(ddcLoc), "ddc.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	ddcLogPath, err := filepath.Abs(path.Join(path.Dir(ddcLoc), "ddc.log"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ddcLog, err = os.OpenFile(filepath.Clean(ddcLogPath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		log.Fatal(err)
 	}

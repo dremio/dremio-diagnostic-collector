@@ -362,6 +362,8 @@ func Execute(args []string, overrides map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read configuration %w", err)
 	}
+	defer simplelog.LogEndMessage()
+
 	if !c.AcceptCollectionConsent() {
 		fmt.Println(consent.OutputConsent(c))
 		return errors.New("no consent given")
@@ -385,7 +387,6 @@ func Execute(args []string, overrides map[string]string) error {
 		return fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
 	}
 	simplelog.Infof("Archive %v complete", tarballName)
-	simplelog.LogEndMessage()
 	return nil
 }
 
