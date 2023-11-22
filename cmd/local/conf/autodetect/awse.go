@@ -71,7 +71,7 @@ func IsAWSEExecutor(nodeName string) (bool, error) {
 	return IsAWSEExecutorUsingDir(efsFolder, nodeName)
 }
 
-func IsAWSECoordinator(nodeName string) (bool, string, error) {
+func IsAWSECoordinator() (bool, string, error) {
 	// Check the symbolic link for the current node
 	// Each node on AWSE will always have asymlink from /var/log/dremio
 	//

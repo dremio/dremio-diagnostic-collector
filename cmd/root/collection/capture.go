@@ -118,7 +118,6 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		mask = false
 	}
 	if err := ComposeExecuteAndStream(mask, conf, func(line string) {
-		//simplelog.HostLog(host, line)
 	}, localCollectArgs); err != nil {
 		simplelog.Warningf("on host %v capture failed due to error '%v'", host, err)
 	} else {

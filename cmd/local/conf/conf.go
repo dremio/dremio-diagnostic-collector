@@ -241,7 +241,7 @@ func ReadConf(overrides map[string]string, configDir string) (*CollectConf, erro
 		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
 	}
 	if IsAWSEfromLogDirs {
-		isCoord, logPath, err := autodetect.IsAWSECoordinator(c.nodeName)
+		isCoord, logPath, err := autodetect.IsAWSECoordinator()
 		if err != nil {
 			simplelog.Errorf("unable to detect if this node %v was a coordinator so will not apply AWSE log path fix this may mean no log collection %v", c.nodeName, err)
 		}
