@@ -34,11 +34,11 @@ func RunCollectJFR(c *conf.CollectConf) error {
 	simplelog.Debugf("node: %v - jfr unlock commercial output - %v", c.NodeName(), w.String())
 
 	w = bytes.Buffer{}
+	// this is effectively a no op unless there is an existing recording running
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.stop name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
 		simplelog.Debugf("attempting to stop existing JFR failed, but this is usually expected: '%v' -- output: '%v'", err, w.String())
-	} else {
-		simplelog.Warningf("JFR named DREMIO_JFR was running on PID %v and has been stopped so we could get a fresh collection: '%v'", c.DremioPID(), w.String())
 	}
+	simplelog.Debugf("node: %v - jfr stop of any existing recordings named 'DREMIO_JFR' - %v", c.NodeName(), w.String())
 
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
