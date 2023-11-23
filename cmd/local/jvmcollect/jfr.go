@@ -18,6 +18,7 @@ package jvmcollect
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -31,6 +32,7 @@ func RunCollectJFR(c *conf.CollectConf) error {
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v VM.unlock_commercial_features", c.DremioPID())); err != nil {
 		simplelog.Warningf("Error trying to unlock commercial features %v. Note: newer versions of OpenJDK do not support the call VM.unlock_commercial_features. This is usually safe to ignore", err)
 	}
+
 	simplelog.Debugf("node: %v - jfr unlock commercial output - %v", c.NodeName(), w.String())
 
 	w = bytes.Buffer{}
@@ -38,7 +40,9 @@ func RunCollectJFR(c *conf.CollectConf) error {
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.stop name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
 		simplelog.Debugf("attempting to stop existing JFR failed, but this is usually expected: '%v' -- output: '%v'", err, w.String())
 	}
-	simplelog.Debugf("node: %v - jfr stop of any existing recordings named 'DREMIO_JFR' - %v", c.NodeName(), w.String())
+	if strings.Contains(w.String(), "Stopped recording") {
+		simplelog.Warningf("stopped a JFR recording named \"DREMIO_JFR\"")
+	}
 
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
