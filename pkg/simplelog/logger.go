@@ -129,7 +129,8 @@ func getDefaultLogLoc() (*os.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get absolute path of ddc log %v", err)
 	}
-	f, err := os.OpenFile(ddcLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	// abs has already cleaned this path so no need to ignore it again
+	f, err := os.OpenFile(ddcLogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304
 	if err != nil {
 		return nil, fmt.Errorf("unable to open ddc log %v", err)
 	}
