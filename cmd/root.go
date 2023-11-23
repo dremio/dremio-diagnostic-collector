@@ -24,6 +24,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/awselogs"
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
@@ -130,6 +131,23 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	return nil
 }
 
+func ValidateYaml(ddcYaml string) error {
+	emtpyOverrides := make(map[string]string)
+	confData, err := conf.ParseConfig(ddcYaml, emtpyOverrides)
+	if err != nil {
+		return err
+	}
+	simplelog.Infof("parsed configuration for %v follows", ddcYaml)
+	for k, v := range confData {
+		if k == conf.KeyDremioPatToken && v != "" {
+			simplelog.Infof("yaml key '%v':'REDACTED'", k)
+		} else {
+			simplelog.Infof("yaml key '%v':'%v'", k, v)
+		}
+	}
+	return nil
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) {
@@ -158,6 +176,10 @@ func Execute(args []string) {
 
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
+		if err := ValidateYaml(ddcYamlLoc); err != nil {
+			fmt.Printf("CRITICAL ERROR: unable to parse %v: %v\n", ddcYamlLoc, err)
+			os.Exit(1)
+		}
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,

@@ -26,6 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func TestSSHDefault(t *testing.T) {
@@ -153,5 +154,67 @@ func TestAllSubCommandsAreWiredUp(t *testing.T) {
 	expected := "Available Commands:\n  awselogs      Log only collect of AWSE from the coordinator node\n  local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support\n  version       Print the version number of DDC\n"
 	if !strings.Contains(helpText, expected) {
 		t.Errorf("missing command text in `%q`", helpText)
+	}
+}
+
+func TestValidateDDCYamlValid(t *testing.T) {
+
+	valid := filepath.Join("testdata", "ddc-valid.yaml")
+	err := ValidateYaml(valid)
+	if err != nil {
+		t.Errorf("expected no error for valid yaml: %v", err)
+	}
+}
+
+func TestValidateDDCYamlNotPresent(t *testing.T) {
+	valid := filepath.Join("testdata", "not-found-anwhere.yaml")
+	err := ValidateYaml(valid)
+	if err == nil {
+		t.Error("expected an error for missing yaml")
+	}
+}
+
+func TestValidateDDCYamlNotValid(t *testing.T) {
+	valid := filepath.Join("testdata", "ddc-invalid.yaml")
+	err := ValidateYaml(valid)
+	if err == nil {
+		t.Errorf("expected an error for invalid yaml: %v", err)
+	}
+	expected := "unable to parse yaml: yaml: line 2: could not find expected ':'"
+	if err.Error() != expected {
+		t.Errorf("expected '%v' but was '%v'", expected, err.Error())
+	}
+}
+
+func TestValidateDDCYamlMaskPAT(t *testing.T) {
+	simplelog.InitLogger(3)
+	logLoc := simplelog.GetLogLoc()
+
+	err := simplelog.Close()
+	if err != nil {
+		t.Log(err)
+	}
+
+	err = os.Remove(logLoc)
+	if err != nil {
+		t.Fatalf("need to clean up file '%v': '%v'", logLoc, err)
+	}
+
+	simplelog.InitLogger(3)
+	logLoc = simplelog.GetLogLoc()
+
+	valid := filepath.Join("testdata", "ddc-valid.yaml")
+	err = ValidateYaml(valid)
+	if err != nil {
+		t.Errorf("expected no error for valid yaml: %v", err)
+	}
+
+	b, err := os.ReadFile(logLoc)
+	if err != nil {
+		t.Fatalf("need to read the log file '%v': '%v'", logLoc, err)
+	}
+
+	if !strings.Contains(string(b), "yaml key 'dremio-pat-token':'REDACTED'") {
+		t.Errorf("expected redacted pat: '%v'", string(b))
 	}
 }

@@ -147,6 +147,15 @@ func SystemTableList() []string {
 	}
 }
 
+func LogConfData(confData map[string]string) {
+	for k, v := range confData {
+		if k == KeyDremioPatToken && v != "" {
+			simplelog.Debugf("conf key '%v':'REDACTED'", k)
+		} else {
+			simplelog.Debugf("conf key '%v':'%v'", k, v)
+		}
+	}
+}
 func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, error) {
 	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {

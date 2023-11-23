@@ -5,6 +5,7 @@
 * ddc.log file location on command start and on command end
 * ddc falls back to logging to the temp directory if the default location is not present
 * --ddc-yaml flag now for local-collect to be able to read a ddc yaml from anywhere
+* added validation and logging of ddc.yaml when running the ddc command
 
 ### Fixed
 * log JFR stopped a recording only when it actually did
