@@ -73,14 +73,14 @@ func TestLogger(t *testing.T) {
 func TestStartLogMessage(t *testing.T) {
 	InitLogger(4)
 	loc := GetLogLoc()
+	if loc == "" {
+		t.Error("expected log file to not be empty but it was")
+	}
 	out, err := output.CaptureOutput(func() {
 		LogStartMessage()
 	})
 	if err != nil {
 		t.Fatalf("failed running capture %v", err)
-	}
-	if loc == "" {
-		t.Error("expected log file to not be empty but it was")
 	}
 	if !strings.Contains(out, loc) {
 		t.Errorf("expected %v in string %v", loc, out)

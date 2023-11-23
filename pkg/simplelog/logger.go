@@ -103,20 +103,21 @@ func createLog(adjustedLevel int) {
 		if err := Close(); err != nil {
 			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
 		}
-		defaultLog, err := getDefaultLogLoc()
-		if err != nil {
-			fallbackPath := filepath.Clean(filepath.Join(os.TempDir(), "ddc.log"))
-			fallbackLog, err := os.OpenFile(fallbackPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-			if err != nil {
-				fmt.Println("falling back to standard out")
-			} else {
-				ddcLog = fallbackLog
-				fmt.Printf("falling back to %v\n", fallbackPath)
-			}
-		} else {
-			ddcLog = defaultLog
-		}
 	}
+	defaultLog, err := getDefaultLogLoc()
+	if err != nil {
+		fallbackPath := filepath.Clean(filepath.Join(os.TempDir(), "ddc.log"))
+		fallbackLog, err := os.OpenFile(fallbackPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			fmt.Println("falling back to standard out")
+		} else {
+			ddcLog = fallbackLog
+			fmt.Printf("falling back to %v\n", fallbackPath)
+		}
+	} else {
+		ddcLog = defaultLog
+	}
+
 }
 
 func getDefaultLogLoc() (*os.File, error) {
