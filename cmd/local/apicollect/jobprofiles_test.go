@@ -48,7 +48,8 @@ func TestGetNumberOfJobProfilesTriedWIthNoServerUp(t *testing.T) {
 		t.Fatalf("unable to write queries.json %v", err)
 	}
 
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 number-job-profiles: 25000
 job-profiles-num-high-query-cost: 5000 
 job-profiles-num-slow-exec: 10000
@@ -62,7 +63,7 @@ tmp-output-dir: %v
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}
@@ -121,7 +122,8 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 		t.Fatalf("unable to write queries.json %v", err)
 	}
 
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 number-job-profiles: 2500
 job-profiles-num-high-query-cost: 500
 job-profiles-num-slow-exec: 1000
@@ -136,7 +138,7 @@ dremio-endpoint: %v
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}

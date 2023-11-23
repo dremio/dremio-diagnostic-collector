@@ -62,7 +62,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -84,7 +84,7 @@ func TestCreateAllDirs(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -167,7 +167,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -261,7 +261,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]string), filepath.Dir(yamlLocation))
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -280,5 +280,19 @@ is-dremio-cloud: false
 
 	if len(entries) > 0 {
 		t.Errorf("expecting no entries but there were %v", len(entries))
+	}
+}
+
+func TestDDCYamlFlagDefault(t *testing.T) {
+	ddcYamlFlag := LocalCollectCmd.Flag("ddc-yaml")
+	defaultValue := ddcYamlFlag.Value.String()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exeDir := filepath.Dir(exe)
+	expected := filepath.Join(exeDir, "ddc.yaml")
+	if defaultValue != expected {
+		t.Errorf("expected %v actual %v", expected, defaultValue)
 	}
 }

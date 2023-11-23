@@ -349,7 +349,7 @@ func TestMain(m *testing.M) {
 		}()
 		yamlLocation := writeConf(dremioPATToken, dremioEndpoint, tmpDirForConf)
 		yamlDir := filepath.Dir(yamlLocation)
-		c, err = conf.ReadConf(make(map[string]string), yamlDir)
+		c, err = conf.ReadConf(make(map[string]string), yamlLocation)
 		if err != nil {
 			simplelog.Errorf("reading config %v", err)
 			return 1

@@ -50,14 +50,15 @@ func TestValidateAPICredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 dremio-endpoint: %v
 dremio-pat-token: my-pat-token
 `, server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}
@@ -94,14 +95,15 @@ func TestValidateAPICredentialsWithError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(`
 dremio-endpoint: "http://localhost:9047"
 dremio-pat-token: "my-pat-token"
 `), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}
@@ -134,7 +136,8 @@ func TestValidateAPICredentialsWithCloud(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 dremio-endpoint: %v
 dremio-pat-token: my-pat-token
 is-dremio-cloud: true
@@ -143,7 +146,7 @@ dremio-cloud-project-id: 1234
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}
@@ -180,7 +183,8 @@ func TestValidateAPICredentialsWithCloudWithError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
-	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 dremio-endpoint: %v
 dremio-pat-token: my-pat-token
 is-dremio-cloud: true
@@ -189,7 +193,7 @@ dremio-cloud-project-id: 1234
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}

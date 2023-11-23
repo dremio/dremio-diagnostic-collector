@@ -15,9 +15,9 @@
 package conf_test
 
 import (
-	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -39,7 +39,7 @@ var genericConfSetup = func(cfgContent string) {
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
-	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
+	cfgFilePath = filepath.Join(tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {
 		// Create a sample configuration file.
@@ -117,7 +117,7 @@ dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: eu.dremio.cloud
 `)
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -149,7 +149,7 @@ dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: dremio.cloud
 `)
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -178,7 +178,7 @@ dremio-endpoint: dremio.cloud
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	genericConfSetup("")
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -287,7 +287,7 @@ collect-kvstore-report: true
 `
 	genericConfSetup(yaml)
 	defer afterEachConfTest()
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -325,7 +325,7 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	//should log redacted when token is present
 	out, err := output.CaptureOutput(func() {
 		simplelog.InitLogger(4)
-		cfg, err = conf.ReadConf(overrides, tmpDir)
+		cfg, err = conf.ReadConf(overrides, cfgFilePath)
 		if err != nil {
 			t.Errorf("expected no error but had %v", err)
 		}

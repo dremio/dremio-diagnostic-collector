@@ -70,10 +70,11 @@ dremio-jstack-freq-seconds: 1
 		nodeName,
 		cmd.Process.Pid,
 	)
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(ddcYamlString), 0600); err != nil {
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}

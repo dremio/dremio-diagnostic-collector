@@ -80,9 +80,10 @@ func TestRunCollectWLM(t *testing.T) {
 	//allow the server to startup
 	time.Sleep(1 * time.Second)
 	confDir := setupConfigDir(t, server.URL)
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
 	// Prepare the configuration
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatalf("unable to read conf due to error %v", err)
 	}

@@ -43,7 +43,8 @@ func TestCollectsConfFilesWithNoSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 tmp-output-dir: %v
 dremio-conf-dir: %v
 node-name: %v
@@ -54,7 +55,7 @@ node-name: %v
 		t.Fatal(err)
 	}
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +135,8 @@ func TestCollectsConfFilesAndRedactDremioConf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 tmp-output-dir: %v
 dremio-conf-dir: %v
 node-name: %v
@@ -145,7 +147,7 @@ node-name: %v
 		t.Fatal(err)
 	}
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}

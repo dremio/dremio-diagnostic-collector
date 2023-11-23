@@ -146,22 +146,9 @@ func SystemTableList() []string {
 		"cache.storage_plugins",
 	}
 }
-func ReadConfFromExecLocation(overrides map[string]string) (*CollectConf, error) {
-	//now read in configuration values. This will get defaults if no values are available in the configuration files or no environment variable is set
 
-	// find the location of the ddc executable
-	execPath, err := os.Executable()
-	if err != nil {
-		simplelog.Errorf("Error getting executable path: '%v'. Falling back to working directory for search location", err)
-		execPath = "."
-	}
-	// use that as the default location of the configuration
-	configDir := filepath.Dir(execPath)
-	return ReadConf(overrides, configDir)
-}
-
-func ReadConf(overrides map[string]string, configDir string) (*CollectConf, error) {
-	confData, err := ParseConfig(configDir, overrides)
+func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, error) {
+	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {
 		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
 	}

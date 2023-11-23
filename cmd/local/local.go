@@ -42,6 +42,8 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
+var ddcYamlLoc string
+
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
 	if !c.IsDremioCloud() {
@@ -358,7 +360,7 @@ func Execute(args []string, overrides map[string]string) error {
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 	simplelog.Infof("args: %v", strings.Join(args, " "))
 
-	c, err := conf.ReadConfFromExecLocation(overrides)
+	c, err := conf.ReadConf(overrides, ddcYamlLoc)
 	if err != nil {
 		return fmt.Errorf("unable to read configuration %w", err)
 	}
@@ -414,4 +416,13 @@ func init() {
 	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
+
+	execLoc, err := os.Executable()
+	if err != nil {
+		fmt.Printf("unable to find ddc, critical error %v", err)
+		os.Exit(1)
+	}
+	execLocDir := filepath.Dir(execLoc)
+	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
+
 }
