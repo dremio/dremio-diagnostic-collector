@@ -40,7 +40,7 @@ func RunCollectJFR(c *conf.CollectConf) error {
 	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v JFR.stop name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
 		simplelog.Debugf("attempting to stop existing JFR failed, but this is usually expected: '%v' -- output: '%v'", err, w.String())
 	}
-	if strings.Contains(w.String(), "Stopped recording") {
+	if strings.Contains(w.String(), "Stopped recording \"DREMIO_JFR\"") {
 		simplelog.Warningf("stopped a JFR recording named \"DREMIO_JFR\"")
 	}
 
