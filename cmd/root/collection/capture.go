@@ -58,13 +58,13 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		consoleprint.UpdateNodeState(host, "CREATING REMOTE DIR")
 		//remotely make TransferDir
 		if out, err := ComposeExecute(false, conf, []string{"mkdir", "-p", ddcTmpDir}); err != nil {
-			consoleprint.UpdateNodeState(host, "FAILED - TRANSFER SETUP")
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - TRANSFER SETUP - (%v) %v", err, out))
 			return 0, "", fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
 		}
 		consoleprint.UpdateNodeState(host, "COPY DDC TO HOST")
 		//copy file to TransferDir assume there is
 		if out, err := ComposeCopyTo(conf, localDDCPath, pathToDDC); err != nil {
-			consoleprint.UpdateNodeState(host, "FAILED - DDC COPY")
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC COPY - (%v) %v", err, out))
 			return 0, "", fmt.Errorf("unable to copy local ddc %v to remote path due to error: '%v' with output '%v'", localDDCPath, err, out)
 			//this is a critical error so it is safe to exit
 		}
@@ -84,14 +84,14 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 		consoleprint.UpdateNodeState(host, "SETTING DDC PERMISSIONS")
 		//make  exec TransferDir
 		if out, err := ComposeExecute(false, conf, []string{"chmod", "+x", pathToDDC}); err != nil {
-			consoleprint.UpdateNodeState(host, "FAILED - DDC SETTING PERMS")
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC SETTING PERMS - (%v) %v", err, out))
 			return 0, "", fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 		}
 	}
 	consoleprint.UpdateNodeState(host, "COPY DDC.YAML")
 	//always update the configuration
 	if out, err := ComposeCopyTo(conf, localDDCYamlPath, pathToDDCYAML); err != nil {
-		consoleprint.UpdateNodeState(host, "FAILED - DDC.YAML COPY")
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC.YAML COPY - (%v) %v", err, out))
 		return 0, "", fmt.Errorf("unable to copy local ddc yaml '%v' to remote path due to error: '%v' with output '%v'", localDDCYamlPath, err, out)
 		//this is a critical step and will not work without it so exit
 	}
@@ -117,17 +117,18 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	} else {
 		mask = false
 	}
-	var builder strings.Builder
+	lastLine := ""
+	var allHostLog []string
 	err := ComposeExecuteAndStream(mask, conf, func(line string) {
-		builder.WriteString(line)
+		lastLine = line
+		allHostLog = append(allHostLog, line)
 		simplelog.HostLog(host, line)
 	}, localCollectArgs)
 	if err != nil {
 
-		cmdFailure := strutils.GetLastLine(builder.String())
-		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(cmdFailure, 350)
+		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(lastLine, 350)
 		consoleprint.UpdateNodeState(host, status)
-		return 0, "", fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, builder.String())
+		return 0, "", fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
 	}
 
 	simplelog.Debugf("on host %v capture successful", host)
@@ -152,7 +153,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	//IMPORTANT we want filepath.Join here for the destination because it may be copying back to windows
 	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := ComposeCopyNoSudo(conf, tarGZ, destFile); err != nil {
-		consoleprint.UpdateNodeState(host, "FAILED - COLLECTION TRANSFER")
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - COLLECTION TRANSFER - (%v) %v", err, out))
 		return 0, "", fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, host, outDir, err, out)
 	}
 
