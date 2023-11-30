@@ -29,7 +29,6 @@ func TestJvmFlagCapture(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("cmd.Start() failed with %s\n", err)
 	}
-
 	defer func() {
 		if err := cmd.Process.Kill(); err != nil {
 			t.Fatalf("failed to kill process: %s", err)
@@ -43,6 +42,6 @@ func TestJvmFlagCapture(t *testing.T) {
 	}
 	expected := "demo.jar -Dmyflag=1 -Xmx512M"
 	if expected != flags {
-		t.Errorf("expected %v to %v", flags, expected)
+		t.Errorf("expected '%v' but was '%v'", expected, flags)
 	}
 }

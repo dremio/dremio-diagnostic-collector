@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -153,20 +152,20 @@ func TestEnsureClose(t *testing.T) {
 	}
 	expectedFile := "my_long_file_name.txt"
 
-	out, err := output.CaptureOutput(func() {
-		// so the simplelogger output will be captured
-		simplelog.InitLogger(2)
-		ddcio.EnsureClose(expectedFile, failedClose)
-	})
+	// so the simplelogger output will be captured
+	simplelog.InitLogger(2)
+	ddcio.EnsureClose(expectedFile, failedClose)
 
+	raw, err := os.ReadFile(simplelog.GetLogLoc())
 	if err != nil {
 		t.Fatal(err)
 	}
+	out := string(raw)
 	if !strings.Contains(out, expectedText) {
-		t.Error("expected error text was not captured")
+		t.Errorf("expected error text''%v' was not captured in %v", expectedFile, out)
 	}
 
 	if !strings.Contains(out, expectedFile) {
-		t.Error("expected error text was not captured")
+		t.Errorf("expected error text''%v' was not captured in %v", expectedFile, out)
 	}
 }

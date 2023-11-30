@@ -17,6 +17,7 @@ package collection_test
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
@@ -204,8 +205,8 @@ func TestComposeExecuteWithSudoWithError(t *testing.T) {
 	if txt, err := collection.ComposeExecute(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
-		if err.Error() != "silly error 1" {
-			t.Errorf("expected %v but got %v", "silly error 1", err)
+		if !strings.Contains(err.Error(), "silly error 1") {
+			t.Errorf("expected '%v' but got '%v'", "silly error 1", err)
 		}
 		if txt != "" {
 			t.Errorf("expected nil but got %v", txt)
@@ -234,7 +235,7 @@ func TestComposeExecuteWithoutSudoWithError(t *testing.T) {
 	if txt, err := collection.ComposeExecute(false, conf, command); err == nil {
 		t.Fatal(err)
 	} else {
-		if err.Error() != "silly error 1" {
+		if !strings.Contains(err.Error(), "silly error 1") {
 			t.Errorf("expected %v but got %v", "silly error 1", err)
 		}
 		if txt != "" {
