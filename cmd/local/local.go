@@ -514,8 +514,8 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
-	defer simplelog.LogEndMessage()
 
+	fmt.Println("looking for logs in: " + c.DremioLogDir())
 	if !c.AcceptCollectionConsent() {
 		fmt.Println(consent.OutputConsent(c))
 		return "", errors.New("no consent given")

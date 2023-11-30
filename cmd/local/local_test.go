@@ -36,9 +36,10 @@ func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) strin
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
 	yamlText := fmt.Sprintf(`
+dremio-log-dir: %v
 tmp-output-dir: %v
 %v
-`, strings.ReplaceAll(cleaned, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
+`, filepath.Join("testdata", "fs", "opt", "dremio", "logs"), strings.ReplaceAll(cleaned, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
 	fmt.Printf("yaml text is\n%q\n", yamlText)
 	if err := os.WriteFile(testDDCYaml, []byte(yamlText), 0600); err != nil {
 		log.Fatal(err)
@@ -137,7 +138,6 @@ func TestCollectJVMFlags(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	fmt.Printf("pid is %v", cmd.Process.Pid)
 	yaml := fmt.Sprintf(`
-dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
 dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
 
@@ -231,7 +231,6 @@ func TestSkipCollect(t *testing.T) {
 		}
 	}()
 	yaml := fmt.Sprintf(`
-dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 dremio-conf-dir: "/opt/dremio/conf/..data" #where the dremio conf files are located
 dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
 
@@ -320,10 +319,9 @@ func TestFindClusterID(t *testing.T) {
 	}()
 	dremioHome := filepath.Join("testdata", "fs", "opt", "dremio")
 	yaml := fmt.Sprintf(`
-dremio-log-dir: %v
 dremio-conf-dir: %v
 dremio-rocksdb-dir: %v
-`, filepath.Join(dremioHome, "logs"), filepath.Join(dremioHome, "conf"), filepath.Join(dremioHome, "db"))
+`, filepath.Join(dremioHome, "conf"), filepath.Join(dremioHome, "db"))
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
 	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
 	if err != nil {

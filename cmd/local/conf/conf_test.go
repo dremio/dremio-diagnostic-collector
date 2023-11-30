@@ -15,6 +15,7 @@
 package conf_test
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -43,7 +43,7 @@ var genericConfSetup = func(cfgContent string) {
 
 	if cfgContent == "" {
 		// Create a sample configuration file.
-		cfgContent = `
+		cfgContent = fmt.Sprintf(`
 accept-collection-consent: true
 disable-rest-api: false
 collect-acceleration-log: true
@@ -52,7 +52,7 @@ collect-audit-log: true
 collect-jvm-flags: true
 dremio-pid-detection: false
 dremio-gclogs-dir: "/path/to/gclogs"
-dremio-log-dir: "/path/to/dremio/logs"
+dremio-log-dir: %v
 node-name: "node1"
 dremio-conf-dir: "/path/to/dremio/conf"
 tarball-out-dir: "/my-tarball-dir"
@@ -87,7 +87,7 @@ collect-wlm: true
 collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`
+`, filepath.Join("testdata", "logs"))
 	}
 	// Write the sample configuration to a file.
 	err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
@@ -274,7 +274,8 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 }
 
 func TestConfReadWithDisabledRestAPIResultsInDisabledWLMJobProfileAndKVReport(t *testing.T) {
-	yaml := `
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
 disable-rest-api: true
 number-threads: 4
 dremio-endpoint: "http://localhost:9047"
@@ -284,7 +285,7 @@ number-job-profiles: 10
 collect-wlm: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`
+`, filepath.Join("testdata", "logs"))
 	genericConfSetup(yaml)
 	defer afterEachConfTest()
 	cfg, err = conf.ReadConf(overrides, cfgFilePath)
@@ -322,20 +323,25 @@ collect-kvstore-report: true
 
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
+
 	//should log redacted when token is present
-	out, err := output.CaptureOutput(func() {
-		simplelog.InitLogger(4)
-		cfg, err = conf.ReadConf(overrides, cfgFilePath)
-		if err != nil {
-			t.Errorf("expected no error but had %v", err)
-		}
-		if cfg == nil {
-			t.Error("expected a valid CollectConf but it is nil")
-		}
-	})
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
-		simplelog.Errorf("unable to capture output %v", err)
+		t.Fatalf("expected no error but had %v", err)
 	}
+	if cfg == nil {
+		t.Error("expected a valid CollectConf but it is nil")
+	}
+	//flush buffer
+	for i := 0; i < 100; i++ {
+		simplelog.Infof("test %v", i)
+	}
+	b, err := os.ReadFile(simplelog.GetLogLoc())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(b)
+
 	if !strings.Contains(out, "conf key 'dremio-pat-token':'REDACTED'") {
 		t.Errorf("expected dremio-pat-token to be redacted in '%v' but it was not", out)
 	}

@@ -47,6 +47,13 @@ var AWSELogsCmd = &cobra.Command{
 }
 
 func Execute(efsLogDir string, outDir string, outFile string) error {
+
+	efsLogDir, err := filepath.Abs(efsLogDir)
+	if err != nil {
+		return fmt.Errorf("cannot get abs for dir %v due to error %w", efsLogDir, err)
+	}
+	fmt.Println("EFS dir: " + efsLogDir)
+
 	entries, err := os.ReadDir(filepath.Join(efsLogDir, "executor"))
 	if err != nil {
 		return fmt.Errorf("failed listing EFS log dir: %w", err)
@@ -67,6 +74,7 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 			simplelog.Warningf("unable to cleanup folder %v due to error: %v", outDir, err)
 		}
 	}()
+
 	coordinatorNode := "coordinator"
 	overrides := make(map[string]string)
 	overrides[conf.KeyDisableRESTAPI] = "true"

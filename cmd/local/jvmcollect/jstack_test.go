@@ -61,12 +61,13 @@ func TestJStackCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	ddcYamlString := fmt.Sprintf(`
+dremio-log-dir: %v
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jstack-time-seconds: 2
 dremio-jstack-freq-seconds: 1
-`, strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
+`, filepath.Join("testdata", "logs"), strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
 	)

@@ -209,22 +209,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	simplelog.InitLogger(verbose)
 	// we use dremio cloud option here to know if we should validate the log and conf dirs or not
 	c.isDremioCloud = GetBool(confData, KeyIsDremioCloud)
-	// this will change validation so we need to do this as early as we can
-	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()
-	if err != nil {
-		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
-	}
-	if IsAWSEfromLogDirs {
-		isCoord, logPath, err := autodetect.IsAWSECoordinator()
-		if err != nil {
-			simplelog.Errorf("unable to detect if this node %v was a coordinator so will not apply AWSE log path fix this may mean no log collection %v", c.nodeName, err)
-		}
-		if isCoord {
-			simplelog.Debugf("AWSE coordinator node detected, using log dir %v, sylinked to %v", c.dremioLogDir, logPath)
-		} else {
-			simplelog.Debugf("AWSE executor node detected, using log dir %v, sylinked to %v", c.dremioLogDir, logPath)
-		}
-	}
+
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
 	c.dremioPID = GetInt(confData, KeyDremioPid)
 	if c.dremioPID < 1 && c.dremioPIDDetection {
@@ -263,9 +248,23 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			c.dremioRocksDBDir = rocksDBDir
 		}
 	}
-	//we do not want to validate configuration of logs for dremio cloud or for AWSE
-	if !c.isDremioCloud && !IsAWSEfromLogDirs {
-		if c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs || c.collectServerLogs {
+	// log collect
+	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
+	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
+	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
+	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
+	c.collectQueriesJSON = GetBool(confData, KeyCollectQueriesJSON)
+	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
+	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
+	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
+	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
+	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+
+	//we do not want to validate configuration of logs for dremio cloud
+	if !c.isDremioCloud {
+		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs
+		if capturesATypeOfLog {
 
 			// which configuration is better
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
@@ -289,6 +288,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 				simplelog.Info(msg)
 				fmt.Println(msg)
 			}
+
 			if err := dirs.CheckDirectory(c.dremioLogDir, func(de []fs.DirEntry) bool {
 				// in a common misconfigured directory server.out will still be present
 				return len(de) > 1
@@ -361,6 +361,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			simplelog.Warningf("unexpected dremio cloud endpoint: %v - Known endpoints are https://app.dremio.cloud and https://app.eu.dremio.cloud", c.dremioEndpoint)
 		}
 	}
+
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
@@ -374,19 +375,6 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.collectOSConfig = GetBool(confData, KeyCollectOSConfig)
 	c.collectDiskUsage = GetBool(confData, KeyCollectDiskUsage)
 	c.collectJVMFlags = GetBool(confData, KeyCollectJVMFlags)
-
-	// log collect
-	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	c.outputDir = GetString(confData, KeyTmpOutputDir)
-	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
-	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
-	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
-	c.collectQueriesJSON = GetBool(confData, KeyCollectQueriesJSON)
-	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
-	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
-	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
-	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
-	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 
 	// jfr config
 	c.collectJFR = GetBool(confData, KeyCollectJFR) && dremioPIDIsValid
@@ -419,7 +407,23 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
 	c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
 	c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
-
+	// TODO figure out if this makes any sense as nothing changed these values
+	// this is just logging logic and not actually useful for anything but reporting
+	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()
+	if err != nil {
+		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
+	}
+	if IsAWSEfromLogDirs {
+		isCoord, logPath, err := autodetect.IsAWSECoordinator()
+		if err != nil {
+			simplelog.Errorf("unable to detect if this node %v was a coordinator so will not apply AWSE log path fix this may mean no log collection %v", c.nodeName, err)
+		}
+		if isCoord {
+			simplelog.Debugf("AWSE coordinator node detected, using log dir %v, symlinked to %v", c.dremioLogDir, logPath)
+		} else {
+			simplelog.Debugf("AWSE executor node detected, using log dir %v, symlinked to %v", c.dremioLogDir, logPath)
+		}
+	}
 	return c, nil
 }
 
