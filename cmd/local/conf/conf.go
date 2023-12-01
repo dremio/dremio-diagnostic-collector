@@ -268,7 +268,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 
 			// which configuration is better
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
-			if configuredLogDir != "" || configuredLogDir != c.dremioLogDir {
+			if configuredLogDir != c.dremioLogDir {
 				msg := fmt.Sprintf("configured log directory '%v' and detected directory '%v' disagree validating contents", configuredLogDir, c.dremioLogDir)
 				fmt.Println(msg)
 				simplelog.Warning(msg)
@@ -298,7 +298,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		}
 		if c.collectDremioConfiguration {
 			configuredConfDir := GetString(confData, KeyDremioConfDir)
-			if configuredConfDir != "" && configuredConfDir != c.dremioConfDir {
+			if configuredConfDir != c.dremioConfDir {
 				simplelog.Warningf("configured conf directory '%v' and detected directory '%v' disagree validating contents", configuredConfDir, c.dremioConfDir)
 				err := dirs.CheckDirectory(configuredConfDir, func(de []fs.DirEntry) bool {
 					return len(de) > 0
@@ -317,7 +317,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			}
 		}
 		configuredRocksDBDir := GetString(confData, KeyDremioRocksdbDir)
-		if configuredRocksDBDir != "" && configuredRocksDBDir != c.dremioRocksDBDir {
+		if configuredRocksDBDir != c.dremioRocksDBDir {
 			simplelog.Warningf("configured rocksdb directory '%v' and detected directory '%v' disagree validating contents", configuredRocksDBDir, c.dremioRocksDBDir)
 			err := dirs.CheckDirectory(configuredRocksDBDir, func(de []fs.DirEntry) bool {
 				return len(de) > 0

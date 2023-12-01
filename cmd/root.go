@@ -195,8 +195,8 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
-		//stop := startTicker()
-		//defer stop()
+		stop := startTicker()
+		defer stop()
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {

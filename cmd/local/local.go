@@ -383,6 +383,9 @@ func getClassPath(pid int) (string, error) {
 			return line, nil
 		}
 	}
+	if scanner.Err() != nil {
+		return "", fmt.Errorf("error while scanning '%v' for version: %v", out, scanner.Err())
+	}
 	return "", fmt.Errorf("no matches for java.class.path= found in '%v'", pid)
 }
 
