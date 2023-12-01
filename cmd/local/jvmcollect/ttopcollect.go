@@ -38,7 +38,7 @@ type TtopService interface {
 
 func NewTtopService() (TtopService, error) {
 	t := &ttop{}
-	tmpDir, err := os.MkdirTemp("", "ddc-sjk")
+	tmpDir, err := os.MkdirTemp("", "ddc-sjk*")
 	if err != nil {
 		return &ttop{}, err
 	}
@@ -139,15 +139,13 @@ func (t *ttop) KillTtop() (string, error) {
 	if err := t.cmd.Process.Kill(); err != nil {
 		return "", fmt.Errorf("failed to kill process: %w", err)
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.tmpDir == "" {
-		return "", errors.New("unable to get data from ttop as it is not yet started")
-	}
-	if err := os.RemoveAll(t.tmpDir); err != nil {
-		simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
-	}
-	t.tmpDir = ""
+	// if t.tmpDir == "" {
+	// 	return "", errors.New("unable to get data from ttop as it is not yet started")
+	// }
+	// if err := os.RemoveAll(t.tmpDir); err != nil {
+	// 	simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
+	// }
+	// t.tmpDir = ""
 	return string(t.output), nil
 }
 
