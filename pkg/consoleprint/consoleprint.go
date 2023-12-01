@@ -32,16 +32,18 @@ type NodeCaptureStats struct {
 
 // CollectionStats represents stats for a collection.
 type CollectionStats struct {
-	ddcVersion        string
-	logFile           string
-	ddcYaml           string
-	TransfersComplete int
-	totalTransfers    int
-	collectionType    string
-	tarball           string
-	nodeCaptureStats  map[string]*NodeCaptureStats
-	result            string
-	mu                sync.RWMutex // Mutex to protect access
+	ddcVersion           string
+	logFile              string
+	ddcYaml              string
+	TransfersComplete    int
+	totalTransfers       int
+	collectionType       string
+	tarball              string
+	nodeCaptureStats     map[string]*NodeCaptureStats
+	result               string
+	k8sFilesCollected    []string
+	lastK8sFileCollected string
+	mu                   sync.RWMutex // Mutex to protect access
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
@@ -54,6 +56,13 @@ func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, transfer
 	c.totalTransfers = totalTransfers
 	c.collectionType = collectionType
 	c.mu.Unlock()
+}
+
+func UpdateK8sFiles(fileName string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.k8sFilesCollected = append(c.k8sFilesCollected, fileName)
+	c.lastK8sFileCollected = fileName
 }
 
 func UpdateTarballDir(tarballDir string) {
@@ -106,6 +115,16 @@ func PrintState() {
 	}
 	sort.Strings(keys)
 	var nodes strings.Builder
+	if c.lastK8sFileCollected != "" {
+		nodes.WriteString("Kubernetes:\n-----------\n")
+		nodes.WriteString(fmt.Sprintf("Last file collected   : %v\n", c.lastK8sFileCollected))
+		nodes.WriteString(fmt.Sprintf("files collected       : %v\n", len(c.k8sFilesCollected)))
+		nodes.WriteString("\n")
+	}
+	if len(c.nodeCaptureStats) > 0 {
+		nodes.WriteString("Nodes:\n------\n")
+	}
+
 	for i, key := range keys {
 		node := c.nodeCaptureStats[key]
 		var secondsElapsed int
@@ -130,9 +149,6 @@ Collection Type      : %v
 Transfers Complete   : %v/%v
 Tarball              : %v
 Result               : %v
-
-Collection Stats
------------------
 
 %v
 `, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, c.TransfersComplete, total,

@@ -323,7 +323,8 @@ collect-kvstore-report: true
 
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
-
+	testLog := filepath.Join(t.TempDir(), "ddc.log")
+	simplelog.InitLoggerWIthFile(4, testLog)
 	//should log redacted when token is present
 	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
@@ -332,11 +333,8 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	if cfg == nil {
 		t.Error("expected a valid CollectConf but it is nil")
 	}
-	//flush buffer
-	for i := 0; i < 100; i++ {
-		simplelog.Infof("test %v", i)
-	}
-	b, err := os.ReadFile(simplelog.GetLogLoc())
+
+	b, err := os.ReadFile(testLog)
 	if err != nil {
 		t.Fatal(err)
 	}

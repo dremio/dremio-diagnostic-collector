@@ -43,6 +43,7 @@ func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 		t.Fatalf("unable to create wlm dir due to error %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+dremio-log-dir: %v
 verbose: vvvv
 number-threads: 2
 dremio-endpoint: %v
@@ -52,11 +53,15 @@ accept-collection-consent: true
 allow-insecure-ssl: true
 node-name: %v
 tmp-output-dir: %v
-`, endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
+`, LogDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
 	if err != nil {
 		t.Fatalf("unable to create ddc.yaml due to error %v", err)
 	}
 	return confDir
+}
+
+func LogDir() string {
+	return filepath.Join("testdata", "logs")
 }
 
 func TestRunCollectWLM(t *testing.T) {

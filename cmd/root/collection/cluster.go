@@ -23,6 +23,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -58,6 +59,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 				simplelog.Errorf("trying to write file %v, error was %v", filename, err)
 				return
 			}
+			consoleprint.UpdateK8sFiles(cmdname)
 		}(cmd)
 	}
 	wg.Wait()
@@ -88,6 +90,7 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 			for _, container := range strings.Split(containers, " ") {
 				copyContainerLog(cs, ddfs, k, container, namespace, path, podname)
 			}
+			consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
 		}(pod)
 	}
 	wg.Wait()

@@ -52,9 +52,10 @@ func TestValidateAPICredentials(t *testing.T) {
 	}
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
 	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
+dremio-log-dir: %v
 dremio-endpoint: %v
 dremio-pat-token: my-pat-token
-`, server.URL)), 0600)
+`, LogDir(), server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -99,6 +100,7 @@ func TestValidateAPICredentialsWithError(t *testing.T) {
 	err = os.WriteFile(ddcYaml, []byte(`
 dremio-endpoint: "http://localhost:9047"
 dremio-pat-token: "my-pat-token"
+is-dremio-cloud: true
 `), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
