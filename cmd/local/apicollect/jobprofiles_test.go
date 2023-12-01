@@ -51,6 +51,7 @@ func TestGetNumberOfJobProfilesTriedWIthNoServerUp(t *testing.T) {
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
 	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 dremio-log-dir: %v
+dremio-conf-dir: %v
 number-job-profiles: 25000
 job-profiles-num-high-query-cost: 5000 
 job-profiles-num-slow-exec: 10000
@@ -60,7 +61,7 @@ dremio-pat-token: my-pat-token
 node-name: node1
 number-threads: 4
 tmp-output-dir: %v
-`, LogDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"))), 0600)
+`, LogDir(), ConfDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"))), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -126,6 +127,7 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
 	err = os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
 dremio-log-dir: %v
+dremio-conf-dir: %v
 number-job-profiles: 2500
 job-profiles-num-high-query-cost: 500
 job-profiles-num-slow-exec: 1000
@@ -136,7 +138,7 @@ node-name: node1
 number-threads: 4
 tmp-output-dir: %v
 dremio-endpoint: %v
-`, LogDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0600)
+`, LogDir(), ConfDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}

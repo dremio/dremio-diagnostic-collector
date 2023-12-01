@@ -44,6 +44,7 @@ func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
 dremio-log-dir: %v
+dremio-conf-dir: %v
 verbose: vvvv
 number-threads: 2
 dremio-endpoint: %v
@@ -53,7 +54,7 @@ accept-collection-consent: true
 allow-insecure-ssl: true
 node-name: %v
 tmp-output-dir: %v
-`, LogDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
+`, LogDir(), ConfDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
 	if err != nil {
 		t.Fatalf("unable to create ddc.yaml due to error %v", err)
 	}
@@ -61,6 +62,10 @@ tmp-output-dir: %v
 }
 
 func LogDir() string {
+	return filepath.Join("testdata", "logs")
+}
+
+func ConfDir() string {
 	return filepath.Join("testdata", "logs")
 }
 

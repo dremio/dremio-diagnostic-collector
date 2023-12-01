@@ -35,7 +35,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
@@ -52,21 +51,19 @@ type JobAPIResponse struct {
 	ID string `json:"id"`
 }
 
-var c *conf.CollectConf
 var setupIsRun = false
+var outputDir string
 
 func cleanupOutput() {
-	if c != nil {
-		mustRemove := true
-		if _, err := os.Stat(c.OutputDir()); err != nil {
-			if os.IsNotExist(err) {
-				mustRemove = false
-			}
+	mustRemove := true
+	if _, err := os.Stat(outputDir); err != nil {
+		if os.IsNotExist(err) {
+			mustRemove = false
 		}
-		if mustRemove {
-			if err := os.RemoveAll(c.OutputDir()); err != nil {
-				log.Printf("WARN unable to remove %v it may have to be manually cleaned up", c.OutputDir())
-			}
+	}
+	if mustRemove {
+		if err := os.RemoveAll(outputDir); err != nil {
+			log.Printf("WARN unable to remove %v it may have to be manually cleaned up", outputDir)
 		}
 	}
 
@@ -88,12 +85,12 @@ func cleanupOutput() {
 
 func writeConf(patToken, dremioEndpoint, tmpOutputDir string) string {
 	if err := os.MkdirAll(tmpOutputDir, 0700); err != nil {
-		log.Fatal(err)
+		log.Fatalf("unable to write conf to dir %v: %v", tmpOutputDir, err)
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
 	w, err := os.Create(testDDCYaml)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("unable to create file %v: %v", testDDCYaml, err)
 	}
 	defer func() {
 		if err := w.Close(); err != nil {
@@ -119,7 +116,7 @@ accept-collection-consent: true
 tmp-output-dir: %v
 `, dremioEndpoint, patToken, strings.ReplaceAll(tmpOutputDir, "\\", "\\\\"))
 	if _, err := w.WriteString(yamlText); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed writing yaml text %v: %v", yamlText, err)
 	}
 	return testDDCYaml
 }
@@ -148,7 +145,6 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	simplelog.InitLogger(4)
 	exitCode := func() (exitCode int) {
 		var err error
 
@@ -159,7 +155,7 @@ func TestMain(m *testing.M) {
 		cmdApply.Stdout = &buf
 		err = cmdApply.Run()
 		if err != nil {
-			simplelog.Errorf("Error during kubectl apply: %v", err)
+			log.Printf("Error during kubectl apply: %v", err)
 			return 1
 		}
 		nsScanner := bufio.NewScanner(&buf)
@@ -170,13 +166,13 @@ func TestMain(m *testing.M) {
 				existingNS := tokens[0]
 				if strings.HasPrefix(existingNS, "ddc-test-") {
 					//delete it
-					simplelog.Infof("found an existing namespace %v deleting it", existingNS)
+					log.Printf("found an existing namespace %v deleting it", existingNS)
 					cmdApply = exec.Command("kubectl", "delete", "namespace", existingNS)
 					cmdApply.Stderr = os.Stderr
 					cmdApply.Stdout = os.Stdout
 					err = cmdApply.Run()
 					if err != nil {
-						simplelog.Warningf("Error during kubectl delete ns: %v", err)
+						log.Printf("Error during kubectl delete ns: %v", err)
 					}
 				}
 			}
@@ -189,7 +185,7 @@ func TestMain(m *testing.M) {
 		cmdApply.Stdout = os.Stdout
 		err = cmdApply.Run()
 		if err != nil {
-			simplelog.Errorf("Error during kubectl apply: %v", err)
+			log.Printf("Error during kubectl apply: %v", err)
 			return 1
 		}
 
@@ -200,7 +196,7 @@ func TestMain(m *testing.M) {
 		cmdApply.Stdout = os.Stdout
 		err = cmdApply.Run()
 		if err != nil {
-			simplelog.Errorf("Error during kubectl apply: %v", err)
+			log.Printf("Error during kubectl apply: %v", err)
 			return 1
 		}
 		// Give Kubernetes some extra time to get everything ready.
@@ -214,7 +210,7 @@ func TestMain(m *testing.M) {
 		//cmdWait.Stdout = os.Stdout
 		err = cmdWait.Run()
 		if err != nil {
-			simplelog.Errorf("Error during kubectl wait: '%v'", err)
+			log.Printf("Error during kubectl wait: '%v'", err)
 			return 1
 		}
 
@@ -228,22 +224,22 @@ func TestMain(m *testing.M) {
 		// Let the system choose a free port.
 		dremioTestPort, err := getFreePort()
 		if err != nil {
-			simplelog.Errorf("Failed to find a free port: %v", err)
+			log.Printf("Failed to find a free port: %v", err)
 			return 1
 		}
 
 		// Start the port forwarding.
 		cmd := exec.Command("kubectl", "port-forward", "dremio-master-0", fmt.Sprintf("%v:9047", dremioTestPort), "-n", namespace)
 		if err := cmd.Start(); err != nil {
-			simplelog.Errorf("Failed to start port-forward command due to error: %v", err)
+			log.Printf("Failed to start port-forward command due to error: %v", err)
 			return 1
 		}
-		simplelog.Infof("port-forward to port %v successful", dremioTestPort)
+		log.Printf("port-forward to port %v successful", dremioTestPort)
 
 		// Ensure the command is stopped when main returns.
 		defer func() {
 			if err := cmd.Process.Kill(); err != nil {
-				simplelog.Errorf("Failed to kill process: %v", err)
+				log.Printf("Failed to kill process: %v", err)
 			}
 		}()
 
@@ -254,12 +250,12 @@ func TestMain(m *testing.M) {
 
 		res, err := http.Get(dremioEndpoint) //nolint
 		if err != nil {
-			simplelog.Errorf("error making http request: %s\n", err)
+			log.Printf("error making http request: %s\n", err)
 			return 1
 		}
 		expectedCode := 200
 		if res.StatusCode != expectedCode {
-			simplelog.Errorf("expected status code %v but instead got %v. Dremio is not ready", expectedCode, res.StatusCode)
+			log.Printf("expected status code %v but instead got %v. Dremio is not ready", expectedCode, res.StatusCode)
 			return 1
 		}
 
@@ -269,23 +265,23 @@ func TestMain(m *testing.M) {
 		}
 		body, err := json.Marshal(authRequest)
 		if err != nil {
-			simplelog.Errorf("Error marshaling JSON: %v", err)
+			log.Printf("Error marshaling JSON: %v", err)
 			return 1
 		}
 		res, err = http.Post(fmt.Sprintf("http://localhost:%v/apiv2/login", dremioTestPort), "application/json", bytes.NewBuffer(body))
 		if err != nil {
-			simplelog.Errorf("error logging in to get token : %s\n", err)
+			log.Printf("error logging in to get token : %s\n", err)
 			return 1
 		}
 		defer res.Body.Close()
 		if res.StatusCode != expectedCode {
 			text, err := io.ReadAll(res.Body)
 			if err != nil {
-				simplelog.Errorf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				log.Printf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
 				return 1
 			}
-			simplelog.Infof("body was %s", string(text))
-			simplelog.Infof("expected status code %v but instead got %v with message %v. Unable to get dremio PAT", expectedCode, res.StatusCode, res.Status)
+			log.Printf("body was %s", string(text))
+			log.Printf("expected status code %v but instead got %v with message %v. Unable to get dremio PAT", expectedCode, res.StatusCode, res.Status)
 			return 1
 		}
 		var authResponse AuthResponse
@@ -293,11 +289,11 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			text, err := io.ReadAll(res.Body)
 			if err != nil {
-				simplelog.Errorf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
+				log.Printf("fatal attempt to decode body from dremio auth %v and unable to read body for debugging", err)
 				return 1
 			}
-			simplelog.Infof("body was %s", string(text))
-			simplelog.Infof("fatal attempt to decode body from dremio auth %v", err)
+			log.Printf("body was %s", string(text))
+			log.Printf("fatal attempt to decode body from dremio auth %v", err)
 			return 1
 		}
 		dremioPATToken = authResponse.Token
@@ -322,18 +318,18 @@ func TestMain(m *testing.M) {
 		  }`
 		httpReq, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%v/apiv3/catalog", dremioTestPort), bytes.NewBuffer([]byte(nasSource)))
 		if err != nil {
-			simplelog.Errorf("unable to create data source request")
+			log.Printf("unable to create data source request")
 			return 1
 		}
 		httpReq.Header.Add("Content-Type", "application/json")
 		httpReq.Header.Add("Authorization", "_dremio"+dremioPATToken)
 		res, err = http.DefaultClient.Do(httpReq)
 		if err != nil {
-			simplelog.Errorf("unable to create data source due to error %v", err)
+			log.Printf("unable to create data source due to error %v", err)
 			return 1
 		}
 		if res.StatusCode != 200 {
-			simplelog.Errorf("expected status code 200 but instead got %v while trying to create source", res.StatusCode)
+			log.Printf("expected status code 200 but instead got %v while trying to create source", res.StatusCode)
 			return 1
 		}
 		tmpDirForConf, err := os.MkdirTemp("", "ddc")
@@ -344,34 +340,32 @@ func TestMain(m *testing.M) {
 		}
 		defer func() {
 			if err := os.RemoveAll(tmpDirForConf); err != nil {
-				simplelog.Warningf("unable to clean up dir %v due to error %v", tmpDirForConf, err)
+				log.Printf("unable to clean up dir %v due to error %v", tmpDirForConf, err)
 			}
 		}()
 		yamlLocation := writeConf(dremioPATToken, dremioEndpoint, tmpDirForConf)
 		yamlDir := filepath.Dir(yamlLocation)
-		c, err = conf.ReadConf(make(map[string]string), yamlLocation)
-		if err != nil {
-			simplelog.Errorf("reading config %v", err)
-			return 1
-		}
-		simplelog.Infof("the directory for yaml was %v", yamlDir)
+		// no op on the configuration check because it is not valid for
+		//c, _ = conf.ReadConf(make(map[string]string), yamlLocation)
+
+		log.Printf("the directory for yaml was %v", yamlDir)
 		entries, err := os.ReadDir(yamlDir)
 		if err != nil {
-			simplelog.Errorf("unable to read the yaml dir %v due to error %v", yamlDir, err)
+			log.Printf("unable to read the yaml dir %v due to error %v", yamlDir, err)
 			return 1
 		}
 		for _, e := range entries {
-			simplelog.Infof("the %v in directory %v", e.Name(), yamlDir)
+			log.Printf("the %v in directory %v", e.Name(), yamlDir)
 		}
-		_, err = submitSQLQuery("CREATE TABLE tester.table1 AS SELECT a, b FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(a, b)")
+		_, err = submitSQLQuery("CREATE TABLE tester.table1 AS SELECT a, b FROM (values (CAST(1 AS INTEGER), CAST(2 AS INTEGER))) as t(a, b)", dremioEndpoint, dremioPATToken)
 		if err != nil {
-			simplelog.Errorf("unable to create table for testing %v", err)
+			log.Printf("unable to create table for testing %v", err)
 			return 1
 		}
 		for i := 0; i < 25; i++ {
-			_, err := submitSQLQuery("SELECT a,b FROM tester.table1")
+			_, err := submitSQLQuery("SELECT a,b FROM tester.table1", dremioEndpoint, dremioPATToken)
 			if err != nil {
-				simplelog.Errorf("failed query #%v with error %v", i+1, err)
+				log.Printf("failed query #%v with error %v", i+1, err)
 				return 1
 			}
 		}
@@ -427,27 +421,28 @@ dremio-jfr-time-seconds: 10
 `, dremioPATToken, tmpOutputDir)), 0600); err != nil {
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
-
+	outputDir = tmpOutputDir
 	args := []string{"ddc", "-k", "-n", namespace, "-c", "app=dremio-coordinator", "-e", "app=dremio-executor", "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
 	}
-	simplelog.Info("remote collect complete now verifying the results")
+	log.Printf("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
 	err = os.Mkdir(testOut, 0700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
-	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
+	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
-	simplelog.Infof("now we are reading the %v dir", testOut)
+
+	t.Logf("now we are reading the %v dir", testOut)
 	entries, err := os.ReadDir(testOut)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("uanble to read dir %v: %v", testOut, err)
 	}
 	hcDir := ""
 	var names []string
@@ -455,7 +450,7 @@ dremio-jfr-time-seconds: 10
 		names = append(names, e.Name())
 		if e.IsDir() {
 			hcDir = filepath.Join(testOut, e.Name())
-			simplelog.Infof("now found the health check directory which is %v", hcDir)
+			t.Logf("now found the health check directory which is %v", hcDir)
 		}
 	}
 
@@ -514,7 +509,7 @@ dremio-jfr-time-seconds: 10
 	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
 	entries, err = os.ReadDir(dir)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("unable to read dir %v: %v", dir, err)
 	}
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
@@ -528,7 +523,7 @@ dremio-jfr-time-seconds: 10
 	for _, e := range entries {
 		fs, err := e.Info()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("error getting entry %v info: %v", e, err)
 		}
 		if fs.Size() == 0 {
 			foundEmptyFiles = append(foundEmptyFiles, fs.Name())
@@ -669,16 +664,16 @@ dremio-jfr-time-seconds: 10
 	}
 }
 
-func submitSQLQuery(query string) (string, error) {
+func submitSQLQuery(query, dremioEndpoint, dremioPat string) (string, error) {
 	sql := fmt.Sprintf(`{
 		"sql": "%v"
 	}`, query)
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/api/v3/sql/", c.DremioEndpoint()), bytes.NewBuffer([]byte(sql)))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/api/v3/sql/", dremioEndpoint), bytes.NewBuffer([]byte(sql)))
 	if err != nil {
 		return "", fmt.Errorf("unable to run sql %v", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", "_dremio"+c.DremioPATToken())
+	req.Header.Add("Authorization", "_dremio"+dremioPat)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("unable to run sql %v due to error  %v", query, err)
@@ -689,7 +684,7 @@ func submitSQLQuery(query string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("fatal attempt to make job api call %v and unable to read body for debugging", err)
 		}
-		simplelog.Debugf("body was %s", string(text))
+		log.Printf("body was %s", string(text))
 		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to run sql %v ", res.StatusCode, query)
 	}
 	var jobResponse JobAPIResponse
@@ -699,7 +694,7 @@ func submitSQLQuery(query string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("fatal attempt to decode body from dremio job api call %v and unable to read body for debugging", err)
 		}
-		simplelog.Debugf("body was %s", string(text))
+		log.Printf("body was %s", string(text))
 		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
 	}
 	return jobResponse.ID, nil

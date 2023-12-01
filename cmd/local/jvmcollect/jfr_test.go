@@ -73,13 +73,14 @@ func TestJFRCapture(t *testing.T) {
 	nodeName := "node1"
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
+dremio-conf-dir: %v
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jfr-time-seconds: 2
-
 `,
 		filepath.Join("testdata", "logs"),
+		filepath.Join("testdata", "conf"),
 		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
@@ -168,12 +169,15 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
+dremio-conf-dir: %v
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jfr-time-seconds: 2
 
-`, filepath.Join("testdata", "logs"),
+`,
+		filepath.Join("testdata", "logs"),
+		filepath.Join("testdata", "conf"),
 		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
