@@ -133,7 +133,7 @@ func PrintState() {
 		} else {
 			secondsElapsed = int(time.Now().Unix()) - int(node.startTime)
 		}
-		nodes.WriteString(fmt.Sprintf("%v. elapsed %v secs - node %v - status %v \n", i+1, secondsElapsed, key, node.status))
+		nodes.WriteString(fmt.Sprintf("%v. node %v - elapsed %v secs - status %v \n", i+1, key, secondsElapsed, node.status))
 	}
 
 	fmt.Printf(
