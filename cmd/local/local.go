@@ -378,13 +378,13 @@ func runCollectClusterStats(c *conf.CollectConf) error {
 		return err
 	}
 	dremioVersion := parseVersionFromClassPath(classPath)
-	// clusterID, err := findClusterID(c)
-	// if err != nil {
-	// 	return err
-	// }
+	clusterID, err := findClusterID(c)
+	if err != nil {
+		return err
+	}
 	clusterStats := &clusterstats.ClusterStats{
 		DremioVersion: dremioVersion,
-		ClusterID:     "",
+		ClusterID:     clusterID,
 		NodeName:      c.NodeName(),
 	}
 	b, err := json.Marshal(clusterStats)
