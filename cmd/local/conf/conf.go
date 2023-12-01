@@ -125,7 +125,8 @@ type CollectConf struct {
 }
 
 func DetectRocksDB(dremioHome string, dremioConfDir string) string {
-	content, err := os.ReadFile(filepath.Join(dremioConfDir, "dremio.conf"))
+	dremioConfFile := filepath.Join(dremioConfDir, "dremio.conf")
+	content, err := os.ReadFile(filepath.Clean(dremioConfFile))
 	if err != nil {
 		simplelog.Errorf("configuration directory incorrect : %v", err)
 	}
