@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -46,13 +45,6 @@ func (m *MockTtopService) StartTtop(args jvmcollect.TtopArgs) error {
 	m.started = true
 	m.pid = args.PID
 	return nil
-}
-
-func (m *MockTtopService) GetClasspath(_ int) (string, error) {
-	if m.writeError != nil {
-		return "", m.writeError
-	}
-	return "classpath", nil
 }
 
 func (m *MockTtopService) KillTtop() (string, error) {
@@ -122,10 +114,7 @@ func TestTtopCollects(t *testing.T) {
 }
 
 func TestTtopExec(t *testing.T) {
-	ttop, err := jvmcollect.NewTtopService()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttop := &jvmcollect.Ttop{}
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -160,10 +149,7 @@ func TestTtopExec(t *testing.T) {
 }
 
 func TestTtopExecHasNoPidToFind(t *testing.T) {
-	ttop, err := jvmcollect.NewTtopService()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttop := &jvmcollect.Ttop{}
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      89899999999,
 		Interval: 1,
@@ -178,10 +164,7 @@ func TestTtopExecHasNoPidToFind(t *testing.T) {
 }
 
 func TestTtopExecHasNoPid(t *testing.T) {
-	ttop, err := jvmcollect.NewTtopService()
-	if err != nil {
-		t.Fatal(err)
-	}
+	ttop := &jvmcollect.Ttop{}
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      -2,
 		Interval: 1,
@@ -214,48 +197,13 @@ func TestTtopHasAndInvalidInterval(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	ttop, err := jvmcollect.NewTtopService()
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	ttop := &jvmcollect.Ttop{}
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      cmd.Process.Pid,
 		Interval: 0,
 	}
 	if err := ttop.StartTtop(ttopArgs); err == nil {
 		t.Error("expected ttop start to fail with interval 0")
-	}
-}
-
-func TestGetClassPaths(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-
-	defer func() {
-		//in windows we may need a bit more time to kill the process
-		if runtime.GOOS == "windows" {
-			time.Sleep(500 * time.Millisecond)
-		}
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	ttop, err := jvmcollect.NewTtopService()
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(time.Duration(500) * time.Millisecond)
-	c, err := ttop.GetClasspath(cmd.Process.Pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := fmt.Sprintf("ClassPath testdata%cdemo.jar", filepath.Separator)
-	if !strings.Contains(c, expected) {
-		t.Errorf("expected to container %v but got '%v'", expected, c)
 	}
 }

@@ -31,43 +31,20 @@ import (
 )
 
 type TtopService interface {
-	GetClasspath(pid int) (string, error)
 	StartTtop(TtopArgs) error
 	KillTtop() (string, error)
-}
-
-func NewTtopService() (TtopService, error) {
-	t := &ttop{}
-	tmpDir, err := os.MkdirTemp("", "ddc-sjk*")
-	if err != nil {
-		return &ttop{}, err
-	}
-	t.tmpDir = tmpDir
-	// referencing a part interior to go always use / path
-	data, err := fs.ReadFile(f, "lib/sjk.jar")
-	if err != nil {
-		return &ttop{}, err
-	}
-
-	sjk := filepath.Join(t.tmpDir, "sjk.jar")
-	if err := os.WriteFile(sjk, data, 0600); err != nil {
-		return &ttop{}, err
-	}
-	t.sjk = sjk
-	return t, nil
 }
 
 //go:embed lib/sjk.jar
 var f embed.FS
 
 // Ttop provides access to the ttop sjk.jar application
-type ttop struct {
+type Ttop struct {
 	cmd    *exec.Cmd
 	tmpDir string
 	output []byte
 	mu     sync.Mutex // Mutex to protect concurrent access to p.output
 	tmpMu  sync.Mutex //mutext for tmpDir
-	sjk    string
 }
 
 type TtopArgs struct {
@@ -75,16 +52,7 @@ type TtopArgs struct {
 	PID      int
 }
 
-func (t *ttop) GetClasspath(pid int) (string, error) {
-	c := exec.Command("java", "-jar", t.sjk, "mx", "-p", fmt.Sprintf("%v", pid), "-b", "java.lang:type=Runtime", "-mg", "-f", "ClassPath")
-	b, err := c.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("unable to get classpath with command %#v: %v", c.Args, err)
-	}
-	return string(b), nil
-}
-
-func (t *ttop) StartTtop(args TtopArgs) error {
+func (t *Ttop) StartTtop(args TtopArgs) error {
 	interval := args.Interval
 	pid := args.PID
 	if interval == 0 {
@@ -95,8 +63,23 @@ func (t *ttop) StartTtop(args TtopArgs) error {
 	}
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
+	tmpDir, err := os.MkdirTemp("", "ddc-sjkttop")
+	if err != nil {
+		return err
+	}
+	t.tmpDir = tmpDir
+	// referencing a part interior to go always use / path
+	data, err := fs.ReadFile(f, "lib/sjk.jar")
+	if err != nil {
+		return err
+	}
 
-	t.cmd = exec.Command("java", "-jar", t.sjk, "ttop", "-ri", fmt.Sprintf("%vs", interval), "-n", "100", "-p", fmt.Sprintf("%v", pid))
+	sjk := filepath.Join(t.tmpDir, "sjk.jar")
+	if err := os.WriteFile(sjk, data, 0600); err != nil {
+		return err
+	}
+
+	t.cmd = exec.Command("java", "-jar", sjk, "ttop", "-ri", fmt.Sprintf("%vs", interval), "-n", "100", "-p", fmt.Sprintf("%v", pid))
 
 	stdout, err := t.cmd.StdoutPipe()
 	if err != nil {
@@ -133,19 +116,21 @@ func (t *ttop) StartTtop(args TtopArgs) error {
 	return nil
 }
 
-func (t *ttop) KillTtop() (string, error) {
+func (t *Ttop) KillTtop() (string, error) {
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
 	if err := t.cmd.Process.Kill(); err != nil {
 		return "", fmt.Errorf("failed to kill process: %w", err)
 	}
-	// if t.tmpDir == "" {
-	// 	return "", errors.New("unable to get data from ttop as it is not yet started")
-	// }
-	// if err := os.RemoveAll(t.tmpDir); err != nil {
-	// 	simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
-	// }
-	// t.tmpDir = ""
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.tmpDir == "" {
+		return "", errors.New("unable to get data from ttop as it is not yet started")
+	}
+	if err := os.RemoveAll(t.tmpDir); err != nil {
+		simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
+	}
+	t.tmpDir = ""
 	return string(t.output), nil
 }
 
@@ -166,11 +151,7 @@ func RunTtopCollect(c *conf.CollectConf) error {
 		Interval: c.DremioTtopFreqSeconds(),
 		PID:      c.DremioPID(),
 	}
-	sjk, err := NewTtopService()
-	if err != nil {
-		return err
-	}
-	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), sjk, &DateTimeTicker{})
+	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
 }
 
 func OnLoop(ttopArgs TtopArgs, duration int, outDir string, ttopService TtopService, timeTicker TimeTicker) error {
