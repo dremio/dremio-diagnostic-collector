@@ -580,8 +580,10 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
 	// check file contents
-	// TODO - add more checks here
-	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, "os_info.txt")
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
@@ -613,8 +615,6 @@ dremio-jfr-time-seconds: 10
 		//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 		t.Errorf("should be at least 9 jstack entries for dremio-executor-0 but there was %v", len(entries))
 	}
-
-	// System tables
 
 	// System tables
 	var systemTables []string

@@ -16,13 +16,10 @@ package tests
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func MatchFile(expectedFile, actualFile string) (success bool, err error) {
@@ -49,18 +46,11 @@ func MatchLines(expectedLines []string, actualFile string) (success bool, err er
 	if err != nil {
 		return false, err
 	}
-	//remove cross platform line endings to make the tests work on windows and linux
-	//expectedText := normalizeText(expectedLines)
-	//actualText := normalizeText(actualLines)
 
 	// We take each expected line and check for matches
 	matches := 0
 	for _, expectedLine := range expectedLines {
 		for _, actualLine := range actualLines {
-			fmt.Println(expectedLine)
-			simplelog.Info(expectedLine)
-			fmt.Println(actualLine)
-			simplelog.Info(actualLine)
 			if strings.Contains(actualLine, expectedLine) {
 				matches = matches + 1
 			}
