@@ -99,6 +99,9 @@ type MockCapCopy struct {
 	Destination   string
 }
 
+func (m *MockCapCollector) Name() string {
+	return "Mock"
+}
 func (m *MockCapCollector) HelpText() string {
 	return "you should use a production library"
 }

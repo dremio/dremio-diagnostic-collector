@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
@@ -37,8 +38,18 @@ const msgMax = 1000
 
 var logger *Logger
 var internalDebugLogger *log.Logger
-var ddcLog *os.File
-var mut = &sync.Mutex{}
+var xddcLog *os.File
+var ddcLogFilePath string
+var ddcLogMut = &sync.Mutex{}
+
+func setDDCLog(filePath string, f *os.File) {
+	xddcLog = f
+	ddcLogFilePath = filePath
+}
+
+func getDDCLog() *os.File {
+	return xddcLog
+}
 
 type Logger struct {
 	debugLogger   *log.Logger
@@ -49,16 +60,113 @@ type Logger struct {
 }
 
 func init() {
-	logger = newLogger(LevelError)
+	InitLogger(4)
 	internalDebugLogger = log.New(os.Stdout, "LOG_DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
 func InitLogger(level int) {
-	if level > 3 {
-		logger = newLogger(LevelDebug)
+	//default location
+	createLog(level, "")
+	logger = newLogger()
+}
+
+func InitLoggerWithFile(level int, fileName string) {
+	createLog(level, fileName)
+	logger = newLogger()
+}
+
+func LogStartMessage() {
+	var logLine string
+	if GetLogLoc() != "" {
+		logLine = fmt.Sprintf("### logging to file: %v ###", GetLogLoc())
+
 	} else {
-		logger = newLogger(level)
+		logLine = "### unable to write ddc.log using STDOUT ###"
 	}
+	padding := PaddingForStr(logLine)
+	fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
+}
+
+func PaddingForStr(str string) string {
+	newStr := ""
+	for i := 0; i < len(str); i++ {
+		newStr += "#"
+	}
+	return newStr
+}
+
+func LogEndMessage() {
+	var logLine string
+	if GetLogLoc() != "" {
+		logLine = fmt.Sprintf("### for any troubleshooting consult log: %v ###", GetLogLoc())
+
+	} else {
+		logLine = "### no log written ###"
+	}
+	padding := PaddingForStr(logLine)
+	fmt.Printf("%v\n%v\n%v\n", padding, logLine, padding)
+}
+
+func createLog(adjustedLevel int, fileName string) {
+	ddcLogMut.Lock()
+	defer ddcLogMut.Unlock()
+	if getDDCLog() != nil {
+		internalDebug(adjustedLevel, "closing log")
+		if err := Close(); err != nil {
+			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
+		}
+	}
+	var f *os.File
+	var logLocation string
+	var err error
+	if fileName != "" {
+		logLocation = fileName
+		f, err = os.OpenFile(filepath.Clean(fileName), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
+	} else {
+		logLocation, f, err = getDefaultLogLoc()
+	}
+	if err != nil {
+		fallbackPath := filepath.Clean(filepath.Join(os.TempDir(), "ddc.log"))
+		fallbackLog, err := os.OpenFile(fallbackPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
+		if err != nil {
+			fmt.Println("falling back to standard out")
+		} else {
+			setDDCLog(fallbackPath, fallbackLog)
+			fmt.Printf("falling back to %v\n", fallbackPath)
+		}
+	} else {
+		setDDCLog(logLocation, f)
+	}
+
+}
+
+func getDefaultLogLoc() (string, *os.File, error) {
+	ddcLoc, err := os.Executable()
+	if err != nil {
+		return "", nil, fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
+	}
+	ddcLogPath, err := filepath.Abs(path.Join(path.Dir(ddcLoc), "ddc.log"))
+	if err != nil {
+		return "", nil, fmt.Errorf("unable to get absolute path of ddc log %v", err)
+	}
+	// abs has already cleaned this path so no need to ignore it again
+	f, err := os.OpenFile(ddcLogPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304
+	if err != nil {
+		return "", nil, fmt.Errorf("unable to open ddc log %v", err)
+	}
+	return ddcLogPath, f, nil
+}
+
+func GetLogLoc() string {
+	if ddcLogFilePath != "" {
+		full, err := filepath.Abs(ddcLogFilePath)
+		if err != nil {
+			logger.Debugf("unable to get full path for %v due to error %v", ddcLogFilePath, err)
+			return ddcLogFilePath
+		}
+		return full
+	}
+	return ddcLogFilePath
 }
 
 func Close() error {
@@ -68,8 +176,10 @@ func Close() error {
 	logger.warningLogger = log.New(io.Discard, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile)
 	logger.errorLogger = log.New(io.Discard, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 	logger.hostLog = log.New(io.Discard, "", 0)
-	if err := ddcLog.Close(); err != nil {
-		return fmt.Errorf("unable to close ddc.log with error %v", err)
+	if getDDCLog() != nil {
+		if err := getDDCLog().Close(); err != nil {
+			return fmt.Errorf("unable to close ddc.log with error %v", err)
+		}
 	}
 	return nil
 }
@@ -78,64 +188,59 @@ func internalDebug(level int, text string) {
 		internalDebugLogger.Print(text)
 	}
 }
-func newLogger(level int) *Logger {
-	//cap out logging level because we rely on switch case below to match logging level
-	adjustedLevel := level
-	if adjustedLevel > 3 {
-		adjustedLevel = 3
-	}
+func newLogger() *Logger {
+	// adjustedLevel := level
+	// if adjustedLevel > 3 {
+	// 	adjustedLevel = 3
+	// }
 
 	var debugOut io.Writer
 	var infoOut io.Writer
 	var warningOut io.Writer
 	var errorOut io.Writer
-	ddcLoc, err := os.Executable()
-	if err != nil {
-		log.Fatalf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
-	}
-	mut.Lock()
-	if ddcLog != nil {
-		internalDebug(adjustedLevel, "closing log")
-		if err := Close(); err != nil {
-			internalDebug(adjustedLevel, fmt.Sprintf("unable to close log %v", err))
-		}
-	}
-	ddcLog, err = os.OpenFile(path.Join(path.Dir(ddcLoc), "ddc.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		log.Fatal(err)
-	}
-	mut.Unlock()
+	var hostOut io.Writer
 
-	var stringLevelText = "UNKNOWN"
-	switch adjustedLevel {
-	case LevelDebug:
-		stringLevelText = "DEBUG"
-	case LevelInfo:
-		stringLevelText = "INFO"
-	case LevelWarning:
-		stringLevelText = "WARN"
-	case LevelError:
-		stringLevelText = "ERROR"
+	// var stringLevelText = "UNKNOWN"
+	// switch adjustedLevel {
+	// case LevelDebug:
+	// 	stringLevelText = "DEBUG"
+	// case LevelInfo:
+	// 	stringLevelText = "INFO"
+	// case LevelWarning:
+	// 	stringLevelText = "WARN"
+	// case LevelError:
+	// 	stringLevelText = "ERROR"
+	// }
+	// internalDebug(adjustedLevel, fmt.Sprintf("initialized log with level %v", stringLevelText))
+	// // var output io.Writer
+	ddcLogMut.Lock()
+	d := getDDCLog()
+	if d != nil {
+		// output = ddcLog
+		// we log debug to log every time so we can figure out problems
+		hostOut, debugOut, infoOut, warningOut, errorOut = d, d, d, d, d
+	} else {
+		// output = os.Stdout
+		// we are putting everything out to discard since there is no valid file to write too
+		hostOut, debugOut, infoOut, warningOut, errorOut = os.Stdout, os.Stdout, os.Stdout, os.Stdout, os.Stdout
 	}
-	internalDebug(adjustedLevel, fmt.Sprintf("initialized log with level %v", stringLevelText))
-
-	debugOut, infoOut, warningOut, errorOut = ddcLog, ddcLog, ddcLog, ddcLog
-	//set logger levels because we rely on fall through we cannot use the above switch easily
-	switch adjustedLevel {
-	case LevelDebug:
-		debugOut = io.MultiWriter(os.Stdout, ddcLog)
-		fallthrough
-	case LevelInfo:
-		infoOut = io.MultiWriter(os.Stdout, ddcLog)
-		fallthrough
-	case LevelWarning:
-		warningOut = io.MultiWriter(os.Stdout, ddcLog)
-		fallthrough
-	case LevelError:
-		errorOut = io.MultiWriter(os.Stdout, ddcLog)
-	}
+	ddcLogMut.Unlock()
+	// //set logger levels because we rely on fall through we cannot use the above switch easily
+	// switch adjustedLevel {
+	// case LevelDebug:
+	// 	debugOut = io.MultiWriter(os.Stdout, output)
+	// 	fallthrough
+	// case LevelInfo:
+	// 	infoOut = io.MultiWriter(os.Stdout, output)
+	// 	fallthrough
+	// case LevelWarning:
+	// 	warningOut = io.MultiWriter(os.Stdout, output)
+	// 	fallthrough
+	// case LevelError:
+	// 	errorOut = io.MultiWriter(os.Stdout, output)
+	// }
 	//always add this
-	hostOut := io.MultiWriter(os.Stdout, ddcLog)
+	// hostOut := io.MultiWriter(os.Stdout, output)
 	return &Logger{
 		debugLogger:   log.New(debugOut, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
 		infoLogger:    log.New(infoOut, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),

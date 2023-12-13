@@ -26,30 +26,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 )
 
-func TestJvmFlagCapture(t *testing.T) {
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx512M", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
-
-	defer func() {
-		if err := cmd.Process.Kill(); err != nil {
-			t.Fatalf("failed to kill process: %s", err)
-		} else {
-			t.Log("Process killed successfully.")
-		}
-	}()
-	flags, err := jvmcollect.CaptureFlagsFromPID(cmd.Process.Pid)
-	if err != nil {
-		t.Fatalf("expected no error but got %v", err)
-	}
-	expected := "demo.jar -Dmyflag=1 -Xmx512M"
-	if expected != flags {
-		t.Errorf("expected %v to %v", flags, expected)
-	}
-}
-
 func TestJvmFlagsAreWritten(t *testing.T) {
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
@@ -79,17 +55,22 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	ddcYamlString := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
-`, strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
+`, filepath.Join("testdata", "logs"),
+		filepath.Join("testdata", "conf"),
+		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
 	)
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(ddcYamlString), 0600); err != nil {
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -38,4 +38,13 @@ func TestGetDremioPIDFromText(t *testing.T) {
 	if pid2 != 12345 {
 		t.Errorf("Unexpected value for pid. Got %v, expected 12345", pid2)
 	}
+
+	jpsOutput3 := "1 DremioDaemon -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.connduit.port=45679 -Ddremio.admin-only-mode=false -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC\214 Jps -Dapplication.home=/opt/java/openjdk -Xms8m"
+	pid3, err3 := autodetect.GetDremioPIDFromText(jpsOutput3)
+	if err3 != nil {
+		t.Errorf("Unexpected error: %v", err3)
+	}
+	if pid3 != 1 {
+		t.Errorf("Unexpected value for pid. Got %v, expected 1", pid3)
+	}
 }

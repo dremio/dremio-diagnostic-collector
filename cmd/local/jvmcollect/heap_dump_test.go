@@ -63,17 +63,22 @@ func TestHeapDumpCapture(t *testing.T) {
 	}
 	nodeName := "node1"
 	ddcYamlString := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
 tmp-output-dir: %v
 node-name: %v
 dremio-pid: %v
-`, strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
+`, filepath.Join("testdata", "logs"),
+		filepath.Join("testdata", "conf"),
+		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
 		nodeName,
 		cmd.Process.Pid,
 	)
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(ddcYamlString), 0600); err != nil {
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}

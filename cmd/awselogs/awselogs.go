@@ -36,7 +36,8 @@ var AWSELogsCmd = &cobra.Command{
 	Short: "Log only collect of AWSE from the coordinator node",
 	Long:  `Log only collect of AWSE from the coordinator node`,
 	Run: func(cmd *cobra.Command, args []string) {
-		simplelog.InitLogger(2)
+		simplelog.LogStartMessage()
+		defer simplelog.LogEndMessage()
 		if err := Execute(EFSLogDir, OutDir, OutFile); err != nil {
 			simplelog.Errorf("exiting %v", err)
 			os.Exit(1)
@@ -45,7 +46,13 @@ var AWSELogsCmd = &cobra.Command{
 }
 
 func Execute(efsLogDir string, outDir string, outFile string) error {
-	simplelog.InitLogger(2)
+
+	efsLogDir, err := filepath.Abs(efsLogDir)
+	if err != nil {
+		return fmt.Errorf("cannot get abs for dir %v due to error %w", efsLogDir, err)
+	}
+	fmt.Println("EFS dir: " + efsLogDir)
+
 	entries, err := os.ReadDir(filepath.Join(efsLogDir, "executor"))
 	if err != nil {
 		return fmt.Errorf("failed listing EFS log dir: %w", err)
@@ -66,6 +73,7 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 			simplelog.Warningf("unable to cleanup folder %v due to error: %v", outDir, err)
 		}
 	}()
+
 	coordinatorNode := "coordinator"
 	overrides := make(map[string]string)
 	overrides[conf.KeyDisableRESTAPI] = "true"
@@ -87,7 +95,7 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 	overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, coordinatorNode)
 	overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, coordinatorNode)
 
-	if err := local.Execute([]string{}, overrides); err != nil {
+	if _, err := local.Execute([]string{}, overrides); err != nil {
 		return fmt.Errorf("unable to collect entry %v due to error %w", coordinatorNode, err)
 	}
 	for _, entry := range entries {
@@ -111,7 +119,7 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 		overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 		overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 
-		if err := local.Execute([]string{}, overrides); err != nil {
+		if _, err := local.Execute([]string{}, overrides); err != nil {
 			return fmt.Errorf("unable to collect entry %v due to error %w", entry.Name(), err)
 		}
 	}

@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 )
 
 func TestLogger(t *testing.T) {
@@ -39,7 +41,7 @@ func TestLogger(t *testing.T) {
 	for _, tt := range tests {
 		buf := new(bytes.Buffer)
 
-		logger := newLogger(tt.level)
+		logger := newLogger()
 		logger.debugLogger.SetOutput(buf)
 		logger.infoLogger.SetOutput(buf)
 		logger.warningLogger.SetOutput(buf)
@@ -67,6 +69,41 @@ func TestLogger(t *testing.T) {
 		}
 	}
 }
+
+func TestStartLogMessage(t *testing.T) {
+	InitLogger(4)
+	loc := GetLogLoc()
+	if loc == "" {
+		t.Error("expected log file to not be empty but it was")
+	}
+	out, err := output.CaptureOutput(func() {
+		LogStartMessage()
+	})
+	if err != nil {
+		t.Fatalf("failed running capture %v", err)
+	}
+	if !strings.Contains(out, loc) {
+		t.Errorf("expected %v in string %v", loc, out)
+	}
+}
+
+func TestEndLogMessage(t *testing.T) {
+	InitLogger(4)
+	loc := GetLogLoc()
+	out, err := output.CaptureOutput(func() {
+		LogEndMessage()
+	})
+	if err != nil {
+		t.Fatalf("failed running capture %v", err)
+	}
+	if loc == "" {
+		t.Error("expected log file to not be empty but it was")
+	}
+	if !strings.Contains(out, loc) {
+		t.Errorf("expected %v in string %v", loc, out)
+	}
+}
+
 func TestLoggerMessageIsTruncated(t *testing.T) {
 	var arr []string
 	for i := 0; i < 2000; i++ {
@@ -78,7 +115,7 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	warnbuf := new(bytes.Buffer)
 	errbuf := new(bytes.Buffer)
 
-	logger := newLogger(LevelDebug)
+	logger := newLogger()
 	logger.debugLogger.SetOutput(dbbuf)
 	logger.infoLogger.SetOutput(infobuf)
 	logger.warningLogger.SetOutput(warnbuf)

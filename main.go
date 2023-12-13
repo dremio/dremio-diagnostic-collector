@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -25,11 +26,13 @@ import (
 
 func main() {
 	//initial logger before verbosity is parsed
-	simplelog.InitLogger(2)
 	defer func() {
 		if err := simplelog.Close(); err != nil {
 			log.Printf("unable to close log due to error %v", err)
 		}
 	}()
-	cmd.Execute(os.Args)
+	if err := cmd.Execute(os.Args); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

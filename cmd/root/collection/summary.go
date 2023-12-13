@@ -26,7 +26,7 @@ import (
 type SummaryInfo struct {
 	ClusterInfo         ClusterInfo             `json:"clusterInfo"`
 	CollectedFiles      []helpers.CollectedFile `json:"collectedFiles"`
-	FailedFiles         []FailedFiles           `json:"failedFiles"`
+	FailedFiles         []string                `json:"failedFiles"`
 	SkippedFiles        []string                `json:"skippedFiles"`
 	StartTimeUTC        time.Time               `json:"startTimeUTC"`
 	EndTimeUTC          time.Time               `json:"endTimeUTC"`
@@ -34,16 +34,14 @@ type SummaryInfo struct {
 	TotalBytesCollected int64                   `json:"totalBytesCollected"`
 	Executors           []string                `json:"executors"`
 	Coordinators        []string                `json:"coordinators"`
+	DremioVersion       map[string]string       `json:"dremioVersion"`
+	ClusterID           map[string]string       `json:"clusterID"`
+	DDCVersion          string                  `json:"ddcVersion"`
 }
 
 type ClusterInfo struct {
 	NumberNodesContacted int `json:"numberNodesContacted"`
 	TotalNodesAttempted  int `json:"totalNodesAttempted"`
-}
-
-type FailedFiles struct {
-	Path string `json:"path"`
-	Err  error  `json:"err"`
 }
 
 type SummaryInfoWriterError struct {

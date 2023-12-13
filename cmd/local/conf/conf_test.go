@@ -18,11 +18,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -39,11 +39,11 @@ var genericConfSetup = func(cfgContent string) {
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
-	cfgFilePath = fmt.Sprintf("%s/%s", tmpDir, "ddc.yaml")
+	cfgFilePath = filepath.Join(tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {
 		// Create a sample configuration file.
-		cfgContent = `
+		cfgContent = fmt.Sprintf(`
 accept-collection-consent: true
 disable-rest-api: false
 collect-acceleration-log: true
@@ -52,9 +52,9 @@ collect-audit-log: true
 collect-jvm-flags: true
 dremio-pid-detection: false
 dremio-gclogs-dir: "/path/to/gclogs"
-dremio-log-dir: "/path/to/dremio/logs"
+dremio-log-dir: %v
 node-name: "node1"
-dremio-conf-dir: "/path/to/dremio/conf"
+dremio-conf-dir: "%v"
 tarball-out-dir: "/my-tarball-dir"
 number-threads: 4
 dremio-endpoint: "http://localhost:9047"
@@ -87,7 +87,7 @@ collect-wlm: true
 collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
 	}
 	// Write the sample configuration to a file.
 	err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
@@ -117,7 +117,7 @@ dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: eu.dremio.cloud
 `)
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -149,7 +149,7 @@ dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: dremio.cloud
 `)
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -178,7 +178,7 @@ dremio-endpoint: dremio.cloud
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	genericConfSetup("")
 	//should parse the configuration correctly
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -260,8 +260,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	if cfg.DremioTtopFreqSeconds() != 5 {
 		t.Errorf("Expected to have 5 seconds for ttop freq but was %v", cfg.DremioTtopFreqSeconds())
 	}
-	if cfg.DremioConfDir() != "/path/to/dremio/conf" {
-		t.Errorf("Expected DremioConfDir to be '/path/to/dremio/conf', got '%s'", cfg.DremioConfDir())
+	testConf := filepath.Join("testdata", "conf")
+	if cfg.DremioConfDir() != testConf {
+		t.Errorf("Expected DremioConfDir to be '%v', got '%s'", testConf, cfg.DremioConfDir())
 	}
 	if cfg.TarballOutDir() != "/my-tarball-dir" {
 		t.Errorf("expected /my-tarball-dir but was %v", cfg.TarballOutDir())
@@ -274,7 +275,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 }
 
 func TestConfReadWithDisabledRestAPIResultsInDisabledWLMJobProfileAndKVReport(t *testing.T) {
-	yaml := `
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
 disable-rest-api: true
 number-threads: 4
 dremio-endpoint: "http://localhost:9047"
@@ -284,10 +287,10 @@ number-job-profiles: 10
 collect-wlm: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
 	genericConfSetup(yaml)
 	defer afterEachConfTest()
-	cfg, err = conf.ReadConf(overrides, tmpDir)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -322,22 +325,77 @@ collect-kvstore-report: true
 
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
+	testLog := filepath.Join(t.TempDir(), "ddc.log")
+	simplelog.InitLoggerWithFile(4, testLog)
 	//should log redacted when token is present
-	out, err := output.CaptureOutput(func() {
-		simplelog.InitLogger(4)
-		cfg, err = conf.ReadConf(overrides, tmpDir)
-		if err != nil {
-			t.Errorf("expected no error but had %v", err)
-		}
-		if cfg == nil {
-			t.Error("expected a valid CollectConf but it is nil")
-		}
-	})
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
 	if err != nil {
-		simplelog.Errorf("unable to capture output %v", err)
+		t.Fatalf("expected no error but had %v", err)
 	}
+	if cfg == nil {
+		t.Error("expected a valid CollectConf but it is nil")
+	}
+
+	b, err := os.ReadFile(testLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := string(b)
+
 	if !strings.Contains(out, "conf key 'dremio-pat-token':'REDACTED'") {
 		t.Errorf("expected dremio-pat-token to be redacted in '%v' but it was not", out)
 	}
 	afterEachConfTest()
+}
+
+func TestURLsuffix(t *testing.T) {
+	testURL := "http://localhost:9047/some/path/"
+	expected := "http://localhost:9047/some/path"
+	actual := conf.SanitiseURL(testURL)
+	if expected != actual {
+		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
+	}
+
+	testURL = "http://localhost:9047/some/path"
+	expected = "http://localhost:9047/some/path"
+	actual = conf.SanitiseURL(testURL)
+	if expected != actual {
+		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
+	}
+
+}
+
+func TestClusterStatsDirectory(t *testing.T) {
+	genericConfSetup("")
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Error("invalid conf")
+	}
+	outDir := cfg.ClusterStatsOutDir()
+	expected := filepath.Join("cluster-stats", "node1")
+	if !strings.HasSuffix(outDir, expected) {
+		t.Errorf("expected %v to end with %v", outDir, expected)
+	}
+}
+
+func TestParsePSForConfig(t *testing.T) {
+	ps := `   /opt/java/openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.conduit.port=45679 -Ddremio.admin-only-mode=false -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/opt/java/openjdk/lib/tools.jar com.dremio.dac.daemon.DremioDaemon DREMIO_PLUGINS_DIR=/opt/dremio/plugins KUBERNETES_SERVICE_PORT_HTTPS=443 KUBERNETES_SERVICE_PORT=443 DREMIO_LOG_DIR=/var/log/dremio JAVA_MAJOR_VERSION=8 DREMIO_IN_CONTAINER=1 HOSTNAME=dremio-master-0 LANGUAGE=en_US:en JAVA_HOME=/opt/java/openjdk AWS_CREDENTIAL_PROFILES_FILE=/opt/dremio/aws/credentials DREMIO_CLIENT_PORT_32010_TCP_PROTO=tcp MALLOC_ARENA_MAX=4 ZK_CS_PORT_2181_TCP_ADDR=192.10.1.1 DREMIO_GC_LOGS_ENABLED=yes DREMIO_CLASSPATH=/opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/opt/java/openjdk/lib/tools.jar DREMIO_MAX_HEAP_MEMORY_SIZE_MB=2048 DREMIO_CLIENT_PORT_9047_TCP_PORT=9047 PWD=/opt/dremio JAVA_VERSION_STRING=1.8.0_372 DREMIO_JAVA_SERVER_EXTRA_OPTS=-Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.conduit.port=45679 DREMIO_MAX_DIRECT_MEMORY_SIZE_MB=2048 ZK_CS_PORT_2181_TCP_PROTO=tcp MALLOC_MMAP_MAX_=65536 DREMIO_CLIENT_PORT_32010_TCP_ADDR=192.10.1.13 DREMIO_CLIENT_PORT_31010_TCP_PROTO=tcp DREMIO_CONF_DIR=/opt/dremio/conf TZ=UTC ZK_CS_PORT=tcp://10.43.15.147:2181 DREMIO_ENV_SCRIPT=dremio-env DREMIO_CLIENT_PORT_31010_TCP_ADDR=192.10.1.1 HOME=/var/lib/dremio/dremio LANG=en_US.UTF-8 KUBERNETES_PORT_443_TCP=tcp://192.10.1.1:443 ZK_CS_PORT_2181_TCP_PORT=2181 DREMIO_CLIENT_PORT_9047_TCP_PROTO=tcp LOG_TO_CONSOLE=0 DREMIO_ADMIN_ONLY=false DREMIO_CLIENT_PORT=tcp://192.10.1.13:31010 DREMIO_CLIENT_SERVICE_HOST=192.10.1.13 DREMIO_HOME=/opt/dremio ZK_CS_SERVICE_PORT_CLIENT=2181 DREMIO_CLIENT_SERVICE_PORT_WEB=9047 ZK_CS_SERVICE_PORT=2181 DREMIO_CLIENT_PORT_31010_TCP=tcp://192.10.1.13:31010 DREMIO_CLIENT_SERVICE_PORT_CLIENT=31010 DREMIO_CLIENT_PORT_9047_TCP=tcp://192.10.1.13:9047 DREMIO_PID_DIR=/var/run/dremio DREMIO_CLIENT_SERVICE_PORT=31010 MALLOC_TRIM_THRESHOLD_=131072 DREMIO_GC_OPTS=-XX:+UseG1GC SHLVL=0 DREMIO_CLIENT_PORT_31010_TCP_PORT=31010 DREMIO_GC_LOG_TO_CONSOLE=yes KUBERNETES_PORT_443_TCP_PROTO=tcp is_cygwin=false MALLOC_MMAP_THRESHOLD_=131072 KUBERNETES_PORT_443_TCP_ADDR=10.43.0.1 KUBERNETES_SERVICE_HOST=10.43.0.1 LC_ALL=en_US.UTF-8 AWS_SHARED_CREDENTIALS_FILE=/opt/dremio/aws/credentials KUBERNETES_PORT=tcp://10.43.0.1:443 DREMIO_CLIENT_PORT_9047_TCP_ADDR=192.10.1.13 KUBERNETES_PORT_443_TCP_PORT=443 PATH=/opt/java/openjdk/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin MALLOC_TOP_PAD_=131072 DREMIO_JAVA_OPTS=-Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.conduit.port=45679 -Ddremio.admin-only-mode=false -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC DREMIO_CLIENT_PORT_32010_TCP=tcp://192.10.1.1:32010 ZK_CS_SERVICE_HOST=192.10.1.1 DREMIO_CLIENT_SERVICE_PORT_FLIGHT=32010 DREMIO_LOG_TO_CONSOLE=1 DREMIO_CLIENT_PORT_32010_TCP_PORT=32010 JAVA_VERSION=jdk8u372-b07 ZK_CS_PORT_2181_TCP=tcp://192.10.1.1:2181`
+	conf, err := conf.ParsePSForConfig(ps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conf.ConfDir != "/opt/dremio/conf" {
+		t.Errorf("exected /opt/dremio/conf but was %v", conf.ConfDir)
+	}
+
+	if conf.LogDir != "/opt/dremio/data/logs" {
+		t.Errorf("exected /opt/dremio/data/logs but was %v", conf.LogDir)
+	}
+
+	if conf.Home != "/opt/dremio" {
+		t.Errorf("exected /opt/dremio but was %q", conf.Home)
+	}
 }

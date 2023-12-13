@@ -43,18 +43,20 @@ func TestCollectsConfFilesWithNoSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
+dremio-log-dir: %v
 tmp-output-dir: %v
 dremio-conf-dir: %v
 node-name: %v
-`,
+`, filepath.Join("testdata", "logs"),
 		strings.ReplaceAll(confDir, "\\", "\\\\"),
 		strings.ReplaceAll(testDataPath, "\\", "\\\\"),
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,18 +136,21 @@ func TestCollectsConfFilesAndRedactDremioConf(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
+	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte(fmt.Sprintf(`
+dremio-log-dir: %v
 tmp-output-dir: %v
 dremio-conf-dir: %v
 node-name: %v
 `,
+		filepath.Join("testdata", "logs"),
 		strings.ReplaceAll(confDir, "\\", "\\\\"),
 		strings.ReplaceAll(testDataPath, "\\", "\\\\"),
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, confDir)
+	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
 		t.Fatal(err)
 	}

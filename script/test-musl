@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# script/test: Run all tests
+
+#set -e
+
+cd "$(dirname "$0")/.."
+
+[ -z "$DEBUG" ] || set -x
+
+./script/clean
+./script/build-musl
+
+ go test -race -coverpkg=./... -coverprofile=covprofile ./...

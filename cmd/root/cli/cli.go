@@ -38,7 +38,7 @@ type UnableToStartErr struct {
 }
 
 func (u UnableToStartErr) Error() string {
-	return fmt.Sprintf("unable to start command '%v' due to error '%v'", u.Cmd, u.Err)
+	return fmt.Sprintf("cmd '%v' failed: '%v'", u.Cmd, u.Err)
 }
 
 type ExecuteCliErr struct {

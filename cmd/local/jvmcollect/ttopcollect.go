@@ -40,11 +40,11 @@ var f embed.FS
 
 // Ttop provides access to the ttop sjk.jar application
 type Ttop struct {
-	cmd    *exec.Cmd
-	tmpDir string
-	output []byte
-	mu     sync.Mutex // Mutex to protect concurrent access to p.output
-	tmpMu  sync.Mutex //mutext for tmpDir
+	cmd         *exec.Cmd
+	tmpDir      string
+	output      []byte
+	outputMutex sync.Mutex // Mutex to protect concurrent access to p.output
+	tmpMu       sync.Mutex //mutext for tmpDir
 }
 
 type TtopArgs struct {
@@ -99,18 +99,18 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			t.mu.Lock()
+			t.outputMutex.Lock()
 			t.output = append(t.output, []byte(scanner.Text()+"\n")...)
-			t.mu.Unlock()
+			t.outputMutex.Unlock()
 		}
 	}()
 
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			t.mu.Lock()
+			t.outputMutex.Lock()
 			t.output = append(t.output, []byte(scanner.Text()+"\n")...)
-			t.mu.Unlock()
+			t.outputMutex.Unlock()
 		}
 	}()
 	return nil
@@ -122,8 +122,6 @@ func (t *Ttop) KillTtop() (string, error) {
 	if err := t.cmd.Process.Kill(); err != nil {
 		return "", fmt.Errorf("failed to kill process: %w", err)
 	}
-	t.mu.Lock()
-	defer t.mu.Unlock()
 	if t.tmpDir == "" {
 		return "", errors.New("unable to get data from ttop as it is not yet started")
 	}
@@ -131,6 +129,8 @@ func (t *Ttop) KillTtop() (string, error) {
 		simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
 	}
 	t.tmpDir = ""
+	t.outputMutex.Lock()
+	defer t.outputMutex.Unlock()
 	return string(t.output), nil
 }
 

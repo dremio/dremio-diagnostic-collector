@@ -14,7 +14,10 @@
 
 package strutils
 
-import "unicode/utf8"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 func LimitString(s string, maxLength int) string {
 	max := 0
@@ -30,4 +33,12 @@ func LimitString(s string, maxLength int) string {
 	runes := []rune(s)
 	truncatedRunes := runes[:max]
 	return string(truncatedRunes)
+}
+
+func GetLastLine(s string) string {
+	index := strings.LastIndex(s, "\n")
+	if index == -1 {
+		return s // No newline character, return the whole string
+	}
+	return s[index+1:] // Return the substring after the last newline character
 }

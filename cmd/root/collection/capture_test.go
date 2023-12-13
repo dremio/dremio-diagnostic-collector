@@ -130,6 +130,10 @@ func (m *MockCollector) HelpText() string {
 	return "help me"
 }
 
+func (m *MockCollector) Name() string {
+	return "Mock"
+}
+
 // func TestFindFiles(t *testing.T) {
 // 	expectedOutput := "/opt/file1\n/opt/file2\n"
 // 	var returnValues [][]interface{}

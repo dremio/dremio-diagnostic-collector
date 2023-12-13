@@ -49,6 +49,10 @@ type CmdSSHActions struct {
 	sshUser string
 }
 
+func (c *CmdSSHActions) Name() string {
+	return "SSH/SCP"
+}
+
 func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, _ bool, args ...string) (err error) {
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostString))

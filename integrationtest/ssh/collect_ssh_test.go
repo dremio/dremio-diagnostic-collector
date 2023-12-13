@@ -50,6 +50,9 @@ type SSHTestConf struct {
 }
 
 func TestSSHBasedRemoteCollect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 
 	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
 	if err != nil {
@@ -110,7 +113,10 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile}
-	cmd.Execute(args)
+	err = cmd.Execute(args)
+	if err != nil {
+		t.Fatalf("unable to run collect: %v", err)
+	}
 	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
 	err = os.Mkdir(testOut, 0700)

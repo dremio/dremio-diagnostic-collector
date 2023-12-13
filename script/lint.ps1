@@ -11,3 +11,6 @@ go fmt ./...
 
 Write-Output "Executing golangci-lint run"
 golangci-lint run -E exportloopref,revive,gofmt -D structcheck
+
+Write-Output "executing license-header-checker"
+license-header-checker license_header.txt . go

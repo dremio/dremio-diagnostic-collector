@@ -21,14 +21,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/awselogs"
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
@@ -63,12 +66,19 @@ var RootCmd = &cobra.Command{
 	Short: versions.GetCLIVersion() + " ddc connects via to dremio servers collects logs into an archive",
 	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
+
 for ssh based communication to VMs or Bare metal hardware:
 
+	# coordinator only
+	ddc --coordinator 10.0.0.19 --ssh-user myuser
+	# coordinator and executors
 	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
 
 for kubernetes deployments:
 
+	# coordinator only
+	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator
+	# coordinator and executors
 	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
 
 To sample job profiles and collect system tables information, kv reports, and Workload Manager Information add the --dremio-pat-prompt flag:
@@ -80,7 +90,39 @@ To sample job profiles and collect system tables information, kv reports, and Wo
 	},
 }
 
+// startTicker starts a ticker that ticks every specified duration and returns
+// a function that can be called to stop the ticker.
+func startTicker() (stop func()) {
+	ticker := time.NewTicker(time.Second * 2)
+	quit := make(chan struct{})
+	consoleprint.PrintState()
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				// Action to be performed on each tick
+				consoleprint.PrintState()
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(quit)
+	}
+}
+
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, k8sEnabled bool) error {
+	consoleprint.UpdateRuntime(
+		versions.GetCLIVersion(),
+		simplelog.GetLogLoc(),
+		collectionArgs.DDCYamlLoc,
+		"",
+		0,
+		0,
+	)
 	err := validateParameters(collectionArgs, sshArgs, k8sEnabled)
 	if err != nil {
 		fmt.Println("COMMAND HELP TEXT:")
@@ -91,11 +133,12 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		}
 		return fmt.Errorf("invalid command flag detected: %w", err)
 	}
-	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
-
-	//default no op
+	cs, err := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
+	if err != nil {
+		return fmt.Errorf("error when creating copy strategy: %v", err)
+	}
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if k8sEnabled {
@@ -123,39 +166,58 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		clusterCollect,
 	)
 	if err != nil {
-		simplelog.Errorf("unexpected error running collection '%v'", err)
-		os.Exit(1)
+		return err
+	}
+	return nil
+}
+
+func ValidateYaml(ddcYaml string) error {
+	emtpyOverrides := make(map[string]string)
+	confData, err := conf.ParseConfig(ddcYaml, emtpyOverrides)
+	if err != nil {
+		return err
+	}
+	simplelog.Infof("parsed configuration for %v follows", ddcYaml)
+	for k, v := range confData {
+		if k == conf.KeyDremioPatToken && v != "" {
+			simplelog.Infof("yaml key '%v':'REDACTED'", k)
+		} else {
+			simplelog.Infof("yaml key '%v':'%v'", k, v)
+		}
 	}
 	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(args []string) {
+func Execute(args []string) error {
+
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+		stop := startTicker()
+		defer stop()
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
-				simplelog.Errorf("unexpected error getting ssh directory '%v'. This is a critical error and should result in a bug report.", err)
-				os.Exit(1)
+				return fmt.Errorf("unexpected error getting ssh directory '%v'. This is a critical error and should result in a bug report", err)
 			}
 			sshKeyLoc = sshDefault
 		}
-		simplelog.InitLogger(2)
 		dremioPAT := ""
 		if promptForDremioPAT {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
-				fmt.Printf("unable to get PAT due to: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("unable to get PAT due to: %v", err)
 			}
 			dremioPAT = pat
 		}
 
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
+		if err := ValidateYaml(ddcYamlLoc); err != nil {
+			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
+		}
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
@@ -171,21 +233,24 @@ func Execute(args []string) {
 			SSHUser:   sshUser,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace: namespace,
-			//ScaleoutCoordinatorContainer: scaleoutCoordinatorContainer,
+			Namespace:            namespace,
 			CoordinatorContainer: coordinatorContainer,
 			ExecutorsContainer:   executorsContainer,
 			KubectlPath:          kubectlPath,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, isK8s); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			consoleprint.UpdateResult(err.Error())
+		} else {
+			consoleprint.UpdateResult(fmt.Sprintf("complete at %v", time.Now().Format(time.RFC1123)))
 		}
+		// we put the error in result so just return nil
+		consoleprint.PrintState()
+		return nil
 	}
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 type unableToGetHomeDir struct {
@@ -242,12 +307,6 @@ func validateParameters(args collection.Args, sshArgs ssh.Args, isK8s bool) erro
 			return errors.New("the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\"")
 		}
 		return errors.New("the coordinator string was empty you must pass a single host or a comma separated lists of hosts to --coordinator or -c arguments. Example: -e 192.168.64.12,192.168.65.10")
-	}
-	if args.ExecutorsStr == "" {
-		if isK8s {
-			return errors.New("the executor string was empty you must pass a label that will match your executors --executor or -e arguments. Example: -e \"mylabel=executor\"")
-		}
-		return errors.New("the executor string was empty you must pass a single host or a comma separated lists of hosts to --executor or -e arguments. Example: -e 192.168.64.12,192.168.65.10")
 	}
 
 	if !isK8s {

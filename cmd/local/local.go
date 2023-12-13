@@ -16,12 +16,17 @@
 package cmd
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -34,6 +39,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -41,6 +47,8 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
+
+var ddcYamlLoc string
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
@@ -77,6 +85,9 @@ func createAllDirs(c *conf.CollectConf) error {
 		}
 	}
 
+	if err := os.MkdirAll(c.ClusterStatsOutDir(), perms); err != nil {
+		return fmt.Errorf("unable to create cluster-stats directory due to error %v", err)
+	}
 	if err := os.MkdirAll(c.SystemTablesOutDir(), perms); err != nil {
 		return fmt.Errorf("unable to create system-tables directory due to error %v", err)
 	}
@@ -243,7 +254,162 @@ func collect(c *conf.CollectConf) error {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
+
+	if err := runCollectClusterStats(c); err != nil {
+		simplelog.Errorf("during unable to collect cluster stats like cluster ID: %v", err)
+	}
 	return nil
+}
+
+func findClusterID(c *conf.CollectConf) (string, error) {
+	startTime := time.Now().Unix()
+	var clusterID string
+	rocksDBDir := c.DremioRocksDBDir()
+	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
+		}
+
+		if clusterID != "" {
+			return nil
+		}
+		if !info.IsDir() {
+			// readonly cannot modify the files touched
+			f, err := os.Open(filepath.Clean(path))
+			if err != nil {
+				return fmt.Errorf("error reading file %s: %v", path, err)
+			}
+			defer f.Close()
+			var tempString string
+			reader := bufio.NewReader(f)
+			matched := ""
+			nextChar := 'c'
+			skipped := 0
+			for {
+				// Read file byte by byte
+				b, err := reader.ReadByte()
+				if err != nil {
+					break // End of file or an error
+				}
+				if tempString == "clusterIdentity" {
+					if skipped != 4 {
+						skipped++
+						continue
+					}
+					matched += string(b)
+					if len(matched) == 36 {
+						endTime := time.Now().Unix()
+						simplelog.Infof("found cluster ID '%v' in file %v in %v seconds", matched, path, endTime-startTime)
+						clusterID = matched
+						return nil
+					}
+				} else {
+					// looking for starting clusterIdentity
+					c := rune(b)
+					if nextChar == c {
+						tempString += string(b)
+						switch tempString {
+						case "c":
+							nextChar = 'l'
+						case "cl":
+							nextChar = 'u'
+						case "clu":
+							nextChar = 's'
+						case "clus":
+							nextChar = 't'
+						case "clust":
+							nextChar = 'e'
+						case "cluste":
+							nextChar = 'r'
+						case "cluster":
+							nextChar = 'I'
+						case "clusterI":
+							nextChar = 'd'
+						case "clusterId":
+							nextChar = 'e'
+						case "clusterIde":
+							nextChar = 'n'
+						case "clusterIden":
+							nextChar = 't'
+						case "clusterIdent":
+							nextChar = 'i'
+						case "clusterIdenti":
+							nextChar = 't'
+						case "clusterIdentit":
+							nextChar = 'y'
+						case "clusterIdentity":
+							simplelog.Infof("found clusterIdentity key in file %v", path)
+						}
+					} else {
+						tempString = ""
+						nextChar = 'c'
+					}
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("error walking the path %v: %v", rocksDBDir, err)
+	}
+	simplelog.Infof("total time to search clusterID in directory %v was %v seconds", rocksDBDir, time.Now().Unix()-startTime)
+	return clusterID, nil
+}
+
+func parseVersionFromClassPath(classPath string) string {
+	re := regexp.MustCompile(`dremio-common-(.+)\.jar`)
+	lines := strings.Split(classPath, ":")
+	for _, line := range lines {
+		matches := re.FindStringSubmatch(line)
+		if len(matches) > 1 {
+			return matches[1]
+		}
+	}
+	return ""
+}
+
+func getClassPath(pid int) (string, error) {
+	var w bytes.Buffer
+	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v system_properties", pid)); err != nil {
+		return "", err
+	}
+	out := w.String()
+	scanner := bufio.NewScanner(strings.NewReader(out))
+	buf := make([]byte, 0, 256*1024)
+	scanner.Buffer(buf, 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "java.class.path=") {
+			return line, nil
+		}
+	}
+	if scanner.Err() != nil {
+		return "", fmt.Errorf("error while scanning '%v' for version: %v", out, scanner.Err())
+	}
+	return "", fmt.Errorf("no matches for java.class.path= found in '%v'", pid)
+}
+
+func runCollectClusterStats(c *conf.CollectConf) error {
+	simplelog.Debugf("Collecting cluster stats")
+	classPath, err := getClassPath(c.DremioPID())
+	if err != nil {
+		return err
+	}
+	dremioVersion := parseVersionFromClassPath(classPath)
+	clusterID, err := findClusterID(c)
+	if err != nil {
+		return err
+	}
+	clusterStats := &clusterstats.ClusterStats{
+		DremioVersion: dremioVersion,
+		ClusterID:     clusterID,
+		NodeName:      c.NodeName(),
+	}
+	b, err := json.Marshal(clusterStats)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0600)
 }
 
 func runCollectOSConfig(c *conf.CollectConf) error {
@@ -363,47 +529,57 @@ var LocalCollectCmd = &cobra.Command{
 			}
 			overrides[flag.Name] = flag.Value.String()
 		})
-		if err := Execute(args, overrides); err != nil {
-			simplelog.Error(errors.Unwrap(err).Error())
+		msg, err := Execute(args, overrides)
+		if err != nil {
+			fmt.Println(errors.Unwrap(err).Error())
 			os.Exit(1)
 		}
+		fmt.Println(msg)
 	},
 }
 
-func Execute(args []string, overrides map[string]string) error {
+func Execute(args []string, overrides map[string]string) (string, error) {
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 	simplelog.Infof("args: %v", strings.Join(args, " "))
+	fmt.Println(strings.TrimSpace(versions.GetCLIVersion()))
+	startTime := time.Now().Unix()
 
-	c, err := conf.ReadConfFromExecLocation(overrides)
+	c, err := conf.ReadConf(overrides, ddcYamlLoc)
 	if err != nil {
-		return fmt.Errorf("unable to read configuration %w", err)
+		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
+
+	fmt.Println("looking for logs in: " + c.DremioLogDir())
 	if !c.AcceptCollectionConsent() {
 		fmt.Println(consent.OutputConsent(c))
-		return errors.New("no consent given")
+		return "", errors.New("no consent given")
 	}
 
 	// Run application
 	simplelog.Info("Starting collection...")
 	if err := collect(c); err != nil {
-		return fmt.Errorf("unable to collect: %w", err)
+		return "", fmt.Errorf("unable to collect: %w", err)
 	}
-	ddcLoc, err := os.Executable()
-	if err != nil {
-		simplelog.Warningf("unable to find ddc itself..so can't copy it's log due to error %v", err)
-	} else {
-		ddcDir := filepath.Dir(ddcLoc)
-		if err := ddcio.CopyFile(filepath.Join(ddcDir, "ddc.log"), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
+
+	logLoc := simplelog.GetLogLoc()
+	if logLoc != "" {
+		if err := ddcio.CopyFile(simplelog.GetLogLoc(), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
 			simplelog.Warningf("uanble to copy log to archive due to error %v", err)
 		}
 	}
 	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
 	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
 	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
-		return fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
+		return "", fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
 	}
 	simplelog.Infof("Archive %v complete", tarballName)
-	return nil
+	endTime := time.Now().Unix()
+	fi, err := os.Stat(tarballName)
+	if err != nil {
+		// quickly just supplying tarball name and elapsed
+		return fmt.Sprintf("file %v - %v secs collection", tarballName, endTime-startTime), nil
+	}
+	return fmt.Sprintf("file %v - %v secs collection - size %v bytes", tarballName, endTime-startTime, fi.Size()), nil
 }
 
 func init() {
@@ -430,4 +606,13 @@ func init() {
 	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
+
+	execLoc, err := os.Executable()
+	if err != nil {
+		fmt.Printf("unable to find ddc, critical error %v", err)
+		os.Exit(1)
+	}
+	execLocDir := filepath.Dir(execLoc)
+	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
+
 }

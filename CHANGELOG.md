@@ -1,4 +1,38 @@
 # Changelog
+## [0.8.0]
+
+### Added
+* ddc.log file location on command start and on command end
+* ddc falls back to logging to the temp directory if the default location is not present
+* --ddc-yaml flag now for local-collect to be able to read a ddc yaml from anywhere
+* added validation and logging of ddc.yaml when running the ddc command
+* automatic detection of dremio log and configuration directories from the dremio process.
+* an effort is made to detect the rocksdb folder
+* cluster ID is captured from the rocksdb folder
+* dremio version is now captured from the classpath
+
+### Changed
+* Major UX redesign: minimized the output from the tool to the essential, no more wall of text
+* failing validiation of the dremio log directory
+* will fail the collect if log directory only has one file or is inaccessible
+* will fail the collect if conf directory is empty or inaccessible
+* no longer require executor be given to the ddc command, but we still require a coordinator
+
+### Fixed
+* no longer logging we stopped an existing JFR recording when we didn't
+
+## [0.7.4]
+### Fixed
+
+* AWSE coordinator/executor detection changed - now checks for coordinator first
+* JFR now attempts a silent stop for existing DDC JFR recordings, this will clean up any collections that had not been properly stopped
+
+## [0.7.3]
+### Fixed
+
+* now copy, archive, and delete copy instead of archive in place log files #130
+* unexpected use of tmp path #123
+* clean rest API URL by adding check for trailing slash #127 
 
 ## [0.7.2]
 
@@ -365,6 +399,11 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.8.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.4...v0.8.0
+[0.7.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.3...v0.7.4
+[0.7.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.6.0...v0.6.1

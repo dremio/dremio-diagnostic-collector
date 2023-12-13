@@ -75,7 +75,10 @@ func (t *ThreadPool) worker() {
 	for job := range t.jobs {
 		err := job()
 		if err != nil {
+			fmt.Print("x")
 			simplelog.Errorf("Failed to execute job: %v", err)
+		} else {
+			fmt.Print(".")
 		}
 		t.mut.Lock()
 		t.pendingJobs--
