@@ -104,7 +104,10 @@ func AssertFileHasExpectedLines(t *testing.T, expectedLines []string, filePath s
 	success, _ := MatchLines(expectedLines, filePath)
 	if !success {
 		t.Errorf("file %v did not contain expected lines %v", filePath, expectedLines)
-		echoLines(t, filePath)
+		err := echoLines(t, filePath)
+		if err != nil {
+			t.Errorf("when trying to echo lines from file %v, the following error was seen\n%v", filePath, err)
+		}
 	}
 }
 
