@@ -265,6 +265,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 	startTime := time.Now().Unix()
 	var clusterID string
 	rocksDBDir := c.DremioRocksDBDir()
+	simplelog.Debugf("checking dir %v for cluster version", rocksDBDir)
 	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
@@ -276,6 +277,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 		if !info.IsDir() {
 			// readonly cannot modify the files touched
 			f, err := os.Open(filepath.Clean(path))
+			simplelog.Debugf("checking file %v for cluster version", f.Name())
 			if err != nil {
 				return fmt.Errorf("error reading file %s: %v", path, err)
 			}
@@ -370,7 +372,7 @@ func parseVersionFromClassPath(classPath string) string {
 
 func getClassPath(pid int) (string, error) {
 	var w bytes.Buffer
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v system_properties", pid)); err != nil {
+	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v VM.system_properties", pid)); err != nil {
 		return "", err
 	}
 	out := w.String()
@@ -392,10 +394,12 @@ func getClassPath(pid int) (string, error) {
 func runCollectClusterStats(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting cluster stats")
 	classPath, err := getClassPath(c.DremioPID())
+	simplelog.Debugf("classpath %v", classPath)
 	if err != nil {
 		return err
 	}
 	dremioVersion := parseVersionFromClassPath(classPath)
+	simplelog.Debugf("dremio version %v", dremioVersion)
 	clusterID, err := findClusterID(c)
 	if err != nil {
 		return err
