@@ -394,7 +394,6 @@ func getClassPath(pid int) (string, error) {
 func runCollectClusterStats(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting cluster stats")
 	classPath, err := getClassPath(c.DremioPID())
-	simplelog.Debugf("classpath %v", classPath)
 	if err != nil {
 		return err
 	}
