@@ -104,5 +104,26 @@ func AssertFileHasExpectedLines(t *testing.T, expectedLines []string, filePath s
 	success, _ := MatchLines(expectedLines, filePath)
 	if !success {
 		t.Errorf("file %v did not contain expected lines %v", filePath, expectedLines)
+		echoLines(t, filePath)
 	}
+}
+
+// echo out lines if an error is seen with unexpected lines
+func echoLines(t *testing.T, filePath string) error {
+	file, err := os.Open(filepath.Clean(filePath))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		t.Logf(scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
