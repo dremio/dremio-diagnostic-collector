@@ -585,6 +585,11 @@ dremio-jfr-time-seconds: 10
 	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", "dremio-executor-0", "os_info.txt"))
 
+	// check cluster describe node files
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
+	t.Logf("checking file %v", filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{"Name:", "Role:", "Label:"}, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
+
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
 
