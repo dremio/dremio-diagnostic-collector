@@ -16,7 +16,6 @@ package tests
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,7 +55,6 @@ func MatchLines(expectedLines []string, actualFile string) (bool, error) {
 	}
 
 	// We take each expected line and check for matches
-	matches := 0
 	mi := 0
 	for _, expectedLine := range expectedLines {
 		matchLine.word = expectedLine
@@ -64,7 +62,6 @@ func MatchLines(expectedLines []string, actualFile string) (bool, error) {
 		matchLines = append(matchLines, matchLine)
 		for _, actualLine := range actualLines {
 			if strings.Contains(actualLine, expectedLine) {
-				matches = matches + 1
 				matchLines[mi].word = expectedLine
 				matchLines[mi].matched = true
 			}
@@ -74,7 +71,6 @@ func MatchLines(expectedLines []string, actualFile string) (bool, error) {
 	// We have to see at least one match on each expected line
 	// if not then the whole check fails
 	for _, m := range matchLines {
-		fmt.Println(m)
 		if !m.matched {
 			return false, nil
 		}
