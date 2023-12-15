@@ -1,4 +1,15 @@
 # Changelog
+
+## [0.8.1]
+
+### Added
+* collect kubectl descibe output for nodes
+* add `mount` and `lsblk` outputs into `node-info.txt` file for each node
+
+### Fixed
+* fixed jcmd command syntax when getting dremio version from process info 
+
+
 ## [0.8.0]
 
 ### Added
