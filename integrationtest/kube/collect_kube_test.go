@@ -588,7 +588,7 @@ dremio-jfr-time-seconds: 10
 	// check cluster describe node files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
 	t.Logf("checking file %v", filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
-	tests.AssertFileHasExpectedLines(t, []string{"Name:", "Role:", "Label:"}, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{"Name:", "Roles:", "Labels:"}, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
 
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
