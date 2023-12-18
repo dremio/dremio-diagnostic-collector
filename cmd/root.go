@@ -70,19 +70,19 @@ examples:
 for ssh based communication to VMs or Bare metal hardware:
 
 	# coordinator only
-	ddc --coordinator 10.0.0.19 --ssh-user myuser
+	ddc --coordinator 10.0.0.19 --ssh-user myuser 
 	# coordinator and executors
-	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser 
+	# to collect job profiles, system tables, kv reports and wlm 
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser  --dremio-pat-prompt
 
 for kubernetes deployments:
 
 	# coordinator only
-	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator
+	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator 
 	# coordinator and executors
 	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
-
-To sample job profiles and collect system tables information, kv reports, and Workload Manager Information add the --dremio-pat-prompt flag:
-
+	# to collect job profiles, system tables, kv reports and wlm 
 	ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor --dremio-pat-prompt
 `,
 	Run: func(c *cobra.Command, args []string) {
@@ -120,6 +120,9 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		simplelog.GetLogLoc(),
 		collectionArgs.DDCYamlLoc,
 		"",
+		collectionArgs.Enabled,
+		collectionArgs.Disabled,
+		collectionArgs.PATSet,
 		0,
 		0,
 	)
@@ -144,6 +147,17 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	if k8sEnabled {
 		simplelog.Info("using Kubernetes kubectl based collection")
 		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
+		consoleprint.UpdateRuntime(
+			versions.GetCLIVersion(),
+			simplelog.GetLogLoc(),
+			collectionArgs.DDCYamlLoc,
+			collectorStrategy.Name(),
+			collectionArgs.Enabled,
+			collectionArgs.Disabled,
+			collectionArgs.PATSet,
+			0,
+			0,
+		)
 		clusterCollect = func(pods []string) {
 			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
 			if err != nil {
@@ -175,12 +189,13 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	return nil
 }
 
-func ValidateYaml(ddcYaml string) error {
-	emtpyOverrides := make(map[string]string)
-	confData, err := conf.ParseConfig(ddcYaml, emtpyOverrides)
+func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
+	empyyOverrides := make(map[string]string)
+	confData, err := conf.ParseConfig(ddcYaml, empyyOverrides)
 	if err != nil {
-		return err
+		return make(map[string]interface{}), err
 	}
+
 	simplelog.Infof("parsed configuration for %v follows", ddcYaml)
 	for k, v := range confData {
 		if k == conf.KeyDremioPatToken && v != "" {
@@ -189,13 +204,24 @@ func ValidateYaml(ddcYaml string) error {
 			simplelog.Infof("yaml key '%v':'%v'", k, v)
 		}
 	}
-	return nil
+
+	// set defaults so we get an accurate reading of if these will be enabled or not
+	conf.SetViperDefaults(confData, "", 0, "")
+	return confData, nil
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
-
+	if len(args) < 2 {
+		fmt.Println("COMMAND HELP TEXT:")
+		fmt.Println("")
+		helpErr := RootCmd.Help()
+		if helpErr != nil {
+			return fmt.Errorf("unable to print help %w", helpErr)
+		}
+		return nil
+	}
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
@@ -216,11 +242,41 @@ func Execute(args []string) error {
 			}
 			dremioPAT = pat
 		}
-
+		patSet := dremioPAT != ""
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
-		if err := ValidateYaml(ddcYamlLoc); err != nil {
+		confData, err := ValidateAndReadYaml(ddcYamlLoc)
+		if err != nil {
 			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
+		}
+		var enabled []string
+		var disabled []string
+		for k, v := range confData {
+			if k == conf.KeyNumberJobProfiles {
+				if v.(int) > 0 && patSet {
+					enabled = append(enabled, "job-profiles")
+				} else {
+					disabled = append(disabled, "job-profiles")
+				}
+				continue
+			}
+			if strings.HasPrefix(k, "collect-") {
+				newName := strings.TrimPrefix(k, "collect-")
+				if value, ok := v.(bool); ok {
+					// check pat so they end up in the right column
+					if !patSet {
+						if k == conf.KeyCollectWLM || k == conf.KeyCollectKVStoreReport || k == conf.KeyCollectSystemTablesExport {
+							disabled = append(disabled, newName)
+							continue
+						}
+					}
+					if value {
+						enabled = append(enabled, newName)
+					} else {
+						disabled = append(disabled, newName)
+					}
+				}
+			}
 		}
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
@@ -231,6 +287,9 @@ func Execute(args []string) error {
 			DremioPAT:      dremioPAT,
 			TransferDir:    transferDir,
 			DDCYamlLoc:     ddcYamlLoc,
+			Enabled:        enabled,
+			Disabled:       disabled,
+			PATSet:         patSet,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc: sshKeyLoc,

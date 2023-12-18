@@ -69,6 +69,9 @@ type Args struct {
 	DremioPAT      string
 	TransferDir    string
 	DDCYamlLoc     string
+	Disabled       []string
+	Enabled        []string
+	PATSet         bool
 }
 
 type HostCaptureConfiguration struct {
@@ -140,6 +143,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		simplelog.GetLogLoc(),
 		collectionArgs.DDCYamlLoc,
 		c.Name(),
+		collectionArgs.Enabled,
+		collectionArgs.Disabled,
+		dremioPAT != "",
 		0,
 		len(coordinators)+len(executors),
 	)
@@ -230,6 +236,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.FailedFiles = totalFailedFiles
 	collectionInfo.SkippedFiles = totalSkippedFiles
 	collectionInfo.DDCVersion = versions.GetCLIVersion()
+	collectionInfo.CollectionsEnabled = collectionArgs.Enabled
+	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
+	collectionInfo.PatSet = collectionArgs.PATSet
+
 	o, err := collectionInfo.String()
 	if err != nil {
 		return err

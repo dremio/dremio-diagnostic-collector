@@ -44,11 +44,14 @@ type CollectionStats struct {
 	result               string
 	k8sFilesCollected    []string
 	lastK8sFileCollected string
+	enabled              []string
+	disabled             []string
+	patSet               bool
 	mu                   sync.RWMutex // Mutex to protect access
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
-func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, transfersComplete, totalTransfers int) {
+func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, enabled []string, disabled []string, patSet bool, transfersComplete, totalTransfers int) {
 	c.mu.Lock()
 	c.ddcVersion = ddcVersion
 	c.logFile = logFile
@@ -56,6 +59,11 @@ func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, transfer
 	c.TransfersComplete = transfersComplete
 	c.totalTransfers = totalTransfers
 	c.collectionType = collectionType
+	sort.Strings(enabled)
+	c.enabled = enabled
+	sort.Strings(disabled)
+	c.disabled = disabled
+	c.patSet = patSet
 	c.mu.Unlock()
 }
 
@@ -141,7 +149,12 @@ func PrintState() {
 		}
 		nodes.WriteString(fmt.Sprintf("%v. node %v - elapsed %v secs - status %v \n", i+1, key, secondsElapsed, node.status))
 	}
-
+	patMessage := ""
+	if c.patSet {
+		patMessage = "Yes"
+	} else {
+		patMessage = "No (disables Job Profiles, WLM, KV Store and System Table Reports use --dremio-pat-prompt if you want these)"
+	}
 	fmt.Printf(
 		`=================================
 == Dremio Diagnostic Collector ==
@@ -152,12 +165,18 @@ Version              : %v
 Yaml                 : %v
 Log File             : %v
 Collection Type      : %v
+Collections Enabled  : %v
+Collections Disabled : %v
+Dremio PAT Set       : %v
+
+-- status --
 Transfers Complete   : %v/%v
 Tarball              : %v
 Result               : %v
 
+
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), patMessage, c.TransfersComplete, total,
 		c.tarball, c.result, nodes.String())
 	c.mu.Unlock()
 

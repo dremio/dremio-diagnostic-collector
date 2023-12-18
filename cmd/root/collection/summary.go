@@ -37,6 +37,9 @@ type SummaryInfo struct {
 	DremioVersion       map[string]string       `json:"dremioVersion"`
 	ClusterID           map[string]string       `json:"clusterID"`
 	DDCVersion          string                  `json:"ddcVersion"`
+	CollectionsEnabled  []string                `json:"collectionsEnabled"`
+	CollectionsDisabled []string                `json:"collectionsDisabled"`
+	PatSet              bool                    `json:"patSet"`
 }
 
 type ClusterInfo struct {
