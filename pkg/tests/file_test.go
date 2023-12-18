@@ -50,7 +50,7 @@ func TestFileContents(t *testing.T) {
 
 	var match bool
 	// Expect testFile to contain the expected lines
-	match, err := tests.MatchLines(expectedText, testFile)
+	match, err := tests.MatchLines(t, expectedText, testFile)
 	if !match {
 		t.Errorf("expected %v to contain %v", testFile, expectedText)
 	}

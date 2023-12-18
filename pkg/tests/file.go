@@ -40,7 +40,7 @@ func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 	return expectedText == actualText, nil
 }
 
-func MatchLines(expectedLines []string, actualFile string) (bool, error) {
+func MatchLines(t *testing.T, expectedLines []string, actualFile string) (bool, error) {
 
 	type MatchLines struct {
 		word    string
@@ -48,6 +48,7 @@ func MatchLines(expectedLines []string, actualFile string) (bool, error) {
 	}
 	var matchLine MatchLines
 	var matchLines []MatchLines
+	var success int
 
 	actualLines, err := readLines(actualFile)
 	if err != nil {
@@ -72,11 +73,17 @@ func MatchLines(expectedLines []string, actualFile string) (bool, error) {
 	// if not then the whole check fails
 	for _, m := range matchLines {
 		if !m.matched {
+			t.Errorf("Did not find a match for %v in file %v", m.word, actualFile)
 			return false, nil
 		}
+		success++
 	}
-	// otherwise if we havent failed the check
-	return true, nil
+	// the count of success must equal the count of expected words
+	// or expressions
+	if len(expectedLines) == success {
+		return true, nil
+	}
+	return false, nil
 }
 
 func readLines(filePath string) ([]string, error) {
@@ -114,7 +121,7 @@ func AssertFileHasContent(t *testing.T, filePath string) {
 }
 
 func AssertFileHasExpectedLines(t *testing.T, expectedLines []string, filePath string) {
-	success, _ := MatchLines(expectedLines, filePath)
+	success, _ := MatchLines(t, expectedLines, filePath)
 	if !success {
 		t.Errorf("file %v did not contain expected lines %v", filePath, expectedLines)
 		err := echoLines(t, filePath)
