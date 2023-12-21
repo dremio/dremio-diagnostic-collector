@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.3]
+
+### Fixed
+* fixed summary.json missing clusterId and Dremio version
+
+## [0.8.2]
+
+### Added
+* added more information to the TUI to make clear the collection status
+* added addtional info to summary.json
+
 ## [0.8.1]
 
 ### Added
