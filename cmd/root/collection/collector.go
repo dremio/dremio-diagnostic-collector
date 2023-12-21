@@ -240,11 +240,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
 	collectionInfo.PatSet = collectionArgs.PATSet
 
-	o, err := collectionInfo.String()
-	if err != nil {
-		return err
-	}
-
 	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDir()))
 	if err != nil {
 		return err
@@ -280,6 +275,14 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	if len(files) == 0 {
 		return errors.New("no files transferred")
 	}
+
+	// converts the collection info to a string
+	// ready to write out to a file
+	o, err := collectionInfo.String()
+	if err != nil {
+		return err
+	}
+
 	// archives the collected files
 	// creates the summary file too
 	err = s.ArchiveDiag(o, outputLoc)
@@ -299,7 +302,6 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 		if err != nil {
 			return err // Handle the error according to your needs
 		}
-
 		if info.Name() == "cluster-stats.json" {
 			b, err := os.ReadFile(filepath.Clean(path))
 			if err != nil {
