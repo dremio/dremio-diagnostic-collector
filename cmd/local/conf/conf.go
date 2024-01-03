@@ -311,11 +311,22 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 				simplelog.Warning("no valid pid found therefor the log and configuration autodetection will not function")
 			}
 
+			// function check to validate the logs directory contains
+			// files with valid prefix names
+			containsValidLog := func(de []fs.DirEntry) bool {
+				for _, e := range de {
+					if strings.HasPrefix(e.Name(), "server.log") || strings.HasPrefix(e.Name(), "queries.json") {
+						return true
+					}
+				}
+				return false
+			}
+
 			// configure log dir
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
 			fmt.Printf("configured log dir is %v detected is %v\n", configuredLogDir, detectedConfig.LogDir)
 			// see if the configured dir is valid
-			if err := dirs.CheckDirectory(configuredLogDir, func(de []fs.DirEntry) bool { return len(de) > 1 }); err != nil {
+			if err := dirs.CheckDirectory(configuredLogDir, containsValidLog); err != nil {
 				msg := fmt.Sprintf("configured log %v is invalid: %v", configuredLogDir, err)
 				fmt.Println(msg)
 				simplelog.Warning(msg)
@@ -325,10 +336,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			msg := fmt.Sprintf("using log dir '%v'", c.dremioLogDir)
 			simplelog.Info(msg)
 			fmt.Println(msg)
-			if err := dirs.CheckDirectory(c.dremioLogDir, func(de []fs.DirEntry) bool {
-				// in a common misconfigured directory server.out will still be present
-				return len(de) > 1
-			}); err != nil {
+			if err := dirs.CheckDirectory(c.dremioLogDir, containsValidLog); err != nil {
 				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', update ddc.yaml and fix it: %v", c.dremioLogDir, err)
 			}
 
