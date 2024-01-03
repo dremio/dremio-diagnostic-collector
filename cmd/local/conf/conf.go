@@ -18,7 +18,6 @@ package conf
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -542,7 +541,7 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 func extractValue(input string, key string) (string, error) {
 	startIndex := strings.Index(input, key)
 	if startIndex == -1 {
-		return "", errors.New("key not found: " + key)
+		return "", fmt.Errorf("key not found: " + key)
 	}
 
 	// Find the end of the value (space or end of string)
