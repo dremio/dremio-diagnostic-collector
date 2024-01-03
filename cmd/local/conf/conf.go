@@ -512,7 +512,7 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 	// Find and extract the values
 	dremioHome, err := extractValue(ps, dremioHomeKey)
 	if err != nil {
-		return DremioConfig{}, err
+		simplelog.Warningf("key not found: " + dremioHomeKey)
 	}
 
 	dremioLogDir, err := extractValue(ps, dremioLogDirKey)
