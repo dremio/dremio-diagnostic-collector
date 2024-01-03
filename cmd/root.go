@@ -190,8 +190,8 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 }
 
 func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
-	empyyOverrides := make(map[string]string)
-	confData, err := conf.ParseConfig(ddcYaml, empyyOverrides)
+	emptyOverrides := make(map[string]string)
+	confData, err := conf.ParseConfig(ddcYaml, emptyOverrides)
 	if err != nil {
 		return make(map[string]interface{}), err
 	}

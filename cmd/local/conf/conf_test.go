@@ -388,14 +388,48 @@ func TestParsePSForConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	if conf.ConfDir != "/opt/dremio/conf" {
-		t.Errorf("exected /opt/dremio/conf but was %v", conf.ConfDir)
+		t.Errorf("expected /opt/dremio/conf but was %v", conf.ConfDir)
 	}
 
 	if conf.LogDir != "/opt/dremio/data/logs" {
-		t.Errorf("exected /opt/dremio/data/logs but was %v", conf.LogDir)
+		t.Errorf("expected /opt/dremio/data/logs but was %v", conf.LogDir)
 	}
 
 	if conf.Home != "/opt/dremio" {
-		t.Errorf("exected /opt/dremio but was %q", conf.Home)
+		t.Errorf("expected /opt/dremio but was %q", conf.Home)
 	}
+}
+
+func TestLoggingDirsHaveExpectedFiles(t *testing.T) {
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+`, filepath.Join("testdata", "badlogs"), filepath.Join("testdata", "conf"))
+	genericConfSetup(yaml)
+
+	// we expect an error since "badlogs" doesnt have the right files
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
+	if cfg == nil {
+		t.Error("expected a valid CollectConf but it is nil")
+	}
+	// typically the config directory "badlogs" does not have the right files, so
+	// we fall back to the auto-detect which in this case comes up empty (expected)
+	expected := `invalid dremio log dir '', update ddc.yaml and fix it: directory does not exist`
+	if !strings.Contains(err.Error(), expected) {
+		t.Errorf("\nexpected:\n%v\nactual:\n%v", expected, err.Error())
+	}
+
+	// reset config (so we point to the normal logs dir)
+	genericConfSetup("")
+
+	// we don't expect an error since "logs" has the right files
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg == nil {
+		t.Error("expected a valid CollectConf but it is nil")
+	}
+
+	afterEachConfTest()
 }

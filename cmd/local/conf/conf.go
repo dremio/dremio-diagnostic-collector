@@ -324,7 +324,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 
 			// configure log dir
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
-			fmt.Printf("configured log dir is %v detected is %v\n", configuredLogDir, detectedConfig.LogDir)
+			fmt.Printf("configured log dir is: %v\ndetected log dir is: %v\n", configuredLogDir, detectedConfig.LogDir)
 			// see if the configured dir is valid
 			if err := dirs.CheckDirectory(configuredLogDir, containsValidLog); err != nil {
 				msg := fmt.Sprintf("configured log %v is invalid: %v", configuredLogDir, err)
