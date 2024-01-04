@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -64,8 +65,42 @@ func IsAWSE() (bool, error) {
 }
 
 func IsAWSEExecutor(nodeName string) (bool, error) {
-	//search EFS folder
+	// search EFS folder
 	// Open the directory
 	efsFolder := "/var/dremio_efs/log/executor"
 	return IsAWSEExecutorUsingDir(efsFolder, nodeName)
+}
+
+func IsAWSECoordinator() (bool, string, error) {
+	// Check the symbolic link for the current node
+	// Each node on AWSE will always have asymlink from /var/log/dremio
+	//
+	// For coordinators:
+	// lrwxrwxrwx 1 root root 31 Nov 15 16:44 /var/log/dremio -> /var/dremio_efs/log/coordinator
+	// For executors:
+	// lrwxrwxrwx 1 root root 71 Nov 16 09:36 /var/log/dremio -> /var/dremio_efs/log/executor/ip-10-10-10-147.eu-west-1.compute.internal
+	//
+	// so we check this to evaluate what type of node it is
+	p, err := filepath.EvalSymlinks("/var/log/dremio")
+	if err != nil {
+		return false, p, err
+	}
+	if strings.Contains(p, "coordinator") {
+		return true, p, nil
+	}
+	return false, p, nil
+}
+
+func IsAWSEfromLogDirs() (bool, error) {
+	// Check logs path for the current node
+	// Each node on AWSE will always have a symlink from /var/log/dremio
+	// to a path that contains dremio_efs
+	p, err := filepath.EvalSymlinks("/var/log/dremio")
+	if err != nil {
+		return false, err
+	}
+	if strings.Contains(p, "dremio_efs") {
+		return true, nil
+	}
+	return false, nil
 }

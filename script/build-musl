@@ -1,0 +1,56 @@
+#!/bin/sh
+
+# script/build: build binary 
+set -e
+
+cd "$(dirname "$0")/.."
+
+./script/clean
+
+echo "Checking if zip is installed…"
+date "+%H:%M:%S"
+
+if ! type "zip" > /dev/null; then
+    echo "zip not found installing…"
+    date "+%H:%M:%S"
+    OS="`uname`"
+    case $OS in
+      'Linux')
+        if type "apt" > /dev/null; then
+            echo "detected debian based system installing via apt"
+            sudo apt install zip
+        fi
+        if type "yum" > /dev/null; then
+            echo "detected rpm based system installing via yum"
+            sudo yum install zip
+        fi
+        ;;
+      'WindowsNT')
+        echo "install gnu zip and try again http://gnuwin32.sourceforge.net/packages/zip.htm"
+        exit 1
+        ;;
+      'Darwin') 
+        if type "brew" > /dev/null; then
+            brew install zip
+        else
+            echo "install homebrew to have zip https://brew.sh/"
+            exit 1
+        fi
+        ;;
+      *) ;;
+      esac
+fi
+
+# this is also set in script/release and is a copy paste
+GIT_SHA=`git rev-parse --short HEAD`
+VERSION=`git rev-parse --abbrev-ref HEAD`
+LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION -linkmode external -extldflags \"-static\""
+touch ./cmd/root/ddcbinary/output/ddc.zip
+CC=/usr/bin/musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+zip ./bin/ddc.zip ./bin/ddc
+mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
+rm ./bin/ddc
+
+CC=/usr/bin/musl-gcc go build -ldflags "$LDFLAGS" -o ./bin/ddc
+
+cp ./default-ddc.yaml ./bin/ddc.yaml

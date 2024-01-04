@@ -1,0 +1,165 @@
+___
+>>> cat /etc/*-release
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=22.04
+DISTRIB_CODENAME=jammy
+DISTRIB_DESCRIPTION="Ubuntu 22.04.3 LTS"
+PRETTY_NAME="Ubuntu 22.04.3 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.3 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=jammy
+___
+>>> uname -r
+5.10.0-23-cloud-amd64
+___
+>>> cat /etc/issue
+Ubuntu 22.04.3 LTS \n \l
+
+___
+>>> cat /proc/sys/kernel/hostname
+dremio-master-0
+___
+>>> cat /proc/meminfo
+MemTotal:       16392460 kB
+MemFree:         5861692 kB
+MemAvailable:    9992976 kB
+Buffers:           80304 kB
+Cached:          4105152 kB
+SwapCached:            0 kB
+Active:          1142128 kB
+Inactive:        8913456 kB
+Active(anon):       1192 kB
+Inactive(anon):  5870380 kB
+Active(file):    1140936 kB
+Inactive(file):  3043076 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Dirty:              2072 kB
+Writeback:             0 kB
+AnonPages:       5749268 kB
+Mapped:           333584 kB
+Shmem:              1444 kB
+KReclaimable:     285296 kB
+Slab:             361024 kB
+SReclaimable:     285296 kB
+SUnreclaim:        75728 kB
+KernelStack:        8880 kB
+PageTables:        16160 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     8196228 kB
+Committed_AS:    7352608 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:       20216 kB
+VmallocChunk:          0 kB
+Percpu:             5248 kB
+AnonHugePages:   4861952 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:      334648 kB
+DirectMap2M:    13293568 kB
+DirectMap1G:     5242880 kB
+___
+>>> lscpu
+Architecture:                    x86_64
+CPU op-mode(s):                  32-bit, 64-bit
+Address sizes:                   46 bits physical, 48 bits virtual
+Byte Order:                      Little Endian
+CPU(s):                          4
+On-line CPU(s) list:             0-3
+Vendor ID:                       GenuineIntel
+Model name:                      Intel(R) Xeon(R) CPU @ 2.20GHz
+CPU family:                      6
+Model:                           79
+Thread(s) per core:              2
+Core(s) per socket:              2
+Socket(s):                       1
+Stepping:                        0
+BogoMIPS:                        4400.41
+Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch invpcid_single pti ssbd ibrs ibpb stibp fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm rdseed adx smap xsaveopt arat md_clear arch_capabilities
+Hypervisor vendor:               KVM
+Virtualization type:             full
+L1d cache:                       64 KiB (2 instances)
+L1i cache:                       64 KiB (2 instances)
+L2 cache:                        512 KiB (2 instances)
+L3 cache:                        55 MiB (1 instance)
+NUMA node(s):                    1
+NUMA node0 CPU(s):               0-3
+Vulnerability Itlb multihit:     Not affected
+Vulnerability L1tf:              Mitigation; PTE Inversion
+Vulnerability Mds:               Mitigation; Clear CPU buffers; SMT Host state unknown
+Vulnerability Meltdown:          Mitigation; PTI
+Vulnerability Mmio stale data:   Vulnerable: Clear CPU buffers attempted, no microcode; SMT Host state unknown
+Vulnerability Retbleed:          Mitigation; IBRS
+Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp
+Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:        Mitigation; IBRS, IBPB conditional, STIBP conditional, RSB filling, PBRSB-eIBRS Not affected
+Vulnerability Srbds:             Not affected
+Vulnerability Tsx async abort:   Mitigation; Clear CPU buffers; SMT Host state unknown
+___
+>>> mount
+overlay on / type overlay (rw,relatime,lowerdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2223/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2222/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2220/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2215/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2211/fs:/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2208/fs,upperdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2241/fs,workdir=/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2241/work)
+proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)
+tmpfs on /dev type tmpfs (rw,nosuid,size=65536k,mode=755)
+devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=666)
+mqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)
+sysfs on /sys type sysfs (ro,nosuid,nodev,noexec,relatime)
+cgroup on /sys/fs/cgroup type cgroup2 (ro,nosuid,nodev,noexec,relatime)
+/dev/sda1 on /etc/hosts type ext4 (rw,relatime,discard,errors=remount-ro)
+/dev/sda1 on /dev/termination-log type ext4 (rw,relatime,discard,errors=remount-ro)
+/dev/sda1 on /etc/hostname type ext4 (rw,relatime,discard,errors=remount-ro)
+/dev/sda1 on /etc/resolv.conf type ext4 (rw,relatime,discard,errors=remount-ro)
+shm on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,relatime,size=65536k)
+/dev/sda1 on /opt/dremio/data type ext4 (rw,relatime,discard,errors=remount-ro)
+/dev/sda1 on /opt/dremio/conf type ext4 (ro,relatime,discard,errors=remount-ro)
+/dev/sda1 on /opt/dremio/plugins/connectors/hive2.d type ext4 (ro,relatime,discard,errors=remount-ro)
+/dev/sda1 on /opt/dremio/plugins/connectors/hive2-ee.d type ext4 (ro,relatime,discard,errors=remount-ro)
+/dev/sda1 on /opt/dremio/plugins/connectors/hive3.d type ext4 (ro,relatime,discard,errors=remount-ro)
+/dev/sda1 on /opt/dremio/plugins/connectors/hive3-ee.d type ext4 (ro,relatime,discard,errors=remount-ro)
+tmpfs on /run/secrets/kubernetes.io/serviceaccount type tmpfs (ro,relatime,size=16392460k)
+proc on /proc/bus type proc (ro,nosuid,nodev,noexec,relatime)
+proc on /proc/fs type proc (ro,nosuid,nodev,noexec,relatime)
+proc on /proc/irq type proc (ro,nosuid,nodev,noexec,relatime)
+proc on /proc/sys type proc (ro,nosuid,nodev,noexec,relatime)
+proc on /proc/sysrq-trigger type proc (ro,nosuid,nodev,noexec,relatime)
+tmpfs on /proc/acpi type tmpfs (ro,relatime)
+tmpfs on /proc/kcore type tmpfs (rw,nosuid,size=65536k,mode=755)
+tmpfs on /proc/keys type tmpfs (rw,nosuid,size=65536k,mode=755)
+tmpfs on /proc/timer_list type tmpfs (rw,nosuid,size=65536k,mode=755)
+tmpfs on /proc/sched_debug type tmpfs (rw,nosuid,size=65536k,mode=755)
+tmpfs on /sys/firmware type tmpfs (ro,relatime)
+___
+>>> lsblk
+NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda       8:0    0   10G  0 disk 
+├─sda1    8:1    0  9.9G  0 part /opt/dremio/plugins/connectors/hive3-ee.d
+│                                /opt/dremio/plugins/connectors/hive3.d
+│                                /opt/dremio/plugins/connectors/hive2-ee.d
+│                                /opt/dremio/plugins/connectors/hive2.d
+│                                /opt/dremio/conf
+│                                /opt/dremio/data
+│                                /etc/resolv.conf
+│                                /etc/hostname
+│                                /dev/termination-log
+│                                /etc/hosts
+├─sda14   8:14   0    3M  0 part 
+└─sda15   8:15   0  124M  0 part 

@@ -166,5 +166,8 @@
 	],
 	"coordinators": [
 		"default.dremio-master-0"
-	]
+	],
+	"ddcVersion": "v0.8.0",
+	"clusterID": "7e782d49-6b02-4fc8-bc91-8b6d702c3a06",
+	"dremioVersion": "24.2.5-202311070743190643-0e5f9039"
 }

@@ -7,4 +7,4 @@ $ErrorActionPreference = "Stop"
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "Executing license-header-check add"
-license-header-checker license_header.txt -a . go
+license-header-checker -a license_header.txt . go

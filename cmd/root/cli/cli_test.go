@@ -103,9 +103,9 @@ func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error but got nil")
 	}
-	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
+	expectedErr := "executable file not found in $PATH"
 	if !strings.Contains(err.Error(), expectedErr) {
-		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
+		t.Errorf("Expected error message to contain '%s', but it was %v", expectedErr, err)
 	}
 }
 
@@ -155,8 +155,8 @@ func TestExecute_WhenCommandIsInvalid(t *testing.T) {
 	if err == nil {
 		t.Errorf("Expected error but got nil")
 	}
-	expectedErr := "unable to start command '22JIDJMJMHHF' due to error"
+	expectedErr := "executable file not found in $PATH"
 	if !strings.Contains(err.Error(), expectedErr) {
-		t.Errorf("Expected error message to contain '%s', but it didn't", expectedErr)
+		t.Errorf("Expected error message to contain '%s', but it was %v", expectedErr, err)
 	}
 }

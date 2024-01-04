@@ -23,6 +23,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -58,6 +59,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 				simplelog.Errorf("trying to write file %v, error was %v", filename, err)
 				return
 			}
+			consoleprint.UpdateK8sFiles(cmdname)
 		}(cmd)
 	}
 	wg.Wait()
@@ -68,7 +70,7 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 	var wg sync.WaitGroup
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
-		simplelog.Errorf("trying to construct cluster config path %v with error %v", path, err)
+		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
 		return err
 	}
 
@@ -88,6 +90,7 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 			for _, container := range strings.Split(containers, " ") {
 				copyContainerLog(cs, ddfs, k, container, namespace, path, podname)
 			}
+			consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
 		}(pod)
 	}
 	wg.Wait()
@@ -111,6 +114,30 @@ func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k, container, na
 	if err != nil {
 		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
 	}
+}
+
+func GetClusterNodes(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string) error {
+	path, err := cs.CreatePath("kubernetes", "nodes", "")
+	if err != nil {
+		simplelog.Errorf("trying to construct cluster node path %v with error %v", path, err)
+		return err
+	}
+
+	kubectlArgs := []string{k, "-n", namespace, "describe", "nodes"}
+	nodes, err := clusterExecutePod(kubectlArgs)
+	if err != nil {
+		simplelog.Errorf("trying to list nodes from cluster with error %v", err)
+		return err
+	}
+	// Write the output of the kubectl describe nodes command to a file
+	outFile := filepath.Join(path, "describe-nodes.txt")
+	err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
+	if err != nil {
+		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
+	}
+	consoleprint.UpdateK8sFiles("cluster describe nodes")
+
+	return err
 }
 
 // Execute commands at the cluster level

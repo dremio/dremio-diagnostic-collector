@@ -113,7 +113,10 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile}
-	cmd.Execute(args)
+	err = cmd.Execute(args)
+	if err != nil {
+		t.Fatalf("unable to run collect: %v", err)
+	}
 	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
 	err = os.Mkdir(testOut, 0700)
@@ -180,6 +183,12 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "diskusage.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "jvm_settings.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
+
+	// check file contents
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", coordinator, "kvstore-report.zip"))

@@ -74,6 +74,10 @@ func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator bool)
 	return c.executorContainer
 }
 
+func (c *KubectlK8sActions) Name() string {
+	return "Kubectl"
+}
+
 func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) (err error) {
 	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), hostString, "--"}
 	kubectlArgs = append(kubectlArgs, args...)

@@ -18,6 +18,8 @@ package collection
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -31,7 +33,10 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
 var DirPerms fs.FileMode = 0750
@@ -51,6 +56,7 @@ type Collector interface {
 	HostExecute(mask bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error)
 	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) error
 	HelpText() string
+	Name() string
 }
 
 type Args struct {
@@ -63,6 +69,9 @@ type Args struct {
 	DremioPAT      string
 	TransferDir    string
 	DDCYamlLoc     string
+	Disabled       []string
+	Enabled        []string
+	PATSet         bool
 }
 
 type HostCaptureConfiguration struct {
@@ -124,12 +133,22 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		c(hosts)
 	}
 	var files []helpers.CollectedFile
-	var totalFailedFiles []FailedFiles
+	var totalFailedFiles []string
 	var totalSkippedFiles []string
 	var nodesConnectedTo int
 	var m sync.Mutex
 	var wg sync.WaitGroup
-
+	consoleprint.UpdateRuntime(
+		versions.GetCLIVersion(),
+		simplelog.GetLogLoc(),
+		collectionArgs.DDCYamlLoc,
+		c.Name(),
+		collectionArgs.Enabled,
+		collectionArgs.Disabled,
+		dremioPAT != "",
+		0,
+		len(coordinators)+len(executors),
+	)
 	for _, coordinator := range coordinators {
 		nodesConnectedTo++
 		wg.Add(1)
@@ -148,12 +167,20 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			writtenFiles, failedFiles, skippedFiles := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
-			m.Lock()
-			totalFailedFiles = append(totalFailedFiles, failedFiles...)
-			totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
-			files = append(files, writtenFiles...)
-			m.Unlock()
+			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			if err != nil {
+				m.Lock()
+				totalFailedFiles = append(totalFailedFiles, f)
+				m.Unlock()
+			} else {
+				m.Lock()
+				files = append(files, helpers.CollectedFile{
+					Path: f,
+					Size: size,
+				})
+				m.Unlock()
+			}
+
 		}(coordinator)
 	}
 
@@ -174,12 +201,19 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			writtenFiles, failedFiles, skippedFiles := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
-			m.Lock()
-			totalFailedFiles = append(totalFailedFiles, failedFiles...)
-			totalSkippedFiles = append(totalSkippedFiles, skippedFiles...)
-			files = append(files, writtenFiles...)
-			m.Unlock()
+			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			if err != nil {
+				m.Lock()
+				totalFailedFiles = append(totalFailedFiles, f)
+				m.Unlock()
+			} else {
+				m.Lock()
+				files = append(files, helpers.CollectedFile{
+					Path: f,
+					Size: size,
+				})
+				m.Unlock()
+			}
 		}(executor)
 	}
 	wg.Wait()
@@ -201,11 +235,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.Executors = executors
 	collectionInfo.FailedFiles = totalFailedFiles
 	collectionInfo.SkippedFiles = totalSkippedFiles
-
-	o, err := collectionInfo.String()
-	if err != nil {
-		return err
-	}
+	collectionInfo.DDCVersion = versions.GetCLIVersion()
+	collectionInfo.CollectionsEnabled = collectionArgs.Enabled
+	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
+	collectionInfo.PatSet = collectionArgs.PATSet
 
 	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDir()))
 	if err != nil {
@@ -226,10 +259,67 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			simplelog.Debugf("removed %v", t)
 		}
 	}
+
+	clusterstats, err := FindClusterID(s.GetTmpDir())
+	if err != nil {
+		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTmpDir(), err)
+	} else {
+		versions := make(map[string]string)
+		clusterIDs := make(map[string]string)
+		for _, stats := range clusterstats {
+			versions[stats.NodeName] = stats.DremioVersion
+			clusterIDs[stats.NodeName] = stats.ClusterID
+		}
+		collectionInfo.ClusterID = clusterIDs
+		collectionInfo.DremioVersion = versions
+	}
+	if len(files) == 0 {
+		return errors.New("no files transferred")
+	}
+
+	// converts the collection info to a string
+	// ready to write out to a file
+	o, err := collectionInfo.String()
+	if err != nil {
+		return err
+	}
+
 	// archives the collected files
 	// creates the summary file too
-	return s.ArchiveDiag(o, outputLoc)
+	err = s.ArchiveDiag(o, outputLoc)
+	if err != nil {
+		return err
+	}
+	fullPath, err := filepath.Abs(outputLoc)
+	if err != nil {
+		return err
+	}
+	consoleprint.UpdateTarballDir(fullPath)
+	return nil
+}
 
+func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterStats, err error) {
+	err = filepath.Walk(outputDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err // Handle the error according to your needs
+		}
+		if info.Name() == "cluster-stats.json" {
+			b, err := os.ReadFile(filepath.Clean(path))
+			if err != nil {
+				return err
+			}
+			var clusterStats clusterstats.ClusterStats
+
+			err = json.Unmarshal(b, &clusterStats)
+			if err != nil {
+				return err
+			}
+			clusterStatsList = append(clusterStatsList, clusterStats)
+		}
+
+		return nil
+	})
+	return
 }
 
 // Sanitize archive file pathing from "G305: Zip Slip vulnerability"
@@ -258,7 +348,6 @@ func ExtractTarGz(gzFilePath, dest string) error {
 
 	for {
 		header, err := tarReader.Next()
-
 		switch {
 		case err == io.EOF:
 			return nil

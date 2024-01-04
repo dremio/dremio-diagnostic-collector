@@ -97,9 +97,14 @@ func (s *CopyStrategyHC) CreatePath(fileType, source, nodeType string) (path str
 	baseDir := s.BaseDir
 	tmpDir := s.TmpDir
 
-	// We only tag a suffix of '-C' / '-E' for ssh nodes, the K8s pods are desriptive enough to determine the coordinator / executpr
+	// We only tag a suffix of '-C' / '-E' for ssh nodes, the K8s pods are desriptive enough to determine the coordinator / executor
+	// also add exceptions for general k8s directories
 	var isK8s bool
-	if strings.Contains(source, "dremio-master") || strings.Contains(source, "dremio-executor") || strings.Contains(source, "dremio-coordinator") || strings.Contains(source, "container-logs") {
+	if strings.Contains(source, "dremio-master") ||
+		strings.Contains(source, "dremio-executor") ||
+		strings.Contains(source, "dremio-coordinator") ||
+		strings.Contains(source, "container-logs") ||
+		strings.Contains(source, "nodes") {
 		isK8s = true
 	}
 	if !isK8s { // SSH node types

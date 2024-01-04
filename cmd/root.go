@@ -21,14 +21,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/awselogs"
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
@@ -63,16 +66,23 @@ var RootCmd = &cobra.Command{
 	Short: versions.GetCLIVersion() + " ddc connects via to dremio servers collects logs into an archive",
 	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
+
 for ssh based communication to VMs or Bare metal hardware:
 
-	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+	# coordinator only
+	ddc --coordinator 10.0.0.19 --ssh-user myuser 
+	# coordinator and executors
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser 
+	# to collect job profiles, system tables, kv reports and wlm 
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser  --dremio-pat-prompt
 
 for kubernetes deployments:
 
+	# coordinator only
+	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator 
+	# coordinator and executors
 	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
-
-To sample job profiles and collect system tables information, kv reports, and Workload Manager Information add the --dremio-pat-prompt flag:
-
+	# to collect job profiles, system tables, kv reports and wlm 
 	ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor --dremio-pat-prompt
 `,
 	Run: func(c *cobra.Command, args []string) {
@@ -80,7 +90,42 @@ To sample job profiles and collect system tables information, kv reports, and Wo
 	},
 }
 
+// startTicker starts a ticker that ticks every specified duration and returns
+// a function that can be called to stop the ticker.
+func startTicker() (stop func()) {
+	ticker := time.NewTicker(time.Second * 2)
+	quit := make(chan struct{})
+	consoleprint.PrintState()
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				// Action to be performed on each tick
+				consoleprint.PrintState()
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	return func() {
+		close(quit)
+	}
+}
+
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, k8sEnabled bool) error {
+	consoleprint.UpdateRuntime(
+		versions.GetCLIVersion(),
+		simplelog.GetLogLoc(),
+		collectionArgs.DDCYamlLoc,
+		"",
+		collectionArgs.Enabled,
+		collectionArgs.Disabled,
+		collectionArgs.PATSet,
+		0,
+		0,
+	)
 	err := validateParameters(collectionArgs, sshArgs, k8sEnabled)
 	if err != nil {
 		fmt.Println("COMMAND HELP TEXT:")
@@ -102,6 +147,17 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	if k8sEnabled {
 		simplelog.Info("using Kubernetes kubectl based collection")
 		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
+		consoleprint.UpdateRuntime(
+			versions.GetCLIVersion(),
+			simplelog.GetLogLoc(),
+			collectionArgs.DDCYamlLoc,
+			collectorStrategy.Name(),
+			collectionArgs.Enabled,
+			collectionArgs.Disabled,
+			collectionArgs.PATSet,
+			0,
+			0,
+		)
 		clusterCollect = func(pods []string) {
 			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
 			if err != nil {
@@ -110,6 +166,10 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath, pods)
 			if err != nil {
 				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
+			}
+			err = collection.GetClusterNodes(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
+			if err != nil {
+				simplelog.Errorf("when getting cluster nodes, the following error was returned: %v", err)
 			}
 		}
 	} else {
@@ -124,39 +184,100 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		clusterCollect,
 	)
 	if err != nil {
-		simplelog.Errorf("unexpected error running collection '%v'", err)
-		os.Exit(1)
+		return err
 	}
 	return nil
 }
 
+func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
+	emptyOverrides := make(map[string]string)
+	confData, err := conf.ParseConfig(ddcYaml, emptyOverrides)
+	if err != nil {
+		return make(map[string]interface{}), err
+	}
+
+	simplelog.Infof("parsed configuration for %v follows", ddcYaml)
+	for k, v := range confData {
+		if k == conf.KeyDremioPatToken && v != "" {
+			simplelog.Infof("yaml key '%v':'REDACTED'", k)
+		} else {
+			simplelog.Infof("yaml key '%v':'%v'", k, v)
+		}
+	}
+
+	// set defaults so we get an accurate reading of if these will be enabled or not
+	conf.SetViperDefaults(confData, "", 0, "")
+	return confData, nil
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute(args []string) {
+func Execute(args []string) error {
+	if len(args) < 2 {
+		fmt.Println("COMMAND HELP TEXT:")
+		fmt.Println("")
+		helpErr := RootCmd.Help()
+		if helpErr != nil {
+			return fmt.Errorf("unable to print help %w", helpErr)
+		}
+		return nil
+	}
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+		stop := startTicker()
+		defer stop()
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
-				simplelog.Errorf("unexpected error getting ssh directory '%v'. This is a critical error and should result in a bug report.", err)
-				os.Exit(1)
+				return fmt.Errorf("unexpected error getting ssh directory '%v'. This is a critical error and should result in a bug report", err)
 			}
 			sshKeyLoc = sshDefault
 		}
-		simplelog.InitLogger(2)
 		dremioPAT := ""
 		if promptForDremioPAT {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
-				fmt.Printf("unable to get PAT due to: %v\n", err)
-				os.Exit(1)
+				return fmt.Errorf("unable to get PAT due to: %v", err)
 			}
 			dremioPAT = pat
 		}
-
+		patSet := dremioPAT != ""
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
+		confData, err := ValidateAndReadYaml(ddcYamlLoc)
+		if err != nil {
+			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
+		}
+		var enabled []string
+		var disabled []string
+		for k, v := range confData {
+			if k == conf.KeyNumberJobProfiles {
+				if v.(int) > 0 && patSet {
+					enabled = append(enabled, "job-profiles")
+				} else {
+					disabled = append(disabled, "job-profiles")
+				}
+				continue
+			}
+			if strings.HasPrefix(k, "collect-") {
+				newName := strings.TrimPrefix(k, "collect-")
+				if value, ok := v.(bool); ok {
+					// check pat so they end up in the right column
+					if !patSet {
+						if k == conf.KeyCollectWLM || k == conf.KeyCollectKVStoreReport || k == conf.KeyCollectSystemTablesExport {
+							disabled = append(disabled, newName)
+							continue
+						}
+					}
+					if value {
+						enabled = append(enabled, newName)
+					} else {
+						disabled = append(disabled, newName)
+					}
+				}
+			}
+		}
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
@@ -166,27 +287,33 @@ func Execute(args []string) {
 			DremioPAT:      dremioPAT,
 			TransferDir:    transferDir,
 			DDCYamlLoc:     ddcYamlLoc,
+			Enabled:        enabled,
+			Disabled:       disabled,
+			PATSet:         patSet,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc: sshKeyLoc,
 			SSHUser:   sshUser,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace: namespace,
-			//ScaleoutCoordinatorContainer: scaleoutCoordinatorContainer,
+			Namespace:            namespace,
 			CoordinatorContainer: coordinatorContainer,
 			ExecutorsContainer:   executorsContainer,
 			KubectlPath:          kubectlPath,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, isK8s); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			consoleprint.UpdateResult(err.Error())
+		} else {
+			consoleprint.UpdateResult(fmt.Sprintf("complete at %v", time.Now().Format(time.RFC1123)))
 		}
+		// we put the error in result so just return nil
+		consoleprint.PrintState()
+		return nil
 	}
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
 
 type unableToGetHomeDir struct {
@@ -243,12 +370,6 @@ func validateParameters(args collection.Args, sshArgs ssh.Args, isK8s bool) erro
 			return errors.New("the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\"")
 		}
 		return errors.New("the coordinator string was empty you must pass a single host or a comma separated lists of hosts to --coordinator or -c arguments. Example: -e 192.168.64.12,192.168.65.10")
-	}
-	if args.ExecutorsStr == "" {
-		if isK8s {
-			return errors.New("the executor string was empty you must pass a label that will match your executors --executor or -e arguments. Example: -e \"mylabel=executor\"")
-		}
-		return errors.New("the executor string was empty you must pass a single host or a comma separated lists of hosts to --executor or -e arguments. Example: -e 192.168.64.12,192.168.65.10")
 	}
 
 	if !isK8s {
