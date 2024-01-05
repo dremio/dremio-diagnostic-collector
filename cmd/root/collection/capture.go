@@ -61,6 +61,13 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - TRANSFER SETUP - (%v) %v", err, out))
 			return 0, "", fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
 		}
+		//chmod for TransferDir
+		if out, err := ComposeExecute(false, conf, []string{"chmod", "777", ddcTmpDir}); err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - SETTING PERMS FOR TRANSFER DIR - (%v) %v", err, out))
+			return 0, "", fmt.Errorf("host %v unable set permissions for transfer dir %v and cannot proceed with capture due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
+
+		}
+
 		consoleprint.UpdateNodeState(host, "COPY DDC TO HOST")
 		//copy file to TransferDir assume there is
 		if out, err := ComposeCopyTo(conf, localDDCPath, pathToDDC); err != nil {
