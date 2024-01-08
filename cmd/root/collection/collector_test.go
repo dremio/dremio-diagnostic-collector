@@ -37,7 +37,7 @@ type MockCopyStrategy struct {
 
 type MockStrategy struct {
 	StrategyName string             // the name of the output strategy (defasult, healthcheck etc)
-	TmpDir       string             // tmp dir used for staging files
+	TmpDirRemote string             // tmp dir used for staging files
 	BaseDir      string             // the base dir of where the output is routed
 	Fs           helpers.Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
 
@@ -49,12 +49,18 @@ func NewMockStrategy(ddcfs helpers.Filesystem) *MockStrategy {
 	return &MockStrategy{
 		StrategyName: "basic",
 		BaseDir:      dir,
-		TmpDir:       tmpDir,
+		TmpDirRemote: tmpDir,
 		Fs:           ddcfs,
 	}
 }
-func (s *MockStrategy) GetTmpDir() string {
-	return path.Join(s.TmpDir, s.BaseDir)
+
+func (s *MockStrategy) GetTmpDirRemote() string {
+	return path.Join(s.TmpDirRemote, s.BaseDir)
+}
+
+func (s *MockStrategy) GetTmpDirLocal() (string, error) {
+	tmpDir, err := os.MkdirTemp("", "*")
+	return tmpDir, err
 }
 
 func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path string, err error) {
@@ -62,14 +68,18 @@ func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path strin
 	if strings.Contains(source, "dremio-master") || strings.Contains(source, "dremio-executor") || strings.Contains(source, "dremio-coordinator") {
 		isK8s = true
 	}
+	localDir, err := s.GetTmpDirLocal()
+	if err != nil {
+		return "", err
+	}
 	if !isK8s {
 		if nodeType == "coordinator" {
-			path = filepath.Join(s.TmpDir, fileType, source+"-C")
+			path = filepath.Join(localDir, fileType, source+"-C")
 		} else {
-			path = filepath.Join(s.TmpDir, fileType, source+"-E")
+			path = filepath.Join(localDir, fileType, source+"-E")
 		}
 	} else {
-		path = filepath.Join(s.TmpDir, fileType, source)
+		path = filepath.Join(s.TmpDirRemote, fileType, source)
 	}
 	return path, nil
 }
@@ -221,7 +231,7 @@ func TestFindHostsCoordinators(t *testing.T) {
 
 	fakeFS := helpers.NewFakeFileSystem()
 	mockStrategy := NewMockStrategy(fakeFS)
-	mockStrategy.TmpDir = t.TempDir()
+	mockStrategy.TmpDirRemote = t.TempDir()
 	fakeTmp := t.TempDir()
 	fakeArgs := Args{
 		DDCfs:          fakeFS,
@@ -252,7 +262,7 @@ func TestFindHostsExecutors(t *testing.T) {
 
 	fakeFS := helpers.NewFakeFileSystem()
 	mockStrategy := NewMockStrategy(fakeFS)
-	fakeTmp := mockStrategy.TmpDir
+	fakeTmp := mockStrategy.TmpDirRemote
 	fakeArgs := Args{
 		DDCfs:          fakeFS,
 		CoordinatorStr: "10.1.2.3-ok",

@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -433,6 +434,13 @@ dremio-jfr-time-seconds: 10
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
+	tgzPath := path.Dir(tgzFile)
+	opt, _ := os.ReadDir(tgzPath)
+	log.Printf("TEST: looking in %v", opt)
+	for _, op := range opt {
+		log.Printf("TEST: %v", op.Name())
+	}
+
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
