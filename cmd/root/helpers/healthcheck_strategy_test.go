@@ -58,7 +58,7 @@ func TestTmpDirHC(t *testing.T) {
 		t.Errorf("error when creating copy strategy: %v", err)
 	}
 	expected := filepath.Join("tmp", "dir1", "random")
-	actual := testStrat.GetTmpDirLocal()
+	actual := testStrat.TmpDirRemote
 	// Check the base dir is set on creation
 	if expected != actual {
 		t.Errorf("ERROR: tmp directory on create: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)

@@ -190,17 +190,9 @@ func (s *CopyStrategyHC) createHCFiles() (file string, err error) {
 		return compFile, fmt.Errorf("ERROR: failed to create HC completed file %v due to error: %v", compFile, err)
 
 	}
-
 	return compFile, nil
-
 }
 
-func (s *CopyStrategyHC) GetTmpDirRemote() string {
+func (s *CopyStrategyHC) GetTmpDir() string {
 	return path.Join(s.TmpDirRemote, s.BaseDir)
-}
-
-func (s *CopyStrategyHC) GetTmpDirLocal() string {
-	//tmpDir, err := os.MkdirTemp("", "*")
-	//return tmpDir, err
-	return path.Join(s.TmpDirLocal, s.BaseDir)
 }

@@ -44,8 +44,7 @@ var DirPerms fs.FileMode = 0750
 type CopyStrategy interface {
 	CreatePath(fileType, source, nodeType string) (path string, err error)
 	ArchiveDiag(o string, outputLoc string) error
-	GetTmpDirLocal() string
-	GetTmpDirRemote() string
+	GetTmpDir() string
 }
 
 type Collector interface {
@@ -101,8 +100,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	var err error
 	//var locTmpDir string
 	//locTmpDir = s.GetTmpDirRemote()
-	//locTmpDir = s.GetTmpDirLocal()
-	tmpInstallDir := filepath.Join(s.GetTmpDirLocal(), "ddcex-output")
+	//locTmpDir = s.GetTmpDir()
+	tmpInstallDir := filepath.Join(s.GetTmpDir(), "ddcex-output")
 	if err != nil {
 		return err
 	}
@@ -162,7 +161,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				Collector:      c,
 				IsCoordinator:  true,
 				Host:           host,
-				OutputLocation: s.GetTmpDirLocal(),
+				OutputLocation: s.GetTmpDir(),
 				SudoUser:       sudoUser,
 				CopyStrategy:   s,
 				DDCfs:          ddcfs,
@@ -171,8 +170,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDirLocal(), skipRESTCalls)
-			fmt.Printf("TEST: capturing for %v in %v", coordinatorCaptureConf.Host, s.GetTmpDirLocal())
+			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			fmt.Printf("TEST: capturing for %v in %v", coordinatorCaptureConf.Host, s.GetTmpDir())
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)
@@ -198,7 +197,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				Collector:      c,
 				IsCoordinator:  false,
 				Host:           host,
-				OutputLocation: s.GetTmpDirLocal(),
+				OutputLocation: s.GetTmpDir(),
 				SudoUser:       sudoUser,
 				CopyStrategy:   s,
 				DDCfs:          ddcfs,
@@ -206,8 +205,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDirLocal(), skipRESTCalls)
-			fmt.Printf("TEST: capturing for %v in %v\n", executorCaptureConf.Host, s.GetTmpDirLocal())
+			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			fmt.Printf("TEST: capturing for %v in %v\n", executorCaptureConf.Host, s.GetTmpDir())
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)
@@ -247,7 +246,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.PatSet = collectionArgs.PATSet
 	fmt.Printf("TEST: summary info %v\n", collectionInfo)
 
-	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDirLocal()))
+	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDir()))
 	if err != nil {
 		return err
 	}
@@ -258,8 +257,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {
 			fmt.Printf("TEST: extracting tarball %v\n", t)
-			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDirLocal())
-			if err := ExtractTarGz(t, s.GetTmpDirLocal()); err != nil {
+			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDir())
+			if err := ExtractTarGz(t, s.GetTmpDir()); err != nil {
 				simplelog.Errorf("unable to extract tarball %v due to error %v", t, err)
 			}
 			simplelog.Debugf("extracted %v", t)
@@ -272,9 +271,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		}
 	}
 
-	clusterstats, err := FindClusterID(s.GetTmpDirLocal())
+	clusterstats, err := FindClusterID(s.GetTmpDir())
 	if err != nil {
-		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTmpDirLocal(), err)
+		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTmpDir(), err)
 	} else {
 		versions := make(map[string]string)
 		clusterIDs := make(map[string]string)

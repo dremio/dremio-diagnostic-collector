@@ -56,14 +56,8 @@ func NewMockStrategy(ddcfs helpers.Filesystem) *MockStrategy {
 	}
 }
 
-func (s *MockStrategy) GetTmpDirRemote() string {
-	return path.Join(s.TmpDirLocal, s.BaseDir)
-}
-
-func (s *MockStrategy) GetTmpDirLocal() string {
+func (s *MockStrategy) GetTmpDir() string {
 	return path.Join(s.TmpDirRemote, s.BaseDir)
-	//tmpDir, err := os.MkdirTemp("", "*")
-	//return tmpDir, err
 }
 
 func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path string, err error) {
@@ -71,7 +65,7 @@ func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path strin
 	if strings.Contains(source, "dremio-master") || strings.Contains(source, "dremio-executor") || strings.Contains(source, "dremio-coordinator") {
 		isK8s = true
 	}
-	localDir := s.GetTmpDirLocal()
+	localDir := s.GetTmpDir()
 	if err != nil {
 		return "", err
 	}
