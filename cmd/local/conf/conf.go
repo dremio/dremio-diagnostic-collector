@@ -147,8 +147,10 @@ func SystemTableList() []string {
 	return []string{
 		"\\\"tables\\\"",
 		"boot",
+		"copy_errors_history",
 		"fragments",
 		"jobs",
+		// "jobs_recent",
 		"materializations",
 		"membership",
 		"memory",
@@ -163,6 +165,7 @@ func SystemTableList() []string {
 		"slicing_threads",
 		"table_statistics",
 		"threads",
+		// "user_defined_functions",
 		"version",
 		"views",
 		"cache.datasets",
@@ -212,7 +215,9 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		"organization.usage",
 		"project.engines",
 		"project.jobs",
+		"project.materializations",
 		"project.privileges",
+		"project.reflection_dependencies",
 		"project.reflections",
 		"project.\\\"tables\\\"",
 		"project.views",
@@ -525,12 +530,13 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 	// Find and extract the values
 	dremioHome, err := extractValue(ps, dremioHomeKey)
 	if err != nil {
-		simplelog.Warningf("key not found: " + dremioHomeKey)
+		return DremioConfig{}, err
 	}
 
 	dremioLogDir, err := extractValue(ps, dremioLogDirKey)
 	if err != nil {
-		return DremioConfig{}, err
+		simplelog.Warningf("key not found: %v", dremioLogDirKey)
+
 	}
 	if dremioLogDir == "" {
 		dremioLogDir, err = extractValue(ps, dremioLogDirKeyBackup)
