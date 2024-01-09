@@ -60,6 +60,10 @@ func (s *MockStrategy) GetTmpDir() string {
 	return path.Join(s.TmpDirRemote, s.BaseDir)
 }
 
+func (s *MockStrategy) GetTmpDirLocal() string {
+	return path.Join(s.TmpDirLocal, s.BaseDir)
+}
+
 func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path string, err error) {
 	var isK8s bool
 	if strings.Contains(source, "dremio-master") || strings.Contains(source, "dremio-executor") || strings.Contains(source, "dremio-coordinator") {

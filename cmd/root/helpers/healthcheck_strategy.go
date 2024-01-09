@@ -196,3 +196,7 @@ func (s *CopyStrategyHC) createHCFiles() (file string, err error) {
 func (s *CopyStrategyHC) GetTmpDir() string {
 	return path.Join(s.TmpDirRemote, s.BaseDir)
 }
+
+func (s *CopyStrategyHC) GetTmpDirLocal() string {
+	return path.Join(s.TmpDirLocal, s.BaseDir)
+}

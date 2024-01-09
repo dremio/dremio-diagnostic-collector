@@ -45,6 +45,7 @@ type CopyStrategy interface {
 	CreatePath(fileType, source, nodeType string) (path string, err error)
 	ArchiveDiag(o string, outputLoc string) error
 	GetTmpDir() string
+	GetTmpDirLocal() string
 }
 
 type Collector interface {
