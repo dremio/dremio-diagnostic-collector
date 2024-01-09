@@ -17,7 +17,6 @@ package helpers
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -44,14 +43,14 @@ func (r *RealTimeService) GetNow() time.Time {
 func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService, transferDir string) (*CopyStrategyHC, error) {
 	now := timeService.GetNow()
 	dir := now.Format("20060102-150405-DDC")
-	//tmpDir, _ := ddcfs.MkdirTemp("", "*")
+	tmpDir, _ := ddcfs.MkdirTemp("", "*")
 	return &CopyStrategyHC{
 		StrategyName: "healthcheck",
 		BaseDir:      dir,
 		TmpDirRemote: transferDir,
-		//TmpDirLocal:  tmpDir,
-		Fs:          ddcfs,
-		TimeService: timeService,
+		TmpDirLocal:  tmpDir,
+		Fs:           ddcfs,
+		TimeService:  timeService,
 	}, nil
 }
 
@@ -59,12 +58,12 @@ func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService, transferDir st
 This struct holds the details we need to copy files. The strategy is used to determine where and in what format we copy the files
 */
 type CopyStrategyHC struct {
-	StrategyName string // the name of the output strategy (defasult, healthcheck etc)
-	TmpDirRemote string // tmp dir for remote staging of files
-	BaseDir      string // the base dir of where the output is routed
-	//TmpDirLocal  string     // tmp dir for local staging of files
-	Fs          Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
-	TimeService TimeService
+	StrategyName string     // the name of the output strategy (defasult, healthcheck etc)
+	TmpDirRemote string     // tmp dir for remote staging of files
+	BaseDir      string     // the base dir of where the output is routed
+	TmpDirLocal  string     // tmp dir for local staging of files
+	Fs           Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
+	TimeService  TimeService
 }
 
 /*
@@ -147,7 +146,8 @@ func (s *CopyStrategyHC) ClusterPath() (path string, err error) {
 // Archive calls out to the main archive function
 func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	// creates the summary file
-	summaryFile := filepath.Join(s.TmpDirRemote, "summary.json")
+	summaryFile := filepath.Join(s.TmpDirLocal, "summary.json")
+	fmt.Printf("TEST: summary file %v\n", summaryFile)
 	if err := s.Fs.WriteFile(summaryFile, []byte(o), 0600); err != nil {
 		return fmt.Errorf("failed writing summary file '%v' due to error %v", summaryFile, err)
 	}
@@ -155,8 +155,9 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	// cleanup when done
 	defer func() {
 		simplelog.Infof("cleaning up temp directory %v", s.TmpDirRemote)
+		fmt.Printf("TEST: cleanup tmp dir %v\n", s.TmpDirLocal)
 		//temp folders stay around forever unless we tell them to go away
-		if err := s.Fs.RemoveAll(s.TmpDirRemote); err != nil {
+		if err := s.Fs.RemoveAll(s.TmpDirLocal); err != nil {
 			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.TmpDirRemote, err)
 		}
 	}()
@@ -167,13 +168,14 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	}
 
 	// call general archive routine
-	return archive.TarGzDir(s.TmpDirRemote, outputLoc)
+	fmt.Printf("TEST: call tar.gz of %v to target %v\n", s.TmpDirLocal, outputLoc)
+	return archive.TarGzDir(s.TmpDirLocal, outputLoc)
 }
 
 // This function creates a couple of supplemental files required for the HC data to be uploaded
 func (s *CopyStrategyHC) createHCFiles() (file string, err error) {
 	baseDir := s.BaseDir
-	tmpDir := s.TmpDirRemote
+	tmpDir := s.TmpDirLocal
 
 	path := filepath.Join(tmpDir, baseDir, "completed")
 	compFile := filepath.Join(path, baseDir)
@@ -197,7 +199,8 @@ func (s *CopyStrategyHC) GetTmpDirRemote() string {
 	return path.Join(s.TmpDirRemote, s.BaseDir)
 }
 
-func (s *CopyStrategyHC) GetTmpDirLocal() (string, error) {
-	tmpDir, err := os.MkdirTemp("", "*")
-	return tmpDir, err
+func (s *CopyStrategyHC) GetTmpDirLocal() string {
+	//tmpDir, err := os.MkdirTemp("", "*")
+	//return tmpDir, err
+	return path.Join(s.TmpDirLocal, s.BaseDir)
 }

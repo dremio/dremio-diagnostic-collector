@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -124,7 +125,9 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
-
+	// TEST
+	log.Printf("TEST: dir  %v", t.TempDir())
+	log.Printf("TEST: dir listing %v", listDirContents(t.TempDir()))
 	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
@@ -313,4 +316,16 @@ func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) 
 		return "", fmt.Errorf("no host name present: stderror was %v", stdErr.String())
 	}
 	return strings.TrimSpace(txt), nil
+}
+
+// TEST: list dir contents
+func listDirContents(dir string) (list []string) {
+	dirs, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Printf("error when listing path %v, error was:\n%v", dir, err)
+	}
+	for _, dir := range dirs {
+		list = append(list, dir.Name())
+	}
+	return list
 }

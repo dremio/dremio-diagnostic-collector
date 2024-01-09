@@ -442,7 +442,9 @@ dremio-jfr-time-seconds: 10
 	}
 
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
-
+	// TEST
+	log.Printf("TEST: dir  %v", t.TempDir())
+	log.Printf("TEST: dir listing %v", listDirContents(t.TempDir()))
 	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
@@ -715,4 +717,16 @@ func submitSQLQuery(query, dremioEndpoint, dremioPat string) (string, error) {
 		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
 	}
 	return jobResponse.ID, nil
+}
+
+// TEST: list dir contents
+func listDirContents(dir string) (list []string) {
+	dirs, err := os.ReadDir(dir)
+	if err != nil {
+		fmt.Printf("error when listing path %v, error was:\n%v", dir, err)
+	}
+	for _, dir := range dirs {
+		list = append(list, dir.Name())
+	}
+	return list
 }

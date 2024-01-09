@@ -36,8 +36,9 @@ type MockCopyStrategy struct {
 }
 
 type MockStrategy struct {
-	StrategyName string             // the name of the output strategy (defasult, healthcheck etc)
-	TmpDirRemote string             // tmp dir used for staging files
+	StrategyName string // the name of the output strategy (defasult, healthcheck etc)
+	TmpDirRemote string // tmp dir used for staging files
+	TmpDirLocal  string
 	BaseDir      string             // the base dir of where the output is routed
 	Fs           helpers.Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
 
@@ -50,17 +51,19 @@ func NewMockStrategy(ddcfs helpers.Filesystem) *MockStrategy {
 		StrategyName: "basic",
 		BaseDir:      dir,
 		TmpDirRemote: tmpDir,
+		TmpDirLocal:  tmpDir,
 		Fs:           ddcfs,
 	}
 }
 
 func (s *MockStrategy) GetTmpDirRemote() string {
-	return path.Join(s.TmpDirRemote, s.BaseDir)
+	return path.Join(s.TmpDirLocal, s.BaseDir)
 }
 
-func (s *MockStrategy) GetTmpDirLocal() (string, error) {
-	tmpDir, err := os.MkdirTemp("", "*")
-	return tmpDir, err
+func (s *MockStrategy) GetTmpDirLocal() string {
+	return path.Join(s.TmpDirRemote, s.BaseDir)
+	//tmpDir, err := os.MkdirTemp("", "*")
+	//return tmpDir, err
 }
 
 func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path string, err error) {
@@ -68,7 +71,7 @@ func (s *MockStrategy) CreatePath(fileType, source, nodeType string) (path strin
 	if strings.Contains(source, "dremio-master") || strings.Contains(source, "dremio-executor") || strings.Contains(source, "dremio-coordinator") {
 		isK8s = true
 	}
-	localDir, err := s.GetTmpDirLocal()
+	localDir := s.GetTmpDirLocal()
 	if err != nil {
 		return "", err
 	}
