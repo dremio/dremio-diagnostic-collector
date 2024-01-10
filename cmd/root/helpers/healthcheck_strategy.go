@@ -147,10 +147,15 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 
 	// cleanup when done
 	defer func() {
-		simplelog.Infof("cleaning up temp directory %v", s.TmpDir)
+		simplelog.Infof("removing tarball output folder '%v'", s.GetTarballOutputDir())
 		//temp folders stay around forever unless we tell them to go away
 		if err := s.Fs.RemoveAll(s.GetTarballOutputDir()); err != nil {
-			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.TmpDir, err)
+			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", s.GetTarballOutputDir(), err)
+		}
+		simplelog.Infof("removing summary.json %v", s.GetTarballOutputDir())
+		// remove summary.json
+		if err := s.Fs.Remove(summaryFile); err != nil {
+			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", summaryFile, err)
 		}
 	}()
 

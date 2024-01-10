@@ -2,12 +2,18 @@
 
 ## [0.8.4] - UNRELEASED
 
+### Added 
+
+* if the --transfer-dir has less space free than the size of the log directory then local-collect will fail
+* if the directory where --output-file is will not have enough space to extract a tarball from a remote node the collect will fail
+
 ### Changed
 * Using presence of queries.json or server.log to validate correct logging directory
 * Updated list of available system tables for Software and Cloud
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 
+* can now completely avoid the usage of the temp folder if so desired
 
 ## [0.8.3] - 2023-12-21
 

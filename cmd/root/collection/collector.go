@@ -394,21 +394,14 @@ func ExtractTarGz(gzFilePath, dest string) error {
 func FindTarGzFiles(rootDir string) ([]string, error) {
 	simplelog.Debugf("looking in %v for tar.gz files", rootDir)
 	var files []string
-	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".tar.gz") {
-			files = append(files, path)
-		}
-
-		return nil
-	})
-
+	entries, err := os.ReadDir(rootDir)
 	if err != nil {
 		return nil, err
 	}
-
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".tar.gz") {
+			files = append(files, filepath.Join(rootDir, e.Name()))
+		}
+	}
 	return files, nil
 }
