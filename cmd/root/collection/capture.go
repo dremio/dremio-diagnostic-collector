@@ -211,6 +211,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, tarb
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DESTINATION DIR TO SMALL - %v (%v available bytes) - FILE - %v (%v bytes) ", tarballFileOutputDir, availableBytes, tarGZ, tarGzBytes))
 			return 0, "", fmt.Errorf("directory %v (%v bytes) is too small for file file %v ( %v bytes )", tarballFileOutputDir, availableBytes, tarGZ, tarGzBytes)
 		}
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("TARBALL TRANSFER - DESTINATION %v (%v available bytes) - FILE - %v (%v bytes) ", tarballFileOutputDir, availableBytes, tarGZ, tarGzBytes))
 	} else {
 		simplelog.Warning("no support for validating collection directory is big enough on windows")
 	}

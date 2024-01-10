@@ -50,6 +50,7 @@ type Ttop struct {
 type TtopArgs struct {
 	Interval int
 	PID      int
+	TempDir  string
 }
 
 func (t *Ttop) StartTtop(args TtopArgs) error {
@@ -63,11 +64,8 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 	}
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
-	tmpDir, err := os.MkdirTemp("", "ddc-sjkttop")
-	if err != nil {
-		return err
-	}
-	t.tmpDir = tmpDir
+	t.tmpDir = args.TempDir
+
 	// referencing a part interior to go always use / path
 	data, err := fs.ReadFile(f, "lib/sjk.jar")
 	if err != nil {
@@ -125,8 +123,8 @@ func (t *Ttop) KillTtop() (string, error) {
 	if t.tmpDir == "" {
 		return "", errors.New("unable to get data from ttop as it is not yet started")
 	}
-	if err := os.RemoveAll(t.tmpDir); err != nil {
-		simplelog.Warningf("must remove manually directory %v where sjk.jar is installed due to error: '%v'", t.tmpDir, err)
+	if err := os.Remove(filepath.Join(t.tmpDir, "sjk.jar")); err != nil {
+		simplelog.Warningf("must remove manually remove %v due to error: '%v'", filepath.Join(t.tmpDir, "sjk.jar"), err)
 	}
 	t.tmpDir = ""
 	t.outputMutex.Lock()
@@ -150,6 +148,7 @@ func RunTtopCollect(c *conf.CollectConf) error {
 	ttopArgs := TtopArgs{
 		Interval: c.DremioTtopFreqSeconds(),
 		PID:      c.DremioPID(),
+		TempDir:  c.TarballOutDir(),
 	}
 	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
 }

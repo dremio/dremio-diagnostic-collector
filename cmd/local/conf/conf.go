@@ -197,7 +197,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
 
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds)
 
 	c := &CollectConf{}
 	c.systemtables = SystemTableList()
@@ -245,7 +245,16 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	tmpOutDir := GetString(confData, KeyTmpOutputDir)
+	if tmpOutDir != "" {
+		simplelog.Warningf("setting tmp-out-dir is in ddc.yaml, this is deprecated and no longer supported, this will be removed in laster versions, just use the tarball-out-dir setting and this will be reused")
+		c.outputDir = tmpOutDir
+	} else {
+		outputDir := getOutputDir(c.tarballOutDir, time.Now())
+		simplelog.Infof("setting work directory to %v", outputDir)
+		c.outputDir = outputDir
+	}
+
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
 	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
@@ -574,9 +583,9 @@ func extractValue(input string, key string) (string, error) {
 	return value, nil
 }
 
-func getOutputDir(now time.Time) string {
+func getOutputDir(tarballOutDir string, now time.Time) string {
 	nowStr := now.Format("20060102-150405")
-	return filepath.Join(os.TempDir(), "ddc", nowStr)
+	return filepath.Join(tarballOutDir, "ddc", nowStr)
 }
 
 func (c CollectConf) DisableRESTAPI() bool {

@@ -74,9 +74,11 @@ func TestTtopCollects(t *testing.T) {
 		text: "ttop file text",
 	}
 	pid := 1900
+	tmpDir := t.TempDir()
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      pid,
 		Interval: interval,
+		TempDir:  tmpDir,
 	}
 	if err := jvmcollect.OnLoop(ttopArgs, duration, outDir, ttopService, timeTicker); err != nil {
 		t.Fatalf("unable to collect %v", err)
@@ -132,10 +134,11 @@ func TestTtopExec(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-
+	tmpDir := t.TempDir()
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      cmd.Process.Pid,
 		Interval: 1,
+		TempDir:  tmpDir,
 	}
 	if err := ttop.StartTtop(ttopArgs); err != nil {
 		t.Error(err.Error())
@@ -150,9 +153,12 @@ func TestTtopExec(t *testing.T) {
 
 func TestTtopExecHasNoPidToFind(t *testing.T) {
 	ttop := &jvmcollect.Ttop{}
+	tmpDir := t.TempDir()
+
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      89899999999,
 		Interval: 1,
+		TempDir:  tmpDir,
 	}
 	if err := ttop.StartTtop(ttopArgs); err != nil {
 		t.Error("expected an error on ttop but none happened")
@@ -165,9 +171,12 @@ func TestTtopExecHasNoPidToFind(t *testing.T) {
 
 func TestTtopExecHasNoPid(t *testing.T) {
 	ttop := &jvmcollect.Ttop{}
+	tmpDir := t.TempDir()
+
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      -2,
 		Interval: 1,
+		TempDir:  tmpDir,
 	}
 	resp := ttop.StartTtop(ttopArgs)
 	time.Sleep(time.Duration(500) * time.Millisecond)
@@ -199,9 +208,12 @@ func TestTtopHasAndInvalidInterval(t *testing.T) {
 	}()
 
 	ttop := &jvmcollect.Ttop{}
+	tmpDir := t.TempDir()
+
 	ttopArgs := jvmcollect.TtopArgs{
 		PID:      cmd.Process.Pid,
 		Interval: 0,
+		TempDir:  tmpDir,
 	}
 	if err := ttop.StartTtop(ttopArgs); err == nil {
 		t.Error("expected ttop start to fail with interval 0")

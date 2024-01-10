@@ -22,7 +22,7 @@ func setDefault(confData map[string]interface{}, key string, value interface{}) 
 }
 
 // SetViperDefaults wires up default values for viper when the ddc.yaml or the cli flags do not set the value
-func SetViperDefaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int, outputDir string) {
+func SetViperDefaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
 	// set default config
 	setDefault(confData, KeyVerbose, "vv")
 	setDefault(confData, KeyDisableRESTAPI, false)
@@ -43,7 +43,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyNumberJobProfiles, 25000)
 	setDefault(confData, KeyDremioEndpoint, "http://localhost:9047")
 	setDefault(confData, KeyTarballOutDir, "/tmp/ddc")
-	setDefault(confData, KeyTmpOutputDir, outputDir)
 	setDefault(confData, KeyCollectOSConfig, true)
 	setDefault(confData, KeyCollectDiskUsage, true)
 	setDefault(confData, KeyDremioLogsNumDays, 7)
