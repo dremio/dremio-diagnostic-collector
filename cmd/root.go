@@ -145,6 +145,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, ddcTarballOutputDir)
+	defer cs.Cleanup()
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if k8sEnabled {
@@ -351,7 +352,7 @@ func init() {
 	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --coordinator and --executors flags")
 	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostics commands need a sudo user (i.e. for jcmd)")
-	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc", "directory to use for communication between the local-collect command and this one")
+	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc-transfer", "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputTarballFileLoc, "output-file", "diag.tgz", "name of tgz file to save the diagnostic collection to")
 	execLoc, err := os.Executable()
 	if err != nil {

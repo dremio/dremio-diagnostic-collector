@@ -10,6 +10,7 @@
 ### Changed
 * Using presence of queries.json or server.log to validate correct logging directory
 * Updated list of available system tables for Software and Cloud
+* if --transfer-dir is not empty it will fail then collect and report the problem directory and node
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 

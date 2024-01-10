@@ -16,11 +16,15 @@
 package collection
 
 import (
+	"bytes"
 	"fmt"
 	"path"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
@@ -39,11 +43,12 @@ func (fe FindErr) Error() string {
 func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, tarballFileOutputLoc string, skipRESTCollect bool) (int64, string, error) {
 	host := conf.Host
 	consoleprint.UpdateNodeState(host, "STARTING")
-	ddcTransferDir := conf.TransferDir
+	transferDir := conf.TransferDir
+
 	// we cannot use filepath.join here as it will break everything during the transfer
-	pathToDDC := path.Join(ddcTransferDir, "ddc")
+	pathToDDC := path.Join(transferDir, "ddc")
 	// we cannot use filepath.join here as it will break everything during the transfer
-	pathToDDCYAML := path.Join(ddcTransferDir, "ddc.yaml")
+	pathToDDCYAML := path.Join(transferDir, "ddc.yaml")
 	dremioPAT := conf.DremioPAT
 	versionMatch := false
 	// //check if the version is up to date
@@ -55,12 +60,24 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, tarb
 	// }
 	//if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
-		consoleprint.UpdateNodeState(host, "CREATING REMOTE DIR")
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("CREATING TRANSFER DIR - '%v'", transferDir))
 		//remotely make TransferDir
-		if out, err := ComposeExecute(false, conf, []string{"mkdir", "-p", ddcTransferDir}); err != nil {
+		if out, err := ComposeExecute(false, conf, []string{"mkdir", "-p", transferDir}); err != nil {
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - TRANSFER SETUP - (%v) %v", err, out))
-			return 0, "", fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTransferDir, err, out)
+			return 0, "", fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, transferDir, err, out)
 		}
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("VALIDATING TRANSFER DIR - '%v'", transferDir))
+
+		transferDirEntries, err := ComposeExecute(false, conf, []string{"ls", "-1U", transferDir})
+		if err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - UNABLE TO VALIDATE TRANSFER DIR '%v' - '%v'", transferDir, err))
+			return 0, "", fmt.Errorf("unable to validate transfer directory '%v' is invalid due to error: %v", transferDir, err)
+		}
+		if strings.TrimSpace(transferDirEntries) != "" {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - TRANSFER DIR '%v' IS NOT EMPTY USE ANOTHER EMPTY FOLDER OR DELETE FILES (%v)", transferDir, transferDirEntries))
+			return 0, "", fmt.Errorf("there are directory entries (%v) for transfer directory '%v'", transferDirEntries, transferDir)
+		}
+		consoleprint.UpdateNodeState(host, fmt.Sprintf("TRANSFER DIR IS EMPTY - '%v'", transferDir))
 		consoleprint.UpdateNodeState(host, "COPY DDC TO HOST")
 		//copy file to TransferDir assume there is
 		if out, err := ComposeCopyTo(conf, localDDCPath, pathToDDC); err != nil {
@@ -141,15 +158,63 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, tarb
 	//copy tar.gz back
 	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
 	//IMPORTANT we must use path.join and not filepath.join or everything will break
-	tarGZ := path.Join(ddcTransferDir, tgzFileName)
+	tarGZ := path.Join(transferDir, tgzFileName)
 	tarballFileOutputDir := path.Dir(tarballFileOutputLoc)
 	if tarballFileOutputDir == "" {
 		tarballFileOutputDir = fmt.Sprintf(".%v", filepath.Separator)
 	}
+
+	//defer delete tar.gz
+	defer func() {
+		if out, err := ComposeExecute(false, conf, []string{"rm", tarGZ}); err != nil {
+			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
+		} else {
+			simplelog.Debugf("on host %v file %v has been removed", host, transferDir)
+		}
+	}()
+	//Validating we have enough space to copy this file
+
 	consoleprint.UpdateNodeState(host, "TARBALL TRANSFER")
 
 	//IMPORTANT we want filepath.Join here for the destination because it may be copying back to windows
 	destFile := filepath.Join(tarballFileOutputDir, tgzFileName)
+
+	if runtime.GOOS != "windows" {
+		fileSize, err := ComposeExecute(false, conf, []string{"du", tarGZ})
+		if err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - VALIDATION OF DESTINATION DIR - FILE SIZE - %v", err))
+			return 0, "", fmt.Errorf("on host %v cannot detect real file size so I cannot copy back the capture due to error %v", host, err)
+		}
+		tokens := strings.Split(fileSize, "\t")
+		if len(tokens) == 0 {
+			return 0, "", fmt.Errorf("on host %v cannot detect real file size as there is no output from the du command, so I cannot copy back the capture due to error %v", host, err)
+		}
+		tarGzBytesText := strings.TrimSpace(tokens[0])
+		tarGzBytes, err := strconv.ParseInt(tarGzBytesText, 10, 64)
+		if err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - VALIDATION OF DESTINATION DIR - FILE SIZE PARSING - %v", err))
+			return 0, "", fmt.Errorf("on host %v detect real file size so I cannot copy back the capture due to error %v", host, err)
+		}
+		var b bytes.Buffer
+		err = ddcio.Shell(&b, fmt.Sprintf("df -P %v | tail -1 | awk '{print $4}'", tarballFileOutputDir))
+		if err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - VALIDATION OF DESTINATION DIR - AVAILABLE FILE SIZE - %v", err))
+			return 0, "", fmt.Errorf("on host %v detect real file size so I cannot copy back the capture due to error %v", host, err)
+		}
+		availableBytesText := strings.TrimSpace(b.String())
+		availableBytes, err := strconv.ParseInt(availableBytesText, 10, 64)
+		if err != nil {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - VALIDATION OF DESTINATION DIR - - AVAILABLE FILE SIZE PARSING - %v", err))
+			return 0, "", fmt.Errorf("on host %v detect real file size so I cannot copy back the capture due to error %v", host, err)
+		}
+		if tarGzBytes > availableBytes {
+			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DESTINATION DIR TO SMALL - %v (%v available bytes) - FILE - %v (%v bytes) ", tarballFileOutputDir, availableBytes, tarGZ, tarGzBytes))
+			return 0, "", fmt.Errorf("directory %v (%v bytes) is too small for file file %v ( %v bytes )", tarballFileOutputDir, availableBytes, tarGZ, tarGzBytes)
+		}
+	} else {
+		simplelog.Warning("no support for validating collection directory is big enough on windows")
+	}
+
 	if out, err := ComposeCopyNoSudo(conf, tarGZ, destFile); err != nil {
 		consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - COLLECTION TRANSFER - (%v) %v", err, out))
 		return 0, "", fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, host, tarballFileOutputDir, err, out)
@@ -165,13 +230,6 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, tarb
 	}
 	consoleprint.UpdateNodeState(host, "COMPLETED")
 	simplelog.Infof("host %v copied %v to %v it was %v bytes", host, tarGZ, destFile, size)
-	//defer delete tar.gz
-	defer func() {
-		if out, err := ComposeExecute(false, conf, []string{"rm", tarGZ}); err != nil {
-			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
-		} else {
-			simplelog.Debugf("on host %v file %v has been removed", host, ddcTransferDir)
-		}
-	}()
+
 	return size, destFile, nil
 }

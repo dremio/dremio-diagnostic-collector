@@ -137,6 +137,23 @@ func (s *CopyStrategyHC) ClusterPath() (path string, err error) {
 	return path, nil
 }
 
+func (s *CopyStrategyHC) Cleanup() {
+	// cleanup when done
+	defer func() {
+		simplelog.Infof("removing tarball output folder '%v'", s.GetTarballOutputDir())
+		//temp folders stay around forever unless we tell them to go away
+		if err := s.Fs.RemoveAll(s.GetTarballOutputDir()); err != nil {
+			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", s.GetTarballOutputDir(), err)
+		}
+		summaryFile := filepath.Join(s.TmpDir, "summary.json")
+		simplelog.Infof("removing summary.json %v", summaryFile)
+		// remove summary.json
+		if err := s.Fs.Remove(summaryFile); err != nil {
+			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", summaryFile, err)
+		}
+	}()
+}
+
 // Archive calls out to the main archive function
 func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	// creates the summary file
@@ -145,25 +162,10 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 		return fmt.Errorf("failed writing summary file '%v' due to error %v", summaryFile, err)
 	}
 
-	// cleanup when done
-	defer func() {
-		simplelog.Infof("removing tarball output folder '%v'", s.GetTarballOutputDir())
-		//temp folders stay around forever unless we tell them to go away
-		if err := s.Fs.RemoveAll(s.GetTarballOutputDir()); err != nil {
-			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", s.GetTarballOutputDir(), err)
-		}
-		simplelog.Infof("removing summary.json %v", s.GetTarballOutputDir())
-		// remove summary.json
-		if err := s.Fs.Remove(summaryFile); err != nil {
-			simplelog.Warningf("unable to remove '%v' due to error '%v'. It will need to be removed manually", summaryFile, err)
-		}
-	}()
-
 	// create completed file (its not gzipped)
 	if _, err := s.createHCFiles(); err != nil {
 		return err
 	}
-
 	// call general archive routine
 	return archive.TarGzDir(s.TmpDir, outputLoc)
 }
@@ -186,7 +188,6 @@ func (s *CopyStrategyHC) createHCFiles() (file string, err error) {
 		return compFile, fmt.Errorf("ERROR: failed to create HC completed file %v due to error: %v", compFile, err)
 
 	}
-
 	return compFile, nil
 
 }

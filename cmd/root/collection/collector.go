@@ -98,7 +98,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	var ddcLoc string
 	var err error
 
-	outputTarballFileDir, err := filepath.Abs(outputTarballFileLoc)
+	outputTarballFileDir, err := filepath.Abs(filepath.Dir(outputTarballFileLoc))
 	if err != nil {
 		return err
 	}
