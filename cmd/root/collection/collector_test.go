@@ -53,7 +53,7 @@ func NewMockStrategy(ddcfs helpers.Filesystem) *MockStrategy {
 		Fs:           ddcfs,
 	}
 }
-func (s *MockStrategy) GetTmpDir() string {
+func (s *MockStrategy) GetTarballOutputDir() string {
 	return path.Join(s.TmpDir, s.BaseDir)
 }
 
@@ -223,11 +223,11 @@ func TestFindHostsCoordinators(t *testing.T) {
 	mockStrategy := NewMockStrategy(fakeFS)
 	fakeTmp := mockStrategy.TmpDir
 	fakeArgs := Args{
-		DDCfs:          fakeFS,
-		CoordinatorStr: "10.1.2.3-nok",
-		ExecutorsStr:   "10.2.3.4-nok",
-		OutputLoc:      fakeTmp,
-		CopyStrategy:   mockStrategy,
+		DDCfs:                fakeFS,
+		CoordinatorStr:       "10.1.2.3-nok",
+		ExecutorsStr:         "10.2.3.4-nok",
+		OutputTarballFileLoc: fakeTmp,
+		CopyStrategy:         mockStrategy,
 	}
 
 	// Test for incorrect host
@@ -253,11 +253,11 @@ func TestFindHostsExecutors(t *testing.T) {
 	mockStrategy := NewMockStrategy(fakeFS)
 	fakeTmp := mockStrategy.TmpDir
 	fakeArgs := Args{
-		DDCfs:          fakeFS,
-		CoordinatorStr: "10.1.2.3-ok",
-		ExecutorsStr:   "10.2.3.4-nok",
-		OutputLoc:      fakeTmp,
-		CopyStrategy:   mockStrategy,
+		DDCfs:                fakeFS,
+		CoordinatorStr:       "10.1.2.3-ok",
+		ExecutorsStr:         "10.2.3.4-nok",
+		OutputTarballFileLoc: fakeTmp,
+		CopyStrategy:         mockStrategy,
 	}
 
 	fakeArgs.ExecutorsStr = "dremio-executor-99"

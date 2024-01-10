@@ -44,7 +44,7 @@ var DirPerms fs.FileMode = 0750
 type CopyStrategy interface {
 	CreatePath(fileType, source, nodeType string) (path string, err error)
 	ArchiveDiag(o string, outputLoc string) error
-	GetTmpDir() string
+	GetTarballOutputDir() string
 }
 
 type Collector interface {
@@ -60,37 +60,36 @@ type Collector interface {
 }
 
 type Args struct {
-	DDCfs          helpers.Filesystem
-	CoordinatorStr string
-	ExecutorsStr   string
-	OutputLoc      string
-	SudoUser       string
-	CopyStrategy   CopyStrategy
-	DremioPAT      string
-	TransferDir    string
-	DDCYamlLoc     string
-	Disabled       []string
-	Enabled        []string
-	PATSet         bool
+	DDCfs                helpers.Filesystem
+	CoordinatorStr       string
+	ExecutorsStr         string
+	OutputTarballFileLoc string
+	SudoUser             string
+	CopyStrategy         CopyStrategy
+	DremioPAT            string
+	TransferDir          string
+	DDCYamlLoc           string
+	Disabled             []string
+	Enabled              []string
+	PATSet               bool
 }
 
 type HostCaptureConfiguration struct {
-	IsCoordinator  bool
-	Collector      Collector
-	Host           string
-	OutputLocation string
-	SudoUser       string
-	CopyStrategy   CopyStrategy
-	DDCfs          helpers.Filesystem
-	DremioPAT      string
-	TransferDir    string
+	IsCoordinator bool
+	Collector     Collector
+	Host          string
+	SudoUser      string
+	CopyStrategy  CopyStrategy
+	DDCfs         helpers.Filesystem
+	DremioPAT     string
+	TransferDir   string
 }
 
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func([]string)) error {
 	start := time.Now().UTC()
 	coordinatorStr := collectionArgs.CoordinatorStr
 	executorsStr := collectionArgs.ExecutorsStr
-	outputLoc := collectionArgs.OutputLoc
+	outputTarballFileLoc := collectionArgs.OutputTarballFileLoc
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
 	dremioPAT := collectionArgs.DremioPAT
@@ -98,16 +97,22 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	var ddcLoc string
 	var err error
-	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
+
+	outputTarballFileDir, err := filepath.Abs(outputTarballFileLoc)
+	if err != nil {
+		return err
+	}
+	tmpInstallDir := filepath.Join(outputTarballFileDir, "ddcex-output")
+	err = os.MkdirAll(tmpInstallDir, 0700)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := os.RemoveAll(tmpIinstallDir); err != nil {
+		if err := os.RemoveAll(tmpInstallDir); err != nil {
 			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
 		}
 	}()
-	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir)
+	ddcLoc, err = ddcbinary.WriteOutDDC(tmpInstallDir)
 	if err != nil {
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
@@ -155,19 +160,18 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			coordinatorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  true,
-				Host:           host,
-				OutputLocation: s.GetTmpDir(),
-				SudoUser:       sudoUser,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
-				DremioPAT:      dremioPAT,
+				Collector:     c,
+				IsCoordinator: true,
+				Host:          host,
+				SudoUser:      sudoUser,
+				CopyStrategy:  s,
+				DDCfs:         ddcfs,
+				TransferDir:   transferDir,
+				DremioPAT:     dremioPAT,
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, outputTarballFileDir, skipRESTCalls)
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)
@@ -190,18 +194,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			executorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  false,
-				Host:           host,
-				OutputLocation: s.GetTmpDir(),
-				SudoUser:       sudoUser,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
+				Collector:     c,
+				IsCoordinator: false,
+				Host:          host,
+				SudoUser:      sudoUser,
+				CopyStrategy:  s,
+				DDCfs:         ddcfs,
+				TransferDir:   transferDir,
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, outputTarballFileDir, skipRESTCalls)
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)
@@ -240,15 +243,15 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
 	collectionInfo.PatSet = collectionArgs.PATSet
 
-	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDir()))
+	tarballs, err := FindTarGzFiles(path.Dir(s.GetTarballOutputDir()))
 	if err != nil {
 		return err
 	}
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {
-			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDir())
-			if err := ExtractTarGz(t, s.GetTmpDir()); err != nil {
+			simplelog.Debugf("extracting %v to %v", t, s.GetTarballOutputDir())
+			if err := ExtractTarGz(t, s.GetTarballOutputDir()); err != nil {
 				simplelog.Errorf("unable to extract tarball %v due to error %v", t, err)
 			}
 			simplelog.Debugf("extracted %v", t)
@@ -259,9 +262,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		}
 	}
 
-	clusterstats, err := FindClusterID(s.GetTmpDir())
+	clusterstats, err := FindClusterID(s.GetTarballOutputDir())
 	if err != nil {
-		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTmpDir(), err)
+		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTarballOutputDir(), err)
 	} else {
 		versions := make(map[string]string)
 		clusterIDs := make(map[string]string)
@@ -285,15 +288,15 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 
 	// archives the collected files
 	// creates the summary file too
-	err = s.ArchiveDiag(o, outputLoc)
+	err = s.ArchiveDiag(o, outputTarballFileLoc)
 	if err != nil {
 		return err
 	}
-	fullPath, err := filepath.Abs(outputLoc)
+	fullTarballFilePath, err := filepath.Abs(outputTarballFileLoc)
 	if err != nil {
 		return err
 	}
-	consoleprint.UpdateTarballDir(fullPath)
+	consoleprint.UpdateTarballFileLoc(fullTarballFilePath)
 	return nil
 }
 

@@ -74,7 +74,7 @@ func UpdateK8sFiles(fileName string) {
 	c.lastK8sFileCollected = fileName
 }
 
-func UpdateTarballDir(tarballDir string) {
+func UpdateTarballFileLoc(tarballDir string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.tarball = tarballDir

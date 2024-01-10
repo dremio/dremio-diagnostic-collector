@@ -91,9 +91,9 @@ func TestExecute(t *testing.T) {
 // Set of args for other tests
 func makeTestCollection() collection.Args {
 	testCollection := collection.Args{
-		CoordinatorStr: "dremio-master-0",
-		ExecutorsStr:   "dremio-executor-0",
-		OutputLoc:      "/tmp/diags",
+		CoordinatorStr:       "dremio-master-0",
+		ExecutorsStr:         "dremio-executor-0",
+		OutputTarballFileLoc: "/tmp/diags/diag.tgz",
 	}
 	return testCollection
 }

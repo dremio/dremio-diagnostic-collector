@@ -50,7 +50,7 @@ var promptForDremioPAT bool
 var transferDir string
 var ddcYamlLoc string
 
-var outputLoc string
+var outputTarballFileLoc string
 
 var kubectlPath string
 var isK8s bool
@@ -75,6 +75,8 @@ for ssh based communication to VMs or Bare metal hardware:
 	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser 
 	# to collect job profiles, system tables, kv reports and wlm 
 	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser  --dremio-pat-prompt
+	# collect with a small tmp dir on remote nodes
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --transfer-dir /mnt/bigdir/ddc
 
 for kubernetes deployments:
 
@@ -136,12 +138,13 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		}
 		return fmt.Errorf("invalid command flag detected: %w", err)
 	}
+	ddcTarballOutputDir, err := filepath.Abs(filepath.Dir(collectionArgs.OutputTarballFileLoc))
+	if err != nil {
+		return err
+	}
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
-	cs, err := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
-	if err != nil {
-		return fmt.Errorf("error when creating copy strategy: %v", err)
-	}
+	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, ddcTarballOutputDir)
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if k8sEnabled {
@@ -279,17 +282,17 @@ func Execute(args []string) error {
 			}
 		}
 		collectionArgs := collection.Args{
-			CoordinatorStr: coordinatorStr,
-			ExecutorsStr:   executorsStr,
-			OutputLoc:      filepath.Clean(outputLoc),
-			SudoUser:       sudoUser,
-			DDCfs:          helpers.NewRealFileSystem(),
-			DremioPAT:      dremioPAT,
-			TransferDir:    transferDir,
-			DDCYamlLoc:     ddcYamlLoc,
-			Enabled:        enabled,
-			Disabled:       disabled,
-			PATSet:         patSet,
+			CoordinatorStr:       coordinatorStr,
+			ExecutorsStr:         executorsStr,
+			OutputTarballFileLoc: filepath.Clean(outputTarballFileLoc),
+			SudoUser:             sudoUser,
+			DDCfs:                helpers.NewRealFileSystem(),
+			DremioPAT:            dremioPAT,
+			TransferDir:          transferDir,
+			DDCYamlLoc:           ddcYamlLoc,
+			Enabled:              enabled,
+			Disabled:             disabled,
+			PATSet:               patSet,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc: sshKeyLoc,
@@ -349,7 +352,7 @@ func init() {
 	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostics commands need a sudo user (i.e. for jcmd)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", "/tmp/ddc", "directory to use for communication between the local-collect command and this one")
-	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name of tgz file to save the diagnostic collection to")
+	RootCmd.Flags().StringVar(&outputTarballFileLoc, "output-file", "diag.tgz", "name of tgz file to save the diagnostic collection to")
 	execLoc, err := os.Executable()
 	if err != nil {
 		fmt.Printf("unable to find ddc, critical error %v", err)

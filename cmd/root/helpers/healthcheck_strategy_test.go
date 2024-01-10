@@ -36,10 +36,8 @@ func TestBaseDirHC(t *testing.T) {
 	timeService := MockTimeService{
 		Time: now,
 	}
-	testStrat, err := NewHCCopyStrategy(ddcfs, &timeService)
-	if err != nil {
-		t.Errorf("error when creating copy strategy: %v", err)
-	}
+	tarballOutputDir := t.TempDir()
+	testStrat := NewHCCopyStrategy(ddcfs, &timeService, tarballOutputDir)
 	expected := now.Format("20060102-150405-DDC")
 	actual := testStrat.BaseDir
 	// Check the base dir is set on creation
@@ -51,13 +49,12 @@ func TestBaseDirHC(t *testing.T) {
 // Tests the constructor is setting a temp dir
 func TestTmpDirHC(t *testing.T) {
 	ddcfs := NewFakeFileSystem()
-	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{
+	tarballOutputDir := t.TempDir()
+
+	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{
 		Time: time.Now(),
-	})
-	if err != nil {
-		t.Errorf("error when creating copy strategy: %v", err)
-	}
-	expected := filepath.Join("tmp", "dir1", "random")
+	}, tarballOutputDir)
+	expected := tarballOutputDir
 	actual := testStrat.TmpDir
 	// Check the base dir is set on creation
 	if expected != actual {
@@ -68,18 +65,16 @@ func TestTmpDirHC(t *testing.T) {
 // Tests the method returns the correct path
 func TestGetPathHC(t *testing.T) {
 	ddcfs := NewFakeFileSystem()
-	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
-	if err != nil {
-		t.Errorf("error when creating copy strategy: %v", err)
-	}
+	tarballOutputDir := t.TempDir()
+	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()}, tarballOutputDir)
 	// Test path for coordinators
-	expected := filepath.Join("tmp", "dir1", "random", testStrat.BaseDir, "log", "node1-C")
+	expected := filepath.Join(tarballOutputDir, testStrat.BaseDir, "log", "node1-C")
 	actual, _ := testStrat.CreatePath("log", "node1", "coordinator")
 	if expected != actual {
 		t.Errorf("\nERROR: returned path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
 	}
 	// Test path for executors
-	expected = filepath.Join("tmp", "dir1", "random", testStrat.BaseDir, "log", "node1-E")
+	expected = filepath.Join(tarballOutputDir, testStrat.BaseDir, "log", "node1-E")
 	actual, _ = testStrat.CreatePath("log", "node1", "executors")
 	if expected != actual {
 		t.Errorf("\nERROR: returned path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
@@ -90,11 +85,9 @@ func TestGetPathHC(t *testing.T) {
 // it tests the call via the selected strategy
 func TestArchiveDiagHC(t *testing.T) {
 	ddcfs := NewRealFileSystem()
-	testStrat, err := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()})
-	if err != nil {
-		t.Errorf("error when creating copy strategy: %v", err)
-	}
-	tmpDir := t.TempDir()
+	tarballOutputDir := t.TempDir()
+
+	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()}, tarballOutputDir)
 	testFileRaw := filepath.Join("testdata", "test.txt")
 	if testFile, err := filepath.Abs(testFileRaw); err != nil {
 		t.Fatalf("not able to get absolute path for test file %v", err)
@@ -102,7 +95,7 @@ func TestArchiveDiagHC(t *testing.T) {
 		if _, err := ddcfs.Stat(testFile); err != nil {
 			t.Fatalf("unexpected error getting file size for file %v due to error %v", testFile, err)
 		}
-		archiveFile := tmpDir + ".tgz"
+		archiveFile := tarballOutputDir + ".tgz"
 		if err != nil {
 			t.Fatalf("not able to get absolute path for testdata dir %v", err)
 		}
