@@ -18,6 +18,7 @@ package conf
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -83,7 +84,7 @@ type CollectConf struct {
 	dremioCloudProjectID       string
 	dremioCloudAppEndpoint     string
 
-	// advanced variables setable by configuration or environement variable
+	// advanced variables settable by configuration or environment variable
 	outputDir                   string
 	tarballOutDir               string
 	dremioTtopTimeSeconds       int
@@ -318,13 +319,15 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 
 			// function check to validate the logs directory contains
 			// files with valid prefix names
-			containsValidLog := func(de []fs.DirEntry) bool {
+			containsValidLog := func(de []fs.DirEntry) error {
+				var entries []string
 				for _, e := range de {
+					entries = append(entries, e.Name())
 					if strings.HasPrefix(e.Name(), "server.log") || strings.HasPrefix(e.Name(), "queries.json") {
-						return true
+						return nil
 					}
 				}
-				return false
+				return fmt.Errorf("no server.log or queries.json present, files in dir (%v)", strings.Join(entries, ","))
 			}
 
 			// configure log dir
@@ -350,7 +353,13 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			// configure configuration directory
 			configuredConfDir := GetString(confData, KeyDremioConfDir)
 			// see if the configured dir is valid
-			if err := dirs.CheckDirectory(configuredConfDir, func(de []fs.DirEntry) bool { return len(de) > 0 }); err != nil {
+			if err := dirs.CheckDirectory(configuredConfDir, func(de []fs.DirEntry) error {
+				if len(de) > 0 {
+					return nil
+				} else {
+					return errors.New("configuration directory is empty")
+				}
+			}); err != nil {
 				msg := fmt.Sprintf("configured dir %v is invalid: %v", configuredConfDir, err)
 				fmt.Println(msg)
 				simplelog.Warningf(msg)
@@ -361,20 +370,26 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 			msg := fmt.Sprintf("using config dir '%v'", c.dremioConfDir)
 			simplelog.Info(msg)
 			fmt.Println(msg)
-			if err := dirs.CheckDirectory(c.dremioConfDir, func(de []fs.DirEntry) bool {
-				return len(de) > 0
+			if err := dirs.CheckDirectory(c.dremioConfDir, func(de []fs.DirEntry) error {
+				if len(de) > 0 {
+					return nil
+				} else {
+					return errors.New("configuration directory is empty")
+				}
 			}); err != nil {
 				return &CollectConf{}, fmt.Errorf("invalid dremio conf dir '%v', update ddc.yaml and fix it: %v", c.dremioConfDir, err)
 			}
 		}
 		// now try and configure rocksdb
-		validateRocks := func(de []fs.DirEntry) bool {
+		validateRocks := func(de []fs.DirEntry) error {
+			var entries []string
 			for _, e := range de {
+				entries = append(entries, e.Name())
 				if e.Name() == "catalog" {
-					return true
+					return nil
 				}
 			}
-			return false
+			return fmt.Errorf("catalog is not present in rocksdb dir: entries (%v)", strings.Join(entries, ","))
 		}
 		// configured value
 		configuredRocksDb := GetString(confData, KeyDremioRocksdbDir)

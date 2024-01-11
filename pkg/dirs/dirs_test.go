@@ -16,6 +16,7 @@
 package dirs_test
 
 import (
+	"errors"
 	"io/fs"
 	"path/filepath"
 	"testing"
@@ -24,25 +25,37 @@ import (
 )
 
 func TestCheckDirectoryFull(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func(de []fs.DirEntry) bool { return len(de) > 0 }); err != nil {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func(de []fs.DirEntry) error {
+		if len(de) > 0 {
+			return nil
+		} else {
+			return errors.New("failed")
+		}
+	}); err != nil {
 		t.Errorf("expected no error %v", err)
 	}
 }
 
-func TestCheckDirectoryCustomCecker(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func(de []fs.DirEntry) bool { return false }); err == nil {
+func TestCheckDirectoryCustomChecker(t *testing.T) {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func(de []fs.DirEntry) error { return errors.New("failed") }); err == nil {
 		t.Error("expected an error")
 	}
 }
 
 func TestCheckDirectoryEmpty(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "empty"), func(de []fs.DirEntry) bool { return len(de) > 0 }); err == nil {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "empty"), func(de []fs.DirEntry) error {
+		if len(de) > 0 {
+			return nil
+		} else {
+			return errors.New("failed")
+		}
+	}); err == nil {
 		t.Error("expected an error")
 	}
 }
 
 func TestCheckDirectoryNotPresent(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "fdljk"), func(de []fs.DirEntry) bool { return true }); err == nil {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "fdljk"), func(de []fs.DirEntry) error { return nil }); err == nil {
 		t.Error("expected an error")
 	}
 }

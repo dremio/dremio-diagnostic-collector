@@ -24,7 +24,7 @@ import (
 // CheckDirectory checks if a directory exists and contains files.
 // It returns an error if the directory is empty, doesn't exist, isn't a directory,
 // or if there's an error reading it.
-func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) bool) error {
+func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) error) error {
 	// Check if the directory exists
 	fileInfo, err := os.Stat(dirPath)
 	if err != nil {
@@ -50,8 +50,8 @@ func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) bool) error {
 		return fmt.Errorf("directory is empty")
 	}
 
-	if !fileCheck(files) {
-		return fmt.Errorf("file check function failed")
+	if err := fileCheck(files); err != nil {
+		return fmt.Errorf("file check function failed: %v", err)
 	}
 	return nil
 }

@@ -4,6 +4,7 @@
 
 ### Added
 * collect kubectl describe output for pods
+* better error message for validation failure
 
 ### Changed
 * Using presence of queries.json or server.log to validate correct logging directory
