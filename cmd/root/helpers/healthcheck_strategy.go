@@ -104,7 +104,8 @@ func (s *CopyStrategyHC) CreatePath(fileType, source, nodeType string) (path str
 		strings.Contains(source, "dremio-executor") ||
 		strings.Contains(source, "dremio-coordinator") ||
 		strings.Contains(source, "container-logs") ||
-		strings.Contains(source, "nodes") {
+		strings.Contains(source, "nodes") ||
+		strings.Contains(source, "pods") {
 		isK8s = true
 	}
 	if !isK8s { // SSH node types

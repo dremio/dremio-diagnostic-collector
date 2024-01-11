@@ -171,6 +171,10 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			if err != nil {
 				simplelog.Errorf("when getting cluster nodes, the following error was returned: %v", err)
 			}
+			err = collection.GetClusterPods(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
+			if err != nil {
+				simplelog.Errorf("when getting cluster pods, the following error was returned: %v", err)
+			}
 		}
 	} else {
 		simplelog.Info("using SSH based collection")

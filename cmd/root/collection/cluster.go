@@ -140,6 +140,30 @@ func GetClusterNodes(namespace string, cs CopyStrategy, ddfs helpers.Filesystem,
 	return err
 }
 
+func GetClusterPods(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string) error {
+	path, err := cs.CreatePath("kubernetes", "pods", "")
+	if err != nil {
+		simplelog.Errorf("trying to construct cluster pods path %v with error %v", path, err)
+		return err
+	}
+
+	kubectlArgs := []string{k, "-n", namespace, "describe", "pods"}
+	nodes, err := clusterExecutePod(kubectlArgs)
+	if err != nil {
+		simplelog.Errorf("trying to describe pods from cluster with error %v", err)
+		return err
+	}
+	// Write the output of the kubectl describe nodes command to a file
+	outFile := filepath.Join(path, "describe-pods.txt")
+	err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
+	if err != nil {
+		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
+	}
+	consoleprint.UpdateK8sFiles("cluster describe pods")
+
+	return err
+}
+
 // Execute commands at the cluster level
 // Calls a raw execute function and simply writes out the byte array read from the response
 // that comes in directly from kubectl
