@@ -136,12 +136,14 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		}
 		return fmt.Errorf("invalid command flag detected: %w", err)
 	}
+	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
-	cs, err := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{})
 	if err != nil {
-		return fmt.Errorf("error when creating copy strategy: %v", err)
+		return fmt.Errorf("error when getting directory for copy strategy: %v", err)
 	}
+	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
+
 	defer cs.Close()
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector

@@ -8,6 +8,7 @@
 ### Changed
 * Using presence of queries.json or server.log to validate correct logging directory
 * Updated list of available system tables for Software and Cloud
+* ddc command no longer uses random output directory in /tmp for copy destination, but instead uses the directory for the tarball output
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 

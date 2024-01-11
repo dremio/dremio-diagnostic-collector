@@ -37,17 +37,16 @@ func (r *RealTimeService) GetNow() time.Time {
 	return time.Now()
 }
 
-func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService) (*CopyStrategyHC, error) {
+func NewHCCopyStrategy(ddcfs Filesystem, timeService TimeService, tmpDir string) *CopyStrategyHC {
 	now := timeService.GetNow()
 	dir := now.Format("20060102-150405-DDC")
-	tmpDir, err := ddcfs.MkdirTemp("", "*")
 	return &CopyStrategyHC{
 		StrategyName: "healthcheck",
 		BaseDir:      dir,
 		TmpDir:       tmpDir,
 		Fs:           ddcfs,
 		TimeService:  timeService,
-	}, err
+	}
 }
 
 /*
@@ -147,7 +146,7 @@ func (s *CopyStrategyHC) Close() {
 		if err := s.Fs.RemoveAll(s.GetTmpDir()); err != nil {
 			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.GetTmpDir(), err)
 		}
-		summaryFile := filepath.Join(s.BaseDir, "summary.json")
+		summaryFile := filepath.Join(s.TmpDir, "summary.json")
 		simplelog.Infof("cleaning up file %v", summaryFile)
 		//temp folders stay around forever unless we tell them to go away
 		if err := s.Fs.Remove(summaryFile); err != nil {
@@ -170,7 +169,7 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	}
 
 	// call general archive routine
-	return archive.TarGzDir(s.TmpDir, outputLoc)
+	return archive.TarDDC(s.TmpDir, outputLoc, s.BaseDir)
 }
 
 // This function creates a couple of supplemental files required for the HC data to be uploaded

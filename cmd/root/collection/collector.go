@@ -132,6 +132,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	for _, c := range clusterCollection {
 		c(hosts)
 	}
+	var tarballs []string
 	var files []helpers.CollectedFile
 	var totalFailedFiles []string
 	var totalSkippedFiles []string
@@ -174,6 +175,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				m.Unlock()
 			} else {
 				m.Lock()
+				tarballs = append(tarballs, f)
 				files = append(files, helpers.CollectedFile{
 					Path: f,
 					Size: size,
@@ -208,6 +210,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				m.Unlock()
 			} else {
 				m.Lock()
+				tarballs = append(tarballs, f)
 				files = append(files, helpers.CollectedFile{
 					Path: f,
 					Size: size,
@@ -240,10 +243,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
 	collectionInfo.PatSet = collectionArgs.PATSet
 
-	tarballs, err := FindTarGzFiles(path.Dir(s.GetTmpDir()))
-	if err != nil {
-		return err
-	}
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {
@@ -386,26 +385,4 @@ func ExtractTarGz(gzFilePath, dest string) error {
 			simplelog.Debugf("extracted file %v", file.Name())
 		}
 	}
-}
-
-func FindTarGzFiles(rootDir string) ([]string, error) {
-	simplelog.Debugf("looking in %v for tar.gz files", rootDir)
-	var files []string
-	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".tar.gz") {
-			files = append(files, path)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return files, nil
 }

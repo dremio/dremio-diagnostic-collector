@@ -27,6 +27,28 @@ import (
 )
 
 func TarGzDir(srcDir, dest string) error {
+	return TarGzDirFiltered(srcDir, dest, func(s string) bool { return true })
+}
+
+func TarDDC(srcDir, dest, baseDDC string) error {
+	summaryJSON := filepath.Join(srcDir, "summary.json")
+	ddcFolder := filepath.Join(srcDir, baseDDC)
+	return TarGzDirFiltered(srcDir, dest, func(name string) bool {
+		switch name {
+		case summaryJSON, ddcFolder:
+			return true
+		}
+
+		// Check if it's a file under tarballDir
+		if strings.HasPrefix(name, ddcFolder) {
+			return true
+		}
+		simplelog.Infof("skipping %v", name)
+		return false
+	})
+}
+
+func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 	tarGzFile, err := os.Create(filepath.Clean(dest))
 	if err != nil {
 		return err
@@ -57,10 +79,15 @@ func TarGzDir(srcDir, dest string) error {
 		if err != nil {
 			return err
 		}
-		//don't try and archive the tarbal itself
+		//don't try and archive the tarball itself
 		if filePath == dest {
 			return nil
 		}
+
+		if !filterList(filePath) {
+			return nil
+		}
+
 		// Get the relative path of the file
 		relativePath, err := filepath.Rel(srcDir, filePath)
 		if err != nil {
