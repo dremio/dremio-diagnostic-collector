@@ -2,6 +2,9 @@
 
 ## [0.8.4] - UNRELEASED
 
+### Added
+* collect kubectl describe output for pods
+
 ### Changed
 * Using presence of queries.json or server.log to validate correct logging directory
 * Updated list of available system tables for Software and Cloud
@@ -23,7 +26,7 @@
 ## [0.8.1] - 2023-12-18
 
 ### Added
-* collect kubectl descibe output for nodes
+* collect kubectl describe output for nodes
 * add `mount` and `lsblk` outputs into `node-info.txt` file for each node
 
 ### Fixed
