@@ -139,6 +139,23 @@ func (s *CopyStrategyHC) ClusterPath() (path string, err error) {
 	return path, nil
 }
 
+func (s *CopyStrategyHC) Close() {
+	// cleanup when done
+	defer func() {
+		simplelog.Infof("cleaning up temp directory %v", s.GetTmpDir())
+		//temp folders stay around forever unless we tell them to go away
+		if err := s.Fs.RemoveAll(s.GetTmpDir()); err != nil {
+			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.GetTmpDir(), err)
+		}
+		summaryFile := filepath.Join(s.BaseDir, "summary.json")
+		simplelog.Infof("cleaning up file %v", summaryFile)
+		//temp folders stay around forever unless we tell them to go away
+		if err := s.Fs.Remove(summaryFile); err != nil {
+			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", summaryFile, err)
+		}
+	}()
+}
+
 // Archive calls out to the main archive function
 func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	// creates the summary file
@@ -146,15 +163,6 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 	if err := s.Fs.WriteFile(summaryFile, []byte(o), 0600); err != nil {
 		return fmt.Errorf("failed writing summary file '%v' due to error %v", summaryFile, err)
 	}
-
-	// cleanup when done
-	defer func() {
-		simplelog.Infof("cleaning up temp directory %v", s.TmpDir)
-		//temp folders stay around forever unless we tell them to go away
-		if err := s.Fs.RemoveAll(s.TmpDir); err != nil {
-			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.TmpDir, err)
-		}
-	}()
 
 	// create completed file (its not gzipped)
 	if _, err := s.createHCFiles(); err != nil {

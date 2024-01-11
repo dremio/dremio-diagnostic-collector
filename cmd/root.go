@@ -142,6 +142,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	if err != nil {
 		return fmt.Errorf("error when creating copy strategy: %v", err)
 	}
+	defer cs.Close()
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if k8sEnabled {
