@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.8.4] - UNRELEASED
+## [0.9.0] - UNRELEASED
 
 ### Added
 * collect kubectl describe output for pods
@@ -10,6 +10,7 @@
 * Using presence of queries.json or server.log to validate correct logging directory
 * Updated list of available system tables for Software and Cloud
 * ddc command no longer uses random output directory in /tmp for copy destination, but instead uses the directory for the tarball output
+* ttop no longer outputs to the temp folder
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 
@@ -433,7 +434,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
-[0.8.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.3...v0.8.4
+[0.9.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.0...v0.8.1
