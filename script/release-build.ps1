@@ -30,37 +30,37 @@ Move-Item -Force -Path ./bin/ddc.zip -Destination ./cmd/root/ddcbinary/output/dd
 Write-Output "Building linux-amd64"
 Get-Date -Format "HH:mm:ss"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-linux-amd64.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-linux-amd64.zip
 
 Write-Output "Building linux-arm64"
 Get-Date -Format "HH:mm:ss"
 $env:GOARCH="arm64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-linux-arm64.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-linux-arm64.zip
 
 Write-Output "Building darwin-os-x-amd64"
 Get-Date -Format "HH:mm:ss"
 $env:GOOS="darwin"
 $env:GOARCH="amd64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-mac-intel.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-mac-intel.zip
 
 Write-Output "Building darwin-os-x-arm64"
 Get-Date -Format "HH:mm:ss"
 $env:GOARCH="arm64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml -DestinationPath ./bin/ddc-mac-m-series.zip
+Compress-Archive -Path ./bin/ddc, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-mac-m-series.zip
 
 Write-Output "Building windows-amd64"
 Get-Date -Format "HH:mm:ss"
 $env:GOOS="windows"
 $env:GOARCH="amd64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml -DestinationPath ./bin/ddc-windows-amd64.zip
+Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-windows-amd64.zip
 
 Write-Output "Building windows-arm64"
 Get-Date -Format "HH:mm:ss"
 $env:GOOS="windows"
 $env:GOARCH="arm64"
 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml -DestinationPath ./bin/ddc-windows-arm64.zip
+Compress-Archive -Path ./bin/ddc.exe, ./bin/ddc.yaml ./README.md ./FAQ.md -DestinationPath ./bin/ddc-windows-arm64.zip

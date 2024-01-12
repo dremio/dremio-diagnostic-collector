@@ -56,24 +56,24 @@ mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml
+zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml
+zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building darwin-os-x-amd64…"
 date "+%H:%M:%S"
 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-mac-intel.zip ./bin/ddc ./bin/ddc.yaml
+zip ./bin/ddc-mac-intel.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building darwin-os-x-arm64…"
 date "+%H:%M:%S"
 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./bin/ddc.yaml
+zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building windows-amd64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml
+zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building windows-arm64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./bin/ddc.yaml
+zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md

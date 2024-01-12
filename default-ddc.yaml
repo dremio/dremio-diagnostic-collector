@@ -1,5 +1,5 @@
 
-# please set these to match your environment
+## if the node is offline you will need to set these to match your environment to have a collection work 
 # dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 # dremio-conf-dir: "/opt/dremio/conf" #where the dremio conf files are located
 # dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
