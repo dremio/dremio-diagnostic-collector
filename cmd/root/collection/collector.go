@@ -75,15 +75,14 @@ type Args struct {
 }
 
 type HostCaptureConfiguration struct {
-	IsCoordinator  bool
-	Collector      Collector
-	Host           string
-	OutputLocation string
-	SudoUser       string
-	CopyStrategy   CopyStrategy
-	DDCfs          helpers.Filesystem
-	DremioPAT      string
-	TransferDir    string
+	IsCoordinator bool
+	Collector     Collector
+	Host          string
+	SudoUser      string
+	CopyStrategy  CopyStrategy
+	DDCfs         helpers.Filesystem
+	DremioPAT     string
+	TransferDir   string
 }
 
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection ...func([]string)) error {
@@ -156,15 +155,14 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			coordinatorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  true,
-				Host:           host,
-				OutputLocation: s.GetTmpDir(),
-				SudoUser:       sudoUser,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
-				DremioPAT:      dremioPAT,
+				Collector:     c,
+				IsCoordinator: true,
+				Host:          host,
+				SudoUser:      sudoUser,
+				CopyStrategy:  s,
+				DDCfs:         ddcfs,
+				TransferDir:   transferDir,
+				DremioPAT:     dremioPAT,
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
@@ -192,14 +190,12 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		go func(host string) {
 			defer wg.Done()
 			executorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  false,
-				Host:           host,
-				OutputLocation: s.GetTmpDir(),
-				SudoUser:       sudoUser,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
+				Collector:     c,
+				IsCoordinator: false,
+				Host:          host,
+				CopyStrategy:  s,
+				DDCfs:         ddcfs,
+				TransferDir:   transferDir,
 			}
 			//always skip executor calls
 			skipRESTCalls := true
