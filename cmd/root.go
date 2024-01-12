@@ -213,7 +213,7 @@ func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
 	}
 
 	// set defaults so we get an accurate reading of if these will be enabled or not
-	conf.SetViperDefaults(confData, "", 0, "")
+	conf.SetViperDefaults(confData, "", 0)
 	return confData, nil
 }
 

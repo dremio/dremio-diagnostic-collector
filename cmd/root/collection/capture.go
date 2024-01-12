@@ -124,7 +124,7 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	}, localCollectArgs)
 	if err != nil {
 
-		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(strings.Join(allHostLog, " - "), 350)
+		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(strings.Join(allHostLog, " - "), 1024)
 		consoleprint.UpdateNodeState(host, status)
 		return 0, "", fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
 	}

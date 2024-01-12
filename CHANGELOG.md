@@ -11,6 +11,8 @@
 * Updated list of available system tables for Software and Cloud
 * ddc command no longer uses random output directory in /tmp for copy destination, but instead uses the directory for the tarball output
 * ttop no longer outputs to the temp folder
+* ddc.yaml tmp-output-dir now defaults to using tarball-out-dir as it's base directory
+* tmp-output-dir is now deprecated as it was too hard to configure correctly
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 

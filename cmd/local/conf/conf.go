@@ -198,7 +198,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
 
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, getOutputDir(time.Now()))
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds)
 
 	c := &CollectConf{}
 	c.systemtables = SystemTableList()
@@ -246,7 +246,13 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	c.outputDir = GetString(confData, KeyTmpOutputDir)
+	outputDir := GetString(confData, KeyTmpOutputDir)
+	if outputDir != "" {
+		simplelog.Warningf("key %v is deprecated and will be removed in version 1.0 use %v key instead", KeyTmpOutputDir, KeyTarballOutDir)
+		c.outputDir = outputDir
+	} else {
+		c.outputDir = filepath.Join(c.tarballOutDir, getOutputDir(time.Now()))
+	}
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
 	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
@@ -590,8 +596,7 @@ func extractValue(input string, key string) (string, error) {
 }
 
 func getOutputDir(now time.Time) string {
-	nowStr := now.Format("20060102-150405")
-	return filepath.Join(os.TempDir(), "ddc", nowStr)
+	return now.Format("20060102-150405")
 }
 
 func (c CollectConf) DisableRESTAPI() bool {

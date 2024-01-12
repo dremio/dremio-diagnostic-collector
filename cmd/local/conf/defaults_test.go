@@ -22,19 +22,18 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 )
 
-func setupTestSetViperDefaults() (map[string]interface{}, string, int, string) {
+func setupTestSetViperDefaults() (map[string]interface{}, string, int) {
 	hostName := "test-host"
 	defaultCaptureSeconds := 30
-	outputDir := "/tmp"
 	confData := make(map[string]interface{})
 	// Run the function.
-	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds, outputDir)
+	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds)
 
-	return confData, hostName, defaultCaptureSeconds, outputDir
+	return confData, hostName, defaultCaptureSeconds
 }
 
 func TestSetViperDefaults(t *testing.T) {
-	confData, hostName, defaultCaptureSeconds, outputDir := setupTestSetViperDefaults()
+	confData, hostName, defaultCaptureSeconds := setupTestSetViperDefaults()
 
 	checks := []struct {
 		key      string
@@ -58,7 +57,6 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyNumberJobProfiles, 25000},
 		{conf.KeyDremioEndpoint, "http://localhost:9047"},
 		{conf.KeyTarballOutDir, "/tmp/ddc"},
-		{conf.KeyTmpOutputDir, outputDir},
 		{conf.KeyCollectOSConfig, true},
 		{conf.KeyCollectDiskUsage, true},
 		{conf.KeyDremioLogsNumDays, 7},
