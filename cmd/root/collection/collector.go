@@ -90,6 +90,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	coordinatorStr := collectionArgs.CoordinatorStr
 	executorsStr := collectionArgs.ExecutorsStr
 	outputLoc := collectionArgs.OutputLoc
+	outputLocDir := filepath.Dir(outputLoc)
 	sudoUser := collectionArgs.SudoUser
 	ddcfs := collectionArgs.DDCfs
 	dremioPAT := collectionArgs.DremioPAT
@@ -97,16 +98,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	var ddcLoc string
 	var err error
-	tmpIinstallDir, err := os.MkdirTemp("", "ddcex-output")
+	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
+	err = os.Mkdir(tmpInstallDir, 0700)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := os.RemoveAll(tmpIinstallDir); err != nil {
+		if err := os.RemoveAll(tmpInstallDir); err != nil {
 			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
 		}
 	}()
-	ddcLoc, err = ddcbinary.WriteOutDDC(tmpIinstallDir)
+	ddcLoc, err = ddcbinary.WriteOutDDC(tmpInstallDir)
 	if err != nil {
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
