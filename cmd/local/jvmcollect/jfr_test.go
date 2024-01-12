@@ -66,15 +66,12 @@ func TestJFRCapture(t *testing.T) {
 	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	jfrOutDir := filepath.Join(tmpOutDir, "jfr")
-	if err := os.Mkdir(jfrOutDir, 0700); err != nil {
-		t.Fatal(err)
-	}
+
 	nodeName := "node1"
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
 dremio-conf-dir: %v
-tmp-output-dir: %v
+tarball-out-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jfr-time-seconds: 2
@@ -91,6 +88,12 @@ dremio-jfr-time-seconds: 2
 	}
 	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	//create the directory before hand as what happens when we run local-collect
+	jfrOutDir := filepath.Join(c.OutputDir(), "jfr")
+	if err := os.MkdirAll(jfrOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	err = jvmcollect.RunCollectJFR(c)
@@ -131,12 +134,12 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("cmd.Start() failed with %s\n", err)
 	}
-	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
+	jfrCaptureDir := filepath.Join(t.TempDir(), "ddcout")
+	if err := os.Mkdir(jfrCaptureDir, 0700); err != nil {
 		t.Fatal(err)
 	}
 
-	jfrOutDir := filepath.Join(tmpOutDir, "jfr")
+	jfrOutDir := filepath.Join(jfrCaptureDir, "jfr")
 	if err := os.Mkdir(jfrOutDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -166,11 +169,11 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 	if err := os.Mkdir(confDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-
+	tmpOutDir := t.TempDir()
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
 dremio-conf-dir: %v
-tmp-output-dir: %v
+tarball-out-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jfr-time-seconds: 2

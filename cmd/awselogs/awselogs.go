@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
@@ -45,7 +46,7 @@ var AWSELogsCmd = &cobra.Command{
 	},
 }
 
-func Execute(efsLogDir string, outDir string, outFile string) error {
+func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 
 	efsLogDir, err := filepath.Abs(efsLogDir)
 	if err != nil {
@@ -57,9 +58,9 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed listing EFS log dir: %w", err)
 	}
-	outDir, err = filepath.Abs(outDir)
+	outDir, err := filepath.Abs(tarballOutDir)
 	if err != nil {
-		return fmt.Errorf("cannot get abs for dir %v due to error %w", outDir, err)
+		return fmt.Errorf("cannot get abs for dir %v due to error %w", tarballOutDir, err)
 	}
 	if err := os.MkdirAll(outDir, 0700); err != nil {
 		return fmt.Errorf("unable to create dir %w", err)
@@ -89,14 +90,18 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 	overrides[conf.KeyCollectDremioConfiguration] = "false"
 	overrides[conf.KeyDremioPidDetection] = "false"
 	overrides[conf.KeyCollectTtop] = "false"
-	overrides[conf.KeyTmpOutputDir] = outDir
-	overrides[conf.KeyTarballOutDir] = outDir
+	overrides[conf.KeyTarballOutDir] = fmt.Sprintf("%v-%v", outDir, time.Now().UnixNano())
 	overrides[conf.KeyNodeName] = coordinatorNode
 	overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, coordinatorNode)
 	overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, coordinatorNode)
 
 	if _, err := local.Execute([]string{}, overrides); err != nil {
 		return fmt.Errorf("unable to collect entry %v due to error %w", coordinatorNode, err)
+	}
+	fileName := fmt.Sprintf("%v.tar.gz", filepath.Join(overrides[conf.KeyTarballOutDir], coordinatorNode))
+	destFileName := fmt.Sprintf("%v.tar.gz", coordinatorNode)
+	if err := os.Rename(fileName, filepath.Join(outDir, destFileName)); err != nil {
+		return err
 	}
 	for _, entry := range entries {
 		overrides := make(map[string]string)
@@ -113,14 +118,18 @@ func Execute(efsLogDir string, outDir string, outFile string) error {
 		overrides[conf.KeyCollectDremioConfiguration] = "false"
 		overrides[conf.KeyDremioPidDetection] = "false"
 		overrides[conf.KeyCollectTtop] = "false"
-		overrides[conf.KeyTmpOutputDir] = outDir
-		overrides[conf.KeyTarballOutDir] = outDir
+		overrides[conf.KeyTarballOutDir] = fmt.Sprintf("%v-%v", outDir, time.Now().UnixNano())
 		overrides[conf.KeyNodeName] = entry.Name()
 		overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 		overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 
 		if _, err := local.Execute([]string{}, overrides); err != nil {
 			return fmt.Errorf("unable to collect entry %v due to error %w", entry.Name(), err)
+		}
+		fileName := fmt.Sprintf("%v.tar.gz", filepath.Join(overrides[conf.KeyTarballOutDir], entry.Name()))
+		destFileName := fmt.Sprintf("%v.tar.gz", entry.Name())
+		if err := os.Rename(fileName, filepath.Join(outDir, destFileName)); err != nil {
+			return err
 		}
 	}
 	outDirEntries, err := os.ReadDir(outDir)

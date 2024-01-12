@@ -27,14 +27,19 @@ import (
 )
 
 var (
-	tmpDir      string
-	cfgFilePath string
-	overrides   map[string]string
-	err         error
-	cfg         *conf.CollectConf
+	tmpDir        string
+	cfgFilePath   string
+	overrides     map[string]string
+	err           error
+	cfg           *conf.CollectConf
+	tarballOutDir string
 )
 
 var genericConfSetup = func(cfgContent string) {
+	tarballOutDir, err = os.MkdirTemp("", "testerDir")
+	if err != nil {
+		log.Fatalf("unable to create dir with error %v", err)
+	}
 	tmpDir, err = os.MkdirTemp("", "testdataabdc")
 	if err != nil {
 		log.Fatalf("unable to create dir with error %v", err)
@@ -55,7 +60,7 @@ dremio-gclogs-dir: "/path/to/gclogs"
 dremio-log-dir: %v
 node-name: "node1"
 dremio-conf-dir: "%v"
-tarball-out-dir: "/my-tarball-dir"
+tarball-out-dir: "%v"
 number-threads: 4
 dremio-endpoint: "http://localhost:9047"
 dremio-username: "admin"
@@ -87,10 +92,10 @@ collect-wlm: true
 collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"), tarballOutDir)
 	}
 	// Write the sample configuration to a file.
-	err := os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
+	err = os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
 	if err != nil {
 		log.Fatalf("unable to create conf file with error %v", err)
 	}
@@ -142,6 +147,77 @@ dremio-endpoint: eu.dremio.cloud
 	}
 	afterEachConfTest()
 }
+
+func TestConfCanUseTarballOutputDirWithAllowedFiles(t *testing.T) {
+	// allowed files are ddc, ddc.log, ddc.yaml
+	outDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	logDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(logDir, "server.log"), []byte("my log"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	confDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(confDir, "dremio.conf"), []byte("my log"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	yamlText := fmt.Sprintf("tarball-out-dir: %v\ndremio-log-dir: %v\ndremio-conf-dir: %v\n", outDir, logDir, confDir)
+	tmpDir, err = os.MkdirTemp("", "testdataabdc")
+	if err != nil {
+		log.Fatalf("unable to create dir with error %v", err)
+	}
+	cfgFilePath := filepath.Join(tmpDir, "ddc.yaml")
+	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFilePath)
+	_, err = conf.ReadConf(overrides, cfgFilePath)
+	if err != nil {
+		t.Errorf("should not have error: %v", err)
+	}
+}
+func TestConfCannotUseTarballOutputDirWithFiles(t *testing.T) {
+	//allowed files are ddc, ddc.log, ddc.yaml
+	outDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "server.log"), []byte("my log"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	yamlText := fmt.Sprintf("tarball-out-dir: %v\ndremio-log-dir: %v\n", outDir, outDir)
+	tmpDir, err = os.MkdirTemp("", "testdataabdc")
+	if err != nil {
+		log.Fatalf("unable to create dir with error %v", err)
+	}
+	cfgFilePath := filepath.Join(tmpDir, "ddc.yaml")
+	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(cfgFilePath)
+	cfg, err = conf.ReadConf(overrides, cfgFilePath)
+	if err == nil {
+		t.Error("should have an error")
+	}
+	expected := fmt.Sprintf("cannot use directory '%v' for tarball output as it contains 1 entries: ([server.log])", outDir)
+	if err.Error() != expected {
+		t.Errorf("expected %v actual %v", expected, err.Error())
+	}
+}
+
 func TestConfReadingWithDremioCloud(t *testing.T) {
 	genericConfSetup(`
 is-dremio-cloud: true
@@ -264,7 +340,7 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	if cfg.DremioConfDir() != testConf {
 		t.Errorf("Expected DremioConfDir to be '%v', got '%s'", testConf, cfg.DremioConfDir())
 	}
-	if cfg.TarballOutDir() != "/my-tarball-dir" {
+	if cfg.TarballOutDir() != tarballOutDir {
 		t.Errorf("expected /my-tarball-dir but was %v", cfg.TarballOutDir())
 	}
 	if cfg.DremioPIDDetection() != false {

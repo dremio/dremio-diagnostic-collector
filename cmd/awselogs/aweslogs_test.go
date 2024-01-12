@@ -49,11 +49,30 @@ dremio-conf-dir: /path/to/dremio/conf
 `), 0600); err != nil {
 		t.Fatal(err)
 	}
-	outFile := filepath.Join(t.TempDir(), "diag.tgz")
+	outDir := t.TempDir()
+	outFile := filepath.Join(outDir, "diag.tgz")
 	if err := awselogs.Execute(efsDir, tmpDir, outFile); err != nil {
 		t.Fatal(err)
 	}
 	tests.TgzContainsFile(t, filepath.Join(efsDir, "coordinator", "server.out"), outFile, "logs/coordinator/server.out")
 	tests.TgzContainsFile(t, filepath.Join(efsDir, "executor", "node1", "server.out"), outFile, "logs/node1/server.out")
 	tests.TgzContainsFile(t, filepath.Join(efsDir, "executor", "node2", "server.out"), outFile, "logs/node2/server.out")
+
+	///validate directory cleaned up all old tarballs and directories
+	entries, err := os.ReadDir(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var entryNames []string
+	for _, e := range entries {
+		entryNames = append(entryNames, e.Name())
+	}
+	if len(entryNames) != 1 {
+		t.Fatalf("should be one entry but there was the following %#v", entryNames)
+	}
+
+	if entryNames[0] != "diag.tgz" {
+		t.Fatalf("expected diag.tgz but was %v", entryNames[0])
+	}
 }

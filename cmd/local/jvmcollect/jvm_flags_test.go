@@ -50,14 +50,11 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
-	nodeInfoDir := filepath.Join(tmpOutDir, "node-info", nodeName)
-	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
-		t.Fatal(err)
-	}
+
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
 dremio-conf-dir: %v
-tmp-output-dir: %v
+tarball-out-dir: %v
 node-name: %v
 dremio-pid: %v
 `, filepath.Join("testdata", "logs"),
@@ -72,6 +69,11 @@ dremio-pid: %v
 	}
 	c, err := conf.ReadConf(overrides, ddcYaml)
 	if err != nil {
+		t.Fatal(err)
+	}
+	// make the dir..this simulates existing work that happens inside of local.go
+	nodeInfoDir := filepath.Join(c.OutputDir(), "node-info", nodeName)
+	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
 		t.Fatal(err)
 	}
 	err = jvmcollect.RunCollectJVMFlags(c)

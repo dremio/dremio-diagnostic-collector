@@ -23,6 +23,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -246,6 +247,36 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
+	//validate tarball output directory is not empty, because it must be empty or we will end up archiving a lot
+	_, err = os.Stat(c.tarballOutDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// go ahead and make the directory if it is not present
+			if err := os.MkdirAll(c.tarballOutDir, 0700); err != nil {
+				return &CollectConf{}, fmt.Errorf("failed making tarball out dir: %v", err)
+			}
+		} else {
+			//all other errors exit
+			return &CollectConf{}, err
+		}
+	}
+	dirEntries, err := os.ReadDir(c.tarballOutDir)
+	if err != nil {
+		return &CollectConf{}, err
+	}
+	var entryNames []string
+	var entryCount int
+	allowedList := []string{"ddc", "ddc.log", "ddc.yaml", fmt.Sprintf("%v.tar.gz", c.nodeName)}
+	for _, e := range dirEntries {
+		if slices.Contains[[]string](allowedList, e.Name()) {
+			continue
+		}
+		entryCount++
+		entryNames = append(entryNames, e.Name())
+	}
+	if entryCount > 0 {
+		return &CollectConf{}, fmt.Errorf("cannot use directory '%v' for tarball output as it contains %v entries: (%v)", c.tarballOutDir, entryCount, entryNames)
+	}
 	outputDir := GetString(confData, KeyTmpOutputDir)
 	if outputDir != "" {
 		simplelog.Warningf("key %v is deprecated and will be removed in version 1.0 use %v key instead", KeyTmpOutputDir, KeyTarballOutDir)
@@ -253,6 +284,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	} else {
 		c.outputDir = filepath.Join(c.tarballOutDir, getOutputDir(time.Now()))
 	}
+
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
 	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)

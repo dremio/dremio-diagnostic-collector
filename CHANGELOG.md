@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.9.0] - UNRELEASED
+## [0.9.0] - 2024-01-12
 
 ### Added
 * collect kubectl describe output for pods
@@ -13,6 +13,8 @@
 * ttop no longer outputs to the temp folder
 * ddc.yaml tmp-output-dir now defaults to using tarball-out-dir as it's base directory
 * tmp-output-dir is now deprecated as it was too hard to configure correctly
+* default --transfer-dir is now /tmp/ddc-(TIMESTAMP)
+* will fail ddc if we use a --tarball-out-dir or a --transfer-dir that has any entries besides: ddc, ddc.log, ddc.yaml or nodeName.tar.gz
 
 ### Fixed
 * fixed not actually allowing the DREMIO_LOG_DIR to be used 

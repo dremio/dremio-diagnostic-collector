@@ -133,6 +133,7 @@ func ExtractGZipToTar(t *testing.T, gzipArchive string) string {
 func TgzContainsFile(t *testing.T, expectedFile, archiveFile, internalPath string) {
 	t.Helper()
 	tarFile := ExtractGZipToTar(t, archiveFile)
+	defer os.Remove(tarFile)
 	TarContainsFile(t, expectedFile, tarFile, internalPath)
 }
 

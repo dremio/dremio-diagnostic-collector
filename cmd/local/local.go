@@ -567,13 +567,16 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	logLoc := simplelog.GetLogLoc()
 	if logLoc != "" {
 		if err := ddcio.CopyFile(simplelog.GetLogLoc(), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
-			simplelog.Warningf("uanble to copy log to archive due to error %v", err)
+			simplelog.Warningf("unable to copy log to archive due to error %v", err)
 		}
 	}
 	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
 	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
 	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
 		return "", fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
+	}
+	if err := os.RemoveAll(c.OutputDir()); err != nil {
+		simplelog.Errorf("unable to remove %v: %v", c.OutputDir(), err)
 	}
 	simplelog.Infof("Archive %v complete", tarballName)
 	endTime := time.Now().Unix()

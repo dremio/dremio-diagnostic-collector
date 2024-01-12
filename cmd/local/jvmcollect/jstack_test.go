@@ -63,7 +63,7 @@ func TestJStackCapture(t *testing.T) {
 	ddcYamlString := fmt.Sprintf(`
 dremio-log-dir: %v
 dremio-conf-dir: %v
-tmp-output-dir: %v
+tarball-out-dir: %v
 node-name: %v
 dremio-pid: %v
 dremio-jstack-time-seconds: 2
