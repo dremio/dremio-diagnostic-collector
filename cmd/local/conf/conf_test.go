@@ -17,6 +17,8 @@ package conf_test
 import (
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +36,7 @@ var (
 	cfg           *conf.CollectConf
 	tarballOutDir string
 )
+var ts *httptest.Server
 
 var genericConfSetup = func(cfgContent string) {
 	tarballOutDir, err = os.MkdirTemp("", "testerDir")
@@ -47,6 +50,9 @@ var genericConfSetup = func(cfgContent string) {
 	cfgFilePath = filepath.Join(tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {
+		ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintln(w, "Hello, client")
+		}))
 		// Create a sample configuration file.
 		cfgContent = fmt.Sprintf(`
 accept-collection-consent: true
@@ -62,7 +68,7 @@ node-name: "node1"
 dremio-conf-dir: "%v"
 tarball-out-dir: "%v"
 number-threads: 4
-dremio-endpoint: "http://localhost:9047"
+dremio-endpoint: "%v"
 dremio-username: "admin"
 dremio-pat-token: "your_personal_access_token"
 dremio-rocksdb-dir: "/path/to/dremio/rocksdb"
@@ -92,7 +98,7 @@ collect-wlm: true
 collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
-`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"), tarballOutDir)
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"), tarballOutDir, ts.URL)
 	}
 	// Write the sample configuration to a file.
 	err = os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
@@ -112,6 +118,9 @@ var afterEachConfTest = func() {
 	err = os.RemoveAll(tmpDir)
 	if err != nil {
 		log.Fatalf("unable to remove conf dir with error %v", err)
+	}
+	if ts != nil {
+		ts.Close()
 	}
 }
 

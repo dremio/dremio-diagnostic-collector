@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.1] - 2024-01-25
+
+### Changed
+
+* now will validate REST api configuration sooner in the local-collect process and stop collection if it is invalid
+
 ## [0.9.0] - 2024-01-12
 
 ### Added
@@ -438,6 +444,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[0.9.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.1...v0.8.2

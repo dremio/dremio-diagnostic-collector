@@ -33,11 +33,6 @@ import (
 
 func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 	simplelog.Debugf("Collecting results from Export System Tables...")
-	err := ValidateAPICredentials(c)
-	if err != nil {
-		return err
-	}
-
 	var systables []string
 	if !c.IsDremioCloud() {
 		systables = c.Systemtables()

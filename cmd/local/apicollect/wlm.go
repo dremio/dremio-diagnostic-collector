@@ -36,13 +36,6 @@ func RunCollectWLM(c *conf.CollectConf) error {
 		return errors.New("config pointer is nil")
 	}
 
-	// Validate the Dremio API credentials
-	err := ValidateAPICredentials(c)
-	if err != nil {
-		// Return if the API credentials are not valid
-		return err
-	}
-
 	// Define the API objects (queues and rules) to be fetched
 	var apiobjects [][]string
 	if !c.IsDremioCloud() {

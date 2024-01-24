@@ -123,10 +123,6 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 
 func RunCollectJobProfiles(c *conf.CollectConf) error {
 	simplelog.Info("Collecting Job Profiles...")
-	err := ValidateAPICredentials(c)
-	if err != nil {
-		return err
-	}
 	tried, collected, err := GetNumberOfJobProfilesCollected(c)
 	if err != nil {
 		return err

@@ -28,10 +28,6 @@ import (
 )
 
 func RunCollectKvReport(c *conf.CollectConf) error {
-	err := ValidateAPICredentials(c)
-	if err != nil {
-		return err
-	}
 	filename := "kvstore-report.zip"
 	apipath := "/apiv2/kvstore/report"
 	url := c.DremioEndpoint() + apipath

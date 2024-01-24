@@ -17,6 +17,7 @@ package restclient
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,6 +45,9 @@ func InitClient(allowInsecureSSL bool, restHTTPTimeout int) {
 }
 
 func APIRequest(url string, pat string, request string, headers map[string]string) ([]byte, error) {
+	if client == nil {
+		return []byte(""), errors.New("critical error call InitClient first")
+	}
 	simplelog.Debugf("Requesting %s", url)
 	req, err := http.NewRequest(request, url, nil)
 	if err != nil {

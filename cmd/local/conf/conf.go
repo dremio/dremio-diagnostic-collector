@@ -125,6 +125,19 @@ type CollectConf struct {
 	dremioPID               int
 }
 
+func ValidateAPICredentials(c *CollectConf) error {
+	simplelog.Debugf("Validating REST API user credentials...")
+	var url string
+	if !c.IsDremioCloud() {
+		url = c.DremioEndpoint() + "/apiv2/login"
+	} else {
+		url = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID()
+	}
+	headers := map[string]string{"Content-Type": "application/json"}
+	_, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
+	return err
+}
+
 func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 	dremioConfFile := filepath.Join(dremioConfDir, "dremio.conf")
 	content, err := os.ReadFile(filepath.Clean(dremioConfFile))
@@ -466,18 +479,23 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		}
 	}
 
+	c.allowInsecureSSL = GetBool(confData, KeyAllowInsecureSSL)
+	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
 	// collect rest apis
 	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
 	if disableRESTAPI {
 		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+	} else {
+		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
+		//validate rest api configuration
+		if err := ValidateAPICredentials(c); err != nil {
+			return &CollectConf{}, fmt.Errorf("invalid dremio API configuration: %v", err)
+		}
 	}
-	c.allowInsecureSSL = GetBool(confData, KeyAllowInsecureSSL)
 	c.collectWLM = GetBool(confData, KeyCollectWLM) && !disableRESTAPI
 	c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport) && !disableRESTAPI
 	c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
 	c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport) && !disableRESTAPI
-	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
-	restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 
 	numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
 	c.numberJobProfilesToCollect = numberJobProfilesToCollect
