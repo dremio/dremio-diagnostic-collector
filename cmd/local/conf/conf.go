@@ -461,7 +461,6 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		}
 
 	}
-	// end discovering minimal configuration
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
 	if c.isDremioCloud {
@@ -485,24 +484,33 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
 	if disableRESTAPI {
 		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+		c.numberJobProfilesToCollect = 0
+		c.jobProfilesNumHighQueryCost = 0
+		c.jobProfilesNumSlowExec = 0
+		c.jobProfilesNumRecentErrors = 0
+		c.jobProfilesNumSlowPlanning = 0
+		c.collectWLM = false
+		c.collectSystemTablesExport = false
+		c.systemTablesRowLimit = 0
+		c.collectKVStoreReport = false
 	} else {
+		numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
+		c.numberJobProfilesToCollect = numberJobProfilesToCollect
+		c.jobProfilesNumHighQueryCost = jobProfilesNumHighQueryCost
+		c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
+		c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
+		c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
+		c.collectWLM = GetBool(confData, KeyCollectWLM)
+		c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport)
+		c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
+		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
 		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 		//validate rest api configuration
 		if err := ValidateAPICredentials(c); err != nil {
-			return &CollectConf{}, fmt.Errorf("invalid dremio API configuration: %v", err)
+			return &CollectConf{}, fmt.Errorf("CRITICAL ERROR invalid Dremio API configuration: (url: %v, user: %v) %v", c.dremioEndpoint, c.dremioUsername, err)
 		}
 	}
-	c.collectWLM = GetBool(confData, KeyCollectWLM) && !disableRESTAPI
-	c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport) && !disableRESTAPI
-	c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
-	c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport) && !disableRESTAPI
 
-	numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
-	c.numberJobProfilesToCollect = numberJobProfilesToCollect
-	c.jobProfilesNumHighQueryCost = jobProfilesNumHighQueryCost
-	c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
-	c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
-	c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
 	// TODO figure out if this makes any sense as nothing changed these values
 	// this is just logging logic and not actually useful for anything but reporting
 	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()

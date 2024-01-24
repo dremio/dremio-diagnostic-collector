@@ -39,7 +39,6 @@ type SummaryInfo struct {
 	DDCVersion          string                  `json:"ddcVersion"`
 	CollectionsEnabled  []string                `json:"collectionsEnabled"`
 	CollectionsDisabled []string                `json:"collectionsDisabled"`
-	PatSet              bool                    `json:"patSet"`
 }
 
 type ClusterInfo struct {

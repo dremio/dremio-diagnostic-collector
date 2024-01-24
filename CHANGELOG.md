@@ -5,6 +5,8 @@
 ### Changed
 
 * now will validate REST api configuration sooner in the local-collect process and stop collection if it is invalid
+* UI was not reporting correctly when pat was set with DDC.yaml
+* have UI update after token prompt for a better UX
 
 ## [0.9.0] - 2024-01-12
 

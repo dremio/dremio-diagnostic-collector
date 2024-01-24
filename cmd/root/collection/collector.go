@@ -71,7 +71,6 @@ type Args struct {
 	DDCYamlLoc     string
 	Disabled       []string
 	Enabled        []string
-	PATSet         bool
 }
 
 type HostCaptureConfiguration struct {
@@ -240,7 +239,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	collectionInfo.DDCVersion = versions.GetCLIVersion()
 	collectionInfo.CollectionsEnabled = collectionArgs.Enabled
 	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
-	collectionInfo.PatSet = collectionArgs.PATSet
 
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))

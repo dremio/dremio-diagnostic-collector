@@ -520,17 +520,16 @@ var LocalCollectCmd = &cobra.Command{
 						fmt.Printf("unable to get PAT due to: %v\n", err)
 						os.Exit(1)
 					}
-					if err := flag.Value.Set(pat); err != nil {
-						simplelog.Errorf("critical error unable to set %v due to %v", conf.KeyDremioPatToken, err)
-						os.Exit(1)
-					}
+					overrides[flag.Name] = pat
+				} else {
+					overrides[flag.Name] = flag.Value.String()
 				}
 				//we do not want to log the token
 				simplelog.Debugf("overriding yaml with cli flag %v and value 'REDACTED'", flag.Name)
 			} else {
 				simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
+				overrides[flag.Name] = flag.Value.String()
 			}
-			overrides[flag.Name] = flag.Value.String()
 		})
 		msg, err := Execute(args, overrides)
 		if err != nil {

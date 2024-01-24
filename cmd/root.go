@@ -117,6 +117,7 @@ func startTicker() (stop func()) {
 }
 
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, k8sEnabled bool) error {
+	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
 		simplelog.GetLogLoc(),
@@ -124,7 +125,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		"",
 		collectionArgs.Enabled,
 		collectionArgs.Disabled,
-		collectionArgs.PATSet,
+		patSet,
 		0,
 		0,
 	)
@@ -159,7 +160,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			collectorStrategy.Name(),
 			collectionArgs.Enabled,
 			collectionArgs.Disabled,
-			collectionArgs.PATSet,
+			patSet,
 			0,
 			0,
 		)
@@ -234,8 +235,6 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
-		stop := startTicker()
-		defer stop()
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
@@ -243,7 +242,14 @@ func Execute(args []string) error {
 			}
 			sshKeyLoc = sshDefault
 		}
-		dremioPAT := ""
+
+		simplelog.Info(versions.GetCLIVersion())
+		simplelog.Infof("cli command: %v", strings.Join(args, " "))
+		confData, err := ValidateAndReadYaml(ddcYamlLoc)
+		if err != nil {
+			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
+		}
+		dremioPAT := confData[conf.KeyDremioPatToken].(string)
 		if promptForDremioPAT {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
@@ -252,12 +258,6 @@ func Execute(args []string) error {
 			dremioPAT = pat
 		}
 		patSet := dremioPAT != ""
-		simplelog.Info(versions.GetCLIVersion())
-		simplelog.Infof("cli command: %v", strings.Join(args, " "))
-		confData, err := ValidateAndReadYaml(ddcYamlLoc)
-		if err != nil {
-			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
-		}
 		var enabled []string
 		var disabled []string
 		for k, v := range confData {
@@ -287,6 +287,8 @@ func Execute(args []string) error {
 				}
 			}
 		}
+		stop := startTicker()
+		defer stop()
 		collectionArgs := collection.Args{
 			CoordinatorStr: coordinatorStr,
 			ExecutorsStr:   executorsStr,
@@ -298,7 +300,6 @@ func Execute(args []string) error {
 			DDCYamlLoc:     ddcYamlLoc,
 			Enabled:        enabled,
 			Disabled:       disabled,
-			PATSet:         patSet,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc: sshKeyLoc,
