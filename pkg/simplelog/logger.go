@@ -186,7 +186,7 @@ func CopyLog(dest string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(dest, logRead, 0644)
+	err = os.WriteFile(dest, logRead, 0600)
 	if err != nil {
 		return err
 	}
