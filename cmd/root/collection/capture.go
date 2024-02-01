@@ -119,11 +119,13 @@ func Capture(conf HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outp
 	}
 	var allHostLog []string
 	err := ComposeExecuteAndStream(mask, conf, func(line string) {
+		if strings.Contains(line, "AUTODETECTION DISABLED") {
+			consoleprint.UpdateNodeAutodetectDisabled(host, true)
+		}
 		allHostLog = append(allHostLog, line)
 		simplelog.HostLog(host, line)
 	}, localCollectArgs)
 	if err != nil {
-
 		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(strings.Join(allHostLog, " - "), 1024)
 		consoleprint.UpdateNodeState(host, status)
 		return 0, "", fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
