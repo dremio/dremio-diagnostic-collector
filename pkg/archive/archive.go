@@ -53,26 +53,6 @@ func TarDDC(srcDir, dest, baseDDC string) error {
 	})
 }
 
-/*func includeDDCLog(baseDDC string) error {
-	ddcLogIn := filepath.Join(simplelog.GetLogLoc())
-	simplelog.Infof("ddc log in: %v", ddcLogIn)
-	ddcLogOut := filepath.Join(baseDDC, "ddc.log")
-	simplelog.Infof("ddc log out: %v", ddcLogOut)
-	simplelog.Infof("ddc log closing")
-	simplelog.Close()
-	logRead, err := os.ReadFile(ddcLogIn)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(ddcLogOut, logRead, 0644)
-	if err != nil {
-		return err
-	}
-	simplelog.InitLogger(4)
-	simplelog.Infof("ddc log opening")
-	return nil
-}*/
-
 func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 	tarGzFile, err := os.Create(filepath.Clean(dest))
 	if err != nil {
