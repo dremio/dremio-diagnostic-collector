@@ -98,8 +98,20 @@ func init() {
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
+func UpdateNodeAutodetect(node string, enabled bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.nodeDetect[node]; ok {
+	} else {
+		c.nodeDetect[node] = enabled
+	}
+
+}
+
+// Update updates the CollectionStats fields in a thread-safe manner.
 func UpdateNodeState(node string, status string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	if _, ok := c.nodeCaptureStats[node]; ok {
 		c.nodeCaptureStats[node].status = status
 		if status == "COMPLETED" || strings.HasPrefix(status, "FAILED") {
@@ -114,7 +126,6 @@ func UpdateNodeState(node string, status string) {
 			status:    status,
 		}
 	}
-	c.mu.Unlock()
 }
 
 var clearCode = "\033[H\033[2J"
