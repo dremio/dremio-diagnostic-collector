@@ -263,7 +263,7 @@ func TestCopyLog(t *testing.T) {
 	if err != nil {
 		t.Errorf("error opening file:\n%v", err)
 	}
-	if actual.Size() == expected.Size() {
+	if actual.Size() != expected.Size() {
 		t.Errorf("expected logs to be equal size but they were not:\nFile: %v\nSize: %v\nFile: %v\nSize: %v", currLog, expected.Size(), destLog, actual.Size())
 	}
 }
