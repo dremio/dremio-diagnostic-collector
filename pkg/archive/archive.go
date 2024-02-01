@@ -33,6 +33,11 @@ func TarGzDir(srcDir, dest string) error {
 func TarDDC(srcDir, dest, baseDDC string) error {
 	summaryJSON := filepath.Join(srcDir, "summary.json")
 	ddcFolder := filepath.Join(srcDir, baseDDC)
+	err := simplelog.CopyLog(filepath.Join(baseDDC, "ddc.log"))
+	if err != nil {
+		simplelog.Warningf("unable to copy ddc.log: \n%v", err)
+	}
+
 	return TarGzDirFiltered(srcDir, dest, func(name string) bool {
 		switch name {
 		case summaryJSON, ddcFolder:
@@ -47,6 +52,26 @@ func TarDDC(srcDir, dest, baseDDC string) error {
 		return false
 	})
 }
+
+/*func includeDDCLog(baseDDC string) error {
+	ddcLogIn := filepath.Join(simplelog.GetLogLoc())
+	simplelog.Infof("ddc log in: %v", ddcLogIn)
+	ddcLogOut := filepath.Join(baseDDC, "ddc.log")
+	simplelog.Infof("ddc log out: %v", ddcLogOut)
+	simplelog.Infof("ddc log closing")
+	simplelog.Close()
+	logRead, err := os.ReadFile(ddcLogIn)
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(ddcLogOut, logRead, 0644)
+	if err != nil {
+		return err
+	}
+	simplelog.InitLogger(4)
+	simplelog.Infof("ddc log opening")
+	return nil
+}*/
 
 func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 	tarGzFile, err := os.Create(filepath.Clean(dest))

@@ -169,6 +169,22 @@ func GetLogLoc() string {
 	return ddcLogFilePath
 }
 
+func CopyLog(dest string) error {
+	ddcLogMut.Lock()
+	Close()
+	logRead, err := os.ReadFile(GetLogLoc())
+	if err != nil {
+		return err
+	}
+	err = os.WriteFile(dest, logRead, 0644)
+	if err != nil {
+		return err
+	}
+	ddcLogMut.Unlock()
+	newLogger()
+	return err
+}
+
 func Close() error {
 	logger.Debug("Close called on log")
 	logger.debugLogger = log.New(io.Discard, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
