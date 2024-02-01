@@ -43,7 +43,7 @@ func TestGetFreeSpace(t *testing.T) {
 		input uint64
 		want  string
 	}{
-		"free space will fail": {input: 100000000, want: fmt.Sprintf("there are only %v GB free on %v and 100000000 GB is the minimum. Use --transfer-dir to specify a larger dir to use or --tarball-out-dir if running ddc local-collect", bytesFree, tmpFolder)},
+		"free space will fail": {input: 100000000, want: fmt.Sprintf("there are only %v GB free on %v and 100000000 GB is the minimum", bytesFree, tmpFolder)},
 		"no requirement":       {input: 0, want: ""},
 		"1 gb free":            {input: 1, want: ""},
 	}
