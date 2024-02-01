@@ -70,4 +70,5 @@ const (
 	KeyJobProfilesNumRecentErrors  = "job-profiles-num-recent-errors"
 	KeyJobProfilesNumSlowPlanning  = "job-profiles-num-slow-planning"
 	KeyRestHTTPTimeout             = "rest-http-timeout"
+	KeyDisableFreeSpaceCheck       = "disable-free-space-check"
 )

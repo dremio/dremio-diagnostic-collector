@@ -32,6 +32,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
@@ -56,6 +57,7 @@ var kubectlPath string
 var isK8s bool
 var sudoUser string
 var namespace string
+var disableFreeSpaceCheck bool
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -249,6 +251,16 @@ func Execute(args []string) error {
 		if err != nil {
 			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
 		}
+		if !disableFreeSpaceCheck {
+			abs, err := filepath.Abs(outputLoc)
+			if err != nil {
+				return err
+			}
+			outputFolder := filepath.Dir(abs)
+			if err := dirs.CheckFreeSpace(outputFolder, 40); err != nil {
+				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
+			}
+		}
 		dremioPAT := confData[conf.KeyDremioPatToken].(string)
 		if promptForDremioPAT {
 			pat, err := masking.PromptForPAT()
@@ -290,16 +302,17 @@ func Execute(args []string) error {
 		stop := startTicker()
 		defer stop()
 		collectionArgs := collection.Args{
-			CoordinatorStr: coordinatorStr,
-			ExecutorsStr:   executorsStr,
-			OutputLoc:      filepath.Clean(outputLoc),
-			SudoUser:       sudoUser,
-			DDCfs:          helpers.NewRealFileSystem(),
-			DremioPAT:      dremioPAT,
-			TransferDir:    transferDir,
-			DDCYamlLoc:     ddcYamlLoc,
-			Enabled:        enabled,
-			Disabled:       disabled,
+			CoordinatorStr:        coordinatorStr,
+			ExecutorsStr:          executorsStr,
+			OutputLoc:             filepath.Clean(outputLoc),
+			SudoUser:              sudoUser,
+			DDCfs:                 helpers.NewRealFileSystem(),
+			DremioPAT:             dremioPAT,
+			TransferDir:           transferDir,
+			DDCYamlLoc:            ddcYamlLoc,
+			Enabled:               enabled,
+			Disabled:              disabled,
+			DisableFreeSpaceCheck: disableFreeSpaceCheck,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc: sshKeyLoc,
@@ -357,9 +370,10 @@ func init() {
 	RootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "kubectl", "where to find kubectl")
 	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --coordinator and --executors flags")
 	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
+	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostics commands need a sudo user (i.e. for jcmd)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
-	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name of tgz file to save the diagnostic collection to")
+	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 	execLoc, err := os.Executable()
 	if err != nil {
 		fmt.Printf("unable to find ddc, critical error %v", err)

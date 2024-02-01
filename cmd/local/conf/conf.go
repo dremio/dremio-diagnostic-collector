@@ -64,6 +64,7 @@ func SanitiseURL(url string) string {
 
 type CollectConf struct {
 	// flags that are configurable by env or configuration
+	disableFreeSpaceCheck      bool
 	numberThreads              int
 	disableRESTAPI             bool
 	gcLogsDir                  string
@@ -308,6 +309,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
+	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
@@ -356,7 +358,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 				var err error
 				detectedConfig, err = GetConfiguredDremioValuesFromPID(c.dremioPID)
 				if err != nil {
-					msg := fmt.Sprintf("unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
+					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 					fmt.Println(msg)
 					simplelog.Errorf(msg)
 				} else {
@@ -364,7 +366,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 					c.dremioConfDir = detectedConfig.ConfDir
 				}
 			} else {
-				fmt.Println("no valid pid found therefore the log and configuration autodetection will not function")
+				fmt.Println("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resovle this")
 				simplelog.Warning("no valid pid found therefor the log and configuration autodetection will not function")
 			}
 
@@ -659,6 +661,10 @@ func getOutputDir(now time.Time) string {
 
 func (c CollectConf) DisableRESTAPI() bool {
 	return c.disableRESTAPI
+}
+
+func (c CollectConf) DisableFreeSpaceCheck() bool {
+	return c.disableFreeSpaceCheck
 }
 
 func (c *CollectConf) GcLogsDir() string {

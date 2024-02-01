@@ -60,17 +60,18 @@ type Collector interface {
 }
 
 type Args struct {
-	DDCfs          helpers.Filesystem
-	CoordinatorStr string
-	ExecutorsStr   string
-	OutputLoc      string
-	SudoUser       string
-	CopyStrategy   CopyStrategy
-	DremioPAT      string
-	TransferDir    string
-	DDCYamlLoc     string
-	Disabled       []string
-	Enabled        []string
+	DDCfs                 helpers.Filesystem
+	CoordinatorStr        string
+	ExecutorsStr          string
+	OutputLoc             string
+	SudoUser              string
+	CopyStrategy          CopyStrategy
+	DremioPAT             string
+	TransferDir           string
+	DDCYamlLoc            string
+	Disabled              []string
+	Enabled               []string
+	DisableFreeSpaceCheck bool
 }
 
 type HostCaptureConfiguration struct {
@@ -95,6 +96,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	dremioPAT := collectionArgs.DremioPAT
 	transferDir := collectionArgs.TransferDir
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
+	disableFreeSpaceCheck := collectionArgs.DisableFreeSpaceCheck
 	var ddcLoc string
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
@@ -167,7 +169,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			size, f, err := Capture(coordinatorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls, disableFreeSpaceCheck)
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)
@@ -201,7 +203,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls)
+			size, f, err := Capture(executorCaptureConf, ddcLoc, ddcYamlFilePath, s.GetTmpDir(), skipRESTCalls, disableFreeSpaceCheck)
 			if err != nil {
 				m.Lock()
 				totalFailedFiles = append(totalFailedFiles, f)

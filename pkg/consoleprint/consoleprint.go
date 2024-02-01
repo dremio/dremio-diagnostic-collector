@@ -41,6 +41,7 @@ type CollectionStats struct {
 	collectionType       string
 	tarball              string
 	nodeCaptureStats     map[string]*NodeCaptureStats
+	nodeDetectDisabled   map[string]bool
 	result               string
 	k8sFilesCollected    []string
 	lastK8sFileCollected string
@@ -90,7 +91,8 @@ var c *CollectionStats
 
 func init() {
 	c = &CollectionStats{
-		nodeCaptureStats: make(map[string]*NodeCaptureStats),
+		nodeCaptureStats:   make(map[string]*NodeCaptureStats),
+		nodeDetectDisabled: make(map[string]bool),
 	}
 	if strings.HasSuffix(os.Args[0], ".test") {
 		clearCode = "CLEAR SCREEN"
@@ -98,8 +100,16 @@ func init() {
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
+func UpdateNodeAutodetectDisabled(node string, enabled bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.nodeDetectDisabled[node] = enabled
+}
+
+// Update updates the CollectionStats fields in a thread-safe manner.
 func UpdateNodeState(node string, status string) {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	if _, ok := c.nodeCaptureStats[node]; ok {
 		c.nodeCaptureStats[node].status = status
 		if status == "COMPLETED" || strings.HasPrefix(status, "FAILED") {
@@ -114,7 +124,6 @@ func UpdateNodeState(node string, status string) {
 			status:    status,
 		}
 	}
-	c.mu.Unlock()
 }
 
 var clearCode = "\033[H\033[2J"
@@ -147,13 +156,21 @@ func PrintState() {
 		} else {
 			secondsElapsed = int(time.Now().Unix()) - int(node.startTime)
 		}
-		nodes.WriteString(fmt.Sprintf("%v. node %v - elapsed %v secs - status %v \n", i+1, key, secondsElapsed, node.status))
+		status := node.status
+		if _, ok := c.nodeDetectDisabled[key]; ok {
+			status = fmt.Sprintf("(NO PID) %v", status)
+		}
+		nodes.WriteString(fmt.Sprintf("%v. node %v - elapsed %v secs - status %v \n", i+1, key, secondsElapsed, status))
 	}
 	patMessage := ""
 	if c.patSet {
 		patMessage = "Yes"
 	} else {
 		patMessage = "No (disables Job Profiles, WLM, KV Store and System Table Reports use --dremio-pat-prompt if you want these)"
+	}
+	autodetectEnabled := "Yes"
+	if len(c.nodeDetectDisabled) > 0 {
+		autodetectEnabled = fmt.Sprintf("Disabled on %v/%v nodes files may be missing try again with the --sudo-user flag", len(c.nodeDetectDisabled), len(c.nodeCaptureStats))
 	}
 	fmt.Printf(
 		`=================================
@@ -168,6 +185,7 @@ Collection Type      : %v
 Collections Enabled  : %v
 Collections Disabled : %v
 Dremio PAT Set       : %v
+Autodetect Enabled   : %v
 
 -- status --
 Transfers Complete   : %v/%v
@@ -176,7 +194,7 @@ Result               : %v
 
 
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), patMessage, c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), patMessage, autodetectEnabled, c.TransfersComplete, total,
 		c.tarball, c.result, nodes.String())
 	c.mu.Unlock()
 

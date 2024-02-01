@@ -72,4 +72,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyDremioCloudProjectID, "")
 	setDefault(confData, KeyAllowInsecureSSL, true)
 	setDefault(confData, KeyRestHTTPTimeout, 30)
+	setDefault(confData, KeyDisableFreeSpaceCheck, false)
+
 }
