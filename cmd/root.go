@@ -257,7 +257,7 @@ func Execute(args []string) error {
 				return err
 			}
 			outputFolder := filepath.Dir(abs)
-			if err := dirs.CheckFreeSpace(outputFolder, 40); err != nil {
+			if err := dirs.CheckFreeSpace(outputFolder, 4000); err != nil {
 				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
 			}
 		}

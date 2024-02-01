@@ -32,9 +32,8 @@ func GetFreeSpaceOnFileSystem(folder string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	err := windows.GetDiskFreeSpaceEx(windows.StringToUTF16Ptr(abs),
-		&freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes)
-	if err != nil {
+	if err := windows.GetDiskFreeSpaceEx(windows.StringToUTF16Ptr(abs),
+		&freeBytesAvailable, &totalNumberOfBytes, &totalNumberOfFreeBytes); err != nil {
 		return 0, err
 	}
 	return freeBytesAvailable, nil
