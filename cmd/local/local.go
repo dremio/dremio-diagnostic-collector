@@ -40,6 +40,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
@@ -101,6 +102,11 @@ func createAllDirs(c *conf.CollectConf) error {
 }
 
 func collect(c *conf.CollectConf) error {
+	if !c.DisableFreeSpaceCheck() {
+		if err := dirs.CheckFreeSpace(c.TarballOutDir(), 40); err != nil {
+			return fmt.Errorf("%v. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
+		}
+	}
 	if err := createAllDirs(c); err != nil {
 		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
@@ -533,7 +539,7 @@ var LocalCollectCmd = &cobra.Command{
 		})
 		msg, err := Execute(args, overrides)
 		if err != nil {
-			fmt.Println(errors.Unwrap(err).Error())
+			fmt.Printf("\nCRITICAL ERROR: %v\n", errors.Unwrap(err).Error())
 			os.Exit(1)
 		}
 		fmt.Println(msg)
@@ -607,6 +613,8 @@ func init() {
 	LocalCollectCmd.Flags().String("dremio-conf-dir", "", "Directory where to find the configuration files")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool("collect-dremio-configuration", true, "Collect Dremio Configuration collector")
+	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
+
 	LocalCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
 	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")

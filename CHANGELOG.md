@@ -5,6 +5,7 @@
 ### Changed
 
 * reporting back failed autodetect due to permissions
+* DDC now requires 40gb of space free wherever the --transfer-dir or --tarball-out-dir is specified. If this is not available the collection will fail
 
 ## [0.9.1] - 2024-01-25
 
