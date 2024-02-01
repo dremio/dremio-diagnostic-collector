@@ -170,8 +170,8 @@ func GetLogLoc() string {
 }
 
 func CopyLog(dest string) error {
-	// We need to get a mutex lock on file to prevent errors
-	// when copying - mostly seen in windows envs
+	// We need to get a lock on the log file to safely close it
+	// to avoid any potentialy copying errors
 	ddcLogMut.Lock()
 	defer func() {
 		ddcLogMut.Unlock()
