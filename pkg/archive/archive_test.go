@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 func TestTarGzDir(t *testing.T) {
@@ -241,5 +242,28 @@ func TestTarDDC(t *testing.T) {
 	}
 	if !reflect.DeepEqual(copied2, original2) {
 		t.Errorf("expected '%q' but got '%q'", string(original2), string(copied2))
+	}
+}
+
+func TestCopyLog(t *testing.T) {
+	simplelog.InitLogger(2)
+	simplelog.Infof("test for copy")
+	currLog := simplelog.GetLogLoc()
+	destLog := filepath.Join("testdata", "ddc.log")
+	err := simplelog.CopyLog(destLog)
+	if err != nil {
+		t.Errorf("error copying log\n%v", err)
+	}
+
+	expected, err := os.Stat(currLog)
+	if err != nil {
+		t.Errorf("error opening file:\n%v", err)
+	}
+	actual, err := os.Stat(destLog)
+	if err != nil {
+		t.Errorf("error opening file:\n%v", err)
+	}
+	if actual.Size() == expected.Size() {
+		t.Errorf("expected logs to be equal size but they were not:\nFile: %v\nSize: %v\nFile: %v\nSize: %v", currLog, expected.Size(), destLog, actual.Size())
 	}
 }

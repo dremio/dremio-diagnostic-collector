@@ -173,7 +173,11 @@ func CopyLog(dest string) error {
 	// We need to get a mutex lock on file to prevent errors
 	// when copying - mostly seen in windows envs
 	ddcLogMut.Lock()
-	defer ddcLogMut.Unlock()
+	defer func() {
+		ddcLogMut.Unlock()
+		newLogger()
+	}()
+
 	err := Close()
 	if err != nil {
 		return err
@@ -186,7 +190,6 @@ func CopyLog(dest string) error {
 	if err != nil {
 		return err
 	}
-	newLogger()
 	return nil
 }
 
