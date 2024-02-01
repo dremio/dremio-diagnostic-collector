@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.0] - 2024-02-01
+
+### Changed
+
+* DDC now requires 40gb of space free wherever the --transfer-dir or --tarball-out-dir is specified. If this is not available the collection will fail
+
 ## [0.9.1] - 2024-01-25
 
 ### Changed
@@ -446,6 +452,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[1.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.1...v1.0.0
 [0.9.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.2...v0.8.3

@@ -64,6 +64,7 @@ func SanitiseURL(url string) string {
 
 type CollectConf struct {
 	// flags that are configurable by env or configuration
+	disableFreeSpaceCheck      bool
 	numberThreads              int
 	disableRESTAPI             bool
 	gcLogsDir                  string
@@ -308,6 +309,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
+	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
@@ -659,6 +661,10 @@ func getOutputDir(now time.Time) string {
 
 func (c CollectConf) DisableRESTAPI() bool {
 	return c.disableRESTAPI
+}
+
+func (c CollectConf) DisableFreeSpaceCheck() bool {
+	return c.disableFreeSpaceCheck
 }
 
 func (c *CollectConf) GcLogsDir() string {
