@@ -96,7 +96,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, isCoordinator bool, 
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "--retries", "99", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *KubectlK8sActions) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
@@ -106,7 +106,7 @@ func (c *KubectlK8sActions) CopyFromHostSudo(hostString string, isCoordinator bo
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "--retries", "99", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
@@ -115,7 +115,7 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, so
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "--retries", "99", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
@@ -125,7 +125,7 @@ func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "--retries", "99", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *KubectlK8sActions) FindHosts(searchTerm string) (podName []string, err error) {
