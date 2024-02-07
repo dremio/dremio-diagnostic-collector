@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.1] - 2024-02-07
+
+### Added
+* include `ddc.log` in the final diag tarball
+
 ## [1.0.0] - 2024-02-01
 
 ### Changed
