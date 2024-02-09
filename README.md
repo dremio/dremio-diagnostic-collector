@@ -93,17 +93,3 @@ This is because of a limitation of kubectl ( see https://github.com/kubernetes/k
 
 The `ddc.yaml` file is located next to your DDC binary and can be edited to fit your environment. The [default-ddc.yaml](default-ddc.yaml) documents the full list of available parameters.
 
-### Flags
-
-```sh
-Available Commands:
-  awselogs      Log only collect of AWSE from the coordinator node
-  completion    Generate the autocompletion script for the specified shell
-  help          Help about any command
-  local-collect retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support
-  version       Print the version number of DDC
-
-Flags:
-  
-
-```
