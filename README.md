@@ -1,5 +1,5 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector)
-![Coverage Status](https://img.shields.io/badge/Code_Coverage-71%25-yellow)
+![Coverage Status](https://img.shields.io/badge/Code_Coverage-73%5-yellow)
 
 
 Automated log and analytics collection for Dremio clusters
@@ -16,7 +16,7 @@ Download the [latest release binary](https://github.com/dremio/dremio-diagnostic
 
 1. Unzip the binary
 2. Open a terminal and change to the directory where you unzipped your binary
-3. Run the command `./ddc -h`. If you see the DDC command help, you are good to go.
+3. Run the command `./ddc help`. If you see the DDC command help, you are good to go.
 
 ### Dremio on Kubernetes
 
@@ -24,20 +24,15 @@ DDC connects via SSH or `kubectl` and collects a series of logs and files for Dr
 
 For Kubernetes deployments _(Requires `kubectl` cluster access to be configured)_:
 
-##### coordinator only
+##### default collection
 ```bash
-ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator 
-```
-    
-##### coordinator and executors
-```bash
-ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
+ddc --namespace mynamespace
 ```
       
 ##### to collect job profiles, system tables, kv reports and wlm (via REST API)
 _Requires Dremio admin privileges. Dremio PATs can be enabled by the support key `auth.personal-access-tokens.enabled`_
 ```bash
-ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor --dremio-pat-prompt
+ddc  -n mynamespace  --collect health-check
 ```
 
 ### Dremio on-prem
@@ -61,13 +56,13 @@ ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user
 ##### to collect job profiles, system tables, kv reports and wlm (via REST API)
 _Requires Dremio admin privileges. Dremio PATs can be enabled by the support key `auth.personal-access-tokens.enabled`_
 ```bash
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --dremio-pat-prompt
+ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --sudo-user dremio --ssh-user myuser --collect health-check
 ```    
     
 ##### to avoid using the /tmp folder on nodes
 
 ```bash
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --transfer-dir /mnt/lots_of_storage/
+ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --sudo-user dremio --ssh-user myuser --transfer-dir /mnt/lots_of_storage/
 ```
 
 ### Dremio AWSE
@@ -100,7 +95,6 @@ The `ddc.yaml` file is located next to your DDC binary and can be edited to fit 
 
 ### Flags
 
-
 ```sh
 Available Commands:
   awselogs      Log only collect of AWSE from the coordinator node
@@ -110,20 +104,6 @@ Available Commands:
   version       Print the version number of DDC
 
 Flags:
-  -c, --coordinator string             coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).
-      --coordinator-container string   for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators (default "dremio-master-coordinator,dremio-coordinator")
-      --ddc-yaml string                location of ddc.yaml that will be transferred to remote nodes for collection configuration (default "/Users/ryan.svihla/Documents/GitHub/dremio-diagnostic-collector/bin/ddc.yaml")
-  -t, --dremio-pat-prompt              Prompt for Dremio Personal Access Token (PAT)
-  -e, --executors string               either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).
-      --executors-container string     for use with -k8s flag: sets the container name to use to retrieve logs in the executors (default "dremio-executor")
-  -h, --help                           help for ddc
-  -k, --k8s                            use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --coordinator and --executors flags
-  -p, --kubectl-path string            where to find kubectl (default "kubectl")
-  -n, --namespace string               namespace to use for kubernetes pods (default "default")
-      --output-file string             name of tgz file to save the diagnostic collection to (default "diag.tgz")
-  -s, --ssh-key string                 location of ssh key to use to login
-  -u, --ssh-user string                user to use during ssh operations to login
-  -b, --sudo-user string               if any diagnostics commands need a sudo user (i.e. for jcmd)
-      --transfer-dir string            directory to use for communication between the local-collect command and this one (default "/tmp/ddc-20240112141658")
+  
 
 ```

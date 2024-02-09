@@ -31,6 +31,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
@@ -41,23 +42,20 @@ import (
 )
 
 // var scaleoutCoordinatorContainer string
-var coordinatorContainer string
-var executorsContainer string
 var coordinatorStr string
 var executorsStr string
 var sshKeyLoc string
 var sshUser string
-var promptForDremioPAT bool
 var transferDir string
 var ddcYamlLoc string
 
 var outputLoc string
 
 var kubectlPath string
-var isK8s bool
 var sudoUser string
 var namespace string
 var disableFreeSpaceCheck bool
+var collectionMode string
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -71,23 +69,18 @@ examples:
 
 for ssh based communication to VMs or Bare metal hardware:
 
-	# coordinator only
-	ddc --coordinator 10.0.0.19 --ssh-user myuser 
-	# coordinator and executors
-	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser 
-	# to collect job profiles, system tables, kv reports and wlm 
-	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser  --dremio-pat-prompt
-	# to avoid using the /tmp folder on nodes
-	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --transfer-dir /mnt/lots_of_storage/	
+	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio 
 
 for kubernetes deployments:
 
-	# coordinator only
-	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator 
-	# coordinator and executors
-	ddc --k8s --namespace mynamespace --coordinator app=dremio-coordinator --executors app=dremio-executor 
-	# to collect job profiles, system tables, kv reports and wlm 
-	ddc --k8s -n mynamespace -c app=dremio-coordinator -e app=dremio-executor --dremio-pat-prompt
+	# run against a specific namespace and retrieve 2 days of logs
+	ddc --namespace mynamespace
+
+	# run against a specific namespace with a full collection (includes jfr, ttop, jstack and 28 days of queries.json logs)
+	ddc --namespace mynamespace	--collect full
+
+	# run against a specific namespace with a Health Check (runs 2 threads and includes everything in a full collection plus collect 25,000 job profiles, system tables, kv reports and Work Load Manager (WLM) reports)
+	ddc --namespace mynamespace	--collec health-check
 `,
 	Run: func(c *cobra.Command, args []string) {
 
@@ -118,7 +111,7 @@ func startTicker() (stop func()) {
 	}
 }
 
-func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, k8sEnabled bool) error {
+func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs) error {
 	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
@@ -131,16 +124,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		0,
 		0,
 	)
-	err := validateParameters(collectionArgs, sshArgs, k8sEnabled)
-	if err != nil {
-		fmt.Println("COMMAND HELP TEXT:")
-		fmt.Println("")
-		helpErr := RootCmd.Help()
-		if helpErr != nil {
-			return fmt.Errorf("unable to print help %w", helpErr)
-		}
-		return fmt.Errorf("invalid command flag detected: %w", err)
-	}
+	consoleprint.UpdateCollectionMode(collectionArgs.CollectionMode)
 	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
@@ -152,7 +136,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	defer cs.Close()
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
-	if k8sEnabled {
+	if kubeArgs.Namespace != "" {
 		simplelog.Info("using Kubernetes kubectl based collection")
 		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
 		consoleprint.UpdateRuntime(
@@ -185,6 +169,16 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			}
 		}
 	} else {
+		err := validateSSHParameters(sshArgs)
+		if err != nil {
+			fmt.Println("COMMAND HELP TEXT:")
+			fmt.Println("")
+			helpErr := RootCmd.Help()
+			if helpErr != nil {
+				return fmt.Errorf("unable to print help %w", helpErr)
+			}
+			return fmt.Errorf("invalid command flag detected: %w", err)
+		}
 		simplelog.Info("using SSH based collection")
 		collectorStrategy = ssh.NewCmdSSHActions(sshArgs)
 	}
@@ -201,13 +195,13 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	return nil
 }
 
-func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
+func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}, error) {
 	emptyOverrides := make(map[string]string)
 	confData, err := conf.ParseConfig(ddcYaml, emptyOverrides)
 	if err != nil {
 		return make(map[string]interface{}), err
 	}
-
+	conf.SetViperDefaults(confData, "", 0, collectionMode)
 	simplelog.Infof("parsed configuration for %v follows", ddcYaml)
 	for k, v := range confData {
 		if k == conf.KeyDremioPatToken && v != "" {
@@ -218,7 +212,7 @@ func ValidateAndReadYaml(ddcYaml string) (map[string]interface{}, error) {
 	}
 
 	// set defaults so we get an accurate reading of if these will be enabled or not
-	conf.SetViperDefaults(confData, "", 0)
+	conf.SetViperDefaults(confData, "", 0, collects.FullCollection)
 	return confData, nil
 }
 
@@ -247,7 +241,7 @@ func Execute(args []string) error {
 
 		simplelog.Info(versions.GetCLIVersion())
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
-		confData, err := ValidateAndReadYaml(ddcYamlLoc)
+		confData, err := ValidateAndReadYaml(ddcYamlLoc, collectionMode)
 		if err != nil {
 			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
 		}
@@ -262,7 +256,7 @@ func Execute(args []string) error {
 			}
 		}
 		dremioPAT := confData[conf.KeyDremioPatToken].(string)
-		if promptForDremioPAT {
+		if collectionMode == collects.HealthCheckCollection {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
 				return fmt.Errorf("unable to get PAT due to: %v", err)
@@ -302,10 +296,7 @@ func Execute(args []string) error {
 		stop := startTicker()
 		defer stop()
 		collectionArgs := collection.Args{
-			CoordinatorStr:        coordinatorStr,
-			ExecutorsStr:          executorsStr,
 			OutputLoc:             filepath.Clean(outputLoc),
-			SudoUser:              sudoUser,
 			DDCfs:                 helpers.NewRealFileSystem(),
 			DremioPAT:             dremioPAT,
 			TransferDir:           transferDir,
@@ -313,18 +304,20 @@ func Execute(args []string) error {
 			Enabled:               enabled,
 			Disabled:              disabled,
 			DisableFreeSpaceCheck: disableFreeSpaceCheck,
+			CollectionMode:        collectionMode,
 		}
 		sshArgs := ssh.Args{
-			SSHKeyLoc: sshKeyLoc,
-			SSHUser:   sshUser,
+			SSHKeyLoc:      sshKeyLoc,
+			SSHUser:        sshUser,
+			SudoUser:       sudoUser,
+			ExecutorStr:    executorsStr,
+			CoordinatorStr: coordinatorStr,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace:            namespace,
-			CoordinatorContainer: coordinatorContainer,
-			ExecutorsContainer:   executorsContainer,
-			KubectlPath:          kubectlPath,
+			Namespace:   namespace,
+			KubectlPath: kubectlPath,
 		}
-		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, isK8s); err != nil {
+		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs); err != nil {
 			consoleprint.UpdateResult(err.Error())
 		} else {
 			consoleprint.UpdateResult(fmt.Sprintf("complete at %v", time.Now().Format(time.RFC1123)))
@@ -360,18 +353,20 @@ func sshDefault() (string, error) {
 func init() {
 	// command line flags
 
-	RootCmd.Flags().StringVar(&coordinatorContainer, "coordinator-container", "dremio-master-coordinator,dremio-coordinator", "for use with -k8s flag: sets the container name to use to retrieve logs in the coordinators")
-	RootCmd.Flags().StringVar(&executorsContainer, "executors-container", "dremio-executor", "for use with -k8s flag: sets the container name to use to retrieve logs in the executors")
-	RootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "coordinator to connect to for collection. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
-	RootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "either a common separated list or a ip range of executors nodes to connect to. With ssh set a list of ip addresses separated by commas. In K8s use a label that matches to the pod(s).")
-	RootCmd.Flags().StringVarP(&sshKeyLoc, "ssh-key", "s", "", "location of ssh key to use to login")
-	RootCmd.Flags().StringVarP(&sshUser, "ssh-user", "u", "", "user to use during ssh operations to login")
-	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "default", "namespace to use for kubernetes pods")
-	RootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "kubectl", "where to find kubectl")
-	RootCmd.Flags().BoolVarP(&isK8s, "k8s", "k", false, "use kubernetes to retrieve the diagnostics instead of ssh, instead of hosts pass in labels to the --coordinator and --executors flags")
-	RootCmd.Flags().BoolVarP(&promptForDremioPAT, "dremio-pat-prompt", "t", false, "Prompt for Dremio Personal Access Token (PAT)")
+	// ssh flags
+	RootCmd.Flags().StringVarP(&coordinatorStr, "coordinator", "c", "", "SSH ONLY: set a list of ip addresses separated by commas")
+	RootCmd.Flags().StringVarP(&executorsStr, "executors", "e", "", "SSH ONLY: set a list of ip addresses separated by commas")
+	RootCmd.Flags().StringVarP(&sshKeyLoc, "ssh-key", "s", "", "SSH ONLY: of ssh key to use to login")
+	RootCmd.Flags().StringVarP(&sshUser, "ssh-user", "u", "", "SSH ONLY: user to use during ssh operations to login")
+	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "SSH ONLY: if any diagnostics commands need a sudo user (i.e. for jcmd)")
+
+	// k8s flags
+	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "", "K8S ONLY: namespace to use for kubernetes pods")
+	RootCmd.Flags().StringVarP(&kubectlPath, "kubectl-path", "p", "K8S ONLY: kubectl", "where to find kubectl")
+
+	// shared flags
+	RootCmd.Flags().StringVar(&collectionMode, "collect", "quick", "type of collection: 'quick'- 2 days of logs (no ttop, jstack or jfr). 'full' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'full' + WLM, KV Store Report, 25,000 Job Profiles")
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
-	RootCmd.Flags().StringVarP(&sudoUser, "sudo-user", "b", "", "if any diagnostics commands need a sudo user (i.e. for jcmd)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 	execLoc, err := os.Executable()
@@ -388,21 +383,12 @@ func init() {
 	RootCmd.AddCommand(awselogs.AWSELogsCmd)
 }
 
-func validateParameters(args collection.Args, sshArgs ssh.Args, isK8s bool) error {
-	if args.CoordinatorStr == "" {
-		if isK8s {
-			return errors.New("the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\"")
-		}
-		return errors.New("the coordinator string was empty you must pass a single host or a comma separated lists of hosts to --coordinator or -c arguments. Example: -e 192.168.64.12,192.168.65.10")
+func validateSSHParameters(sshArgs ssh.Args) error {
+	if sshArgs.SSHKeyLoc == "" {
+		return errors.New("the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa")
 	}
-
-	if !isK8s {
-		if sshArgs.SSHKeyLoc == "" {
-			return errors.New("the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa")
-		}
-		if sshArgs.SSHUser == "" {
-			return errors.New("the ssh user was empty, pass --ssh-user or -u with the user name you want to use to get past this error. Example --ssh-user ubuntu")
-		}
+	if sshArgs.SSHUser == "" {
+		return errors.New("the ssh user was empty, pass --ssh-user or -u with the user name you want to use to get past this error. Example --ssh-user ubuntu")
 	}
 	return nil
 }

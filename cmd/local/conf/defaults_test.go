@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 )
 
 func setupTestSetViperDefaults() (map[string]interface{}, string, int) {
@@ -27,7 +28,7 @@ func setupTestSetViperDefaults() (map[string]interface{}, string, int) {
 	defaultCaptureSeconds := 30
 	confData := make(map[string]interface{})
 	// Run the function.
-	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds)
+	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds, collects.FullCollection)
 
 	return confData, hostName, defaultCaptureSeconds
 }

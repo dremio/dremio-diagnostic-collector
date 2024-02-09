@@ -12,20 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//  Copyright 2023 Dremio Corporation
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // kubernetes package provides access to log collections on k8s
 package kubernetes
 
@@ -40,19 +26,17 @@ import (
 
 func TestKubectlExec(t *testing.T) {
 	namespace := "testns"
-	podName := "pod"
+	podName := "pod1"
 	cli := &tests.MockCli{
-		StoredResponse: []string{"success"},
-		StoredErrors:   []error{nil},
+		StoredResponse: []string{"dremio-executor", "success"},
+		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
 	}
-	out, err := k.HostExecute(false, podName, false, "ls", "-l")
+	out, err := k.HostExecute(false, podName, "ls", "-l")
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -61,28 +45,33 @@ func TestKubectlExec(t *testing.T) {
 		t.Errorf("expected success but got %v", out)
 	}
 	calls := cli.Calls
-	if len(calls) != 1 {
+	if len(calls) != 2 {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "-c", "dremio-executor", podName, "--", "ls", "-l"}
+	var expectedCall []string
+	expectedCall = []string{"kubectl", "-n", "testns", "get", "pods", podName, "-o", "jsonpath={.spec.containers[0].name}"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
+	expectedCall = []string{"kubectl", "exec", "-n", namespace, "-c", "dremio-executor", podName, "--", "ls", "-l"}
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
+	}
+
 }
 
 func TestKubectlSearch(t *testing.T) {
 	namespace := "testns"
-	labelName := "myPods"
 	cli := &tests.MockCli{
-		StoredResponse: []string{"pod/pod1\npod/pod2\npod/pod3\n"},
-		StoredErrors:   []error{nil},
+		StoredResponse: []string{"pod/pod1\npod/pod2\npod/pod3\n", "dremio-coordinator", "dremio-coordinator", "dremio-coordinator"},
+		StoredErrors:   []error{nil, nil, nil, nil},
 	}
 	k := KubectlK8sActions{
 		cli:         cli,
 		kubectlPath: "kubectl",
 		namespace:   namespace,
 	}
-	podNames, err := k.FindHosts(labelName)
+	podNames, err := k.GetCoordinators()
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -94,10 +83,10 @@ func TestKubectlSearch(t *testing.T) {
 		t.Errorf("expected %v call but got %v", expectedPods, podNames)
 	}
 	calls := cli.Calls
-	if len(calls) != 1 {
-		t.Errorf("expected 1 call but got %v", len(calls))
+	if len(calls) != 4 {
+		t.Errorf("expected 4 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "-l", labelName, "-o", "name"}
+	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "-l", "role=dremio-cluster-pod", "-o", "name"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
@@ -109,17 +98,15 @@ func TestKubectCopyFrom(t *testing.T) {
 	source := filepath.Join(string(filepath.Separator), "podroot", "test.log")
 	destination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
 	cli := &tests.MockCli{
-		StoredResponse: []string{"success"},
-		StoredErrors:   []error{nil},
+		StoredResponse: []string{"dremio-executor", "success"},
+		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-master-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
 	}
-	out, err := k.CopyFromHost(podName, false, source, destination)
+	out, err := k.CopyFromHost(podName, source, destination)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -128,12 +115,12 @@ func TestKubectCopyFrom(t *testing.T) {
 		t.Errorf("expected success but got %v", out)
 	}
 	calls := cli.Calls
-	if len(calls) != 1 {
-		t.Errorf("expected 1 call but got %v", len(calls))
+	if len(calls) != 2 {
+		t.Errorf("expected 2 call but got %v", len(calls))
 	}
 	expectedCall := []string{"kubectl", "cp", "-n", namespace, "-c", "dremio-executor", fmt.Sprintf("%v:%v", podName, source), destination}
-	if !reflect.DeepEqual(calls[0], expectedCall) {
-		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
 }
 
@@ -143,17 +130,15 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	source := filepath.Join("podroot", "test.log")
 	destination := filepath.Join("C:", string(filepath.Separator), "mydir", "test.log")
 	cli := &tests.MockCli{
-		StoredResponse: []string{"success"},
-		StoredErrors:   []error{nil},
+		StoredResponse: []string{"dremio-executor", "success"},
+		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
 	}
-	out, err := k.CopyFromHost(podName, false, source, destination)
+	out, err := k.CopyFromHost(podName, source, destination)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -162,27 +147,23 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 		t.Errorf("expected success but got %v", out)
 	}
 	calls := cli.Calls
-	if len(calls) != 1 {
-		t.Errorf("expected 1 call but got %v", len(calls))
+	if len(calls) != 2 {
+		t.Errorf("expected 2 call but got %v", len(calls))
 	}
 	//we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
 	expectedDestination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
 	expectedCall := []string{"kubectl", "cp", "-n", namespace, "-c", "dremio-executor", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
-	if !reflect.DeepEqual(calls[0], expectedCall) {
-		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
 }
 
 func TestNewKubectlK8sActions(t *testing.T) {
 	kubectlPath := "kubectlPath"
-	coordinatorContainer := "main"
-	executorContainer := "exec"
 	namespace := "mynamespace"
 	actions := NewKubectlK8sActions(KubeArgs{
-		KubectlPath:          kubectlPath,
-		CoordinatorContainer: coordinatorContainer,
-		ExecutorsContainer:   executorContainer,
-		Namespace:            namespace,
+		KubectlPath: kubectlPath,
+		Namespace:   namespace,
 	})
 	if actions.namespace != namespace {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", namespace, actions.namespace)
@@ -190,70 +171,5 @@ func TestNewKubectlK8sActions(t *testing.T) {
 
 	if actions.kubectlPath != kubectlPath {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", kubectlPath, actions.kubectlPath)
-	}
-
-	if actions.coordinatorContainer != coordinatorContainer {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", coordinatorContainer, actions.coordinatorContainer)
-	}
-
-	if actions.executorContainer != executorContainer {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", executorContainer, actions.executorContainer)
-	}
-}
-
-func TestGetContainerNameWhenIsMaster(t *testing.T) {
-	namespace := "testns"
-	cli := &tests.MockCli{
-		StoredResponse: []string{"dremio-master-coordinator dremio-coordinator"},
-		StoredErrors:   []error{nil},
-	}
-	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-master-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
-	}
-	containerName := k.getContainerName("dremio-master-0", true)
-	if containerName != k.coordinatorContainer {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", k.coordinatorContainer, containerName)
-	}
-}
-
-func TestGetContainerNameWhenIsCoordinator(t *testing.T) {
-	namespace := "testns"
-	cli := &tests.MockCli{
-		StoredResponse: []string{"dremio-master-coordintor dremio-coordinator"},
-		StoredErrors:   []error{nil},
-	}
-	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
-	}
-	containerName := k.getContainerName("dremio-coordinator-0", true)
-	if containerName != k.coordinatorContainer {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", k.coordinatorContainer, containerName)
-	}
-}
-
-func TestGetContainerNameWhenIsExecutor(t *testing.T) {
-	namespace := "testns"
-	cli := &tests.MockCli{
-		StoredResponse: []string{"dremio-executor"},
-		StoredErrors:   []error{nil},
-	}
-	k := KubectlK8sActions{
-		cli:                  cli,
-		kubectlPath:          "kubectl",
-		coordinatorContainer: "dremio-coordinator",
-		executorContainer:    "dremio-executor",
-		namespace:            namespace,
-	}
-	containerName := k.getContainerName("dremio-executor-0", false)
-	if containerName != k.executorContainer {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", k.executorContainer, containerName)
 	}
 }

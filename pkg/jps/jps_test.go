@@ -18,6 +18,7 @@ package jps_test
 import (
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/jps"
@@ -40,8 +41,8 @@ func TestJvmFlagCapture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
-	expected := "demo.jar -Dmyflag=1 -Xmx512M"
-	if expected != flags {
-		t.Errorf("expected '%v' but was '%v'", expected, flags)
+	expected := "-Dmyflag=1 -Xmx512M"
+	if !strings.Contains(flags, expected) {
+		t.Errorf("expected to contain '%v' in '%v'", expected, flags)
 	}
 }

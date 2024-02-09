@@ -17,37 +17,34 @@ package kubernetes
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type KubeArgs struct {
-	Namespace            string
-	CoordinatorContainer string
-	ExecutorsContainer   string
-	KubectlPath          string
+	Namespace   string
+	KubectlPath string
 }
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
 func NewKubectlK8sActions(kubeArgs KubeArgs) *KubectlK8sActions {
 	return &KubectlK8sActions{
-		cli:                  &cli.Cli{},
-		kubectlPath:          kubeArgs.KubectlPath,
-		coordinatorContainer: kubeArgs.CoordinatorContainer,
-		executorContainer:    kubeArgs.ExecutorsContainer,
-		namespace:            kubeArgs.Namespace,
+		cli:         &cli.Cli{},
+		kubectlPath: kubeArgs.KubectlPath,
+		namespace:   kubeArgs.Namespace,
 	}
 }
 
 // KubectlK8sActions provides a way to collect and copy files using kubectl
 type KubectlK8sActions struct {
-	cli                  cli.CmdExecutor
-	kubectlPath          string
-	coordinatorContainer string
-	executorContainer    string
-	namespace            string
+	cli         cli.CmdExecutor
+	kubectlPath string
+	namespace   string
 }
 
 func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
@@ -55,97 +52,109 @@ func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
 	return strings.TrimPrefix(rawDest, "C:")
 }
 
-func (c *KubectlK8sActions) getContainerName(podName string, isCoordinator bool) string {
-	if isCoordinator {
-		kubectlArgs := []string{c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
-		conts, _ := c.cli.Execute(false, kubectlArgs...)
-		containers := strings.Split(conts, " ")
-		expectedContainers := strings.Split(c.coordinatorContainer, ",")
-		for _, container := range containers {
-			for _, expectedContainer := range expectedContainers {
-				if container == expectedContainer {
-					return container
-				}
-			}
-
-		}
+func (c *KubectlK8sActions) getContainerName(podName string) (string, error) {
+	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[0].name}`)
+	if err != nil {
+		return "", err
 	}
-	// All other pod types are executors
-	return c.executorContainer
+	return strings.TrimSpace(conts), nil
 }
 
 func (c *KubectlK8sActions) Name() string {
 	return "Kubectl"
 }
 
-func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, isCoordinator bool, args ...string) (err error) {
-	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), hostString, "--"}
+func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, args ...string) (err error) {
+	container, err := c.getContainerName(hostString)
+	if err != nil {
+		return fmt.Errorf("unable to get container name: %v", err)
+	}
+	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", container, hostString, "--"}
 	kubectlArgs = append(kubectlArgs, args...)
 	return c.cli.ExecuteAndStreamOutput(mask, output, kubectlArgs...)
 }
 
-func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, isCoordinator bool, args ...string) (out string, err error) {
-	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), hostString, "--"}
-	kubectlArgs = append(kubectlArgs, args...)
-	return c.cli.Execute(mask, kubectlArgs...)
+func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
+	var outBuilder strings.Builder
+	writer := func(line string) {
+		outBuilder.WriteString(line)
+	}
+	err = c.HostExecuteAndStream(mask, hostString, writer, args...)
+	out = outBuilder.String()
+	return
 }
 
-func (c *KubectlK8sActions) CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
+func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	container, err := c.getContainerName(hostString)
+	if err != nil {
+		return "", fmt.Errorf("unable to get container name: %v", err)
+	}
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
-func (c *KubectlK8sActions) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
+func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
-	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
-}
-
-func (c *KubectlK8sActions) CopyToHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
+	container, err := c.getContainerName(hostString)
+	if err != nil {
+		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
-func (c *KubectlK8sActions) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
-	}
-	// We dont have any sudo user in the container so no addition of sudo commands used
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", c.getContainerName(hostString, isCoordinator), c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
+	return c.SearchPods(func(container string) bool {
+		return strings.Contains(container, "coordinator")
+	})
 }
 
-func (c *KubectlK8sActions) FindHosts(searchTerm string) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", searchTerm, "-o", "name")
+func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
+	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", "role=dremio-cluster-pod", "-o", "name")
 	if err != nil {
 		return []string{}, err
 	}
 	rawPods := strings.Split(out, "\n")
 	var pods []string
+	var lock sync.RWMutex
+	var wg sync.WaitGroup
 	for _, pod := range rawPods {
-		if pod == "" {
+		podCopy := pod
+		if podCopy == "" {
 			continue
 		}
-		rawPod := strings.TrimSpace(pod)
-		//log.Print(rawPod)
-		pod := rawPod[4:]
-		//log.Print(pod)
-		pods = append(pods, pod)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rawPod := strings.TrimSpace(podCopy)
+			podCopy := rawPod[4:]
+			container, err := c.getContainerName(podCopy)
+			if err != nil {
+				simplelog.Errorf("uanble to get pod name (%v): %v", podCopy, err)
+				return
+			}
+			if compare(container) {
+				lock.Lock()
+				pods = append(pods, podCopy)
+				lock.Unlock()
+			}
+		}()
 	}
+	wg.Wait()
+	sort.Strings(pods)
 	return pods, nil
+}
+func (c *KubectlK8sActions) GetExecutors() (podName []string, err error) {
+	return c.SearchPods(func(container string) bool {
+		return container == "dremio-executor"
+	})
 }
 
 func (c *KubectlK8sActions) HelpText() string {

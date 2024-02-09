@@ -18,25 +18,28 @@ package ssh
 import (
 	"bufio"
 	"fmt"
-	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/google/uuid"
 )
 
 type Args struct {
-	SSHKeyLoc string
-	SSHUser   string
+	SSHKeyLoc      string
+	SSHUser        string
+	SudoUser       string
+	ExecutorStr    string
+	CoordinatorStr string
 }
 
 func NewCmdSSHActions(sshArgs Args) *CmdSSHActions {
 	return &CmdSSHActions{
-		cli:     &cli.Cli{},
-		sshKey:  sshArgs.SSHKeyLoc,
-		sshUser: sshArgs.SSHUser,
+		cli:            &cli.Cli{},
+		sshKey:         sshArgs.SSHKeyLoc,
+		sshUser:        sshArgs.SSHUser,
+		sudoUser:       sshArgs.SudoUser,
+		executorStr:    sshArgs.ExecutorStr,
+		coordinatorStr: sshArgs.CoordinatorStr,
 	}
 }
 
@@ -44,114 +47,67 @@ func NewCmdSSHActions(sshArgs Args) *CmdSSHActions {
 // then assumes ssh public key auth is in place since it has no support for using
 // password based authentication
 type CmdSSHActions struct {
-	cli     cli.CmdExecutor
-	sshKey  string
-	sshUser string
+	cli            cli.CmdExecutor
+	sshKey         string
+	sshUser        string
+	sudoUser       string
+	executorStr    string
+	coordinatorStr string
 }
 
 func (c *CmdSSHActions) Name() string {
 	return "SSH/SCP"
 }
 
-func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, _ bool, args ...string) (err error) {
+func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, args ...string) (err error) {
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostString))
+	sshArgs = c.addSSHUser(sshArgs)
 	sshArgs = append(sshArgs, strings.Join(args, " "))
 	return c.cli.ExecuteAndStreamOutput(mask, output, sshArgs...)
 }
 
-func (c *CmdSSHActions) CopyFromHost(hostName string, _ bool, source, destination string) (string, error) {
+func (c *CmdSSHActions) CopyFromHost(hostName, source, destination string) (string, error) {
 	return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, source), destination)
 }
 
-func (c *CmdSSHActions) CopyFromHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
-	sourceFileName := filepath.Base(source)
-	// create a tmp dir for scp
-	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
-	out, err := c.HostExecute(false, hostName, false, "mkdir", "-p", tmpDir)
+func (c *CmdSSHActions) CopyToHost(hostName, source, destination string) (string, error) {
+	if c.sudoUser == "" {
+		return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+	}
+	// have to do something more complex in this case and _unfortunately_ copy to the /tmp dir
+	tmpFile := "/tmp/transfer_file"
+	out, err := c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFile))
 	if err != nil {
 		return out, err
 	}
-
-	// cleanup the tmp dir
 	defer func() {
-		_, err = c.HostExecute(false, hostName, false, "rm", "-rf", tmpDir)
+		out, err := c.HostExecute(false, hostName, "rm", tmpFile)
 		if err != nil {
-			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
+			simplelog.Warningf("failed to remove file %v on node %v: %v - %v", tmpFile, hostName, err, out)
 		}
 	}()
-	// first move to tmp dir from source as sudo
-	tmpFilePath := path.Join(tmpDir, sourceFileName)
-	out, err = c.HostExecuteSudo(false, hostName, sudoUser, "cp", source, tmpFilePath)
-	if err != nil {
-		return out, err
-	}
-	// next copy from tmp dir as non-sudo
-	return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", tmpFilePath, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+	// now we can move it to it's final destination
+	return c.HostExecute(false, hostName, "cp", tmpFile, destination)
 }
 
-func (c *CmdSSHActions) CopyToHost(hostName string, _ bool, source, destination string) (string, error) {
-	return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
+func (c *CmdSSHActions) HostExecute(mask bool, hostName string, args ...string) (string, error) {
+	var out strings.Builder
+	writer := func(line string) {
+		out.WriteString(line)
+	}
+	err := c.HostExecuteAndStream(mask, hostName, writer, args...)
+	return out.String(), err
 }
 
-func (c *CmdSSHActions) CopyToHostSudo(hostName string, _ bool, sudoUser, source, destination string) (string, error) {
-	sourceFileName := filepath.Base(source)
-	// create a tmp dir for scp
-	tmpDir := path.Join("/tmp/", "ddc-scp-"+uuid.New().String())
-	out, err := c.HostExecute(false, hostName, false, "mkdir", "-p", tmpDir)
-	if err != nil {
-		return out, err
+func (c *CmdSSHActions) addSSHUser(arguments []string) []string {
+	if c.sudoUser == "" {
+		return arguments
 	}
-	// cleanup the tmp dir
-	defer func() {
-		_, err = c.HostExecute(false, hostName, false, "rm", "-rf", tmpDir)
-		if err != nil {
-			simplelog.Errorf("host %v unable to remove tmp dir %v", hostName, tmpDir)
-		}
-	}()
-	tmpFilePath := path.Join(tmpDir, sourceFileName)
-	// first copy to tmp dir as non-sudo
-
-	out, err = c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFilePath))
-	if err != nil {
-		return out, err
-	}
-
-	// chmod dir for sudo user to be able to read it even if the two users cannot
-	out, err = c.HostExecute(false, hostName, false, "chmod", "777", "-R", tmpDir)
-	if err != nil {
-		return out, err
-	}
-
-	// next move from tmp dir to destination as sudo
-	return c.HostExecuteSudo(false, hostName, sudoUser, "cp", tmpFilePath, destination)
-}
-
-func (c *CmdSSHActions) HostExecute(mask bool, hostName string, _ bool, args ...string) (string, error) {
-	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
-	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
-	sshArgs = append(sshArgs, strings.Join(args, " "))
-	out, err := c.cli.Execute(mask, sshArgs...)
-	if err != nil {
-		return out, err
-	}
-	//return CleanOut(out), nil
-	return out, nil
-}
-
-func (c *CmdSSHActions) HostExecuteSudo(mask bool, hostName string, sudoUser string, args ...string) (string, error) {
-	sudoArgs := []string{"sudo", "-u", sudoUser}
-	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
-	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostName))
-	sshArgs = append(sshArgs, strings.Join(sudoArgs, " "))
-	sshArgs = append(sshArgs, strings.Join(args, " "))
-	out, err := c.cli.Execute(mask, sshArgs...)
-	if err != nil {
-		return out, err
-	}
-	//return CleanOut(out), nil
-	return out, nil
-
+	arguments = append(arguments, "sudo")
+	arguments = append(arguments, "-u")
+	arguments = append(arguments, c.sudoUser)
+	return arguments
 }
 
 func CleanOut(out string) string {
@@ -172,7 +128,15 @@ func CleanOut(out string) string {
 	return cleanedOut
 }
 
-func (c *CmdSSHActions) FindHosts(searchTerm string) (hosts []string, err error) {
+func (c *CmdSSHActions) GetExecutors() (hosts []string, err error) {
+	return c.findHosts(c.executorStr)
+}
+
+func (c *CmdSSHActions) GetCoordinators() (hosts []string, err error) {
+	return c.findHosts(c.coordinatorStr)
+}
+
+func (c *CmdSSHActions) findHosts(searchTerm string) (hosts []string, err error) {
 	rawHosts := strings.Split(searchTerm, ",")
 	for _, host := range rawHosts {
 		if host == "" {

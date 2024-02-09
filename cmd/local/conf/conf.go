@@ -81,7 +81,6 @@ type CollectConf struct {
 	collectAuditLogs           bool
 	collectJVMFlags            bool
 	captureHeapDump            bool
-	acceptCollectionConsent    bool
 	isDremioCloud              bool
 	dremioCloudProjectID       string
 	dremioCloudAppEndpoint     string
@@ -212,8 +211,8 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	if err != nil {
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
-
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds)
+	collectionMode := GetString(confData, KeyCollectionMode)
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)
 
 	c := &CollectConf{}
 	c.systemtables = SystemTableList()
@@ -249,9 +248,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	// simplelog.InitLogger(verbose)
 	// we use dremio cloud option here to know if we should validate the log and conf dirs or not
 	c.isDremioCloud = GetBool(confData, KeyIsDremioCloud)
-
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
-	c.acceptCollectionConsent = GetBool(confData, KeyAcceptCollectionConsent)
 	c.dremioCloudProjectID = GetString(confData, KeyDremioCloudProjectID)
 	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
 	c.collectAccessLogs = GetBool(confData, KeyCollectAccessLog)
@@ -806,10 +803,6 @@ func (c *CollectConf) DremioEndpoint() string {
 
 func (c *CollectConf) DremioPATToken() string {
 	return c.dremioPATToken
-}
-
-func (c *CollectConf) AcceptCollectionConsent() bool {
-	return c.acceptCollectionConsent
 }
 
 func (c *CollectConf) IsDremioCloud() bool {

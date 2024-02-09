@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.0.0] - UNRELEASED
+
+## Removed
+
+* Removed many of the command line flags as they were little used, ddc.yaml still provides all the options needed
+* the -k and --k8s flags are now inferred by the use of the --namespace flag
+
+### Added
+
+* Added --collect with the available values of quick, full, health-check default is quick. 
+  * `--collect quick` has no jfr, jstack, ttop and only 2 days of logs and queries.json
+  * `--collect full` is the old default (jfr, ttop, jstack, 28 days of queries.json and 7 days of logs)
+  * `--collect healthcheck` is full + fires the pat prompt which adds job profile collection
+
+### Changed 
+
+* k8s collection now no longer takes -c and -e flags, and only a full cluster capture is supported with k8s
+
 ## [1.0.1] - 2024-02-07
 
 ### Added
@@ -458,6 +476,8 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.1...v2.0.0
+[1.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.1...v1.0.0
 [0.9.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.8.3...v0.9.0

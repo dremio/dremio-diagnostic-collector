@@ -15,21 +15,31 @@
 // package tests provides helper functions and mocks for running tests
 package tests
 
-import "github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+import (
+	"sync"
+
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+)
 
 type MockCli struct {
 	Calls          [][]string
 	StoredResponse []string
 	StoredErrors   []error
+	lock           sync.RWMutex
 }
 
 func (m *MockCli) Execute(_ bool, args ...string) (out string, err error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.Calls = append(m.Calls, args)
 	length := len(m.Calls)
+
 	return m.StoredResponse[length-1], m.StoredErrors[length-1]
 }
 
 func (m *MockCli) ExecuteAndStreamOutput(_ bool, output cli.OutputHandler, args ...string) (err error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 	m.Calls = append(m.Calls, args)
 	length := len(m.Calls)
 	output(m.StoredResponse[length-1])

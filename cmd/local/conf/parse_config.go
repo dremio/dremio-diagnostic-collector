@@ -41,7 +41,6 @@ func ParseConfig(ddcYamlLoc string, overrides map[string]string) (map[string]int
 	}
 
 	simplelog.Infof("conf %v parsed successfully", absPath)
-
 	for k, v := range overrides {
 		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
 		if v == "\"\"" {

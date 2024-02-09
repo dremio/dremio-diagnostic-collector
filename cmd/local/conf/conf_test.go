@@ -275,10 +275,6 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("Expected DisableRESTAPI to be true, got false")
 	}
 
-	if cfg.AcceptCollectionConsent() != true {
-		t.Errorf("Expected AcceptCollectionConsent to be true, got false")
-	}
-
 	if cfg.CollectAccelerationLogs() != true {
 		t.Errorf("Expected CollectAccelerationLogs to be true, got false")
 	}

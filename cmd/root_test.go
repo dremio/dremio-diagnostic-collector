@@ -25,6 +25,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -42,32 +43,28 @@ func TestSSHDefault(t *testing.T) {
 }
 
 func TestValidateParameters(t *testing.T) {
-	tc := makeTestCollection()
-	tc.CoordinatorStr = ""
-	err := validateParameters(tc, ssh.Args{
+	err := validateSSHParameters(ssh.Args{
 		SSHKeyLoc: "/home/dremio/.ssh",
 		SSHUser:   "dremio",
-	}, true)
-	expectedError := "the coordinator string was empty you must pass a label that will match your coordinators --coordinator or -c arguments. Example: -c \"mylabel=coordinator\""
-	if expectedError != err.Error() {
-		t.Errorf("expected: %v but was %v", expectedError, err.Error())
+		SudoUser:  "",
+	})
+	if err != nil {
+		t.Errorf("expected: nil but was %v", err.Error())
 	}
 
-	tc = makeTestCollection()
-	err = validateParameters(tc, ssh.Args{
+	err = validateSSHParameters(ssh.Args{
 		SSHKeyLoc: "",
 		SSHUser:   "dremio",
-	}, false)
-	expectedError = "the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa"
+	})
+	expectedError := "the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa"
 	if expectedError != err.Error() {
 		t.Errorf("expected: %v but was %v", expectedError, err.Error())
 	}
 
-	tc = makeTestCollection()
-	err = validateParameters(tc, ssh.Args{
+	err = validateSSHParameters(ssh.Args{
 		SSHKeyLoc: "/home/dremio/.ssh",
 		SSHUser:   "",
-	}, false)
+	})
 	expectedError = "the ssh user was empty, pass --ssh-user or -u with the user name you want to use to get past this error. Example --ssh-user ubuntu"
 
 	if expectedError != err.Error() {
@@ -91,9 +88,7 @@ func TestExecute(t *testing.T) {
 // Set of args for other tests
 func makeTestCollection() collection.Args {
 	testCollection := collection.Args{
-		CoordinatorStr: "dremio-master-0",
-		ExecutorsStr:   "dremio-executor-0",
-		OutputLoc:      "/tmp/diags",
+		OutputLoc: "/tmp/diags",
 	}
 	return testCollection
 }
@@ -147,7 +142,7 @@ func TestAllSubCommandsAreWiredUp(t *testing.T) {
 func TestValidateDDCYamlValid(t *testing.T) {
 
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
-	_, err := ValidateAndReadYaml(valid)
+	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
 	if err != nil {
 		t.Errorf("expected no error for valid yaml: %v", err)
 	}
@@ -155,7 +150,7 @@ func TestValidateDDCYamlValid(t *testing.T) {
 
 func TestValidateDDCYamlNotPresent(t *testing.T) {
 	valid := filepath.Join("testdata", "not-found-anwhere.yaml")
-	_, err := ValidateAndReadYaml(valid)
+	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
 	if err == nil {
 		t.Error("expected an error for missing yaml")
 	}
@@ -163,7 +158,7 @@ func TestValidateDDCYamlNotPresent(t *testing.T) {
 
 func TestValidateDDCYamlNotValid(t *testing.T) {
 	valid := filepath.Join("testdata", "ddc-invalid.yaml")
-	_, err := ValidateAndReadYaml(valid)
+	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
 	if err == nil {
 		t.Errorf("expected an error for invalid yaml: %v", err)
 	}
@@ -183,7 +178,7 @@ func TestValidateDDCYamlMaskPAT(t *testing.T) {
 		simplelog.InitLoggerWithFile(4, filepath.Join(os.TempDir(), "ddc.log"))
 	}()
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
-	_, err := ValidateAndReadYaml(valid)
+	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
 	if err != nil {
 		t.Errorf("expected no error for valid yaml: %v", err)
 	}

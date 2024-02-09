@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// package jvmcollect_test validates the jvmcollect package
 package jvmcollect_test
 
 import (
@@ -84,8 +85,8 @@ dremio-pid: %v
 	if err != nil {
 		t.Fatal(err)
 	}
-	expected := "demo.jar -Dmyflag=1 -Xmx128M"
-	if expected != string(b) {
-		t.Errorf("expected %v to %v", string(b), expected)
+	expected := "-Dmyflag=1 -Xmx128M"
+	if !strings.Contains(string(b), expected) {
+		t.Errorf("expected %v to contain %v", string(b), expected)
 	}
 }

@@ -34,7 +34,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/configcollect"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/consent"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/nodeinfocollect"
@@ -558,10 +557,6 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	}
 
 	fmt.Println("looking for logs in: " + c.DremioLogDir())
-	if !c.AcceptCollectionConsent() {
-		fmt.Println(consent.OutputConsent(c))
-		return "", errors.New("no consent given")
-	}
 
 	// Run application
 	simplelog.Info("Starting collection...")
@@ -590,33 +585,16 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		// quickly just supplying tarball name and elapsed
 		return fmt.Sprintf("file %v - %v secs collection", tarballName, endTime-startTime), nil
 	}
-	return fmt.Sprintf("file %v - %v secs collection - size %v bytes", tarballName, endTime-startTime, fi.Size()), nil
+	return fmt.Sprintf("file %v - %v seconds for collection - size %v bytes", tarballName, endTime-startTime, fi.Size()), nil
 }
 
 func init() {
 	//wire up override flags
-	// consent form
-	LocalCollectCmd.Flags().Bool("accept-collection-consent", false, "consent for collection of files, if not true, then collection will stop and a log message will be generated")
-	// command line flags ..default is set at runtime due to the CountVarP not having this capacity
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
-	LocalCollectCmd.Flags().Bool("collect-acceleration-log", false, "Run the Collect Acceleration Log collector")
-	LocalCollectCmd.Flags().Bool("collect-access-log", false, "Run the Collect Access Log collector")
-	LocalCollectCmd.Flags().Bool("collect-audit-log", false, "Run the Collect Audit Log collector")
-	LocalCollectCmd.Flags().String("dremio-gclogs-dir", "", "by default will read from the Xloggc flag, otherwise you can override it here")
-	LocalCollectCmd.Flags().String("dremio-log-dir", "", "directory with application logs on dremio")
-	LocalCollectCmd.Flags().IntP("number-threads", "t", 2, "control concurrency in the system")
-	// Add flags for Dremio connection information
-	LocalCollectCmd.Flags().String("dremio-endpoint", "", "Dremio REST API endpoint")
-	LocalCollectCmd.Flags().String("dremio-username", "", "Dremio username")
 	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
-	LocalCollectCmd.Flags().String("dremio-rocksdb-dir", "", "Path to Dremio RocksDB directory")
-	LocalCollectCmd.Flags().String("dremio-conf-dir", "", "Directory where to find the configuration files")
+	LocalCollectCmd.Flags().String("collect", "quick", "type of collection: 'quick'- 2 days of logs (no ttop, jstack or jfr). 'full' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'full' + WLM, KV Store Report, 25,000 Job Profiles")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
-	LocalCollectCmd.Flags().Bool("collect-dremio-configuration", true, "Collect Dremio Configuration collector")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
-
-	LocalCollectCmd.Flags().Int("number-job-profiles", 0, "Randomly retrieve number job profiles from the server based on queries.json data but must have --dremio-pat-token set to use")
-	LocalCollectCmd.Flags().Bool("capture-heap-dump", false, "Run the Heap Dump collector")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
 

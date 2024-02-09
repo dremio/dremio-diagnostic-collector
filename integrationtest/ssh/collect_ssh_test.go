@@ -112,7 +112,7 @@ dremio-jfr-time-seconds: 10
 	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "full"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)

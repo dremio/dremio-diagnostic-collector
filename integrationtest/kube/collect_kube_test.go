@@ -422,7 +422,7 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
-	args := []string{"ddc", "-k", "-n", namespace, "-c", "app=dremio-coordinator", "-e", "app=dremio-executor", "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile}
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "--full"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
