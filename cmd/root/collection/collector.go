@@ -114,14 +114,22 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
 	}
 
-	coordinators, err := c.FindHosts(coordinatorStr)
-	if err != nil {
-		return err
+	// Check presence of coordinators and executors before looking for hosts
+	var coordinators []string
+	var executors []string
+
+	if coordinatorStr != "" {
+		coordinators, err = c.FindHosts(coordinatorStr)
+		if err != nil {
+			return err
+		}
 	}
 
-	executors, err := c.FindHosts(executorsStr)
-	if err != nil {
-		return err
+	if executorsStr != "" {
+		executors, err = c.FindHosts(executorsStr)
+		if err != nil {
+			return err
+		}
 	}
 
 	totalNodes := len(executors) + len(coordinators)
