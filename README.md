@@ -18,7 +18,22 @@ Download the [latest release binary](https://github.com/dremio/dremio-diagnostic
 2. Open a terminal and change to the directory where you unzipped your binary
 3. Run the command `./ddc help`. If you see the DDC command help, you are good to go.
 
-### Dremio on Kubernetes
+### Guided Collection
+
+```bash
+ddc
+```
+#### select transport
+![step 1: transport](select.png)
+#### select namespace for k8s
+![step 2: namespace](namespaces.png)
+#### select collection type
+![step 3: collection](collection.png)
+#### enjoy progress
+![step 4: progress](progress.png)
+
+
+### Scripting - Dremio on Kubernetes
 
 DDC connects via SSH or `kubectl` and collects a series of logs and files for Dremio, then puts those collected files in an archive
 
@@ -35,7 +50,7 @@ _Requires Dremio admin privileges. Dremio PATs can be enabled by the support key
 ddc  -n mynamespace  --collect health-check
 ```
 
-### Dremio on-prem
+### Scripting - Dremio on-prem
 
 Specific executors that you want to collect from with the `-e` flag and coordinators with the `-c` flag. Specify SSH user, and SSH key to use.
 

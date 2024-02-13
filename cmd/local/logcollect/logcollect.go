@@ -51,7 +51,7 @@ func NewLogCollector(dremioLogDir, logsOutDir, gcLogsDir, dremioGCFilePattern, q
 }
 
 func (l *Collector) RunCollectDremioServerLog() error {
-	simplelog.Debug("Collecting GC logs ...")
+	simplelog.Debug("Collecting Dremio Server logs ...")
 	var errs []error
 	if err := l.exportArchivedLogs(l.dremioLogDir, "server.log", "server", l.dremioLogsNumDays); err != nil {
 		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %v", err))

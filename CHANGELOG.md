@@ -1,6 +1,12 @@
 # Changelog
 
-## [2.0.0] - UNRELEASED
+## [2.0.0] - 2024-02-13 
+
+## Fixed
+
+* a log was leaking to the output when it should have been doing to ddc.log
+* logging error, jstack collection was called gc log collection
+* autodetect in gclogging was not working this has been added back
 
 ## Removed
 
@@ -8,7 +14,7 @@
 * the -k and --k8s flags are now inferred by the use of the --namespace flag
 
 ### Added
-
+* ddc interactive prompt when no options are passed to the command that takes you through a menu driven selection
 * Added --collect with the available values of quick, full, health-check default is quick. 
   * `--collect quick` has no jfr, jstack, ttop and only 2 days of logs and queries.json
   * `--collect full` is the old default (jfr, ttop, jstack, 28 days of queries.json and 7 days of logs)

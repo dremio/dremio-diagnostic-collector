@@ -34,7 +34,7 @@ func RunCollectJStacks(c *conf.CollectConf) error {
 }
 
 func RunCollectJStacksWithTimeService(c *conf.CollectConf, timer func() time.Time) error {
-	simplelog.Debug("Collecting GC logs ...")
+	simplelog.Debug("Collecting Jstack ...")
 	threadDumpFreq := c.DremioJStackFreqSeconds()
 	iterations := c.DremioJStackTimeSeconds() / threadDumpFreq
 	simplelog.Debugf("Running Java thread dumps every %v second(s) for a total of %v iterations ...", threadDumpFreq, iterations)

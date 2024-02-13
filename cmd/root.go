@@ -71,6 +71,9 @@ var RootCmd = &cobra.Command{
 	Long: versions.GetCLIVersion() + ` ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
 examples:
 
+for a ui prompt just run:
+	ddc 
+
 for ssh based communication to VMs or Bare metal hardware:
 
 	ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio 
@@ -230,7 +233,7 @@ func Execute(args []string) error {
 		if namespace == "" && sshUser == "" && !disablePrompt {
 			// fire configuration prompt
 			prompt := promptui.Select{
-				Label: "SELECT TRANSPORT",
+				Label: "select transport for file transfers",
 				Items: []string{"kubernetes", "ssh"},
 			}
 			_, transport, err := prompt.Run()
@@ -259,11 +262,26 @@ func Execute(args []string) error {
 				if err != nil {
 					return err
 				}
-
-				prompt = promptui.Prompt{
-					Label: "ssh key location ie ~/.ssh/id_rsa",
+				home, err := os.UserHomeDir()
+				if err != nil {
+					return err
 				}
-				sshKeyLoc, err = prompt.Run()
+				sshDir := filepath.Join(home, ".ssh")
+				entries, err := os.ReadDir(sshDir)
+				if err != nil {
+					return err
+				}
+				var sshKeys []string
+				for _, e := range entries {
+					if strings.HasPrefix(e.Name(), "id_") && !strings.HasSuffix(e.Name(), ".pub") {
+						sshKeys = append(sshKeys, filepath.Join(sshDir, e.Name()))
+					}
+				}
+				selectPrompt := promptui.Select{
+					Label: "ssh key location (from .ssh directory)",
+					Items: sshKeys,
+				}
+				_, sshKeyLoc, err = selectPrompt.Run()
 				if err != nil {
 					return err
 				}

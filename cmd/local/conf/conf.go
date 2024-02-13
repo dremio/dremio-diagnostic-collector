@@ -253,7 +253,6 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
 	c.collectAccessLogs = GetBool(confData, KeyCollectAccessLog)
 	c.collectAuditLogs = GetBool(confData, KeyCollectAuditLog)
-	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	c.nodeName = GetString(confData, KeyNodeName)
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
@@ -304,7 +303,6 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
 	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
-	c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
@@ -334,12 +332,24 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		dremioPID, err := autodetect.GetDremioPID()
 		if err != nil {
 			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
-			//return &CollectConf{}, fmt.Errorf("read config stopped due to error %v", err)
 		} else {
 			c.dremioPID = dremioPID
 		}
 	}
 	dremioPIDIsValid := c.dremioPID > 0
+	if dremioPIDIsValid {
+		logDir, err := autodetect.FindGCLogLocation()
+		if err != nil {
+			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
+			fmt.Println(msg)
+			simplelog.Errorf(msg)
+			c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+		} else {
+			c.gcLogsDir = logDir
+		}
+	} else {
+		c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+	}
 	// captures that wont work if the dremioPID is invalid
 	c.captureHeapDump = GetBool(confData, KeyCaptureHeapDump) && dremioPIDIsValid
 	c.collectJFR = GetBool(confData, KeyCollectJFR) && dremioPIDIsValid

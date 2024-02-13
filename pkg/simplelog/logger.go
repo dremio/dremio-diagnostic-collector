@@ -172,8 +172,17 @@ func GetLogLoc() string {
 func CopyLog(dest string) error {
 	// We need to get a lock on the log file to safely close it
 	// to avoid any potentialy copying errors
+
 	ddcLogMut.Lock()
+	ddcLog := GetLogLoc()
 	defer func() {
+		f, err := os.Open(filepath.Clean(ddcLog))
+		if err != nil {
+			ddcLogMut.Unlock()
+			Errorf("unable to open up log %v again: %v", ddcLog, err)
+			return
+		}
+		setDDCLog(ddcLog, f)
 		ddcLogMut.Unlock()
 		newLogger()
 	}()
@@ -182,7 +191,7 @@ func CopyLog(dest string) error {
 	if err != nil {
 		return err
 	}
-	logRead, err := os.ReadFile(GetLogLoc())
+	logRead, err := os.ReadFile(filepath.Clean(ddcLog))
 	if err != nil {
 		return err
 	}
