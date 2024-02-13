@@ -28,7 +28,7 @@ func setupTestSetViperDefaults() (map[string]interface{}, string, int) {
 	defaultCaptureSeconds := 30
 	confData := make(map[string]interface{})
 	// Run the function.
-	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds, collects.FullCollection)
+	conf.SetViperDefaults(confData, hostName, defaultCaptureSeconds, collects.StandardCollection)
 
 	return confData, hostName, defaultCaptureSeconds
 }

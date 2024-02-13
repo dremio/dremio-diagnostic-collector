@@ -142,7 +142,7 @@ func TestAllSubCommandsAreWiredUp(t *testing.T) {
 func TestValidateDDCYamlValid(t *testing.T) {
 
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
-	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
+	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)
 	if err != nil {
 		t.Errorf("expected no error for valid yaml: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestValidateDDCYamlValid(t *testing.T) {
 
 func TestValidateDDCYamlNotPresent(t *testing.T) {
 	valid := filepath.Join("testdata", "not-found-anwhere.yaml")
-	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
+	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)
 	if err == nil {
 		t.Error("expected an error for missing yaml")
 	}
@@ -158,7 +158,7 @@ func TestValidateDDCYamlNotPresent(t *testing.T) {
 
 func TestValidateDDCYamlNotValid(t *testing.T) {
 	valid := filepath.Join("testdata", "ddc-invalid.yaml")
-	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
+	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)
 	if err == nil {
 		t.Errorf("expected an error for invalid yaml: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestValidateDDCYamlMaskPAT(t *testing.T) {
 		simplelog.InitLoggerWithFile(4, filepath.Join(os.TempDir(), "ddc.log"))
 	}()
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
-	_, err := ValidateAndReadYaml(valid, collects.FullCollection)
+	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)
 	if err != nil {
 		t.Errorf("expected no error for valid yaml: %v", err)
 	}

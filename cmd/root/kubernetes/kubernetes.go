@@ -160,3 +160,27 @@ func (c *KubectlK8sActions) GetExecutors() (podName []string, err error) {
 func (c *KubectlK8sActions) HelpText() string {
 	return "Make sure the labels and namespace you use actually correspond to your dremio pods: try something like 'ddc -n mynamespace --coordinator app=dremio-coordinator --executor app=dremio-executor'.  You can also run 'kubectl get pods --show-labels' to see what labels are available to use for your dremio pods"
 }
+
+func GetClusters(kubectl string) ([]string, error) {
+	c := &cli.Cli{}
+	out, err := c.Execute(false, kubectl, "get", "ns", "-o", "name")
+	if err != nil {
+		return []string{}, err
+	}
+	var namespaces []string
+	lines := strings.Split(out, "\n")
+	for _, l := range lines {
+		namespaces = append(namespaces, strings.TrimPrefix(l, "namespace/"))
+	}
+	var dremioClusters []string
+	for _, n := range namespaces {
+		out, err := c.Execute(false, kubectl, "get", "pods", "-n", n, "-l", "role=dremio-cluster-role", "-o", "name")
+		if err != nil {
+			return []string{}, err
+		}
+		if len(strings.Split(out, "\n")) > 0 {
+			dremioClusters = append(dremioClusters, n)
+		}
+	}
+	return dremioClusters, nil
+}
