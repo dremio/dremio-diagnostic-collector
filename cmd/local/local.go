@@ -592,7 +592,7 @@ func init() {
 	//wire up override flags
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
-	LocalCollectCmd.Flags().String("collect", "quick", "type of collection: 'quick'- 2 days of logs (no ttop, jstack or jfr). 'full' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'full' + WLM, KV Store Report, 25,000 Job Profiles")
+	LocalCollectCmd.Flags().String("collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'stqndard' + WLM, KV Store Report, 25,000 Job Profiles")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")

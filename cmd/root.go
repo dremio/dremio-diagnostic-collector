@@ -57,7 +57,9 @@ var sudoUser string
 var namespace string
 var disableFreeSpaceCheck bool
 var disablePrompt bool
+var detectNamespace bool
 var collectionMode string
+var cliAuthToken string
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -287,7 +289,7 @@ func Execute(args []string) error {
 					return err
 				}
 				prompt := promptui.Select{
-					Label: "The follozing k8s namespaces have dremio clusters. Select the one you want to collect from",
+					Label: "The following k8s namespaces have dremio clusters. Select the one you want to collect from",
 					Items: clustersToList,
 				}
 				_, namespace, err = prompt.Run()
@@ -299,7 +301,7 @@ func Execute(args []string) error {
 				Label: "Collection Type\n- quick is 2 days logs and not diagnostics\n- full is 7 days of logs and some light diagnostics\n- health check takes 20-30 minutes and requires a Dremio PAT",
 				Items: []string{"light", "standard", "health-check"},
 			}
-			_, namespace, err = prompt.Run()
+			_, collectionMode, err = prompt.Run()
 			if err != nil {
 				return fmt.Errorf("prompt failed %v", err)
 			}
@@ -329,8 +331,12 @@ func Execute(args []string) error {
 				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
 			}
 		}
+
 		dremioPAT := confData[conf.KeyDremioPatToken].(string)
-		if collectionMode == collects.HealthCheckCollection {
+		if cliAuthToken != "" {
+			dremioPAT = cliAuthToken
+		}
+		if collectionMode == collects.HealthCheckCollection && dremioPAT == "" {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
 				return fmt.Errorf("unable to get PAT due to: %v", err)
@@ -338,6 +344,14 @@ func Execute(args []string) error {
 			dremioPAT = pat
 		}
 		patSet := dremioPAT != ""
+
+		if detectNamespace {
+			b, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+			if err != nil {
+				return fmt.Errorf("unable to detect namespace: %v", err)
+			}
+			namespace = fmt.Sprint(b)
+		}
 		var enabled []string
 		var disabled []string
 		for k, v := range confData {
@@ -367,8 +381,10 @@ func Execute(args []string) error {
 				}
 			}
 		}
-		stop := startTicker()
-		defer stop()
+		if !disablePrompt {
+			stop := startTicker()
+			defer stop()
+		}
 		collectionArgs := collection.Args{
 			OutputLoc:             filepath.Clean(outputLoc),
 			DDCfs:                 helpers.NewRealFileSystem(),
@@ -443,6 +459,16 @@ func init() {
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
 	if err := RootCmd.Flags().MarkHidden("disable-prompt"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+	RootCmd.Flags().StringVar(&cliAuthToken, conf.KeyDremioPatToken, "", "Dremio Personal Access Token (PAT) for ui")
+	if err := RootCmd.Flags().MarkHidden(conf.KeyDremioPatToken); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
+	if err := RootCmd.Flags().MarkHidden("detect-namespace"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}

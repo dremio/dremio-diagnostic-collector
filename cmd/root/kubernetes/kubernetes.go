@@ -137,7 +137,7 @@ func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (pod
 			podCopy := rawPod[4:]
 			container, err := c.getContainerName(podCopy)
 			if err != nil {
-				simplelog.Errorf("uanble to get pod name (%v): %v", podCopy, err)
+				simplelog.Errorf("unable to get pod name (%v): %v", podCopy, err)
 				return
 			}
 			if compare(container) {
@@ -173,14 +173,25 @@ func GetClusters(kubectl string) ([]string, error) {
 		namespaces = append(namespaces, strings.TrimPrefix(l, "namespace/"))
 	}
 	var dremioClusters []string
+	var wg sync.WaitGroup
+	var lock sync.RWMutex
 	for _, n := range namespaces {
-		out, err := c.Execute(false, kubectl, "get", "pods", "-n", n, "-l", "role=dremio-cluster-role", "-o", "name")
-		if err != nil {
-			return []string{}, err
-		}
-		if len(strings.Split(out, "\n")) > 0 {
-			dremioClusters = append(dremioClusters, n)
-		}
+		nCopy := n
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out, err := c.Execute(false, kubectl, "get", "pods", "-n", nCopy, "-l", "role=dremio-cluster-pod", "-o", "name")
+			if err != nil {
+				simplelog.Errorf("unable find pods in namespace %v: %v", err, nCopy)
+			}
+			if len(strings.Split(out, "\n")) > 1 {
+				lock.Lock()
+				dremioClusters = append(dremioClusters, nCopy)
+				lock.Unlock()
+			}
+		}()
+
 	}
+	wg.Wait()
 	return dremioClusters, nil
 }
