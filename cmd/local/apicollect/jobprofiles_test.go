@@ -25,6 +25,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 )
 
 func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
@@ -87,7 +88,7 @@ dremio-endpoint: %v
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	c, err := conf.ReadConf(overrides, ddcYaml)
+	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatalf("unable to read conf %v", err)
 	}

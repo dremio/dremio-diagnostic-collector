@@ -32,7 +32,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 	"github.com/google/uuid"
 	"github.com/spf13/cast"
 )
@@ -200,7 +199,7 @@ func LogConfData(confData map[string]string) {
 		}
 	}
 }
-func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, error) {
+func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
 	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {
 		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
@@ -211,10 +210,6 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 	hostName, err := os.Hostname()
 	if err != nil {
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
-	}
-	collectionMode := GetString(confData, KeyCollectionMode)
-	if err := validation.ValidateCollectMode(collectionMode); err != nil {
-		return &CollectConf{}, err
 	}
 
 	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 )
 
 func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) string {
@@ -64,7 +65,7 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -86,7 +87,7 @@ func TestCreateAllDirs(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -167,7 +168,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -259,7 +260,7 @@ collect-kvstore-report: false
 is-dremio-cloud: false
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -321,7 +322,7 @@ func TestFindClusterID(t *testing.T) {
 dremio-rocksdb-dir: %v
 `, filepath.Join(dremioHome, "db"))
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	c, err := conf.ReadConf(make(map[string]string), yamlLocation)
+	c, err := conf.ReadConf(make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
@@ -341,5 +342,18 @@ func TestParseClassPathVersion(t *testing.T) {
 	expected := "24.2.6-202311250456170399-68acbe47"
 	if version != expected {
 		t.Errorf("expected %v but was '%v'", expected, version)
+	}
+}
+
+func TestValidateCollectFlag(t *testing.T) {
+	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+		t.Fatalf("unable to write ddc yaml: %v", err)
+	}
+	args := []string{"ddc", "local-collect", "--ddc-yaml", ddcYaml, "--collect", "wrong"}
+	o := make(map[string]string)
+	_, err := Execute(args, o)
+	if err == nil {
+		t.Error("collect should fail")
 	}
 }

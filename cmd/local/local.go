@@ -41,6 +41,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
@@ -48,7 +49,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
-var ddcYamlLoc string
+var ddcYamlLoc, collectionMode string
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
@@ -550,8 +551,10 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	simplelog.Infof("args: %v", strings.Join(args, " "))
 	fmt.Println(strings.TrimSpace(versions.GetCLIVersion()))
 	startTime := time.Now().Unix()
-
-	c, err := conf.ReadConf(overrides, ddcYamlLoc)
+	if err := validation.ValidateCollectMode(collectionMode); err != nil {
+		return "", err
+	}
+	c, err := conf.ReadConf(overrides, ddcYamlLoc, collectionMode)
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
@@ -592,7 +595,6 @@ func init() {
 	//wire up override flags
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
-	LocalCollectCmd.Flags().String("collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'stqndard' + WLM, KV Store Report, 25,000 Job Profiles")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
@@ -605,5 +607,5 @@ func init() {
 	}
 	execLocDir := filepath.Dir(execLoc)
 	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
-
+	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'stqndard' + WLM, KV Store Report, 25,000 Job Profiles")
 }
