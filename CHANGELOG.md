@@ -5,7 +5,7 @@
 ### Added
 
 * pidfile flag for scripting
-* 
+* support for graceful exit with ctrlp to stop leaving behind local files.
 
 ### Changed
 
