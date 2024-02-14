@@ -23,7 +23,6 @@ import (
 
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/spf13/cobra"
@@ -143,7 +142,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	for _, e := range outDirEntries {
 		if strings.HasSuffix(e.Name(), ".tar.gz") {
 			tgzLoc := filepath.Join(outDir, e.Name())
-			if err := collection.ExtractTarGz(tgzLoc, outDir); err != nil {
+			if err := archive.ExtractTarGz(tgzLoc, outDir); err != nil {
 				simplelog.Errorf("unable to extract tarball %v due to error %v", tgzLoc, err)
 				continue
 			}
