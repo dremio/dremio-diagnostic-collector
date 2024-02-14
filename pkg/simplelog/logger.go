@@ -171,7 +171,7 @@ func GetLogLoc() string {
 
 func CopyLog(dest string) error {
 	// We need to get a lock on the log file to safely close it
-	// to avoid any potentialy copying errors
+	// to avoid any potential copy errors on Windows
 
 	ddcLogMut.Lock()
 	ddcLog := GetLogLoc()

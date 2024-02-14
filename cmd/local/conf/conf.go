@@ -372,7 +372,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 					c.dremioConfDir = detectedConfig.ConfDir
 				}
 			} else {
-				fmt.Println("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resovle this")
+				fmt.Println("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resolve this")
 				simplelog.Warning("no valid pid found therefor the log and configuration autodetection will not function")
 			}
 
