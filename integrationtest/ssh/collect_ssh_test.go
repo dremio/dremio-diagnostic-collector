@@ -112,7 +112,7 @@ dremio-jfr-time-seconds: 10
 	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "full"}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -313,4 +313,51 @@ func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) 
 		return "", fmt.Errorf("no host name present: stderror was %v", stdErr.String())
 	}
 	return strings.TrimSpace(txt), nil
+}
+
+func TestValidateBadCollectFlag(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
+	if err != nil {
+		t.Fatalf(`unable to read ssh.json in ./integrationtest/ssh/testdata/ssh.json
+you must make one with the following format:
+{
+    "sudo_user": "dremio",
+    "user": "myuser", 
+    "public": "ssh-ed25519 publickey", 
+    "private":"-----BEGIN OPENSSH PRIVATE KEY-----\nprivatekey\n-----END OPENSSH PRIVATE KEY-----\n",
+    "coordinator": "coordinator-ip",
+    "executor": "executor1",
+    "dremio-log-dir": "/opt/dremio/log",
+    "dremio-conf-dir": "/opt/dremio/conf",
+    "dremio-rocksdb-dir": "/opt/dremio/cm/db/",
+    "dremio-username": "dremio",
+    "dremio-pat": "mytoken",
+    "dremio-endpoint": "http://localhost:9047",
+    "is-enterprise": true
+}
+
+
+Error was: %v`, err)
+	}
+	var sshConf SSHTestConf
+	if err := json.Unmarshal(b, &sshConf); err != nil {
+		t.Errorf("failed unmarshalling string: %v", err)
+	}
+	privateKey := filepath.Join(t.TempDir(), "ssh_key")
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+		t.Fatalf("unable to write ssh private key: %v", err)
+	}
+	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+		t.Fatalf("unable to write ddc yaml: %v", err)
+	}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong"}
+	err = cmd.Execute(args)
+	if err == nil {
+		t.Error("collect should fail")
+	}
+	expected := "invalid --collect option"
+	if !strings.Contains(err.Error(), expected) {
+		t.Errorf("expected to contain '%v' in '%v'", expected, err.Error())
+	}
 }

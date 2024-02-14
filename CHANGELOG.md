@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] - 2024-02-14
+
+## Added
+
+* validation for the --collect mode.
+
 ## [2.0.0] - 2024-02-13 
 
 ## Fixed
@@ -15,9 +21,9 @@
 
 ### Added
 * ddc interactive prompt when no options are passed to the command that takes you through a menu driven selection
-* Added --collect with the available values of quick, full, health-check default is quick. 
-  * `--collect quick` has no jfr, jstack, ttop and only 2 days of logs and queries.json
-  * `--collect full` is the old default (jfr, ttop, jstack, 28 days of queries.json and 7 days of logs)
+* Added --collect with the available values of light, standard, health-check default is quick. 
+  * `--collect light` has no jfr, jstack, ttop and only 2 days of logs and queries.json
+  * `--collect standard` is the old default (jfr, ttop, jstack, 28 days of queries.json and 7 days of logs)
   * `--collect healthcheck` is full + fires the pat prompt which adds job profile collection
 
 ### Changed 
@@ -482,6 +488,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v0.9.1...v1.0.0

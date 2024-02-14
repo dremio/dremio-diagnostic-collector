@@ -36,6 +36,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -353,6 +354,9 @@ func Execute(args []string) error {
 		dremioPAT := confData[conf.KeyDremioPatToken].(string)
 		if cliAuthToken != "" {
 			dremioPAT = cliAuthToken
+		}
+		if err := validation.ValidateCollectMode(collectionMode); err != nil {
+			return err
 		}
 		if collectionMode == collects.HealthCheckCollection && dremioPAT == "" {
 			pat, err := masking.PromptForPAT()

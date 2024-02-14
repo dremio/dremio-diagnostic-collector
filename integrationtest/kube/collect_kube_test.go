@@ -422,7 +422,7 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
-	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "--full"}
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "standard"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -712,4 +712,20 @@ func submitSQLQuery(query, dremioEndpoint, dremioPat string) (string, error) {
 		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
 	}
 	return jobResponse.ID, nil
+}
+
+func TestValidateBadCollectFlag(t *testing.T) {
+	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+		t.Fatalf("unable to write ddc yaml: %v", err)
+	}
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", ddcYaml, "--collect", "wrong"}
+	err := cmd.Execute(args)
+	if err == nil {
+		t.Error("collect should fail")
+	}
+	expected := "invalid --collect option"
+	if !strings.Contains(err.Error(), expected) {
+		t.Errorf("expected to contain '%v' in '%v'", expected, err.Error())
+	}
 }

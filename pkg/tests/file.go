@@ -114,7 +114,7 @@ func AssertFileHasContent(t *testing.T, filePath string) {
 	if f, err := os.Stat(filePath); err != nil {
 		t.Errorf("file %v failed %v", filePath, err)
 	} else {
-		if !(f.Size() > 0) {
+		if f.Size() == 0 {
 			t.Errorf("file %v is empty", filePath)
 		}
 	}

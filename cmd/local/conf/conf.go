@@ -32,6 +32,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 	"github.com/google/uuid"
 	"github.com/spf13/cast"
 )
@@ -212,8 +213,11 @@ func ReadConf(overrides map[string]string, ddcYamlLoc string) (*CollectConf, err
 		hostName = fmt.Sprintf("unknown-%v", uuid.New())
 	}
 	collectionMode := GetString(confData, KeyCollectionMode)
-	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)
+	if err := validation.ValidateCollectMode(collectionMode); err != nil {
+		return &CollectConf{}, err
+	}
 
+	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)
 	c := &CollectConf{}
 	c.systemtables = SystemTableList()
 	c.systemtablesdremiocloud = []string{
