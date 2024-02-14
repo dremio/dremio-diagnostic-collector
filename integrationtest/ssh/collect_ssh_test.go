@@ -351,7 +351,7 @@ Error was: %v`, err)
 	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
 		t.Fatalf("unable to write ddc yaml: %v", err)
 	}
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong"}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}
 	err = cmd.Execute(args)
 	if err == nil {
 		t.Error("collect should fail")
