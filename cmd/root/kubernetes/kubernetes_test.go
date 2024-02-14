@@ -32,9 +32,7 @@ func TestKubectlExec(t *testing.T) {
 		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:         cli,
-		kubectlPath: "kubectl",
-		namespace:   namespace,
+		namespace: namespace,
 	}
 	out, err := k.HostExecute(false, podName, "ls", "-l")
 	if err != nil {
@@ -67,9 +65,7 @@ func TestKubectlSearch(t *testing.T) {
 		StoredErrors:   []error{nil, nil, nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:         cli,
-		kubectlPath: "kubectl",
-		namespace:   namespace,
+		namespace: namespace,
 	}
 	podNames, err := k.GetCoordinators()
 	if err != nil {
@@ -102,9 +98,7 @@ func TestKubectCopyFrom(t *testing.T) {
 		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:         cli,
-		kubectlPath: "kubectl",
-		namespace:   namespace,
+		namespace: namespace,
 	}
 	out, err := k.CopyFromHost(podName, source, destination)
 	if err != nil {
@@ -134,9 +128,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 		StoredErrors:   []error{nil, nil},
 	}
 	k := KubectlK8sActions{
-		cli:         cli,
-		kubectlPath: "kubectl",
-		namespace:   namespace,
+		namespace: namespace,
 	}
 	out, err := k.CopyFromHost(podName, source, destination)
 	if err != nil {
@@ -159,17 +151,14 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 }
 
 func TestNewKubectlK8sActions(t *testing.T) {
-	kubectlPath := "kubectlPath"
 	namespace := "mynamespace"
-	actions := NewKubectlK8sActions(KubeArgs{
-		KubectlPath: kubectlPath,
-		Namespace:   namespace,
+	actions, err := NewKubectlK8sActions(KubeArgs{
+		Namespace: namespace,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if actions.namespace != namespace {
 		t.Errorf("\nexpected \n%v\nbut got\n%v", namespace, actions.namespace)
-	}
-
-	if actions.kubectlPath != kubectlPath {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", kubectlPath, actions.kubectlPath)
 	}
 }

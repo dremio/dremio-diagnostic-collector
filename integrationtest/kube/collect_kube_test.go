@@ -34,7 +34,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
@@ -435,7 +435,7 @@ dremio-jfr-time-seconds: 10
 	}
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
-	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
+	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
 

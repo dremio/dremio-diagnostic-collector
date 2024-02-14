@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -63,7 +64,17 @@ func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 			simplelog.Debugf("failed extra close to tgz file %v", err)
 		}
 	}()
+	err = TarGzDirFilteredStream(tarGzFile, srcDir, dest, filterList)
+	if err != nil {
+		return err
+	}
+	if err := tarGzFile.Close(); err != nil {
+		return fmt.Errorf("failed close to tgz file %w", err)
+	}
+	return nil
+}
 
+func TarGzDirFilteredStream(tarGzFile io.Writer, srcDir, dest string, filterList func(string) bool) error {
 	gzWriter := gzip.NewWriter(tarGzFile)
 	defer func() {
 		if err := gzWriter.Close(); err != nil {
@@ -147,8 +158,74 @@ func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 	if err := gzWriter.Close(); err != nil {
 		return fmt.Errorf("failed close to gz file %w", err)
 	}
-	if err := tarGzFile.Close(); err != nil {
-		return fmt.Errorf("failed close to tgz file %w", err)
-	}
 	return nil
+}
+
+func ExtractTarGz(gzFilePath, dest string) error {
+	reader, err := os.Open(path.Clean(gzFilePath))
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	return ExtractTarGzStream(reader, dest)
+}
+func ExtractTarGzStream(reader io.Reader, dest string) error {
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return err
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	for {
+		header, err := tarReader.Next()
+		switch {
+		case err == io.EOF:
+			return nil
+		case err != nil:
+			return err
+		case header == nil:
+			continue
+		}
+		target, err := SanitizeArchivePath(dest, header.Name)
+		if err != nil {
+			return err
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(path.Clean(target), 0750); err != nil {
+					return err
+				}
+			}
+		case tar.TypeReg:
+			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				simplelog.Errorf("skipping file %v due to error %v", file, err)
+				continue
+			}
+			defer file.Close()
+			for {
+				_, err := io.CopyN(file, tarReader, 1024)
+				if err != nil {
+					if err == io.EOF {
+						break
+					}
+					return err
+				}
+			}
+			simplelog.Debugf("extracted file %v", file.Name())
+		}
+	}
+}
+
+// Sanitize archive file pathing from "G305: Zip Slip vulnerability"
+func SanitizeArchivePath(d, t string) (v string, err error) {
+	v = filepath.Join(d, t)
+	if strings.HasPrefix(v, filepath.Clean(d)) {
+		return v, nil
+	}
+	return "", fmt.Errorf("%s: %s", "content filepath is tainted", t)
 }

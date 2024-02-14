@@ -1,14 +1,29 @@
 # Changelog
 
+## [2.1.0] - UNRELEASED
+
+### Added
+
+* pidfile flag for scripting
+* 
+
+### Changed
+
+* removed kubectl dependency and now use the K8s api
+
+### Removed
+
+* node and pod describe files from the tarball due to nothing to replace it with easily in the API, will add back later.
+
 ## [2.0.1] - 2024-02-14
 
-## Added
+### Added
 
 * validation for the --collect mode.
 
 ## [2.0.0] - 2024-02-13 
 
-## Fixed
+### Fixed
 
 * a log was leaking to the output when it should have been going to ddc.log
 * logging error, jstack collection was called gc log collection

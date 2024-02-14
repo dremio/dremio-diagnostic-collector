@@ -16,19 +16,22 @@
 package collection
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	v1 "k8s.io/api/core/v1"
+	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, c Collector, k string) error {
+func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k *kubernetes.KubectlK8sActions) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
 	var wg sync.WaitGroup
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
@@ -41,7 +44,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 		go func(cmdname string) {
 			defer wg.Done()
 			resource := cmdname
-			out, err := clusterExecuteBytes(namespace, resource, c, k)
+			out, err := k.GetClient().RESTClient().Get().Resource(resource).Do(context.TODO()).Raw()
 			if err != nil {
 				simplelog.Errorf("when getting cluster config, error was %v", err)
 				return
@@ -66,7 +69,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 	return nil
 }
 
-func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string, pods []string) error {
+func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k *kubernetes.KubectlK8sActions, pods []string) error {
 	var wg sync.WaitGroup
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
@@ -79,15 +82,22 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 		wg.Add(1)
 		go func(podname string) {
 			defer wg.Done()
-			kubectlArgs := []string{k, "-n", namespace, "get", "pods", string(podname), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
-			containers, err := clusterExecutePod(kubectlArgs)
+			//kubectlArgs := []string{k, "-n", namespace, "get", "pods", string(podname), "-o", `jsonpath={.spec['containers','initContainers'][*].name}`}
+			podObj, err := k.GetClient().CoreV1().Pods(namespace).Get(context.Background(), podname, meta_v1.GetOptions{})
 			if err != nil {
 				simplelog.Errorf("trying to list containers from pod %v with error %v", podname, err)
 				return
 			}
-			// Loop over each container, construct a path and log file name
-			// write the output of the kubectl logs command to a file
-			for _, container := range strings.Split(containers, " ") {
+			var containers []string
+			for _, c := range podObj.Spec.Containers {
+				containers = append(containers, c.Name)
+			}
+			for _, c := range podObj.Spec.InitContainers {
+				containers = append(containers, c.Name)
+			}
+			//Loop over each container, construct a path and log file name
+			//write the output of the kubectl logs command to a file
+			for _, container := range containers {
 				copyContainerLog(cs, ddfs, k, container, namespace, path, podname)
 			}
 			consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
@@ -97,9 +107,8 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 	return err
 }
 
-func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k, container, namespace, path, pod string) {
-	kubectlArgs := []string{k, "-n", namespace, "logs", pod, "-c", string(container)}
-	out, err := clusterExecutePod(kubectlArgs)
+func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k *kubernetes.KubectlK8sActions, container, namespace, path, pod string) {
+	out, err := k.GetClient().CoreV1().Pods(namespace).GetLogs(pod, &v1.PodLogOptions{}).Do(context.Background()).Raw()
 	if err != nil {
 		simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
 	}
@@ -116,75 +125,76 @@ func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, k, container, na
 	}
 }
 
-func GetClusterNodes(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string) error {
-	path, err := cs.CreatePath("kubernetes", "nodes", "")
-	if err != nil {
-		simplelog.Errorf("trying to construct cluster node path %v with error %v", path, err)
-		return err
-	}
+// func GetClusterNodes(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string) error {
+// 	path, err := cs.CreatePath("kubernetes", "nodes", "")
+// 	if err != nil {
+// 		simplelog.Errorf("trying to construct cluster node path %v with error %v", path, err)
+// 		return err
+// 	}
 
-	kubectlArgs := []string{k, "-n", namespace, "describe", "nodes"}
-	nodes, err := clusterExecutePod(kubectlArgs)
-	if err != nil {
-		simplelog.Errorf("trying to list nodes from cluster with error %v", err)
-		return err
-	}
-	// Write the output of the kubectl describe nodes command to a file
-	outFile := filepath.Join(path, "describe-nodes.txt")
-	err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
-	if err != nil {
-		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
-	}
-	consoleprint.UpdateK8sFiles("cluster describe nodes")
+// 	kubectlArgs := []string{k, "-n", namespace, "describe", "nodes"}
+// 	nodes, err := clusterExecutePod(kubectlArgs)
+// 	if err != nil {
+// 		simplelog.Errorf("trying to list nodes from cluster with error %v", err)
+// 		return err
+// 	}
+// 	// // Write the output of the kubectl describe nodes command to a file
+// 	// outFile := filepath.Join(path, "describe-nodes.txt")
+// 	// err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
+// 	// if err != nil {
+// 	// 	simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
+// 	// }
+// 	consoleprint.UpdateK8sFiles("cluster describe nodes")
 
-	return err
-}
+// 	return err
+// }
 
-func GetClusterPods(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k string) error {
-	path, err := cs.CreatePath("kubernetes", "pods", "")
-	if err != nil {
-		simplelog.Errorf("trying to construct cluster pods path %v with error %v", path, err)
-		return err
-	}
+// func GetClusterPods(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, k *kubernetes.KubectlK8sActions) error {
+// 	k.GetClient()
+// 	path, err := cs.CreatePath("kubernetes", "pods", "")
+// 	if err != nil {
+// 		simplelog.Errorf("trying to construct cluster pods path %v with error %v", path, err)
+// 		return err
+// 	}
 
-	kubectlArgs := []string{k, "-n", namespace, "describe", "pods"}
-	nodes, err := clusterExecutePod(kubectlArgs)
-	if err != nil {
-		simplelog.Errorf("trying to describe pods from cluster with error %v", err)
-		return err
-	}
-	// Write the output of the kubectl describe nodes command to a file
-	outFile := filepath.Join(path, "describe-pods.txt")
-	err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
-	if err != nil {
-		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
-	}
-	consoleprint.UpdateK8sFiles("cluster describe pods")
+// 	// kubectlArgs := []string{k, "-n", namespace, "describe", "pods"}
+// 	// nodes, err := clusterExecutePod(kubectlArgs)
+// 	// if err != nil {
+// 	// 	simplelog.Errorf("trying to describe pods from cluster with error %v", err)
+// 	// 	return err
+// 	// }
+// 	// Write the output of the kubectl describe nodes command to a file
+// 	outFile := filepath.Join(path, "describe-pods.txt")
+// 	err = ddfs.WriteFile(outFile, []byte(nodes), DirPerms)
+// 	if err != nil {
+// 		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
+// 	}
+// 	consoleprint.UpdateK8sFiles("cluster describe pods")
 
-	return err
-}
+// 	return err
+// }
 
-// Execute commands at the cluster level
-// Calls a raw execute function and simply writes out the byte array read from the response
-// that comes in directly from kubectl
-func clusterExecuteBytes(namespace, resource string, _ Collector, k string) ([]byte, error) {
-	cli := &cli.Cli{}
-	kubectlArgs := []string{k, "-n", namespace, "get", resource}
-	kubectlArgs = append(kubectlArgs, "-o", "json")
-	res, err := cli.ExecuteBytes(false, kubectlArgs...)
-	if err != nil {
-		return []byte(""), fmt.Errorf("when getting config %v error returned was %v", resource, err)
-	}
-	return res, nil
-}
+// // Execute commands at the cluster level
+// // Calls a raw execute function and simply writes out the byte array read from the response
+// // that comes in directly from kubectl
+// func clusterExecuteBytes(namespace, resource string, _ Collector, k string) ([]byte, error) {
+// 	cli := &cli.Cli{}
+// 	kubectlArgs := []string{k, "-n", namespace, "get", resource}
+// 	kubectlArgs = append(kubectlArgs, "-o", "json")
+// 	res, err := cli.ExecuteBytes(false, kubectlArgs...)
+// 	if err != nil {
+// 		return []byte(""), fmt.Errorf("when getting config %v error returned was %v", resource, err)
+// 	}
+// 	return res, nil
+// }
 
-// Execute commands at the cluster level
-// Returns response as a string (instead of bytes)
-func clusterExecutePod(args []string) (string, error) {
-	cli := &cli.Cli{}
-	res, err := cli.Execute(false, args...)
-	if err != nil {
-		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", args, err)
-	}
-	return res, nil
-}
+// // Execute commands at the cluster level
+// // Returns response as a string (instead of bytes)
+// func clusterExecutePod(args []string) (string, error) {
+// 	cli := &cli.Cli{}
+// 	res, err := cli.Execute(false, args...)
+// 	if err != nil {
+// 		return "", fmt.Errorf("when running command \n%v\nerror returned was %v", args, err)
+// 	}
+// 	return res, nil
+// }

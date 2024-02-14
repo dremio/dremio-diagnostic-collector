@@ -19,8 +19,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/awselogs"
@@ -50,6 +52,7 @@ var sshKeyLoc string
 var sshUser string
 var transferDir string
 var ddcYamlLoc string
+var pid string
 
 var outputLoc string
 
@@ -146,7 +149,10 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	var collectorStrategy collection.Collector
 	if kubeArgs.Namespace != "" {
 		simplelog.Info("using Kubernetes kubectl based collection")
-		collectorStrategy = kubernetes.NewKubectlK8sActions(kubeArgs)
+		collectorStrategy, err := kubernetes.NewKubectlK8sActions(kubeArgs)
+		if err != nil {
+			return err
+		}
 		consoleprint.UpdateRuntime(
 			versions.GetCLIVersion(),
 			simplelog.GetLogLoc(),
@@ -159,22 +165,22 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 		)
 		clusterCollect = func(pods []string) {
-			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
+			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
-			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath, pods)
+			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, pods)
 			if err != nil {
 				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 			}
-			err = collection.GetClusterNodes(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
-			if err != nil {
-				simplelog.Errorf("when getting cluster nodes, the following error was returned: %v", err)
-			}
-			err = collection.GetClusterPods(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
-			if err != nil {
-				simplelog.Errorf("when getting cluster pods, the following error was returned: %v", err)
-			}
+			// err = collection.GetClusterNodes(kubeArgs.Namespace, cs, collectionArgs.DDCfs, )
+			// if err != nil {
+			// 	simplelog.Errorf("when getting cluster nodes, the following error was returned: %v", err)
+			// }
+			// err = collection.GetClusterPods(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy)
+			// if err != nil {
+			// 	simplelog.Errorf("when getting cluster pods, the following error was returned: %v", err)
+			// }
 		}
 	} else {
 		err := validateSSHParameters(sshArgs)
@@ -224,10 +230,51 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 	return confData, nil
 }
 
+type Exit struct{ Code int }
+
+// exit code handler
+func handleExit() {
+	if e := recover(); e != nil {
+		if exit, ok := e.(Exit); ok == true {
+			os.Exit(exit.Code)
+		}
+		panic(e) // not an Exit, bubble up
+	}
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
+	defer handleExit() // plug the exit handler
+	// adding cleanup signal
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		// this will allow all defers to fire that have been added and is definitely a bit hacky
+		panic(Exit{1})
+	}()
 
+	if pid != "" {
+		if _, err := os.Stat(pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("unable to read pid location '%v' with error: '%v'", pid, err)
+			}
+			// this means nothing is present great continue
+			if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
+				return fmt.Errorf("unable to write pid file '%v: %v", pid, err)
+			}
+			defer func() {
+				if err := os.Remove(pid); err != nil {
+					msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
+					fmt.Println(msg)
+					simplelog.Error(msg)
+				}
+			}()
+		} else {
+			return fmt.Errorf("DDC is running based on pid file '%v'. If this is a stale file then please remove", pid)
+		}
+	}
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
@@ -244,7 +291,7 @@ func Execute(args []string) error {
 			if transport == "ssh" {
 				// ssh user
 				prompt := promptui.Prompt{
-					Label: "ssh user ",
+					Label: "ssh user",
 				}
 				var err error
 				sshUser, err = prompt.Run()
@@ -303,7 +350,7 @@ func Execute(args []string) error {
 					return err
 				}
 			} else {
-				clustersToList, err := kubernetes.GetClusters(kubectlPath)
+				clustersToList, err := kubernetes.GetClusters()
 				if err != nil {
 					return err
 				}
@@ -426,8 +473,7 @@ func Execute(args []string) error {
 			CoordinatorStr: coordinatorStr,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace:   namespace,
-			KubectlPath: kubectlPath,
+			Namespace: namespace,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs); err != nil {
 			consoleprint.UpdateResult(err.Error())
@@ -491,6 +537,11 @@ func init() {
 	}
 	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
 	if err := RootCmd.Flags().MarkHidden("detect-namespace"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
+	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}
