@@ -149,10 +149,11 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	var collectorStrategy collection.Collector
 	if kubeArgs.Namespace != "" {
 		simplelog.Info("using Kubernetes kubectl based collection")
-		collectorStrategy, err := kubernetes.NewKubectlK8sActions(kubeArgs)
+		k8scollectorStrategy, err := kubernetes.NewKubectlK8sActions(kubeArgs)
 		if err != nil {
 			return err
 		}
+		collectorStrategy = k8scollectorStrategy
 		consoleprint.UpdateRuntime(
 			versions.GetCLIVersion(),
 			simplelog.GetLogLoc(),
@@ -165,11 +166,11 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 		)
 		clusterCollect = func(pods []string) {
-			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy)
+			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, k8scollectorStrategy)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
-			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, pods)
+			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, k8scollectorStrategy, pods)
 			if err != nil {
 				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 			}

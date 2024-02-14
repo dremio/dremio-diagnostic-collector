@@ -69,12 +69,15 @@ func GetCientset() (*kubernetes.Clientset, *rest.Config, error) {
 	var config *rest.Config
 	_, err := os.Stat(kubeConfig)
 	if err != nil {
+		fmt.Println("IN cluster config")
 		// fall back to include config
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
+		fmt.Printf("using k8s file cluster config %v\n", kubeConfig)
+
 		config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
 		if err != nil {
 			return nil, nil, err
@@ -101,17 +104,6 @@ func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
 func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
 	//windows does the wrong thing for kubectl here and provides a path with C:\ we need to remove it as kubectl detects this as a remote destination
 	return strings.TrimPrefix(rawDest, "C:")
-}
-
-func (c *KubectlK8sActions) getContainerName(podName string) (string, error) {
-	pod, err := c.client.CoreV1().Pods(c.namespace).Get(context.TODO(), podName, meta_v1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	if len(pod.Spec.Containers) == 0 {
-		return "", fmt.Errorf("Unsupported pod %v which has no containers attached", podName)
-	}
-	return pod.Spec.Containers[0].Name, nil
 }
 
 func (c *KubectlK8sActions) Name() string {
@@ -287,13 +279,16 @@ func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (pod
 	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.TODO(), meta_v1.ListOptions{
 		LabelSelector: "role=dremio-cluster-pod",
 	})
+	if err != nil {
+		return podName, err
+	}
 	for _, p := range podList.Items {
 		if len(p.Spec.Containers) == 0 {
-			return podName, fmt.Errorf("Unsupported pod %v which has no containers attached", p)
+			return podName, fmt.Errorf("unsupported pod %v which has no containers attached", p)
 		}
 		containerName := p.Spec.Containers[0]
 		if compare(containerName.Name) {
-			podName = append(podName, containerName.Name)
+			podName = append(podName, p.Name)
 		}
 	}
 	sort.Strings(podName)
