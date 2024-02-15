@@ -29,7 +29,7 @@ import (
 //go:embed output/ddc.zip
 var binaryData embed.FS
 
-func WriteOutDDC(targetDir string) (string, error) {
+func WriteOutDDC(targetDir string) (ddcFilePath string, err error) {
 	data, err := binaryData.ReadFile("output/ddc.zip")
 	if err != nil {
 		// Handle error

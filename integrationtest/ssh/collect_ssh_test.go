@@ -316,6 +316,9 @@ func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) 
 }
 
 func TestValidateBadCollectFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
 	if err != nil {
 		t.Fatalf(`unable to read ssh.json in ./integrationtest/ssh/testdata/ssh.json

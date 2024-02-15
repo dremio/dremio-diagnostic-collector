@@ -37,14 +37,13 @@ func (fe FindErr) Error() string {
 
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
 // are first logged and then returned at the end with the reason for the failure.
-func Capture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputLoc string, skipRESTCollect bool, disableFreeSpaceCheck bool) (int64, string, error) {
+func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool) error {
 	host := c.Host
 	consoleprint.UpdateNodeState(host, "STARTING")
-	ddcTmpDir := c.TransferDir
 	// we cannot use filepath.join here as it will break everything during the transfer
-	pathToDDC := path.Join(ddcTmpDir, "ddc")
+	pathToDDC := path.Join(c.TransferDir, "ddc")
 	// we cannot use filepath.join here as it will break everything during the transfer
-	pathToDDCYAML := path.Join(ddcTmpDir, "ddc.yaml")
+	pathToDDCYAML := path.Join(c.TransferDir, "ddc.yaml")
 	dremioPAT := c.DremioPAT
 	versionMatch := false
 	// //check if the version is up to date
@@ -58,15 +57,15 @@ func Capture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputL
 	if !versionMatch {
 		consoleprint.UpdateNodeState(host, "CREATING REMOTE DIR")
 		//remotely make TransferDir
-		if out, err := c.Collector.HostExecute(false, c.Host, "mkdir", "-p", ddcTmpDir); err != nil {
+		if out, err := c.Collector.HostExecute(false, c.Host, "mkdir", "-p", c.TransferDir); err != nil {
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - TRANSFER SETUP - (%v) %v", err, out))
-			return 0, "", fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, ddcTmpDir, err, out)
+			return fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, c.TransferDir, err, out)
 		}
 		consoleprint.UpdateNodeState(host, "COPY DDC TO HOST")
 		//copy file to TransferDir assume there is
 		if out, err := c.Collector.CopyToHost(c.Host, localDDCPath, pathToDDC); err != nil {
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC COPY - (%v) %v", err, out))
-			return 0, "", fmt.Errorf("unable to copy local ddc %v to remote path due to error: '%v' with output '%v'", localDDCPath, err, out)
+			return fmt.Errorf("unable to copy local ddc %v to remote path due to error: '%v' with output '%v'", localDDCPath, err, out)
 			//this is a critical error so it is safe to exit
 		}
 		simplelog.Infof("successfully copied ddc to host %v at %v", host, pathToDDC)
@@ -86,14 +85,14 @@ func Capture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputL
 		//make  exec TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "chmod", "+x", pathToDDC); err != nil {
 			consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC SETTING PERMS - (%v) %v", err, out))
-			return 0, "", fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
+			return fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 		}
 	}
 	consoleprint.UpdateNodeState(host, "COPY DDC.YAML")
 	//always update the configuration
 	if out, err := c.Collector.CopyToHost(c.Host, localDDCYamlPath, pathToDDCYAML); err != nil {
 		consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - DDC.YAML COPY - (%v) %v", err, out))
-		return 0, "", fmt.Errorf("unable to copy local ddc yaml '%v' to remote path due to error: '%v' with output '%v'", localDDCYamlPath, err, out)
+		return fmt.Errorf("unable to copy local ddc yaml '%v' to remote path due to error: '%v' with output '%v'", localDDCYamlPath, err, out)
 		//this is a critical step and will not work without it so exit
 	}
 	simplelog.Infof("successfully copied ddc.yaml to host %v at %v", host, pathToDDCYAML)
@@ -132,33 +131,36 @@ func Capture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputL
 	if err != nil {
 		status := "FAILED - LOCAL-COLLECT - " + strutils.LimitString(strings.Join(allHostLog, " - "), 1024)
 		consoleprint.UpdateNodeState(host, status)
-		return 0, "", fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
+		return fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
 	}
 
 	simplelog.Debugf("on host %v capture successful", host)
 	consoleprint.UpdateNodeState(host, "COLLECTED")
+	return nil
+}
 
+func TransferCapture(c HostCaptureConfiguration, outputLoc string) (int64, string, error) {
 	hostname, err := c.Collector.HostExecute(false, c.Host, "cat", "/proc/sys/kernel/hostname")
 	if err != nil {
-		consoleprint.UpdateNodeState(host, "FAILED - COLLECT HOSTNAME")
-		return 0, "", fmt.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", host, err)
+		consoleprint.UpdateNodeState(c.Host, "FAILED - COLLECT HOSTNAME")
+		return 0, c.Host, fmt.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", c.Host, err)
 	}
 
 	//copy tar.gz back
 	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
 	//IMPORTANT we must use path.join and not filepath.join or everything will break
-	tarGZ := path.Join(ddcTmpDir, tgzFileName)
+	tarGZ := path.Join(c.TransferDir, tgzFileName)
 	outDir := path.Dir(outputLoc)
 	if outDir == "" {
 		outDir = fmt.Sprintf(".%v", filepath.Separator)
 	}
-	consoleprint.UpdateNodeState(host, "TARBALL TRANSFER")
+	consoleprint.UpdateNodeState(c.Host, "TARBALL TRANSFER")
 
 	//IMPORTANT we want filepath.Join here for the destination because it may be copying back to windows
 	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := c.Collector.CopyFromHost(c.Host, tarGZ, destFile); err != nil {
-		consoleprint.UpdateNodeState(host, fmt.Sprintf("FAILED - COLLECTION TRANSFER - (%v) %v", err, out))
-		return 0, "", fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, host, outDir, err, out)
+		consoleprint.UpdateNodeState(c.Host, fmt.Sprintf("FAILED - COLLECTION TRANSFER - (%v) %v", err, out))
+		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, c.Host, outDir, err, out)
 	}
 
 	fileInfo, err := c.DDCfs.Stat(destFile)
@@ -169,14 +171,14 @@ func Capture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath, outputL
 	} else {
 		size = fileInfo.Size()
 	}
-	consoleprint.UpdateNodeState(host, "COMPLETED")
-	simplelog.Infof("host %v copied %v to %v it was %v bytes", host, tarGZ, destFile, size)
+	consoleprint.UpdateNodeState(c.Host, "COMPLETED")
+	simplelog.Infof("host %v copied %v to %v it was %v bytes", c.Host, tarGZ, destFile, size)
 	//defer delete tar.gz
 	defer func() {
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
-			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", host, err, out)
+			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", c.Host, err, out)
 		} else {
-			simplelog.Debugf("on host %v file %v has been removed", host, ddcTmpDir)
+			simplelog.Debugf("on host %v file %v has been removed", c.Host, c.TransferDir)
 		}
 	}()
 	return size, destFile, nil

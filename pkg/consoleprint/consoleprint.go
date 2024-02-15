@@ -49,6 +49,8 @@ type CollectionStats struct {
 	enabled              []string
 	disabled             []string
 	patSet               bool
+	startTime            int64
+	endTime              int64
 	mu                   sync.RWMutex // Mutex to protect access
 }
 
@@ -86,6 +88,7 @@ func UpdateResult(result string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.result = result
+	c.endTime = time.Now().Unix()
 }
 
 func UpdateCollectionMode(collectionMode string) {
@@ -100,6 +103,7 @@ func init() {
 	c = &CollectionStats{
 		nodeCaptureStats:   make(map[string]*NodeCaptureStats),
 		nodeDetectDisabled: make(map[string]bool),
+		startTime:          time.Now().Unix(),
 	}
 	if strings.HasSuffix(os.Args[0], ".test") {
 		clearCode = "CLEAR SCREEN"
@@ -179,6 +183,12 @@ func PrintState() {
 	if len(c.nodeDetectDisabled) > 0 {
 		autodetectEnabled = fmt.Sprintf("Disabled on %v/%v nodes files may be missing try again with the --sudo-user flag", len(c.nodeDetectDisabled), len(c.nodeCaptureStats))
 	}
+	var durationElapsed int64
+	if c.endTime > 0 {
+		durationElapsed = c.endTime - c.startTime
+	} else {
+		durationElapsed = time.Now().Unix() - c.startTime
+	}
 	fmt.Printf(
 		`=================================
 == Dremio Diagnostic Collector ==
@@ -197,13 +207,14 @@ Collection Mode      : %v
 
 -- status --
 Transfers Complete   : %v/%v
+Collect Duration     : elapsed %v seconds
 Tarball              : %v
 Result               : %v
 
 
 %v
 `, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), patMessage, autodetectEnabled, strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
-		c.tarball, c.result, nodes.String())
+		durationElapsed, c.tarball, c.result, nodes.String())
 	c.mu.Unlock()
 
 }
