@@ -110,7 +110,7 @@ func collect(c *conf.CollectConf) error {
 	if err := createAllDirs(c); err != nil {
 		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
-	t, err := threading.NewThreadPool(c.NumberThreads(), 1)
+	t, err := threading.NewThreadPool(c.NumberThreads(), 1, true)
 	if err != nil {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}

@@ -30,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
@@ -124,7 +125,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
 	}
 	hosts := append(coordinators, executors...)
-
+	pool, err := threading.NewThreadPool(2, 100, false)
+	if err != nil {
+		return err
+	}
 	//now safe to collect cluster level information
 	for _, c := range clusterCollection {
 		c(hosts)
@@ -135,7 +139,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	var totalSkippedFiles []string
 	var nodesConnectedTo int
 	var m sync.Mutex
-	var wg sync.WaitGroup
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
 		simplelog.GetLogLoc(),
@@ -149,13 +152,12 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	)
 	for _, coordinator := range coordinators {
 		nodesConnectedTo++
-		wg.Add(1)
-		go func(host string) {
-			defer wg.Done()
+		copyCoordinator := coordinator
+		pool.AddJob(func() error {
 			coordinatorCaptureConf := HostCaptureConfiguration{
 				Collector:      c,
 				IsCoordinator:  true,
-				Host:           host,
+				Host:           copyCoordinator,
 				CopyStrategy:   s,
 				DDCfs:          ddcfs,
 				TransferDir:    transferDir,
@@ -178,19 +180,18 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				})
 				m.Unlock()
 			}
-
-		}(coordinator)
+			return err
+		})
 	}
 
-	for _, executor := range executors {
+	for _, e := range executors {
 		nodesConnectedTo++
-		wg.Add(1)
-		go func(host string) {
-			defer wg.Done()
+		executorCopy := e
+		pool.AddJob(func() error {
 			executorCaptureConf := HostCaptureConfiguration{
 				Collector:      c,
 				IsCoordinator:  false,
-				Host:           host,
+				Host:           executorCopy,
 				CopyStrategy:   s,
 				DDCfs:          ddcfs,
 				TransferDir:    transferDir,
@@ -212,9 +213,12 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				})
 				m.Unlock()
 			}
-		}(executor)
+			return err
+		})
 	}
-	wg.Wait()
+	if err := pool.ProcessAndWait(); err != nil {
+		return err
+	}
 	end := time.Now().UTC()
 	var collectionInfo SummaryInfo
 	collectionInfo.EndTimeUTC = end

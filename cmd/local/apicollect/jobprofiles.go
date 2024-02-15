@@ -93,7 +93,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	var m sync.Mutex
 	if len(profilesToCollect) > 0 {
 		simplelog.Debugf("Downloading %v job profiles...", len(profilesToCollect))
-		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100)
+		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100, false)
 		if err != nil {
 			return 0, 0, fmt.Errorf("invalid thread pool: %w", err)
 		}

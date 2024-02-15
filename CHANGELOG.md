@@ -1,14 +1,20 @@
 # Changelog
+## [2.0.2] - 2024-02-15
+
+### Added
+
+* retries=50 added to the kubectl cp command
+* limit number of transfers of tarballs to 2 at once to help with people that have systems or bandwidth limitations
 
 ## [2.0.1] - 2024-02-14
 
-## Added
+### Added
 
 * validation for the --collect mode.
 
 ## [2.0.0] - 2024-02-13 
 
-## Fixed
+### Fixed
 
 * a log was leaking to the output when it should have been going to ddc.log
 * logging error, jstack collection was called gc log collection
@@ -488,6 +494,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.0.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.1...v2.0.0
 [1.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.0...v1.0.1

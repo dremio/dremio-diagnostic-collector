@@ -30,10 +30,11 @@ type ThreadPool struct {
 	pendingJobs      int
 	totalJobs        int
 	loggingFrequency int
+	output           bool
 	mut              sync.Mutex
 }
 
-func NewThreadPool(numberThreads int, loggingFrequency int) (*ThreadPool, error) {
+func NewThreadPool(numberThreads int, loggingFrequency int, output bool) (*ThreadPool, error) {
 	if numberThreads == 0 {
 		return &ThreadPool{}, errors.New("invalid number of threads at 0")
 	}
@@ -47,7 +48,7 @@ func NewThreadPool(numberThreads int, loggingFrequency int) (*ThreadPool, error)
 	}, nil
 }
 
-func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency int) (*ThreadPool, error) {
+func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency int, output bool) (*ThreadPool, error) {
 	if numberThreads == 0 {
 		return &ThreadPool{}, errors.New("invalid number of threads at 0")
 	}
@@ -57,6 +58,7 @@ func NewThreadPoolWithJobQueue(numberThreads, jobQueueSize int, loggingFrequency
 		numberThreads:    numberThreads,
 		jobs:             jobs,
 		loggingFrequency: loggingFrequency,
+		output:           output,
 	}, nil
 }
 
@@ -75,10 +77,14 @@ func (t *ThreadPool) worker() {
 	for job := range t.jobs {
 		err := job()
 		if err != nil {
-			fmt.Print("x")
+			if t.output {
+				fmt.Print("x")
+			}
 			simplelog.Errorf("Failed to execute job: %v", err)
 		} else {
-			fmt.Print(".")
+			if t.output {
+				fmt.Print(".")
+			}
 		}
 		t.mut.Lock()
 		t.pendingJobs--

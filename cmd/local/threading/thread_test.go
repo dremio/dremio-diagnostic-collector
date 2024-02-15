@@ -28,7 +28,7 @@ var (
 )
 
 var setupThreadPool = func() {
-	t, err := threading.NewThreadPool(2, 1)
+	t, err := threading.NewThreadPool(2, 1, true)
 	if err != nil {
 		log.Fatal(err)
 	}
