@@ -61,6 +61,7 @@ var disablePrompt bool
 var detectNamespace bool
 var collectionMode string
 var cliAuthToken string
+var pid string
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -231,6 +232,26 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+		if pid != "" {
+			if _, err := os.Stat(pid); err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("unable to read pid location '%v' with error: '%v'", pid, err)
+				}
+				// this means nothing is present great continue
+				if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
+					return fmt.Errorf("unable to write pid file '%v: %v", pid, err)
+				}
+				defer func() {
+					if err := os.Remove(pid); err != nil {
+						msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
+						fmt.Println(msg)
+						simplelog.Error(msg)
+					}
+				}()
+			} else {
+				return fmt.Errorf("DDC is running based on pid file '%v'. If this is a stale file then please remove", pid)
+			}
+		}
 		if namespace == "" && sshUser == "" && !disablePrompt {
 			// fire configuration prompt
 			prompt := promptui.Select{
@@ -494,6 +515,12 @@ func init() {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}
+	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
+	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 	execLoc, err := os.Executable()
