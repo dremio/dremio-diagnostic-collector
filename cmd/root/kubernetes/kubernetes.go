@@ -140,7 +140,7 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		Buff:   &buff,
 		Output: output,
 	}
-	return exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: writer,
 		Stderr: writer,
 	})
@@ -208,7 +208,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		return "", err
 	}
 	var errBuff bytes.Buffer
-	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: outStream,
 		Stderr: &errBuff,
 	})
@@ -254,7 +254,7 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", err
 	}
 	var errBuff bytes.Buffer
-	err = exec.StreamWithContext(context.TODO(), remotecommand.StreamOptions{
+	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:  reader,
 		Stdout: &errBuff,
 		Stderr: &errBuff,
@@ -276,7 +276,7 @@ func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.TODO(), meta_v1.ListOptions{
+	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{
 		LabelSelector: "role=dremio-cluster-pod",
 	})
 	if err != nil {
@@ -310,13 +310,13 @@ func GetClusters() ([]string, error) {
 	if err != nil {
 		return []string{}, err
 	}
-	ns, err := clientset.CoreV1().Namespaces().List(context.TODO(), meta_v1.ListOptions{})
+	ns, err := clientset.CoreV1().Namespaces().List(context.Background(), meta_v1.ListOptions{})
 	if err != nil {
 		return []string{}, err
 	}
 	var dremioClusters []string
 	for _, n := range ns.Items {
-		pods, err := clientset.CoreV1().Pods(n.Name).List(context.TODO(), meta_v1.ListOptions{
+		pods, err := clientset.CoreV1().Pods(n.Name).List(context.Background(), meta_v1.ListOptions{
 			LabelSelector: "role=dremio-cluster-pod",
 		})
 		if err != nil {
