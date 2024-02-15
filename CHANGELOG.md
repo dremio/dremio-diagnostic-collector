@@ -3,7 +3,7 @@
 
 ### Added
 
-* retries=50 added to the kubectl cp command
+* retries=5 added to the kubectl cp command
 * limit number of transfers of tarballs to 2 at once to help with system or bandwidth limitations
 
 ## [2.0.1] - 2024-02-14
