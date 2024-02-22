@@ -49,7 +49,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
-var ddcYamlLoc, collectionMode string
+var ddcYamlLoc, collectionMode, pid string
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
@@ -559,7 +559,7 @@ var LocalCollectCmd = &cobra.Command{
 		})
 		msg, err := Execute(args, overrides)
 		if err != nil {
-			fmt.Printf("\nCRITICAL ERROR: %v\n", errors.Unwrap(err).Error())
+			fmt.Printf("\nCRITICAL ERROR: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println(msg)
@@ -570,6 +570,26 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 	simplelog.Infof("args: %v", strings.Join(args, " "))
 	fmt.Println(strings.TrimSpace(versions.GetCLIVersion()))
+	if pid != "" {
+		if _, err := os.Stat(pid); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("unable to read pid location '%v' with error: '%w'", pid, err)
+			}
+			// this means nothing is present great continue
+			if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
+				return "", fmt.Errorf("unable to write pid file '%v: %w", pid, err)
+			}
+			defer func() {
+				if err := os.Remove(pid); err != nil {
+					msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
+					fmt.Println(msg)
+					simplelog.Error(msg)
+				}
+			}()
+		} else {
+			return "", fmt.Errorf("DDC is running based on pid file '%v'. If this is a stale file then please remove", pid)
+		}
+	}
 	startTime := time.Now().Unix()
 	if err := validation.ValidateCollectMode(collectionMode); err != nil {
 		return "", err
@@ -619,7 +639,11 @@ func init() {
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
-
+	LocalCollectCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
+	if err := LocalCollectCmd.Flags().MarkHidden("pid"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
 	execLoc, err := os.Executable()
 	if err != nil {
 		fmt.Printf("unable to find ddc, critical error %v", err)

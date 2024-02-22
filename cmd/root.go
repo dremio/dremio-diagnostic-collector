@@ -62,6 +62,7 @@ var detectNamespace bool
 var collectionMode string
 var cliAuthToken string
 var pid string
+var transferThreads int
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -300,7 +301,7 @@ func Execute(args []string) error {
 					}
 				}
 				selectPrompt := promptui.Select{
-					Label: "ssh key location (from .ssh directory)",
+					Label: "ssh key location (from $HOME/.ssh directory)",
 					Items: sshKeys,
 				}
 				_, sshKeyLoc, err = selectPrompt.Run()
@@ -309,7 +310,7 @@ func Execute(args []string) error {
 				}
 
 				prompt = promptui.Prompt{
-					Label: "coordinator list ex 192.168.1.10,192.168.1.12",
+					Label: "coordinator list ex (192.168.1.10,192.168.1.12)",
 				}
 				coordinatorStr, err = prompt.Run()
 				if err != nil {
@@ -317,7 +318,7 @@ func Execute(args []string) error {
 				}
 
 				prompt = promptui.Prompt{
-					Label: "executor list ex 192.168.1.10,192.168.1.12",
+					Label: "executor list ex (192.168.1.10,192.168.1.12)",
 				}
 				executorsStr, err = prompt.Run()
 				if err != nil {
@@ -438,6 +439,7 @@ func Execute(args []string) error {
 			Disabled:              disabled,
 			DisableFreeSpaceCheck: disableFreeSpaceCheck,
 			CollectionMode:        collectionMode,
+			TransferThreads:       transferThreads,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc:      sshKeyLoc,
@@ -517,6 +519,11 @@ func init() {
 	}
 	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
+	if err := RootCmd.Flags().MarkHidden("transfer-threads"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}

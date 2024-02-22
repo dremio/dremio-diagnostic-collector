@@ -70,6 +70,7 @@ type Args struct {
 	Enabled               []string
 	DisableFreeSpaceCheck bool
 	CollectionMode        string
+	TransferThreads       int
 }
 
 type HostCaptureConfiguration struct {
@@ -93,6 +94,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	disableFreeSpaceCheck := collectionArgs.DisableFreeSpaceCheck
 	collectionMode := collectionArgs.CollectionMode
+	transferThreads := collectionArgs.TransferThreads
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
 	err = os.Mkdir(tmpInstallDir, 0700)
@@ -147,7 +149,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		0,
 		len(coordinators)+len(executors),
 	)
-	transferThreadPool, err := threading.NewThreadPool(2, 1, false)
+	transferThreadPool, err := threading.NewThreadPool(transferThreads, 1, false)
 	if err != nil {
 		return err
 	}
