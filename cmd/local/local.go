@@ -311,7 +311,11 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 					if len(matched) == 36 {
 						endTime := time.Now().Unix()
 						seconds := endTime - startTime
-						simplelog.Infof("found cluster ID '%v' in file %v in %v seconds at %.2f bytes/second", matched, path, seconds, float64(bytesRead)/float64(seconds))
+						if seconds > 0 {
+							simplelog.Infof("found cluster ID '%v' in file %v in %v seconds at %.2f bytes/second", matched, path, seconds, float64(bytesRead)/float64(seconds))
+						} else {
+							simplelog.Infof("found cluster ID '%v' in file %v in less than a second", matched, path)
+						}
 						clusterID = matched
 						return nil
 					}
@@ -433,12 +437,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(osInfoFile), err)
 	}
 	defer func() {
-		if err := w.Sync(); err != nil {
-			simplelog.Warningf("unable to sync the os_info.txt file due to error: %v", err)
-		}
-		if err := w.Close(); err != nil {
-			simplelog.Warningf("unable to close the os_info.txt file due to error: %v", err)
-		}
+
 	}()
 
 	simplelog.Debug("/etc/*-release")
@@ -511,7 +510,24 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
 
+	if c.DremioPID() > 0 {
+		_, err = w.Write([]byte("___\n>>> ps eww\n"))
+		if err != nil {
+			simplelog.Warningf("unable to write ps eww header for os_info.txt due to error %v", err)
+		}
+		err = ddcio.Shell(w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", c.DremioPID()))
+		if err != nil {
+			simplelog.Warningf("unable to write ps eww output for os_info.txt due to error %v", err)
+		}
+	}
+	if err := w.Sync(); err != nil {
+		return fmt.Errorf("unable to sync the os_info.txt file due to error: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("unable to close the os_info.txt file due to error: %v", err)
+	}
 	simplelog.Debugf("... Collecting OS Information from %v COMPLETED", c.NodeName())
+
 	return nil
 }
 

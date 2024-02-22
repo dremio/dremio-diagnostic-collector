@@ -163,7 +163,6 @@ func Shell(writer io.Writer, commandLine string) error {
 	if err != nil {
 		return fmt.Errorf("command execution failed: %w", err)
 	}
-
 	return nil
 }
 

@@ -362,17 +362,13 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 			// enable some autodetected directories
 			if dremioPIDIsValid {
 				var err error
-				var psOut string
-				detectedConfig, psOut, err = GetConfiguredDremioValuesFromPID(c.dremioPID)
+				detectedConfig, err = GetConfiguredDremioValuesFromPID(c.dremioPID)
 				if err != nil {
 					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 					fmt.Println(msg)
 					simplelog.Errorf(msg)
 				} else {
-					psEnvFile := filepath.Join(c.NodeInfoOutDir(), "ps-env-out.txt")
-					if err := os.WriteFile(psEnvFile, []byte(psOut), 0600); err != nil {
-						simplelog.Errorf("unable to output ps env file %v: %v", psEnvFile, err)
-					}
+
 					simplelog.Infof("configured values retrieved from ps output: %v:%v, %v:%v", KeyDremioLogDir, detectedConfig.LogDir, KeyCollectDremioConfiguration, detectedConfig.ConfDir)
 					c.dremioLogDir = detectedConfig.LogDir
 					c.dremioConfDir = detectedConfig.ConfDir
@@ -598,14 +594,21 @@ type DremioConfig struct {
 	ConfDir string
 }
 
-func GetConfiguredDremioValuesFromPID(dremioPID int) (DremioConfig, string, error) {
+func GetConfiguredDremioValuesFromPID(dremioPID int) (DremioConfig, error) {
+	psOut, err := ReadPSEnv(dremioPID)
+	if err != nil {
+		return DremioConfig{}, err
+	}
+	return ParsePSForConfig(psOut)
+}
+
+func ReadPSEnv(dremioPID int) (string, error) {
 	var w bytes.Buffer
 	err := ddcio.Shell(&w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
 	if err != nil {
-		return DremioConfig{}, "", err
+		return "", err
 	}
-	c, err := ParsePSForConfig(w.String())
-	return c, w.String(), err
+	return w.String(), nil
 }
 
 func ParsePSForConfig(ps string) (DremioConfig, error) {
