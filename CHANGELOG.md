@@ -1,4 +1,16 @@
 # Changelog
+## [2.1.1] - 2024-02-23
+
+### Added
+
+* more logging on retrieval of dremio home and log directories
+* storing ps output from autodetection in diag tarball under the node-info
+
+### Fixed
+
+* error message when findClusterID failed was confusing
+* sanitizing intput from autodetection of dremio home, conf and log directories
+
 ## [2.1.0] - 2024-02-15
 
 ### Added
@@ -494,6 +506,8 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.1.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.0...v2.1.1
+[2.1.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.2...v2.1.0
 [2.0.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.1...v2.0.2
 [2.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v1.0.1...v2.0.0

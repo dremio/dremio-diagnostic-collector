@@ -272,9 +272,10 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 	var clusterID string
 	rocksDBDir := c.DremioRocksDBDir()
 	simplelog.Debugf("checking dir %v for cluster version", rocksDBDir)
+
 	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("prevent panic by handling failure accessing a path %q: %v", path, err)
+			return fmt.Errorf("error accessing path %q: %v", path, err)
 		}
 
 		if clusterID != "" {
@@ -285,7 +286,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 			f, err := os.Open(filepath.Clean(path))
 			simplelog.Debugf("checking file %v for cluster version", f.Name())
 			if err != nil {
-				return fmt.Errorf("error reading file %s: %v", path, err)
+				return fmt.Errorf("error reading file %q: %v", path, err)
 			}
 			defer f.Close()
 			var tempString string
@@ -293,12 +294,14 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 			matched := ""
 			nextChar := 'c'
 			skipped := 0
+			var bytesRead int64
 			for {
 				// Read file byte by byte
 				b, err := reader.ReadByte()
 				if err != nil {
 					break // End of file or an error
 				}
+				bytesRead++
 				if tempString == "clusterIdentity" {
 					if skipped != 4 {
 						skipped++
@@ -307,7 +310,8 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 					matched += string(b)
 					if len(matched) == 36 {
 						endTime := time.Now().Unix()
-						simplelog.Infof("found cluster ID '%v' in file %v in %v seconds", matched, path, endTime-startTime)
+						seconds := endTime - startTime
+						simplelog.Infof("found cluster ID '%v' in file %v in %v seconds at %.2f bytes/second", matched, path, seconds, float64(bytesRead)/float64(seconds))
 						clusterID = matched
 						return nil
 					}
