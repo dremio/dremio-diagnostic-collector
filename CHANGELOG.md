@@ -5,6 +5,7 @@
 
 * more logging on retrieval of dremio home and log directories
 * storing ps output from autodetection in diag tarball under the node-info
+* log rate of reading files when searching for cluster ID
 
 ### Fixed
 
