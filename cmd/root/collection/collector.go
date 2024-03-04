@@ -16,15 +16,11 @@
 package collection
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -34,6 +30,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -266,7 +263,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
 		for _, t := range tarballs {
 			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDir())
-			if err := ExtractTarGz(t, s.GetTmpDir()); err != nil {
+			if err := archive.ExtractTarGz(t, s.GetTmpDir()); err != nil {
 				simplelog.Errorf("unable to extract tarball %v due to error %v", t, err)
 			}
 			simplelog.Debugf("extracted %v", t)
@@ -337,71 +334,4 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 		return nil
 	})
 	return
-}
-
-// Sanitize archive file pathing from "G305: Zip Slip vulnerability"
-func SanitizeArchivePath(d, t string) (v string, err error) {
-	v = filepath.Join(d, t)
-	if strings.HasPrefix(v, filepath.Clean(d)) {
-		return v, nil
-	}
-	return "", fmt.Errorf("%s: %s", "content filepath is tainted", t)
-}
-
-func ExtractTarGz(gzFilePath, dest string) error {
-	reader, err := os.Open(path.Clean(gzFilePath))
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	gzReader, err := gzip.NewReader(reader)
-	if err != nil {
-		return err
-	}
-	defer gzReader.Close()
-
-	tarReader := tar.NewReader(gzReader)
-
-	for {
-		header, err := tarReader.Next()
-		switch {
-		case err == io.EOF:
-			return nil
-		case err != nil:
-			return err
-		case header == nil:
-			continue
-		}
-		target, err := SanitizeArchivePath(dest, header.Name)
-		if err != nil {
-			return err
-		}
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(path.Clean(target), 0750); err != nil {
-					return err
-				}
-			}
-		case tar.TypeReg:
-			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				simplelog.Errorf("skipping file %v due to error %v", file, err)
-				continue
-			}
-			defer file.Close()
-			for {
-				_, err := io.CopyN(file, tarReader, 1024)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					return err
-				}
-			}
-			simplelog.Debugf("extracted file %v", file.Name())
-		}
-	}
 }

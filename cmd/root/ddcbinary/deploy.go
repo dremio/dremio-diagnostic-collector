@@ -61,7 +61,7 @@ func Unzip(src string) error {
 		}
 	}()
 	maxFiles := 1
-	maxSize := uint64(1024 * 1024 * 50)
+	maxSize := uint64(1024 * 1024 * 100)
 	totalSize := uint64(0)
 	if len(r.File) > maxFiles {
 		return fmt.Errorf("too many files in zip %v which are %#v", len(r.File), r.File)
