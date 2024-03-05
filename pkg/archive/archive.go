@@ -176,10 +176,10 @@ func ExtractTarGz(gzFilePath, dest string) error {
 		return err
 	}
 	defer reader.Close()
-	return ExtractTarGzStream(reader, dest)
+	return ExtractTarGzStream(reader, dest, "")
 }
 
-func ExtractTarGzStream(reader io.Reader, dest string) error {
+func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
 	gzReader, err := gzip.NewReader(reader)
 	if err != nil {
 		return err
@@ -188,17 +188,23 @@ func ExtractTarGzStream(reader io.Reader, dest string) error {
 
 	tarReader := tar.NewReader(gzReader)
 
+	var totalCopied int64
 	for {
 		header, err := tarReader.Next()
 		switch {
 		case err == io.EOF:
+			simplelog.Infof("extraction complete %v: %v bytes", dest, totalCopied)
 			return nil
 		case err != nil:
 			return err
 		case header == nil:
 			continue
 		}
-		target, err := SanitizeArchivePath(dest, header.Name)
+		var headerName = header.Name
+		if pathToStrip != "" {
+			headerName = strings.TrimPrefix(headerName, pathToStrip)
+		}
+		target, err := SanitizeArchivePath(dest, headerName)
 		if err != nil {
 			return err
 		}
@@ -218,15 +224,15 @@ func ExtractTarGzStream(reader io.Reader, dest string) error {
 			}
 			defer file.Close()
 			for {
-				_, err := io.CopyN(file, tarReader, 1024)
+				copied, err := io.CopyN(file, tarReader, 1024)
 				if err != nil {
 					if err == io.EOF {
 						break
 					}
 					return err
 				}
+				totalCopied += copied
 			}
-			simplelog.Debugf("extracted file %v", file.Name())
 		}
 	}
 }

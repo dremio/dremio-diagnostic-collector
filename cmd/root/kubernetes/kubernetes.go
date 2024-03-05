@@ -33,6 +33,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	//"sigs.k8s.io/kustomize/kyaml/fn/runtime/container"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -154,7 +155,7 @@ type K8SWriter struct {
 }
 
 func (w *K8SWriter) Write(p []byte) (n int, err error) {
-	w.Output(fmt.Sprint(p))
+	w.Output(string(p))
 	return w.Buff.Write(p)
 }
 
@@ -185,7 +186,73 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 
-	return "", nil
+	reader, writer := io.Pipe()
+
+	containerName, err := c.getPrimaryContainer(hostString)
+	if err != nil {
+		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
+	}
+	simplelog.Infof("transfering from %v:%v to %v", hostString, source, destination)
+	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -czf - %v", source)}
+	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
+		Namespace(c.namespace).SubResource("exec")
+	option := &v1.PodExecOptions{
+		Container: containerName,
+		Command:   cmdArr,
+		Stdin:     true,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
+	}
+
+	req.VersionedParams(
+		option,
+		scheme.ParameterCodec,
+	)
+
+	exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
+	if err != nil {
+		return "", fmt.Errorf("spdy failed: %v", err)
+	}
+	var errBuff bytes.Buffer
+	go func() {
+		defer writer.Close()
+		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+			Stdin:  os.Stdin,
+			Stdout: writer,
+			Stderr: &errBuff,
+			Tty:    false,
+		})
+		if err != nil {
+			simplelog.Errorf("failed streaming %v - %v", err, errBuff.String())
+		}
+	}()
+	if err := archive.ExtractTarGzStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
+		return "", fmt.Errorf("unable to copy %v", err)
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			simplelog.Errorf("unable to close stream: %v", err)
+		}
+	}()
+	return errBuff.String(), nil
+}
+
+func (c *KubectlK8sActions) getPrimaryContainer(hostString string) (string, error) {
+	pods, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{})
+	if err != nil {
+		return "", err
+	}
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no pod match for %v", hostString)
+	}
+	var containerName string
+	for _, pod := range pods.Items {
+		if pod.Name == hostString {
+			containerName = pod.Spec.Containers[0].Name
+		}
+	}
+	return containerName, nil
 }
 
 func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
@@ -201,8 +268,8 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(src string, dest string, writer io.WriteCloser) {
-		defer wg.Done()
 		defer writer.Close()
+		defer wg.Done()
 		srcDir := path.Dir(src)
 		if err := archive.TarGzDirFilteredStream(srcDir, writer, func(s string) bool {
 			if s == src {
@@ -214,24 +281,11 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		}
 	}(source, destination, writer)
 	destDir := path.Dir(destination)
-	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -xzmf - -C %v", destDir)}
-	//destDir := path.Dir(destination)
-	//if len(destDir) > 0 {
-	//cmdArr = append(cmdArr, "-C", destDir)
-	//}
-	pods, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{})
+	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
 	}
-	if len(pods.Items) == 0 {
-		return "", fmt.Errorf("no pod match for %v", hostString)
-	}
-	var containerName string
-	for _, pod := range pods.Items {
-		if pod.Name == hostString {
-			containerName = pod.Spec.Containers[0].Name
-		}
-	}
+	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -xzmf - -C %v", destDir)}
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")
 	option := &v1.PodExecOptions{
