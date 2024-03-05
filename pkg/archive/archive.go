@@ -202,7 +202,8 @@ func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
 		}
 		var headerName = header.Name
 		if pathToStrip != "" {
-			headerName = strings.TrimPrefix(headerName, pathToStrip)
+			simplelog.Infof("stripping %v with %v", headerName, pathToStrip)
+			headerName = strings.TrimPrefix("/"+headerName, pathToStrip)
 		}
 		target, err := SanitizeArchivePath(dest, headerName)
 		if err != nil {

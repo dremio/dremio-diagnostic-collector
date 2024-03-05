@@ -1,4 +1,20 @@
 # Changelog
+
+## [2.2.0] - UNRELEASED
+
+### Added
+
+* we now support running ddc in a kubernetes pod assuming the following rights have been giving to the pod
+
+
+### Changed
+ 
+* use kubernetes api instead of kubectl
+
+### Removed
+
+* kubectl describe node and kubectl describe pod had to be removed as they required kubectl
+
 ## [2.1.2] - 2024-02-23
 
 ### Added

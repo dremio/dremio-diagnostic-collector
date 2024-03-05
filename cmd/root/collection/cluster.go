@@ -161,14 +161,56 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	req := c.CoreV1().RESTClient().Post().Resource(resource).Namespace(namespace)
-
+	//options := metav1.ListOptions{}
+	version := "v1"
+	switch resource {
+	case "nodes":
+		// global object
+		namespace = ""
+	case "sc":
+		namespace = ""
+	case "pvc":
+	case "pv":
+		namespace = ""
+	case "service":
+	case "endpoints":
+	case "pods":
+	case "deployments":
+		version = "apps/v1"
+	case "statefulsets":
+		version = "apps/v1"
+	case "daemonset":
+		version = "apps/v1"
+	case "replicaset":
+		version = "apps/v1"
+	case "cronjob":
+		version = "batch/v1"
+	case "job":
+		version = "batch/v1"
+	case "events":
+		version = "events.k8s.io/v1"
+	case "ingress":
+	case "limitrange":
+	case "resourcequota":
+	case "hpa":
+	case "pdb":
+	case "pc":
+	default:
+		simplelog.Errorf("resource (%v) does not have an implementation", resource)
+	}
+	var statusCode int
+	var absPath string
+	if namespace == "" {
+		absPath = fmt.Sprintf("/apis/%s/%s", version, resource)
+	} else {
+		absPath = fmt.Sprintf("/apis/%s/namespaces/%s/%s", version, namespace, resource)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(clusterRequestTimeout)*time.Second)
 	defer cancel() // releases resources if slowOperation completes before timeout elapses
-	res, err := req.Do(ctx).Raw()
-	if err != nil {
-		return []byte(""), err
+	response := c.RESTClient().Get().AbsPath(absPath).
+		Do(ctx).StatusCode(&statusCode)
+	if statusCode != 200 {
+		return []byte(""), fmt.Errorf("expected status code 200 but got %v when querying resouces %v", statusCode, resource)
 	}
-
-	return res, nil
+	return response.Raw()
 }

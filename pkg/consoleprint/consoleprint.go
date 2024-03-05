@@ -177,7 +177,7 @@ func PrintState() {
 	if c.patSet {
 		patMessage = "Yes"
 	} else {
-		patMessage = "No (disables Job Profiles, WLM, KV Store and System Table Reports use --collect-health-check if you want these)"
+		patMessage = "No (disables Job Profiles, WLM, KV Store and System Table Reports use --collect health-check if you want these)"
 	}
 	autodetectEnabled := "Yes"
 	if len(c.nodeDetectDisabled) > 0 {

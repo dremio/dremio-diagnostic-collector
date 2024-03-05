@@ -71,15 +71,12 @@ func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 	var config *rest.Config
 	_, err := os.Stat(kubeConfig)
 	if err != nil {
-		fmt.Println("IN cluster config")
 		// fall back to include config
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		fmt.Printf("using k8s file cluster config %v\n", kubeConfig)
-
 		config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
 		if err != nil {
 			return nil, nil, err
@@ -101,11 +98,6 @@ type KubectlK8sActions struct {
 
 func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
 	return c.client
-}
-
-func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
-	//windows does the wrong thing for kubectl here and provides a path with C:\ we need to remove it as kubectl detects this as a remote destination
-	return strings.TrimPrefix(rawDest, "C:")
 }
 
 func (c *KubectlK8sActions) Name() string {
