@@ -28,7 +28,6 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
@@ -50,14 +49,26 @@ type SSHTestConf struct {
 	IsEnterprise     bool   `json:"is-enterprise"`
 }
 
-func TestSSHBasedRemoteCollect(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping testing in short mode")
-	}
-
-	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
+func GetJson(t *testing.T) []byte {
+	t.Helper()
+	oldTestJson := filepath.Join("testdata", "ssh.json")
+	home, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatalf(`unable to read ssh.json in ./integrationtest/ssh/testdata/ssh.json
+		t.Fatal(err)
+	}
+	testJson := filepath.Join(home, ".config", "ddc-test", "ssh.json")
+	if _, err := os.Stat(oldTestJson); err == nil {
+		t.Logf("moving %v to %v", oldTestJson, testJson)
+		if err := os.MkdirAll(filepath.Dir(testJson), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(oldTestJson, testJson); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, err := os.ReadFile(testJson)
+	if err != nil {
+		t.Fatalf(`unable to read ssh.json in %v 
 you must make one with the following format:
 {
     "sudo_user": "dremio",
@@ -76,9 +87,17 @@ you must make one with the following format:
 }
 
 
-Error was: %v`, err)
+Error was: %v`, testJson, err)
+	}
+	return b
+}
+
+func TestSSHBasedRemoteCollect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
 	}
 	var sshConf SSHTestConf
+	b := GetJson(t)
 	if err := json.Unmarshal(b, &sshConf); err != nil {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
@@ -114,7 +133,7 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard"}
-	err = cmd.Execute(args)
+	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
 	}
@@ -320,29 +339,8 @@ func TestValidateBadCollectFlag(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
 	}
-	b, err := os.ReadFile(filepath.Join("testdata", "ssh.json"))
-	if err != nil {
-		t.Fatalf(`unable to read ssh.json in ./integrationtest/ssh/testdata/ssh.json
-you must make one with the following format:
-{
-    "sudo_user": "dremio",
-    "user": "myuser", 
-    "public": "ssh-ed25519 publickey", 
-    "private":"-----BEGIN OPENSSH PRIVATE KEY-----\nprivatekey\n-----END OPENSSH PRIVATE KEY-----\n",
-    "coordinator": "coordinator-ip",
-    "executor": "executor1",
-    "dremio-log-dir": "/opt/dremio/log",
-    "dremio-conf-dir": "/opt/dremio/conf",
-    "dremio-rocksdb-dir": "/opt/dremio/cm/db/",
-    "dremio-username": "dremio",
-    "dremio-pat": "mytoken",
-    "dremio-endpoint": "http://localhost:9047",
-    "is-enterprise": true
-}
-
-
-Error was: %v`, err)
-	}
+    b := GetJson(t)
+	var err error
 	var sshConf SSHTestConf
 	if err := json.Unmarshal(b, &sshConf); err != nil {
 		t.Errorf("failed unmarshalling string: %v", err)

@@ -33,7 +33,6 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	//"sigs.k8s.io/kustomize/kyaml/fn/runtime/container"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -49,7 +48,7 @@ type KubeArgs struct {
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
 func NewKubectlK8sActions(kubeArgs KubeArgs) (*KubectlK8sActions, error) {
-	clientset, config, err := GetCientset()
+	clientset, config, err := GetClientset()
 	if err != nil {
 		return &KubectlK8sActions{}, err
 	}
@@ -60,7 +59,7 @@ func NewKubectlK8sActions(kubeArgs KubeArgs) (*KubectlK8sActions, error) {
 	}, nil
 }
 
-func GetCientset() (*kubernetes.Clientset, *rest.Config, error) {
+func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 	kubeConfig := os.Getenv("KUBECONFIG")
 	if kubeConfig == "" {
 		home, err := os.UserHomeDir()
@@ -210,13 +209,17 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		scheme.ParameterCodec,
 	)
 
-	exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
-	if err != nil {
-		return "", fmt.Errorf("spdy failed: %v", err)
-	}
 	var errBuff bytes.Buffer
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		defer writer.Close()
+		defer wg.Done()
+		exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
+		if err != nil {
+			simplelog.Errorf("spdy failed: %v", err)
+			return
+		}
 		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 			Stdin:  os.Stdin,
 			Stdout: writer,
@@ -230,11 +233,10 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 	if err := archive.ExtractTarGzStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
-	defer func() {
-		if err := reader.Close(); err != nil {
-			simplelog.Errorf("unable to close stream: %v", err)
-		}
-	}()
+	wg.Wait()
+	if err := reader.Close(); err != nil {
+		simplelog.Errorf("unable to close stream: %v", err)
+	}
 	return errBuff.String(), nil
 }
 
@@ -267,15 +269,12 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	reader, writer := io.Pipe()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(src string, dest string, writer io.WriteCloser) {
-		defer writer.Close()
+	go func(src string, dest string, w io.WriteCloser) {
+		defer w.Close()
 		defer wg.Done()
 		srcDir := path.Dir(src)
 		if err := archive.TarGzDirFilteredStream(srcDir, writer, func(s string) bool {
-			if s == src {
-				return true
-			}
-			return false
+			return s == src
 		}); err != nil {
 			simplelog.Errorf("unable to archive %v", err)
 		}
@@ -307,17 +306,19 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", fmt.Errorf("spdy failed: %v", err)
 	}
 	var errBuff bytes.Buffer
+	var outBuff bytes.Buffer
 	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdin:  reader,
-		Stdout: &errBuff,
+		Stdout: &outBuff,
 		Stderr: &errBuff,
 		Tty:    false,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String())
+		wg.Wait()
+		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String()+outBuff.String())
 	}
 	wg.Wait()
-	return errBuff.String(), nil
+	return errBuff.String() + outBuff.String(), nil
 }
 
 func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
@@ -357,7 +358,7 @@ func (c *KubectlK8sActions) HelpText() string {
 }
 
 func GetClusters() ([]string, error) {
-	clientset, _, err := GetCientset()
+	clientset, _, err := GetClientset()
 	if err != nil {
 		return []string{}, err
 	}
@@ -368,7 +369,6 @@ func GetClusters() ([]string, error) {
 	var dremioClusters []string
 	for _, n := range ns.Items {
 		pods, err := clientset.CoreV1().Pods(n.Name).List(context.Background(), meta_v1.ListOptions{
-
 			LabelSelector: "role=dremio-cluster-pod",
 		})
 		if err != nil {

@@ -34,7 +34,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 )
 
@@ -435,7 +435,7 @@ dremio-jfr-time-seconds: 10
 	}
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
-	if err := collection.ExtractTarGz(tgzFile, testOut); err != nil {
+	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
 		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
 	}
 
@@ -598,16 +598,6 @@ dremio-jfr-time-seconds: 10
 		t.Logf("checking file %v", filepath.Join(hcDir, "node-info", host, "os_info.txt"))
 		tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", host, "os_info.txt"))
 	}
-
-	// check cluster describe node files
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
-	t.Logf("checking file %v", filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
-	tests.AssertFileHasExpectedLines(t, []string{"Name:", "Roles:", "Labels:"}, filepath.Join(hcDir, "kubernetes", "nodes", "describe-nodes.txt"))
-
-	// check cluster describe pod files
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pods", "describe-pods.txt"))
-	t.Logf("checking file %v", filepath.Join(hcDir, "kubernetes", "pods", "describe-pods.txt"))
-	tests.AssertFileHasExpectedLines(t, []string{"Labels:", "Annotations:", "Containers:"}, filepath.Join(hcDir, "kubernetes", "pods", "describe-pods.txt"))
 
 	//kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))

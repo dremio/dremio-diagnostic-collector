@@ -163,22 +163,14 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 		)
 		clusterCollect = func(pods []string) {
-			//    	err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy, kubeArgs.KubectlPath)
-			//		if err != nil {
-			//			simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
-			//		}
-			//		err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath, pods)
-			//		if err != nil {
-			//			simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
-			//		}
-			//		err = collection.GetClusterNodes(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
-			//		if err != nil {
-			//			simplelog.Errorf("when getting cluster nodes, the following error was returned: %v", err)
-			//		}
-			//		err = collection.GetClusterPods(kubeArgs.Namespace, cs, collectionArgs.DDCfs, kubeArgs.KubectlPath)
-			//		if err != nil {
-			//			simplelog.Errorf("when getting cluster pods, the following error was returned: %v", err)
-			//		}
+			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy)
+			if err != nil {
+				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+			}
+			err = collection.GetClusterLogs(kubeArgs.Namespace, cs, collectionArgs.DDCfs, pods)
+			if err != nil {
+				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
+			}
 		}
 	} else {
 		err := validateSSHParameters(sshArgs)
