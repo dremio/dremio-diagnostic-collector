@@ -35,5 +35,5 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "gosec" -ErrorAction SilentlyContinue)) {
     Write-Output "gosec not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/securego/gosec/v2/cmd/gosec@v2.16.0
+    go install github.com/securego/gosec/v2/cmd/gosec@v2.19.0
 }

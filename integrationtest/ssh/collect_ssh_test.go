@@ -49,24 +49,24 @@ type SSHTestConf struct {
 	IsEnterprise     bool   `json:"is-enterprise"`
 }
 
-func GetJson(t *testing.T) []byte {
+func GetJSON(t *testing.T) []byte {
 	t.Helper()
-	oldTestJson := filepath.Join("testdata", "ssh.json")
+	oldTestJSON := filepath.Join("testdata", "ssh.json")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	testJson := filepath.Join(home, ".config", "ddc-test", "ssh.json")
-	if _, err := os.Stat(oldTestJson); err == nil {
-		t.Logf("moving %v to %v", oldTestJson, testJson)
-		if err := os.MkdirAll(filepath.Dir(testJson), 0700); err != nil {
+	testJSON := filepath.Join(home, ".config", "ddc-test", "ssh.json")
+	if _, err := os.Stat(oldTestJSON); err == nil {
+		t.Logf("moving %v to %v", oldTestJSON, testJSON)
+		if err := os.MkdirAll(filepath.Dir(testJSON), 0700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Rename(oldTestJson, testJson); err != nil {
+		if err := os.Rename(oldTestJSON, testJSON); err != nil {
 			t.Fatal(err)
 		}
 	}
-	b, err := os.ReadFile(testJson)
+	b, err := os.ReadFile(testJSON)
 	if err != nil {
 		t.Fatalf(`unable to read ssh.json in %v 
 you must make one with the following format:
@@ -87,7 +87,7 @@ you must make one with the following format:
 }
 
 
-Error was: %v`, testJson, err)
+Error was: %v`, testJSON, err)
 	}
 	return b
 }
@@ -97,7 +97,7 @@ func TestSSHBasedRemoteCollect(t *testing.T) {
 		t.Skip("skipping testing in short mode")
 	}
 	var sshConf SSHTestConf
-	b := GetJson(t)
+	b := GetJSON(t)
 	if err := json.Unmarshal(b, &sshConf); err != nil {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
@@ -339,7 +339,7 @@ func TestValidateBadCollectFlag(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
 	}
-    b := GetJson(t)
+	b := GetJSON(t)
 	var err error
 	var sshConf SSHTestConf
 	if err := json.Unmarshal(b, &sshConf); err != nil {

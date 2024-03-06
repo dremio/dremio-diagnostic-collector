@@ -17,7 +17,6 @@ package kubernetes
 
 import (
 	"testing"
-
 )
 
 func TestNewKubectlK8sActions(t *testing.T) {

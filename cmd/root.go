@@ -163,7 +163,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 		)
 		clusterCollect = func(pods []string) {
-			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs, collectorStrategy)
+			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}

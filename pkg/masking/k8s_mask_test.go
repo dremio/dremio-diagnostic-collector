@@ -74,7 +74,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 					}
 				]
 			}`
-	output, err := masking.RemoveSecretsFromK8sJSON(input)
+	output, err := masking.RemoveSecretsFromK8sJSON([]byte(input))
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -101,7 +101,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 					}
 				]
 			}`
-	output, err = masking.RemoveSecretsFromK8sJSON(input)
+	output, err = masking.RemoveSecretsFromK8sJSON([]byte(input))
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -116,7 +116,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 				"items": "invalid"
 			}`
 
-	_, err = masking.RemoveSecretsFromK8sJSON(input)
+	_, err = masking.RemoveSecretsFromK8sJSON([]byte(input))
 	if err == nil {
 		t.Error("expected error but there was none")
 	}

@@ -33,7 +33,7 @@ func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
 	var containers []interface{}
 	kindRaw, ok := k8sItem["kind"]
 	if !ok {
-		return containers, fmt.Errorf("unable to read kind")
+		return containers, fmt.Errorf("unable to read kind %#v", k8sItem)
 	}
 	kind := strings.ToLower(kindRaw.(string))
 
@@ -116,14 +116,14 @@ func maskLastAppliedConfig(k8sObject map[string]interface{}) {
 }
 
 // Input: a json string of a k8s object
-func RemoveSecretsFromK8sJSON(k8sJSON string) (string, error) {
+func RemoveSecretsFromK8sJSON(k8sJSON []byte) (string, error) {
 	var dataDict map[string]interface{}
-	if err := json.Unmarshal([]byte(k8sJSON), &dataDict); err != nil {
+	if err := json.Unmarshal(k8sJSON, &dataDict); err != nil {
 		return "", err
 	}
 	itemsRaw, ok := dataDict["items"]
 	if !ok {
-		return "", fmt.Errorf("items key not found or not a slice")
+		return "", fmt.Errorf("items key not found or not a slice: %#v", dataDict)
 	}
 
 	items, ok := itemsRaw.([]interface{})

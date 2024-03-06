@@ -18,6 +18,7 @@ package collection
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -34,9 +35,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var clusterRequestTimeout int = 120
+var clusterRequestTimeout = 120
 
-func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, c Collector) error {
+func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
 	var wg sync.WaitGroup
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
@@ -54,7 +55,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 				simplelog.Errorf("when getting cluster config, error was %v", err)
 				return
 			}
-			text, err := masking.RemoveSecretsFromK8sJSON(string(out))
+			text, err := masking.RemoveSecretsFromK8sJSON(out)
 			if err != nil {
 				simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text due to error '%v'", resource, namespace, err)
 				return
@@ -161,56 +162,314 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	if err != nil {
 		return []byte(""), err
 	}
-	//options := metav1.ListOptions{}
-	version := "v1"
+	options := metav1.ListOptions{}
+	var b []byte
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 	switch resource {
 	case "nodes":
-		// global object
-		namespace = ""
+		list, err := c.CoreV1().Nodes().List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Node"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "sc":
-		namespace = ""
+		list, err := c.StorageV1().StorageClasses().List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "StorageClass"
+			c.APIVersion = "storage.k8s.io/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "pvc":
+		list, err := c.CoreV1().PersistentVolumeClaims(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "PersistentVolumeClaim"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "pv":
-		namespace = ""
+		list, err := c.CoreV1().PersistentVolumes().List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "PersistentVolume"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "service":
+		list, err := c.CoreV1().Services(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Service"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "endpoints":
+		list, err := c.CoreV1().Endpoints(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Endpoint"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "pods":
+		list, err := c.CoreV1().Pods(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Pod"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "deployments":
-		version = "apps/v1"
+		list, err := c.AppsV1().Deployments(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Deployment"
+			c.APIVersion = "apps/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "statefulsets":
-		version = "apps/v1"
+		list, err := c.AppsV1().StatefulSets(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "StatefulSet"
+			c.APIVersion = "apps/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "daemonset":
-		version = "apps/v1"
+		list, err := c.AppsV1().StatefulSets(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "DaemonSet"
+			c.APIVersion = "apps/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "replicaset":
-		version = "apps/v1"
+		list, err := c.AppsV1().ReplicaSets(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "ReplicaSet"
+			c.APIVersion = "apps/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "cronjob":
-		version = "batch/v1"
+		list, err := c.BatchV1().CronJobs(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "CronJob"
+			c.APIVersion = "batch/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "job":
-		version = "batch/v1"
+		list, err := c.BatchV1().Jobs(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Job"
+			c.APIVersion = "batch/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "events":
-		version = "events.k8s.io/v1"
+		list, err := c.EventsV1().Events(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Event"
+			c.APIVersion = "events.k8s.io/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "ingress":
+		list, err := c.NetworkingV1().Ingresses(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "Ingress"
+			c.APIVersion = "networking.k8s.io/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "limitrange":
+		list, err := c.CoreV1().LimitRanges(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "LimitRange"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "resourcequota":
+		list, err := c.CoreV1().LimitRanges(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "ResourceQuota"
+			c.APIVersion = "v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "hpa":
+		list, err := c.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "HorizontalPodAutoscaler"
+			c.APIVersion = "autoscaling/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "pdb":
+		list, err := c.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "PodDisruptionBudget"
+			c.APIVersion = "policy/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	case "pc":
+		list, err := c.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, options)
+		if err != nil {
+			return []byte(""), err
+		}
+		list.Kind = "list"
+		for i, c := range list.Items {
+			c.Kind = "PriorityClass"
+			c.APIVersion = "scheduling.k8s.io/v1"
+			list.Items[i] = c
+		}
+		b, err = json.Marshal(list)
+		if err != nil {
+			return []byte(""), err
+		}
 	default:
 		simplelog.Errorf("resource (%v) does not have an implementation", resource)
 	}
-	var statusCode int
-	var absPath string
-	if namespace == "" {
-		absPath = fmt.Sprintf("/apis/%s/%s", version, resource)
-	} else {
-		absPath = fmt.Sprintf("/apis/%s/namespaces/%s/%s", version, namespace, resource)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(clusterRequestTimeout)*time.Second)
-	defer cancel() // releases resources if slowOperation completes before timeout elapses
-	response := c.RESTClient().Get().AbsPath(absPath).
-		Do(ctx).StatusCode(&statusCode)
-	if statusCode != 200 {
-		return []byte(""), fmt.Errorf("expected status code 200 but got %v when querying resouces %v", statusCode, resource)
-	}
-	return response.Raw()
+	return b, nil
+
 }
