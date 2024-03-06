@@ -1,11 +1,10 @@
 # Changelog
 
-## [2.2.0] - UNRELEASED
+## [2.2.0] - 2024-03-07
 
 ### Added
 
 * we now support running ddc in a kubernetes pod assuming the following rights have been giving to the pod
-
 
 ### Changed
  
@@ -13,7 +12,7 @@
 
 ### Removed
 
-* kubectl describe node and kubectl describe pod had to be removed as they required kubectl
+* kubectl describe node and kubectl describe pod had to be removed as they required kubectl and not available easily via the API
 
 ## [2.1.2] - 2024-02-23
 
@@ -530,6 +529,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.1...v2.1.2
 [2.1.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.0.2...v2.1.0
