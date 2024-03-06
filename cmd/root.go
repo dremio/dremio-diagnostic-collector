@@ -388,7 +388,7 @@ func Execute(args []string) error {
 			if err != nil {
 				return fmt.Errorf("unable to detect namespace: %v", err)
 			}
-			namespace = fmt.Sprint(b)
+			namespace = string(b)
 		}
 		var enabled []string
 		var disabled []string

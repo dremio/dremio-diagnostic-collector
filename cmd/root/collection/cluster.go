@@ -453,7 +453,7 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 			return []byte(""), err
 		}
 	case "pc":
-		list, err := c.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, options)
+		list, err := c.SchedulingV1().PriorityClasses().List(ctx, options)
 		if err != nil {
 			return []byte(""), err
 		}

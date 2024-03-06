@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ddc-collect
+rules:
+- apiGroups: [""] # core
+  resources: ["namespaces", "pods", "pods/log", "nodes", "persistentvolumeclaims", "persistentvolumes", "events", "limitranges", "resoucesquotas"] 
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+- apiGroups: ["batch"]
+  resources: ["cronjobs", "jobs", "services", "endpoints"]
+  verbs: ["get", "list"]
+- apiGroups: ["storage.k8s.io"] 
+  resources: ["storageclasses"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"] 
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["get", "list"]
+- apiGroups: ["networking.k8s.io"] 
+  resources: ["ingresses"]
+  verbs: ["get", "list"]
+- apiGroups: ["autoscaling"] 
+  resources: ["horizonalpodautoscalers"]
+  verbs: ["get", "list"]
+- apiGroups: ["scheduling.k8s.io"] 
+  resources: ["priorityclasses"]
+  verbs: ["get", "list"]
