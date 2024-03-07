@@ -162,6 +162,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 			0,
 		)
+
 		clusterCollect = func(pods []string) {
 			err = collection.ClusterK8sExecute(kubeArgs.Namespace, cs, collectionArgs.DDCfs)
 			if err != nil {
@@ -267,13 +268,9 @@ func Execute(args []string) error {
 				if err != nil {
 					return err
 				}
-
 				// sudo user
 				prompt = promptui.Prompt{
 					Label: "sudo user (runs on remote servers as this user)",
-				}
-				if err != nil {
-					return err
 				}
 				sudoUser, err = prompt.Run()
 				if err != nil {

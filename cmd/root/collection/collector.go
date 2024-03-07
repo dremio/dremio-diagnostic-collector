@@ -122,18 +122,26 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
 	}
 	hosts := append(coordinators, executors...)
-
-	//now safe to collect cluster level information
-	for _, c := range clusterCollection {
-		c(hosts)
-	}
+	var clusterWg sync.WaitGroup
+	clusterWg.Add(1)
+	go func() {
+		defer clusterWg.Done()
+		//now safe to collect cluster level information
+		for _, c := range clusterCollection {
+			c(hosts)
+		}
+	}()
 	var tarballs []string
 	var files []helpers.CollectedFile
 	var totalFailedFiles []string
 	var totalSkippedFiles []string
 	var nodesConnectedTo int
 	var m sync.Mutex
+	// block until transfers are commplete
 	var transferWg sync.WaitGroup
+	// cap at trasnfer threads
+	sem := make(chan struct{}, transferThreads)
+	// wait group for the per node capture
 	var wg sync.WaitGroup
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
@@ -146,7 +154,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		0,
 		len(coordinators)+len(executors),
 	)
-	sem := make(chan struct{}, transferThreads)
 	for _, coordinator := range coordinators {
 		nodesConnectedTo++
 		wg.Add(1)
@@ -237,6 +244,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	}
 	wg.Wait()
 	transferWg.Wait()
+	clusterWg.Wait()
 	end := time.Now().UTC()
 	var collectionInfo SummaryInfo
 	collectionInfo.EndTimeUTC = end

@@ -23,7 +23,6 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
@@ -39,44 +38,38 @@ var clusterRequestTimeout = 120
 
 func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
-	var wg sync.WaitGroup
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster config path %v with error %v", p, err)
 		return err
 	}
-	for _, cmd := range cmds {
-		wg.Add(1)
-		go func(cmdname string) {
-			defer wg.Done()
-			resource := cmdname
-			out, err := clusterExecuteBytes(namespace, resource)
-			if err != nil {
-				simplelog.Errorf("when getting cluster config, error was %v", err)
-				return
-			}
-			text, err := masking.RemoveSecretsFromK8sJSON(out)
-			if err != nil {
-				simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text due to error '%v'", resource, namespace, err)
-				return
-			}
 
-			path := strings.TrimSuffix(p, "dremio-master")
-			filename := filepath.Join(path, resource+".json")
-			err = ddfs.WriteFile(filename, []byte(text), DirPerms)
-			if err != nil {
-				simplelog.Errorf("trying to write file %v, error was %v", filename, err)
-				return
-			}
-			consoleprint.UpdateK8sFiles(cmdname)
-		}(cmd)
+	for _, cmd := range cmds {
+		resource := cmd
+		out, err := clusterExecuteBytes(namespace, resource)
+		if err != nil {
+			simplelog.Errorf("when getting cluster config, error was %v", err)
+			continue
+		}
+		text, err := masking.RemoveSecretsFromK8sJSON(out)
+		if err != nil {
+			simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text due to error '%v'", resource, namespace, err)
+			continue
+		}
+
+		path := strings.TrimSuffix(p, "dremio-master")
+		filename := filepath.Join(path, resource+".json")
+		err = ddfs.WriteFile(filename, []byte(text), DirPerms)
+		if err != nil {
+			simplelog.Errorf("trying to write file %v, error was %v", filename, err)
+			continue
+		}
+		consoleprint.UpdateK8sFiles(cmd)
 	}
-	wg.Wait()
 	return nil
 }
 
 func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
-	var wg sync.WaitGroup
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -87,31 +80,26 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 		return err
 	}
 	// Loop over dremio pods
-	for _, pod := range pods {
-		wg.Add(1)
-		go func(podname string) {
-			defer wg.Done()
-			podObj, err := clientSet.CoreV1().Pods(namespace).Get(context.Background(), podname, metav1.GetOptions{})
-			if err != nil {
-				simplelog.Errorf("unable to get pod %v: %v", podname, err)
-				return
-			}
-			var containers []string
-			for _, c := range podObj.Spec.Containers {
-				containers = append(containers, c.Name)
-			}
-			for _, c := range podObj.Spec.InitContainers {
-				containers = append(containers, c.Name)
-			}
-			// Loop over each container, construct a path and log file name
-			// write the output of the kubectl logs command to a file
-			for _, container := range containers {
-				copyContainerLog(cs, ddfs, container, namespace, path, podname)
-			}
-			consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
-		}(pod)
+	for _, podname := range pods {
+		podObj, err := clientSet.CoreV1().Pods(namespace).Get(context.Background(), podname, metav1.GetOptions{})
+		if err != nil {
+			simplelog.Errorf("unable to get pod %v: %v", podname, err)
+			continue
+		}
+		var containers []string
+		for _, c := range podObj.Spec.Containers {
+			containers = append(containers, c.Name)
+		}
+		for _, c := range podObj.Spec.InitContainers {
+			containers = append(containers, c.Name)
+		}
+		// Loop over each container, construct a path and log file name
+		// write the output of the kubectl logs command to a file
+		for _, container := range containers {
+			copyContainerLog(cs, ddfs, container, namespace, path, podname)
+		}
+		consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
 	}
-	wg.Wait()
 	return err
 }
 
