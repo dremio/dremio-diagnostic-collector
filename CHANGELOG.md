@@ -7,7 +7,8 @@
 * we now support running ddc in a kubernetes pod assuming the following rights have been giving to the pod
 
 ### Changed
- 
+
+* concurrent transfers are a bit more aggressive and will attempt to keep 2 transfers going at all time
 * use kubernetes api instead of kubectl
 
 ### Removed

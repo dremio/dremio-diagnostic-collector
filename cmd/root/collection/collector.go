@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
@@ -134,6 +133,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	var totalSkippedFiles []string
 	var nodesConnectedTo int
 	var m sync.Mutex
+	var transferWg sync.WaitGroup
 	var wg sync.WaitGroup
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
@@ -146,10 +146,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 		0,
 		len(coordinators)+len(executors),
 	)
-	transferThreadPool, err := threading.NewThreadPool(transferThreads, 1, false)
-	if err != nil {
-		return err
-	}
+	sem := make(chan struct{}, transferThreads)
 	for _, coordinator := range coordinators {
 		nodesConnectedTo++
 		wg.Add(1)
@@ -172,7 +169,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
 			}
-			transferThreadPool.AddJob(func() error {
+			sem <- struct{}{}
+			transferWg.Add(1)
+			go func() {
+				defer transferWg.Done()
 				size, f, err := TransferCapture(coordinatorCaptureConf, s.GetTmpDir())
 				if err != nil {
 					m.Lock()
@@ -187,9 +187,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 					})
 					m.Unlock()
 				}
-				return nil
-			})
-
+				<-sem
+			}()
 		}(coordinator)
 	}
 
@@ -214,7 +213,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
 			}
-			transferThreadPool.AddJob(func() error {
+			sem <- struct{}{}
+			transferWg.Add(1)
+			go func() {
+				defer transferWg.Done()
 				size, f, err := TransferCapture(executorCaptureConf, s.GetTmpDir())
 				if err != nil {
 					m.Lock()
@@ -229,14 +231,12 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 					})
 					m.Unlock()
 				}
-				return nil
-			})
+				<-sem
+			}()
 		}(executor)
 	}
 	wg.Wait()
-	if err := transferThreadPool.ProcessAndWait(); err != nil {
-		return err
-	}
+	transferWg.Wait()
 	end := time.Now().UTC()
 	var collectionInfo SummaryInfo
 	collectionInfo.EndTimeUTC = end
