@@ -71,5 +71,6 @@ const (
 	KeyJobProfilesNumSlowPlanning  = "job-profiles-num-slow-planning"
 	KeyRestHTTPTimeout             = "rest-http-timeout"
 	KeyDisableFreeSpaceCheck       = "disable-free-space-check"
+	KeyMinFreeSpaceGB              = "min-free-space-gb"
 	KeyCollectionMode              = "collect"
 )

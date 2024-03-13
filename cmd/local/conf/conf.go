@@ -30,6 +30,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
@@ -118,6 +119,7 @@ type CollectConf struct {
 	collectWLM                  bool
 	nodeName                    string
 	restHTTPTimeout             int
+	minFreeSpaceCheckGB         int
 
 	// variables
 	systemtables            []string
@@ -304,6 +306,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
+	c.minFreeSpaceCheckGB = GetInt(confData, KeyMinFreeSpaceGB)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
@@ -340,7 +343,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 		logDir, err := autodetect.FindGCLogLocation()
 		if err != nil {
 			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
-			fmt.Println(msg)
+			consoleprint.ErrorPrint(msg)
 			simplelog.Errorf(msg)
 			c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 		} else {
@@ -365,16 +368,15 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 				detectedConfig, err = GetConfiguredDremioValuesFromPID(c.dremioPID)
 				if err != nil {
 					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
-					fmt.Println(msg)
+					consoleprint.ErrorPrint(msg)
 					simplelog.Errorf(msg)
 				} else {
-
 					simplelog.Infof("configured values retrieved from ps output: %v:%v, %v:%v", KeyDremioLogDir, detectedConfig.LogDir, KeyCollectDremioConfiguration, detectedConfig.ConfDir)
 					c.dremioLogDir = detectedConfig.LogDir
 					c.dremioConfDir = detectedConfig.ConfDir
 				}
 			} else {
-				fmt.Println("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resolve this")
+				consoleprint.ErrorPrint("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resolve this")
 				simplelog.Warning("no valid pid found therefor the log and configuration autodetection will not function")
 			}
 
@@ -397,7 +399,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 			// see if the configured dir is valid
 			if err := dirs.CheckDirectory(configuredLogDir, containsValidLog); err != nil {
 				msg := fmt.Sprintf("configured log %v is invalid: %v", configuredLogDir, err)
-				fmt.Println(msg)
+				consoleprint.ErrorPrint(msg)
 				simplelog.Warning(msg)
 			} else {
 				c.dremioLogDir = configuredLogDir
@@ -926,4 +928,8 @@ func (c *CollectConf) RestHTTPTimeout() int {
 
 func (c *CollectConf) DremioRocksDBDir() string {
 	return c.dremioRocksDBDir
+}
+
+func (c *CollectConf) MinFreeSpaceGB() int {
+	return c.minFreeSpaceCheckGB
 }

@@ -56,6 +56,7 @@ var outputLoc string
 var sudoUser string
 var namespace string
 var disableFreeSpaceCheck bool
+var minFreeSpaceGB int
 var disablePrompt bool
 var detectNamespace bool
 var collectionMode string
@@ -228,6 +229,9 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+		if disablePrompt {
+			consoleprint.EnableStatusOutput()
+		}
 		if pid != "" {
 			if _, err := os.Stat(pid); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
@@ -240,7 +244,7 @@ func Execute(args []string) error {
 				defer func() {
 					if err := os.Remove(pid); err != nil {
 						msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
-						fmt.Println(msg)
+						consoleprint.ErrorPrint(msg)
 						simplelog.Error(msg)
 					}
 				}()
@@ -359,7 +363,7 @@ func Execute(args []string) error {
 				return err
 			}
 			outputFolder := filepath.Dir(abs)
-			if err := dirs.CheckFreeSpace(outputFolder, 40); err != nil {
+			if err := dirs.CheckFreeSpace(outputFolder, uint64(minFreeSpaceGB)); err != nil {
 				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
 			}
 		}
@@ -429,6 +433,7 @@ func Execute(args []string) error {
 			Enabled:               enabled,
 			Disabled:              disabled,
 			DisableFreeSpaceCheck: disableFreeSpaceCheck,
+			MinFreeSpaceGB:        minFreeSpaceGB,
 			CollectionMode:        collectionMode,
 			TransferThreads:       transferThreads,
 		}
@@ -448,7 +453,9 @@ func Execute(args []string) error {
 			consoleprint.UpdateResult(fmt.Sprintf("complete at %v", time.Now().Format(time.RFC1123)))
 		}
 		// we put the error in result so just return nil
-		consoleprint.PrintState()
+		if !disablePrompt {
+			consoleprint.PrintState()
+		}
 		return nil
 	}
 	if err := RootCmd.Execute(); err != nil {
@@ -513,6 +520,11 @@ func init() {
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
 	if err := RootCmd.Flags().MarkHidden("transfer-threads"); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
+	RootCmd.Flags().IntVar(&minFreeSpaceGB, "min-free-space-gb", 40, "min free space needed in GB for the process to run")
+	if err := RootCmd.Flags().MarkHidden("min-free-space-gb"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}

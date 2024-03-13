@@ -16,11 +16,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -32,7 +32,7 @@ func main() {
 		}
 	}()
 	if err := cmd.Execute(os.Args); err != nil {
-		fmt.Println(err)
+		consoleprint.ErrorPrint(err.Error())
 		os.Exit(1)
 	}
 }

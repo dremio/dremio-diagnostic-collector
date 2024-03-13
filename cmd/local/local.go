@@ -103,7 +103,7 @@ func createAllDirs(c *conf.CollectConf) error {
 
 func collect(c *conf.CollectConf) error {
 	if !c.DisableFreeSpaceCheck() {
-		if err := dirs.CheckFreeSpace(c.TarballOutDir(), 40); err != nil {
+		if err := dirs.CheckFreeSpace(c.TarballOutDir(), uint64(c.MinFreeSpaceGB())); err != nil {
 			return fmt.Errorf("%v. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
 		}
 	}
@@ -637,6 +637,11 @@ func init() {
 	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
+	LocalCollectCmd.Flags().Int(conf.KeyMinFreeSpaceGB, 40, "min free space needed in GB for the process to run")
+	if err := LocalCollectCmd.Flags().MarkHidden(conf.KeyMinFreeSpaceGB); err != nil {
+		fmt.Printf("unable to mark flag hidden critical error %v", err)
+		os.Exit(1)
+	}
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
 	LocalCollectCmd.Flags().StringVar(&pid, "pid", "", "write a pid")

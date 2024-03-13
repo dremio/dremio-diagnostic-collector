@@ -65,6 +65,7 @@ type Args struct {
 	Disabled              []string
 	Enabled               []string
 	DisableFreeSpaceCheck bool
+	MinFreeSpaceGB        int
 	CollectionMode        string
 	TransferThreads       int
 }
@@ -89,6 +90,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 	transferDir := collectionArgs.TransferDir
 	ddcYamlFilePath := collectionArgs.DDCYamlLoc
 	disableFreeSpaceCheck := collectionArgs.DisableFreeSpaceCheck
+	minFreeSpaceGB := collectionArgs.MinFreeSpaceGB
 	collectionMode := collectionArgs.CollectionMode
 	transferThreads := collectionArgs.TransferThreads
 	var err error
@@ -171,7 +173,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck)
+			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
@@ -215,7 +217,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, clusterCollection
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck)
+			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return

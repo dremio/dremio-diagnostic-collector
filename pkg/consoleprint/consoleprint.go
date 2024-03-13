@@ -16,6 +16,7 @@
 package consoleprint
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -54,6 +55,29 @@ type CollectionStats struct {
 	mu                   sync.RWMutex // Mutex to protect access
 }
 
+var statusOut bool
+
+func EnableStatusOutput() {
+	statusOut = true
+}
+
+type ErrorOut struct {
+	Error string `json:"error"`
+}
+
+func ErrorPrint(msg string) {
+	if statusOut {
+		b, err := json.Marshal(ErrorOut{Error: msg})
+		if err != nil {
+			fmt.Printf("{\"error\": \"%q\", \"nested\": \"%q\"}\n", err, msg)
+			return
+		}
+		fmt.Println(string(b))
+	} else {
+		fmt.Println(msg)
+	}
+}
+
 // Update updates the CollectionStats fields in a thread-safe manner.
 func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, enabled []string, disabled []string, patSet bool, transfersComplete, totalTransfers int) {
 	c.mu.Lock()
@@ -84,9 +108,21 @@ func UpdateTarballDir(tarballDir string) {
 	c.tarball = tarballDir
 }
 
+type StatusUpdate struct {
+	Result string `json:"result"`
+}
+
 func UpdateResult(result string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if statusOut {
+		b, err := json.Marshal(StatusUpdate{Result: result})
+		if err != nil {
+			fmt.Printf("{\"error\": \"%q\", \"nested\": \"%q\"}\n", err, result)
+			return
+		}
+		fmt.Println(string(b))
+	}
 	c.result = result
 	c.endTime = time.Now().Unix()
 }
@@ -121,6 +157,9 @@ func UpdateNodeAutodetectDisabled(node string, enabled bool) {
 func UpdateNodeState(node string, status string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if statusOut {
+		fmt.Printf("{\"node\": \"%v\", \"status\": \"%v\"}\n", node, status)
+	}
 	if _, ok := c.nodeCaptureStats[node]; ok {
 		c.nodeCaptureStats[node].status = status
 		if status == "COMPLETED" || strings.HasPrefix(status, "FAILED") {
