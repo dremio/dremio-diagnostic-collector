@@ -510,6 +510,15 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
 
+	_, err = w.Write([]byte("___\n>>> ntpstat\n"))
+	if err != nil {
+		simplelog.Warningf("unable to write ntpstat header for os_info.txt due to error %v", err)
+	}
+	err = ddcio.Shell(w, "ntpstat")
+	if err != nil {
+		simplelog.Warningf("unable to write ntpstat for os_info.txt due to error %v", err)
+	}
+
 	if c.DremioPID() > 0 {
 		_, err = w.Write([]byte("___\n>>> ps eww\n"))
 		if err != nil {
