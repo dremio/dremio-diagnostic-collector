@@ -110,30 +110,34 @@ func collect(c *conf.CollectConf) error {
 	if err := createAllDirs(c); err != nil {
 		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
-	t, err := threading.NewThreadPool(c.NumberThreads(), 1, true)
+	// we can probably remove this now that we have gone to single threaded, but keeping it for the delayed execution and logging for now
+	t, err := threading.NewThreadPool(1, 1, true, false)
 	if err != nil {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}
-	wrapConfigJob := func(j func(c *conf.CollectConf) error) func() error {
-		return func() error { return j(c) }
+	wrapConfigJob := func(name string, j func(c *conf.CollectConf) error) threading.Job {
+		return threading.Job{
+			Name:    name,
+			Process: func() error { return j(c) },
+		}
 	}
 	if !c.IsDremioCloud() {
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
-			t.AddJob(wrapConfigJob(nodeinfocollect.RunCollectDiskUsage))
+			t.AddJob(wrapConfigJob("DISK USAGE COLLECTION", nodeinfocollect.RunCollectDiskUsage))
 		}
 
 		if !c.CollectDremioConfiguration() {
 			simplelog.Info("Skipping Dremio config collection")
 		} else {
-			t.AddJob(wrapConfigJob(configcollect.RunCollectDremioConfig))
+			t.AddJob(wrapConfigJob("DREMIO CONFIG COLLECTION", configcollect.RunCollectDremioConfig))
 		}
 
 		if !c.CollectOSConfig() {
 			simplelog.Info("Skipping OS config collection")
 		} else {
-			t.AddJob(wrapConfigJob(runCollectOSConfig))
+			t.AddJob(wrapConfigJob("OS CONFIG COLLECTION", runCollectOSConfig))
 		}
 
 		// log collection
@@ -154,98 +158,123 @@ func collect(c *conf.CollectConf) error {
 			if !c.CollectQueriesJSON() {
 				simplelog.Warning("NOT Skipping collection of Queries JSON, because --number-job-profiles is greater than 0 and job profile download requires queries.json ...")
 			}
-			t.AddJob(logCollector.RunCollectQueriesJSON)
+			t.AddJob(threading.Job{
+				Name:    "QUERIES.JSON COLLECTION",
+				Process: logCollector.RunCollectQueriesJSON,
+			})
+
 		}
 
 		if !c.CollectServerLogs() {
 			simplelog.Debug("Skipping server log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectDremioServerLog)
+			t.AddJob(threading.Job{
+				Name:    "SERVER LOG COLLECTION",
+				Process: logCollector.RunCollectDremioServerLog,
+			})
 		}
 
 		if !c.CollectGCLogs() {
 			simplelog.Debug("Skipping gc log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectGcLogs)
+			t.AddJob(threading.Job{
+				Name:    "GC LOG COLLECTION",
+				Process: logCollector.RunCollectGcLogs,
+			})
 		}
 
 		if !c.CollectMetaRefreshLogs() {
 			simplelog.Debug("Skipping metadata refresh log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectMetadataRefreshLogs)
+			t.AddJob(threading.Job{
+				Name:    "METADATA LOG COLLECTION",
+				Process: logCollector.RunCollectMetadataRefreshLogs,
+			})
 		}
 
 		if !c.CollectReflectionLogs() {
 			simplelog.Debug("Skipping reflection log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectReflectionLogs)
+			t.AddJob(threading.Job{
+				Name:    "REFLECTING LOG COLLECTION",
+				Process: logCollector.RunCollectReflectionLogs,
+			})
 		}
 
 		if !c.CollectAccelerationLogs() {
 			simplelog.Debug("Skipping acceleration log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectAccelerationLogs)
+			t.AddJob(threading.Job{
+				Name:    "ACCELERATION LOG COLLECTION",
+				Process: logCollector.RunCollectAccelerationLogs,
+			})
 		}
 
 		if !c.CollectAccessLogs() {
 			simplelog.Debug("Skipping access log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectDremioAccessLogs)
+			t.AddJob(threading.Job{
+				Name:    "ACCESS LOG COLLECTION",
+				Process: logCollector.RunCollectDremioAccessLogs,
+			})
 		}
 
 		if !c.CollectAuditLogs() {
 			simplelog.Debug("Skipping audit log collection")
 		} else {
-			t.AddJob(logCollector.RunCollectDremioAuditLogs)
+			t.AddJob(threading.Job{
+				Name:    "AUDIT LOG COLLECTION",
+				Process: logCollector.RunCollectDremioAuditLogs,
+			})
 		}
 
 		if !c.CollectJVMFlags() {
 			simplelog.Debug("Skipping JVM Flags collection")
 		} else {
-			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJVMFlags))
+			t.AddJob(wrapConfigJob("JVM FLAG COLLECTION", jvmcollect.RunCollectJVMFlags))
 		}
 		// rest call collections
 
 		if !c.CollectKVStoreReport() {
 			simplelog.Debug("Skipping KV store report collection")
 		} else {
-			t.AddJob(wrapConfigJob(apicollect.RunCollectKvReport))
+			t.AddJob(wrapConfigJob("KV STORE COLLECTION", apicollect.RunCollectKvReport))
 		}
 
 		if !c.CollectTtop() {
 			simplelog.Debugf("Skipping ttop collection")
 		} else {
-			t.AddJob(wrapConfigJob(jvmcollect.RunTtopCollect))
+			t.AddJob(wrapConfigJob("TTOP COLLECTION", jvmcollect.RunTtopCollect))
 		}
 		if !c.CollectJFR() {
 			simplelog.Debugf("Skipping Java Flight Recorder collection")
 		} else {
-			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJFR))
+			t.AddJob(wrapConfigJob("JFR COLLECTION", jvmcollect.RunCollectJFR))
 		}
 
 		if !c.CollectJStack() {
 			simplelog.Debugf("Skipping Java thread dumps collection")
 		} else {
-			t.AddJob(wrapConfigJob(jvmcollect.RunCollectJStacks))
+			t.AddJob(wrapConfigJob("JSTACK COLLECTION", jvmcollect.RunCollectJStacks))
 		}
 
 		if !c.CaptureHeapDump() {
 			simplelog.Debugf("Skipping Java heap dump collection")
 		} else {
-			t.AddJob(wrapConfigJob(jvmcollect.RunCollectHeapDump))
+			t.AddJob(wrapConfigJob("HEAP DUMP COLLECTION", jvmcollect.RunCollectHeapDump))
 		}
 	}
 
 	if !c.CollectWLM() {
 		simplelog.Debug("Skipping Workload Manager report collection")
 	} else {
-		t.AddJob(wrapConfigJob(apicollect.RunCollectWLM))
+		t.AddJob(wrapConfigJob("WLM COLLECTION", apicollect.RunCollectWLM))
 	}
 
 	if !c.CollectSystemTablesExport() {
 		simplelog.Debug("Skipping system tables collection")
 	} else {
-		t.AddJob(wrapConfigJob(apicollect.RunCollectDremioSystemTables))
+		t.AddJob(wrapConfigJob("SYSTEM TABLE COLLECTION", apicollect.RunCollectDremioSystemTables))
 	}
 
 	if err := t.ProcessAndWait(); err != nil {
@@ -656,5 +685,5 @@ func init() {
 	}
 	execLocDir := filepath.Dir(execLoc)
 	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
-	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 28 days of queries.json logs. 'health-check' - all of 'stqndard' + WLM, KV Store Report, 25,000 Job Profiles")
+	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 30 days of queries.json logs. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
 }

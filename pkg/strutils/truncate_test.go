@@ -22,7 +22,7 @@ import (
 
 func TestLimitStringTooLong(t *testing.T) {
 	a := strutils.LimitString("12345", 1)
-	if a != "1" {
+	if a != "5" {
 		t.Errorf("expected '1' but got '%v'", a)
 	}
 }

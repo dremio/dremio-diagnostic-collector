@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.3.0-beta1] - 2024-03-19
+
+### Added
+
+* fine grained updates of job status
+* fallback to local collect only when trying to collect with `--detect-namespace` and `--disable-prompt`
+
+### Changed
+
+* -t flag now means for job profile collection threads and all other collection is now single threaded
+* disabled jstack by default
+* reduced concurrency in cluster copy operation to simplify logic threading
+
+### Fixed
+
+* never closed the reader for kubernetes.CopyToHost 
+* no longer waiting on result of stream copy if it fails in kubernetes.CopyToHost should enhance stability in some networks
+
 ## [2.2.1-beta1] - 2024-03-13
 
 ### Added
@@ -537,6 +555,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.1-beta1...v2.3.0-beta1
 [2.2.1-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.0...v2.2.1-beta1
 [2.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.2...v2.2.0
 [2.1.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.1...v2.1.2

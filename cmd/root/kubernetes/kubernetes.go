@@ -259,6 +259,7 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", fmt.Errorf("%s doesn't exist in local filesystem", source)
 	}
 	reader, writer := io.Pipe()
+	defer reader.Close()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(src string, dest string, w io.WriteCloser) {
@@ -306,7 +307,7 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		Tty:    false,
 	})
 	if err != nil {
-		wg.Wait()
+		// we are chosing not ot wait here, the theory being that depending on how the error occurred we could see a deadlock
 		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String()+outBuff.String())
 	}
 	wg.Wait()

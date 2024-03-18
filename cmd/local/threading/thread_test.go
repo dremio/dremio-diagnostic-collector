@@ -15,6 +15,7 @@
 package threading_test
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"testing"
@@ -28,7 +29,7 @@ var (
 )
 
 var setupThreadPool = func() {
-	t, err := threading.NewThreadPool(2, 1, true)
+	t, err := threading.NewThreadPool(2, 1, true, true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +46,9 @@ func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
 		return nil
 	}
 
-	tp.AddJob(jobFunc)
+	tp.AddJob(threading.Job{
+		Name:    "test",
+		Process: jobFunc})
 	waitErr = tp.ProcessAndWait()
 
 	//		It("should execute all jobs", func() {
@@ -78,7 +81,10 @@ func TestThreadPool_When(t *testing.T) {
 		return nil
 	}
 	for i := 0; i < 100; i++ {
-		tp.AddJob(jobFunc)
+		tp.AddJob(threading.Job{
+			Name:    fmt.Sprintf("%v", i),
+			Process: jobFunc,
+		})
 	}
 	waitErr = tp.ProcessAndWait()
 
@@ -106,10 +112,9 @@ func TestThreadPool_WhenWait(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		tp.AddJob(jobFunc)
+		tp.AddJob(threading.Job{Name: fmt.Sprintf("%v", i), Process: jobFunc})
 	}
 	waitErr = tp.ProcessAndWait()
-
 	//It("should execute all jobs", func() {
 	if len(executed) != 10 {
 		t.Errorf("expected 10 jobs executed but had only %v", len(executed))
@@ -140,7 +145,10 @@ func TestConcurrentThreadsCappedAtThreadPool(t *testing.T) {
 		return nil
 	}
 	for i := 0; i < 10; i++ {
-		tp.AddJob(jobFunc)
+		tp.AddJob(threading.Job{
+			Name:    fmt.Sprintf("%v", i),
+			Process: jobFunc,
+		})
 	}
 	err := tp.ProcessAndWait()
 

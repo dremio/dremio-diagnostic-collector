@@ -27,6 +27,7 @@ import (
 	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/fallback"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
@@ -121,7 +122,7 @@ func startTicker() (stop func()) {
 	}
 }
 
-func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs) error {
+func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool) error {
 	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
@@ -146,8 +147,22 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	defer cs.Close()
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
-	if kubeArgs.Namespace != "" {
-		simplelog.Info("using Kubernetes kubectl based collection")
+	if fallbackEnabled {
+		simplelog.Info("using fallback based collection")
+		collectorStrategy = fallback.NewFallback()
+		consoleprint.UpdateRuntime(
+			versions.GetCLIVersion(),
+			simplelog.GetLogLoc(),
+			collectionArgs.DDCYamlLoc,
+			collectorStrategy.Name(),
+			collectionArgs.Enabled,
+			collectionArgs.Disabled,
+			patSet,
+			0,
+			0,
+		)
+	} else if kubeArgs.Namespace != "" {
+		simplelog.Info("using Kubernetes api based collection")
 		collectorStrategy, err = kubernetes.NewKubectlK8sActions(kubeArgs)
 		if err != nil {
 			return err
@@ -383,13 +398,41 @@ func Execute(args []string) error {
 			dremioPAT = pat
 		}
 		patSet := dremioPAT != ""
-
+		var enableFallback bool
 		if detectNamespace {
+			enableFallback := func(err error) {
+				enableFallback = true
+				// falling back to local collect
+				msg := fmt.Sprintf("unable to detect namespace (%v) falling back to local-collect", err)
+				fmt.Println(msg)
+				simplelog.Error(msg)
+			}
+			validateK8s := func(namespace string) {
+				rightsTester, err := kubernetes.NewKubectlK8sActions(kubernetes.KubeArgs{Namespace: namespace})
+				if err != nil {
+					enableFallback(err)
+					return
+				}
+				testCoordinators, err := rightsTester.GetCoordinators()
+				if err != nil {
+					enableFallback(err)
+					return
+				}
+				for _, c := range testCoordinators {
+					_, err := rightsTester.HostExecute(false, c, "ls")
+					if err != nil {
+						enableFallback(err)
+						return
+					}
+				}
+			}
 			b, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 			if err != nil {
-				return fmt.Errorf("unable to detect namespace: %v", err)
+				enableFallback(err)
+			} else {
+				namespace = string(b)
+				validateK8s(namespace)
 			}
-			namespace = string(b)
 		}
 		var enabled []string
 		var disabled []string
@@ -447,7 +490,7 @@ func Execute(args []string) error {
 		kubeArgs := kubernetes.KubeArgs{
 			Namespace: namespace,
 		}
-		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs); err != nil {
+		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, enableFallback); err != nil {
 			consoleprint.UpdateResult(err.Error())
 		} else {
 			consoleprint.UpdateResult(fmt.Sprintf("complete at %v", time.Now().Format(time.RFC1123)))

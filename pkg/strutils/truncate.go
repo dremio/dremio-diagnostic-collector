@@ -31,7 +31,7 @@ func LimitString(s string, maxLength int) string {
 
 	// Truncate the string to the desired length
 	runes := []rune(s)
-	truncatedRunes := runes[:max]
+	truncatedRunes := runes[len(runes)-max:]
 	return string(truncatedRunes)
 }
 

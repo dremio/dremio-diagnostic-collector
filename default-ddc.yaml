@@ -18,7 +18,7 @@
 # capture-heap-dump: false # when true a heap dump will be captured on each node that the collector is run against
 # accept-collection-consent: true # when true you accept consent to collect data on each node, if false collection will fail
 # allow-insecure-ssl: true # when true skip the ssl cert check when doing API calls
-# number-threads: 2 #number of threads to use for collection
+# number-threads: 2 #number of threads to use for job profile collection
 
 ## not typically recommended to change
 # dremio-pid: 0
@@ -37,7 +37,7 @@
 # collect-reflection-log: true
 # collect-gc-logs: true
 # collect-jfr: true
-# collect-jstack: true
+# collect-jstack: false
 # collect-ttop: true
 # collect-system-tables-export: true
 # system-tables-row-limit: 100000

@@ -31,20 +31,19 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	if collectionMode == collects.QuickCollection {
 		setDefault(confData, KeyCollectJFR, false)
 		setDefault(confData, KeyCollectTtop, false)
-		setDefault(confData, KeyCollectJStack, false)
 		setDefault(confData, KeyDremioLogsNumDays, 2)
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 2)
 		setDefault(confData, KeyNumberThreads, 1)
 	} else {
 		setDefault(confData, KeyCollectJFR, true)
 		setDefault(confData, KeyCollectTtop, true)
-		setDefault(confData, KeyCollectJStack, true)
 		setDefault(confData, KeyDremioLogsNumDays, 7)
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 28)
 		setDefault(confData, KeyNumberThreads, 2)
 	}
 
 	// set default config
+	setDefault(confData, KeyCollectJStack, false)
 	setDefault(confData, KeyVerbose, "vv")
 	setDefault(confData, KeyDisableRESTAPI, false)
 	setDefault(confData, KeyCollectAccelerationLog, false)

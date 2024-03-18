@@ -92,31 +92,38 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	tried = len(profilesToCollect)
 	var m sync.Mutex
 	if len(profilesToCollect) > 0 {
+		fmt.Println("JOB START - JOB PROFILES COLLECTION")
 		simplelog.Debugf("Downloading %v job profiles...", len(profilesToCollect))
-		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 100, false)
+		downloadThreadPool, err := threading.NewThreadPoolWithJobQueue(c.NumberThreads(), len(profilesToCollect), 10, false, true)
 		if err != nil {
 			return 0, 0, fmt.Errorf("invalid thread pool: %w", err)
 		}
 		for key := range profilesToCollect {
 			//because we are looping
 			keyToDownload := key
-			downloadThreadPool.AddJob(func() error {
-				err := DownloadJobProfile(c, keyToDownload)
-				if err != nil {
-					simplelog.Errorf("unable to download %v, err: %v", keyToDownload, err) // Print instead of Error
+			downloadThreadPool.AddJob(threading.Job{
+				Name: keyToDownload,
+				Process: func() error {
+					err := DownloadJobProfile(c, keyToDownload)
+					if err != nil {
+						simplelog.Errorf("unable to download %v, err: %v", keyToDownload, err) // Print instead of Error
+						return nil
+					}
+					m.Lock()
+					collected++
+					m.Unlock()
 					return nil
-				}
-				m.Lock()
-				collected++
-				m.Unlock()
-				return nil
-			})
+				}})
 		}
 		if err = downloadThreadPool.ProcessAndWait(); err != nil {
 			simplelog.Errorf("job profile download thread pool wait error %v", err)
+			fmt.Printf("JOB FAILED - JOB PROFILES COLLECTION - %v\n", err)
+		} else {
+			fmt.Println("JOB COMPLETED - JOB PROFILES COLLECTION")
 		}
 	} else {
 		simplelog.Info("No job profiles to collect exiting...")
+		fmt.Println("JOB FAILED - JOB PROFILES COLLECTION - no profiles to collect")
 	}
 	return tried, collected, nil
 }

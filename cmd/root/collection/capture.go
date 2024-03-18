@@ -76,7 +76,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			}
 		}()
 		defer func() {
-			// clear out when done
+			// clear out w&hen done
 			if out, err := c.Collector.HostExecute(false, c.Host, "rm", pathToDDC+".log"); err != nil {
 				simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
 			}
@@ -122,6 +122,9 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 	}
 	var allHostLog []string
 	err := c.Collector.HostExecuteAndStream(mask, c.Host, func(line string) {
+		if strings.HasPrefix(line, "JOB START") || strings.HasPrefix(line, "JOB COMPLETE") || strings.HasPrefix(line, "JOB FAILED") || strings.HasPrefix(line, "JOB PROGRESS") {
+			consoleprint.UpdateNodeState(c.Host, line)
+		}
 		if strings.Contains(line, "AUTODETECTION DISABLED") {
 			consoleprint.UpdateNodeAutodetectDisabled(host, true)
 		}
