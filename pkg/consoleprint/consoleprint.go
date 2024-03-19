@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -153,16 +154,79 @@ func UpdateNodeAutodetectDisabled(node string, enabled bool) {
 	c.nodeDetectDisabled[node] = enabled
 }
 
+type NodeState struct {
+	Status   string `json:"status"`
+	StatusUX string `json:"status_ux"`
+	Node     string `json:"node"`
+	Message  string `json:"message"`
+	Result   string `json:"result"`
+}
+
+const (
+	ResultPending = "PENDING"
+	ResultFailure = "FAILURE"
+)
+
+const (
+	STARTING                   = "STARTING"
+	CreatingRemoteDir          = "CREATING_REMOTE_DIR"
+	CopyDDCToHost              = "COPY_DDC_TO_HOST"
+	SettingDDCPermissions      = "SETTING_DDC_PERMISSIONS"
+	CopyDDCYaml                = "COPY_DDC_YAML"
+	Collecting                 = "COLLECTING"
+	CollectingAwaitingTransfer = "COLLECTING_AWAITING_TRANSFER"
+	TarballTransfer            = "TARBALL_TRANSFER"
+	Completed                  = "COMPLETED"
+	DiskUsage                  = "DISK_USAGE"
+	DremioConfig               = "DREMIO_CONFIG"
+	GcLog                      = "GC_LOG"
+	Jfr                        = "JFR"
+	Jstack                     = "JSTACK"
+	JVMFlags                   = "JVM_FLAGS"
+	MetadataLog                = "METADATA_LOG"
+	OSConfig                   = "OS_CONFIG"
+	Queries                    = "QUERIES"
+	ReflectionLog              = "REFLECTION_LOG"
+	ServerLog                  = "SERVER_LOG"
+	Ttop                       = "TTOP"
+	AccelerationLog            = "ACCELERATION_LOG"
+	AccessLog                  = "ACCESS_LOG"
+	AuditLog                   = "AUDIT_LOG"
+	JobProfiles                = "JOB_PROFILES"
+	KVStore                    = "KV_STORE"
+	SystemTable                = "SYSTEM_TABLE"
+	Wlm                        = "WLM"
+	HeapDump                   = "HEAP_DUMP"
+)
+
 // Update updates the CollectionStats fields in a thread-safe manner.
-func UpdateNodeState(node string, status string) {
+func UpdateNodeState(nodeState NodeState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if statusOut {
-		fmt.Printf("{\"node\": \"%v\", \"status\": \"%v\"}\n", node, status)
+		b, err := json.Marshal(nodeState)
+		if err != nil {
+			fmt.Printf("{\"error\": \"%v\"}\n", strconv.Quote(err.Error()))
+		} else {
+			fmt.Println(string(b))
+		}
 	}
+	node := nodeState.Node
+	status := nodeState.StatusUX
+	result := nodeState.Result
+	message := nodeState.Message
 	if _, ok := c.nodeCaptureStats[node]; ok {
-		c.nodeCaptureStats[node].status = status
-		if status == "COMPLETED" || strings.HasPrefix(status, "FAILED") {
+		statusText := ""
+		if message != "" {
+			statusText = fmt.Sprintf("(%v) %v", status, message)
+		} else {
+			statusText = status
+		}
+		if result == ResultFailure {
+			statusText = ResultFailure + " - " + statusText
+		}
+		c.nodeCaptureStats[node].status = statusText
+		if status == Completed || result == ResultFailure {
 			if c.nodeCaptureStats[node].endTime == 0 {
 				c.TransfersComplete++
 				c.nodeCaptureStats[node].endTime = time.Now().Unix()
