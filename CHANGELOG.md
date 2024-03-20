@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0-beta2] - 2024-03-20
+
+### Fixed
+
+* logging had extra whitespaces in it and this broke the output for the UX, cleaning this out now
+* logging only individual lines instead of groups of lines together as was possible with kubernetes output, now logging output for k8s should be more logical
+
 ## [2.3.0-beta1] - 2024-03-19
 
 ### Added
@@ -555,6 +562,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-beta2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta1...v2.3.0-beta2
 [2.3.0-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.1-beta1...v2.3.0-beta1
 [2.2.1-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.0...v2.2.1-beta1
 [2.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.1.2...v2.2.0
