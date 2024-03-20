@@ -207,6 +207,8 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	n, err = t.reader.Read(p)
 	if err != nil {
 		if t.maxRetries < 0 || t.retries < t.maxRetries {
+			// short pause between retries
+			time.Sleep(100 * time.Millisecond)
 			t.retries++
 			simplelog.Warningf("resuming copy at %d bytes, retry %d/%d - %v", t.bytesRead, t.retries, t.maxRetries, err)
 			t.initReadFrom(t.bytesRead + 1)
@@ -227,7 +229,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 
-	var wg sync.WaitGroup
+	//var wg sync.WaitGroup
 	var errBuff bytes.Buffer
 	var failed error
 	containerName, err := c.getPrimaryContainer(hostString)
@@ -252,37 +254,34 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 			scheme.ParameterCodec,
 		)
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
-			if err != nil {
-				msg := fmt.Sprintf("spdy failed: %v", err)
-				simplelog.Error(msg)
-				failed = errors.New(msg)
-				return
-			}
-			// hard coding a 1 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
-			defer cancel()
-			err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
-				Stdin:  os.Stdin,
-				Stdout: writer,
-				Stderr: &errBuff,
-				Tty:    false,
-			})
-			if err != nil {
-				msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
-				simplelog.Error(msg)
-				failed = errors.New(msg)
-			}
-		}()
+		exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
+		if err != nil {
+			msg := fmt.Sprintf("spdy failed: %v", err)
+			simplelog.Error(msg)
+			failed = errors.New(msg)
+			return
+		}
+		// hard coding a 1 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+		defer cancel()
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdin:  os.Stdin,
+			Stdout: writer,
+			Stderr: &errBuff,
+			Tty:    false,
+		})
+		if err != nil {
+			msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
+			simplelog.Error(msg)
+			// ok this is non intuitive but this may fail..but not really fail
+			//failed = errors.New(msg)
+		}
 	}
 	reader := newTarPipe(source, executor)
-	if err := archive.ExtractTarGzStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
+	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
-	wg.Wait()
+	//wg.Wait()
 	if failed != nil {
 		return errBuff.String(), failed
 	}

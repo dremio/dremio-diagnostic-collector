@@ -179,14 +179,8 @@ func ExtractTarGz(gzFilePath, dest string) error {
 	return ExtractTarGzStream(reader, dest, "")
 }
 
-func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
-	gzReader, err := gzip.NewReader(reader)
-	if err != nil {
-		return err
-	}
-	defer gzReader.Close()
-
-	tarReader := tar.NewReader(gzReader)
+func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
+	tarReader := tar.NewReader(reader)
 
 	var totalCopied int64
 	for {
@@ -236,4 +230,13 @@ func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
 			}
 		}
 	}
+}
+
+func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
+	gzReader, err := gzip.NewReader(reader)
+	if err != nil {
+		return err
+	}
+	defer gzReader.Close()
+	return ExtractTarStream(gzReader, dest, pathToStrip)
 }
