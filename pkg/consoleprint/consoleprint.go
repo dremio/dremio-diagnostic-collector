@@ -155,11 +155,12 @@ func UpdateNodeAutodetectDisabled(node string, enabled bool) {
 }
 
 type NodeState struct {
-	Status   string `json:"status"`
-	StatusUX string `json:"status_ux"`
-	Node     string `json:"node"`
-	Message  string `json:"message"`
-	Result   string `json:"result"`
+	Status     string `json:"status"`
+	StatusUX   string `json:"status_ux"`
+	Node       string `json:"node"`
+	Message    string `json:"message"`
+	Result     string `json:"result"`
+	EndProcess bool   `json:"-"`
 }
 
 const (
@@ -168,7 +169,7 @@ const (
 )
 
 const (
-	STARTING                   = "STARTING"
+	Starting                   = "STARTING"
 	CreatingRemoteDir          = "CREATING_REMOTE_DIR"
 	CopyDDCToHost              = "COPY_DDC_TO_HOST"
 	SettingDDCPermissions      = "SETTING_DDC_PERMISSIONS"
@@ -226,7 +227,7 @@ func UpdateNodeState(nodeState NodeState) {
 			statusText = ResultFailure + " - " + statusText
 		}
 		c.nodeCaptureStats[node].status = statusText
-		if status == Completed || result == ResultFailure {
+		if nodeState.EndProcess {
 			if c.nodeCaptureStats[node].endTime == 0 {
 				c.TransfersComplete++
 				c.nodeCaptureStats[node].endTime = time.Now().Unix()

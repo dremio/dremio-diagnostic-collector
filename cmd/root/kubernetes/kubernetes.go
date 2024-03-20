@@ -146,7 +146,10 @@ type K8SWriter struct {
 }
 
 func (w *K8SWriter) Write(p []byte) (n int, err error) {
-	w.Output(string(p))
+	lines := strings.Split(string(p), "\n")
+	for _, line := range lines {
+		w.Output(strings.TrimSpace(line))
+	}
 	return w.Buff.Write(p)
 }
 
@@ -178,6 +181,10 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 	}
 
 	reader, writer := io.Pipe()
+	// just in case so we don't leave things hanging forever
+	defer reader.Close()
+	// just in case so we don't leave things hanging forever
+	defer writer.Close()
 
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
@@ -259,7 +266,10 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", fmt.Errorf("%s doesn't exist in local filesystem", source)
 	}
 	reader, writer := io.Pipe()
+	// just in case so we don't leave things hanging forever
 	defer reader.Close()
+	// just in case so we don't leave things hanging forever
+	defer writer.Close()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(src string, dest string, w io.WriteCloser) {
@@ -311,6 +321,9 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String()+outBuff.String())
 	}
 	wg.Wait()
+	if err := reader.Close(); err != nil {
+		return "", fmt.Errorf("failed closing the reader %v - %v", err, errBuff.String()+outBuff.String())
+	}
 	return errBuff.String() + outBuff.String(), nil
 }
 
