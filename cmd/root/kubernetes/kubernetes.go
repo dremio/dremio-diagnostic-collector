@@ -18,6 +18,7 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
@@ -173,6 +175,51 @@ func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...st
 	return
 }
 
+type TarPipe struct {
+	reader     *io.PipeReader
+	outStream  *io.PipeWriter
+	bytesRead  uint64
+	retries    int
+	maxRetries int
+	src        string
+	executor   func(writer *io.PipeWriter, cmdArr []string)
+}
+
+func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
+	t := new(TarPipe)
+	t.src = src
+	t.maxRetries = 10
+	t.initReadFrom(0)
+	t.executor = executor
+	return t
+}
+
+func (t *TarPipe) initReadFrom(n uint64) {
+	t.reader, t.outStream = io.Pipe()
+	copyCommand := []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src, n)}
+	go func() {
+		defer t.outStream.Close()
+		t.executor(t.outStream, copyCommand)
+	}()
+}
+
+func (t *TarPipe) Read(p []byte) (n int, err error) {
+	n, err = t.reader.Read(p)
+	if err != nil {
+		if t.maxRetries < 0 || t.retries < t.maxRetries {
+			t.retries++
+			simplelog.Warningf("resuming copy at %d bytes, retry %d/%d - %v", t.bytesRead, t.retries, t.maxRetries, err)
+			t.initReadFrom(t.bytesRead + 1)
+			err = nil
+		} else {
+			simplelog.Errorf("dropping out copy after %d retries - %v", t.retries, err)
+		}
+	} else {
+		t.bytesRead += uint64(n)
+	}
+	return
+}
+
 func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
@@ -180,61 +227,64 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 
-	reader, writer := io.Pipe()
-	// just in case so we don't leave things hanging forever
-	defer reader.Close()
-	// just in case so we don't leave things hanging forever
-	defer writer.Close()
-
+	var wg sync.WaitGroup
+	var errBuff bytes.Buffer
+	var failed error
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
 		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
 	}
 	simplelog.Infof("transfering from %v:%v to %v", hostString, source, destination)
-	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -czf - %v", source)}
-	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
-		Namespace(c.namespace).SubResource("exec")
-	option := &v1.PodExecOptions{
-		Container: containerName,
-		Command:   cmdArr,
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       false,
+	executor := func(writer *io.PipeWriter, cmdArr []string) {
+		req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
+			Namespace(c.namespace).SubResource("exec")
+		option := &v1.PodExecOptions{
+			Container: containerName,
+			Command:   cmdArr,
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}
+
+		req.VersionedParams(
+			option,
+			scheme.ParameterCodec,
+		)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
+			if err != nil {
+				msg := fmt.Sprintf("spdy failed: %v", err)
+				simplelog.Error(msg)
+				failed = errors.New(msg)
+				return
+			}
+			// hard coding a 1 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+			defer cancel()
+			err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+				Stdin:  os.Stdin,
+				Stdout: writer,
+				Stderr: &errBuff,
+				Tty:    false,
+			})
+			if err != nil {
+				msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
+				simplelog.Error(msg)
+				failed = errors.New(msg)
+			}
+		}()
 	}
-
-	req.VersionedParams(
-		option,
-		scheme.ParameterCodec,
-	)
-
-	var errBuff bytes.Buffer
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer writer.Close()
-		defer wg.Done()
-		exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
-		if err != nil {
-			simplelog.Errorf("spdy failed: %v", err)
-			return
-		}
-		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
-			Stdin:  os.Stdin,
-			Stdout: writer,
-			Stderr: &errBuff,
-			Tty:    false,
-		})
-		if err != nil {
-			simplelog.Errorf("failed streaming %v - %v", err, errBuff.String())
-		}
-	}()
+	reader := newTarPipe(source, executor)
 	if err := archive.ExtractTarGzStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
 	wg.Wait()
-	if err := reader.Close(); err != nil {
-		simplelog.Errorf("unable to close stream: %v", err)
+	if failed != nil {
+		return errBuff.String(), failed
 	}
 	return errBuff.String(), nil
 }
@@ -265,15 +315,13 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	if _, err := os.Stat(source); err != nil {
 		return "", fmt.Errorf("%s doesn't exist in local filesystem", source)
 	}
+	// this is rather not obvious but waiting closing the reader will hang the process, so do not close it on defer
+	// see this thread for all of the complicated problems we can encounter using SPDY https://github.com/kubernetes/client-go/issues/554
 	reader, writer := io.Pipe()
-	// just in case so we don't leave things hanging forever
-	defer reader.Close()
-	// just in case so we don't leave things hanging forever
-	defer writer.Close()
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(src string, dest string, w io.WriteCloser) {
-		defer w.Close()
+		defer writer.Close()
 		defer wg.Done()
 		srcDir := path.Dir(src)
 		if err := archive.TarGzDirFilteredStream(srcDir, writer, func(s string) bool {
@@ -310,7 +358,11 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	}
 	var errBuff bytes.Buffer
 	var outBuff bytes.Buffer
-	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+
+	// hard coding a 4 minute timeout on copy to host we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  reader,
 		Stdout: &outBuff,
 		Stderr: &errBuff,
@@ -321,9 +373,6 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String()+outBuff.String())
 	}
 	wg.Wait()
-	if err := reader.Close(); err != nil {
-		return "", fmt.Errorf("failed closing the reader %v - %v", err, errBuff.String()+outBuff.String())
-	}
 	return errBuff.String() + outBuff.String(), nil
 }
 
