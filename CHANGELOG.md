@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0-beta3] - 2024-03-21
+
+### Added
+
+* Retry logic for copy from
+* high hard-coded timeouts for copy from and copy to pod, if someone really wants this to be configurable we accept PRs
+
 ## [2.3.0-beta2] - 2024-03-20
 
 ### Fixed
@@ -562,6 +569,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-beta3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta2...v2.3.0-beta3
 [2.3.0-beta2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta1...v2.3.0-beta2
 [2.3.0-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.1-beta1...v2.3.0-beta1
 [2.2.1-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.0...v2.2.1-beta1
