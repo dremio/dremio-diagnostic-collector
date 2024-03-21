@@ -38,7 +38,7 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 		setDefault(confData, KeyCollectJFR, true)
 		setDefault(confData, KeyCollectTtop, true)
 		setDefault(confData, KeyDremioLogsNumDays, 7)
-		setDefault(confData, KeyDremioQueriesJSONNumDays, 28)
+		setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
 		setDefault(confData, KeyNumberThreads, 2)
 	}
 

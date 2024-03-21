@@ -1,3 +1,4 @@
+//	Copyright 2016 The Kubernetes Authors
 //	Copyright 2023 Dremio Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,7 +44,8 @@ import (
 )
 
 type KubeArgs struct {
-	Namespace string
+	Namespace     string
+	LabelSelector string
 }
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
@@ -54,9 +56,10 @@ func NewKubectlK8sActions(kubeArgs KubeArgs) (*KubectlK8sActions, error) {
 		return &KubectlK8sActions{}, err
 	}
 	return &KubectlK8sActions{
-		namespace: kubeArgs.Namespace,
-		client:    clientset,
-		config:    config,
+		namespace:     kubeArgs.Namespace,
+		client:        clientset,
+		config:        config,
+		labelSelector: kubeArgs.LabelSelector,
 	}, nil
 }
 
@@ -92,9 +95,10 @@ func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 
 // KubectlK8sActions provides a way to collect and copy files using kubectl
 type KubectlK8sActions struct {
-	namespace string
-	client    *kubernetes.Clientset
-	config    *rest.Config
+	namespace     string
+	labelSelector string
+	client        *kubernetes.Clientset
+	config        *rest.Config
 }
 
 func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
@@ -375,7 +379,7 @@ func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
 
 func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{
-		LabelSelector: "role=dremio-cluster-pod",
+		LabelSelector: c.labelSelector,
 	})
 	if err != nil {
 		return podName, err

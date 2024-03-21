@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.3.0-rc2] - 2024-03-22
+
+### Added
+
+* added a --label-seelcted flag for the kubernetes pods which follows the standard [kubernetes approach](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors), this is entirely optional and will use the current default if nothing is specified
+
+### Changed
+
+* queries.json capture days defaults to 30 for --collect standard and --collect health-check
+
+### Fixed
+
+* prompt UI now is not engaged if --namespace, --disable-prompt, --detect-namespace or --ssh-user is used
+
 ## [2.3.0-rc1] - 2024-03-21
 
 ### Fixed
@@ -576,6 +590,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-rc2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc1...v2.3.0-rc2
 [2.3.0-rc1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta3...v2.3.0-rc1
 [2.3.0-beta3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta2...v2.3.0-beta3
 [2.3.0-beta2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta1...v2.3.0-beta2

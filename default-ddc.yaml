@@ -28,7 +28,7 @@
 # collect-os-config: true
 # collect-disk-usage: true
 # dremio-logs-num-days: 7
-# dremio-queries-json-num-days: 28
+# dremio-queries-json-num-days: 30
 # dremio-gc-file-pattern: "gc*.log*"
 # collect-queries-json: true
 # collect-jvm-flags: true
