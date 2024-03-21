@@ -18,7 +18,6 @@ package kubernetes
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -188,9 +187,9 @@ type TarPipe struct {
 func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
 	t.src = src
-	t.maxRetries = 10
-	t.initReadFrom(0)
+	t.maxRetries = 50
 	t.executor = executor
+	t.initReadFrom(0)
 	return t
 }
 
@@ -229,9 +228,6 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		destination = strings.Replace(destination, `C:`, ``, 1)
 	}
 
-	//var wg sync.WaitGroup
-	var errBuff bytes.Buffer
-	var failed error
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
 		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
@@ -258,9 +254,9 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		if err != nil {
 			msg := fmt.Sprintf("spdy failed: %v", err)
 			simplelog.Error(msg)
-			failed = errors.New(msg)
 			return
 		}
+		var errBuff bytes.Buffer
 		// hard coding a 1 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 		defer cancel()
@@ -281,11 +277,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
-	//wg.Wait()
-	if failed != nil {
-		return errBuff.String(), failed
-	}
-	return errBuff.String(), nil
+	return "", nil
 }
 
 func (c *KubectlK8sActions) getPrimaryContainer(hostString string) (string, error) {
