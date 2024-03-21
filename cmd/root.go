@@ -404,7 +404,7 @@ func Execute(args []string) error {
 				enableFallback = true
 				// falling back to local collect
 				msg := fmt.Sprintf("unable to detect namespace (%v) falling back to local-collect", err)
-				fmt.Println(msg)
+				consoleprint.ErrorPrint(msg)
 				simplelog.Error(msg)
 			}
 			validateK8s := func(namespace string) {

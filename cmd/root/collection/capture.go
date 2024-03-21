@@ -117,9 +117,10 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB int) error {
 	host := c.Host
 	consoleprint.UpdateNodeState(consoleprint.NodeState{
-		Node:    host,
-		Message: "STARTING",
-		Status:  consoleprint.Starting,
+		Node:     host,
+		Status:   consoleprint.Starting,
+		StatusUX: "STARTING",
+		Result:   consoleprint.ResultPending,
 	})
 	// we cannot use filepath.join here as it will break everything during the transfer
 	pathToDDC := path.Join(c.TransferDir, "ddc")

@@ -18,11 +18,9 @@ package queriesjson
 import (
 	"bufio"
 	"compress/gzip"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"sort"
@@ -424,50 +422,15 @@ func CollectJobHistoryJSON(jobhistoryjsons []string) []QueriesRow {
 			continue
 		}
 		queriesrows = append(queriesrows, rows...)
-		log.Println("Found", strconv.Itoa(len(rows)), "new rows in", jobhistoryjson)
+		simplelog.Infof("Found %v new rows in %v", strconv.Itoa(len(rows)), jobhistoryjson)
 	}
 	simplelog.Infof("Collected a total of %v rows of jobs history", len(queriesrows))
 	return queriesrows
 }
 
-func writeToCSV(queriesrows []QueriesRow, filter string, limit int) { //nolint
-	// Can be used for testing or debugging
-
-	file, err := os.Create(path.Clean("job_ids_go_" + filter + strconv.Itoa(limit) + ".csv"))
-	if err != nil {
-		panic(err)
-	}
-	w := csv.NewWriter(file)
-	err = w.Write([]string{"job_id"})
-	if err != nil {
-		panic(err)
-	}
-	var sortingmetric int
-	for _, row := range queriesrows {
-		if filter == "slowplanqueriesrows" {
-			sortingmetric = int(row.ExecutionPlanningTime)
-		} else if filter == "slowexecqueriesrows" {
-			sortingmetric = int(row.RunningTime)
-		} else if filter == "highcostqueriesrows" {
-			sortingmetric = int(row.QueryCost)
-		} else if filter == "errorqueriesrows" {
-			sortingmetric = int(row.Start)
-		} else {
-			log.Println("unknown filter", filter)
-			break
-		}
-		err := w.Write([]string{fmt.Sprintf("%v", row.QueryID), fmt.Sprintf("%d", sortingmetric)})
-		if err != nil {
-			panic(err)
-		}
-	}
-	w.Flush()
-
-}
-
 func errCheck(f func() error) {
 	err := f()
 	if err != nil {
-		fmt.Println("Received error:", err)
+		simplelog.Errorf("received error: %v", err)
 	}
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0-rc1] - 2024-03-21
+
+### Fixed
+
+* fixed races in retrieval of tarballs from pods
+* fixed more output for batch mode
+
 ## [2.3.0-beta3] - 2024-03-21
 
 ### Added
@@ -569,6 +576,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-rc1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta3...v2.3.0-rc1
 [2.3.0-beta3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta2...v2.3.0-beta3
 [2.3.0-beta2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta1...v2.3.0-beta2
 [2.3.0-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.2.1-beta1...v2.3.0-beta1
