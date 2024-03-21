@@ -36,7 +36,7 @@ ddc
 
 DDC connects via SSH or the kubernetes API and collects a series of logs and files for Dremio, then puts those collected files in an archive
 
-For Kubernetes deployments _(Relies a kubernetes configuration file to be at $HOME/.kube/config or at $KUBECONFIG)_:
+For Kubernetes deployments _(Relies on a kubernetes configuration file to be at $HOME/.kube/config or at $KUBECONFIG)_:
 
 ##### default collection
 ```bash
@@ -51,7 +51,7 @@ ddc  -n mynamespace  --collect health-check
 
 ### Scripting - Dremio on-prem
 
-Specific executors that you want to collect from with the `-e` flag and coordinators with the `-c` flag. Specify SSH user, and SSH key to use.
+Specify executors that you want include in diagnostic collection with the `-e` flag and coordinators with the `-c` flag. Specify SSH user, and SSH key to use.
 
 For SSH based communication to VMs or Bare Metal hardware:
 
