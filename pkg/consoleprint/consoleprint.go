@@ -36,6 +36,7 @@ type NodeCaptureStats struct {
 // CollectionStats represents stats for a collection.
 type CollectionStats struct {
 	collectionMode       string
+	collectionArgs       string
 	ddcVersion           string
 	logFile              string
 	ddcYaml              string
@@ -128,6 +129,12 @@ func UpdateResult(result string) {
 	c.endTime = time.Now().Unix()
 }
 
+func UpdateCollectionArgs(collectionArgs string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.collectionArgs = collectionArgs
+}
+
 func UpdateCollectionMode(collectionMode string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -160,7 +167,7 @@ type NodeState struct {
 	Node       string `json:"node"`
 	Message    string `json:"message"`
 	Result     string `json:"result"`
-	EndProcess bool   `json:"-"`
+	EndProcess bool   `json:"end_process"`
 }
 
 const (
@@ -293,6 +300,10 @@ func PrintState() {
 	} else {
 		durationElapsed = time.Now().Unix() - c.startTime
 	}
+	ddcVersion := "Unknown Version"
+	if c.ddcVersion != "" {
+		ddcVersion = c.ddcVersion
+	}
 	fmt.Printf(
 		`=================================
 == Dremio Diagnostic Collector ==
@@ -305,9 +316,10 @@ Log File             : %v
 Collection Type      : %v
 Collections Enabled  : %v
 Collections Disabled : %v
+Collection Mode      : %v
+Collection Args      : %v
 Dremio PAT Set       : %v
 Autodetect Enabled   : %v
-Collection Mode      : %v
 
 -- status --
 Transfers Complete   : %v/%v
@@ -317,7 +329,7 @@ Result               : %v
 
 
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(c.ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), patMessage, autodetectEnabled, strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
 		durationElapsed, c.tarball, c.result, nodes.String())
 	c.mu.Unlock()
 

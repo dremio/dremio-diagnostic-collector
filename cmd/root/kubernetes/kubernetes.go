@@ -191,7 +191,7 @@ type TarPipe struct {
 func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
 	t.src = src
-	t.maxRetries = 50
+	t.maxRetries = 99
 	t.executor = executor
 	t.initReadFrom(0)
 	return t

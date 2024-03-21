@@ -5,10 +5,13 @@
 ### Added
 
 * added a --label-seelcted flag for the kubernetes pods which follows the standard [kubernetes approach](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors), this is entirely optional and will use the current default if nothing is specified
+* show the collection arguments used for DDC
 
 ### Changed
 
 * queries.json capture days defaults to 30 for --collect standard and --collect health-check
+* retrying up to 99 times on the incremental copy of the tarballs
+* change the order of configuration values visible in the UI for readability
 
 ### Fixed
 
@@ -25,7 +28,7 @@
 
 ### Added
 
-* Retry logic for copy from
+* retry logic for copy from 
 * high hard-coded timeouts for copy from and copy to pod, if someone really wants this to be configurable we accept PRs
 
 ## [2.3.0-beta2] - 2024-03-20

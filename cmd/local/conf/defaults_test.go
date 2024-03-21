@@ -61,7 +61,7 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyCollectOSConfig, true},
 		{conf.KeyCollectDiskUsage, true},
 		{conf.KeyDremioLogsNumDays, 7},
-		{conf.KeyDremioQueriesJSONNumDays, 28},
+		{conf.KeyDremioQueriesJSONNumDays, 30},
 		{conf.KeyDremioGCFilePattern, "gc*.log*"},
 		{conf.KeyCollectQueriesJSON, true},
 		{conf.KeyCollectServerLogs, true},
