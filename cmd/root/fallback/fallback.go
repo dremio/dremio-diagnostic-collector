@@ -17,7 +17,9 @@ package fallback
 
 import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -53,11 +55,33 @@ func (c *Fallback) HostExecute(mask bool, _ string, args ...string) (string, err
 }
 
 func (c *Fallback) CopyFromHost(_ string, source, destination string) (out string, err error) {
-	return "", os.Rename(source, destination)
+	src, err := os.Open(filepath.Clean(source))
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	dst, err := os.Create(filepath.Clean(destination))
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, src)
+	return "", err
 }
 
 func (c *Fallback) CopyToHost(_ string, source, destination string) (out string, err error) {
-	return "", os.Rename(source, destination)
+	src, err := os.Open(filepath.Clean(source))
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	dst, err := os.Create(filepath.Clean(destination))
+	if err != nil {
+		return "", err
+	}
+	defer dst.Close()
+	_, err = io.Copy(dst, src)
+	return "", err
 }
 
 func (c *Fallback) GetCoordinators() (podName []string, err error) {

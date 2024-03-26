@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.0-rc3] - 2024-03-26
+
+### Fixed
+
+* was using move instead of copy for fallback strategy
+
 ## [2.3.0-rc2] - 2024-03-21
 
 ### Added
@@ -593,6 +599,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0-rc3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc2...v2.3.0-rc3
 [2.3.0-rc2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc1...v2.3.0-rc2
 [2.3.0-rc1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta3...v2.3.0-rc1
 [2.3.0-beta3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta2...v2.3.0-beta3
