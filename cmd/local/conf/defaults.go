@@ -41,6 +41,11 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
 		setDefault(confData, KeyNumberThreads, 2)
 	}
+	if collectionMode == collects.HealthCheckCollection {
+		setDefault(confData, KeyNumberJobProfiles, 25000)
+	} else {
+		setDefault(confData, KeyNumberJobProfiles, 20)
+	}
 
 	// set default config
 	setDefault(confData, KeyCollectJStack, false)
@@ -59,7 +64,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyDremioRocksdbDir, "/opt/dremio/data/db")
 	setDefault(confData, KeyCollectDremioConfiguration, true)
 	setDefault(confData, KeyCaptureHeapDump, false)
-	setDefault(confData, KeyNumberJobProfiles, 25000)
 	setDefault(confData, KeyDremioEndpoint, "http://localhost:9047")
 	setDefault(confData, KeyTarballOutDir, "/tmp/ddc")
 	setDefault(confData, KeyCollectOSConfig, true)

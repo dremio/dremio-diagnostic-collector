@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0] - 2024-03-28
+
+### Changed
+
+* the default job profiles is now 20 for everything except the health check where it remains 25000. This default only works if
+someone has added the PAT which is always available
+* moved all rest API calls to the start of the process. This is to minimize the amount of operations that fails if a token expires.
+
 ## [2.3.0-rc3] - 2024-03-26
 
 ### Fixed
@@ -599,6 +607,7 @@
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc3...v2.3.0
 [2.3.0-rc3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc2...v2.3.0-rc3
 [2.3.0-rc2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc1...v2.3.0-rc2
 [2.3.0-rc1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-beta3...v2.3.0-rc1

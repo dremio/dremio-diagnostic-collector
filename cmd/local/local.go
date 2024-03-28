@@ -110,18 +110,42 @@ func collect(c *conf.CollectConf) error {
 	if err := createAllDirs(c); err != nil {
 		return fmt.Errorf("unable to create directories due to error %w", err)
 	}
+
 	// we can probably remove this now that we have gone to single threaded, but keeping it for the delayed execution and logging for now
 	t, err := threading.NewThreadPool(1, 1, true, false)
 	if err != nil {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}
+
 	wrapConfigJob := func(name string, j func(c *conf.CollectConf) error) threading.Job {
 		return threading.Job{
 			Name:    name,
 			Process: func() error { return j(c) },
 		}
 	}
+
+	// rest call so we move it the front in case the token expires
+	if !c.CollectWLM() {
+		simplelog.Debug("Skipping Workload Manager report collection")
+	} else {
+		t.AddJob(wrapConfigJob("WLM COLLECTION", apicollect.RunCollectWLM))
+	}
+
+	// rest call so we move it the front in case the token expires
+	if !c.CollectSystemTablesExport() {
+		simplelog.Debug("Skipping system tables collection")
+	} else {
+		t.AddJob(wrapConfigJob("SYSTEM TABLE COLLECTION", apicollect.RunCollectDremioSystemTables))
+	}
+
 	if !c.IsDremioCloud() {
+		// rest call so we move it the front in case the token expires
+		if !c.CollectKVStoreReport() {
+			simplelog.Debug("Skipping KV store report collection")
+		} else {
+			t.AddJob(wrapConfigJob("KV STORE COLLECTION", apicollect.RunCollectKvReport))
+		}
+
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
@@ -141,7 +165,6 @@ func collect(c *conf.CollectConf) error {
 		}
 
 		// log collection
-
 		logCollector := logcollect.NewLogCollector(
 			c.DremioLogDir(),
 			c.LogsOutDir(),
@@ -233,13 +256,6 @@ func collect(c *conf.CollectConf) error {
 		} else {
 			t.AddJob(wrapConfigJob("JVM FLAG COLLECTION", jvmcollect.RunCollectJVMFlags))
 		}
-		// rest call collections
-
-		if !c.CollectKVStoreReport() {
-			simplelog.Debug("Skipping KV store report collection")
-		} else {
-			t.AddJob(wrapConfigJob("KV STORE COLLECTION", apicollect.RunCollectKvReport))
-		}
 
 		if !c.CollectTtop() {
 			simplelog.Debugf("Skipping ttop collection")
@@ -265,23 +281,11 @@ func collect(c *conf.CollectConf) error {
 		}
 	}
 
-	if !c.CollectWLM() {
-		simplelog.Debug("Skipping Workload Manager report collection")
-	} else {
-		t.AddJob(wrapConfigJob("WLM COLLECTION", apicollect.RunCollectWLM))
-	}
-
-	if !c.CollectSystemTablesExport() {
-		simplelog.Debug("Skipping system tables collection")
-	} else {
-		t.AddJob(wrapConfigJob("SYSTEM TABLE COLLECTION", apicollect.RunCollectDremioSystemTables))
-	}
-
 	if err := t.ProcessAndWait(); err != nil {
 		simplelog.Errorf("thread pool has an error: %v", err)
 	}
 
-	//we wait on the thread pool to empty out as this is also multithreaded and takes the longest
+	// this has to happen after the queries.json collection so we don't have much choice and have to leave it here
 	if c.NumberJobProfilesToCollect() == 0 {
 		simplelog.Debugf("Skipping job profiles collection")
 	} else {
@@ -289,7 +293,6 @@ func collect(c *conf.CollectConf) error {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
-
 	if err := runCollectClusterStats(c); err != nil {
 		simplelog.Errorf("during unable to collect cluster stats like cluster ID: %v", err)
 	}
