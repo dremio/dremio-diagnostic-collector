@@ -249,7 +249,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableRESTAPI))
 	} else if dremioPAT != "" {
 		//if the dremio PAT is set, mask its logging then go ahead and pass it in
-		localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
+		// localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
 		mask = true
 	} else {
 		mask = false
@@ -289,7 +289,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			consoleprint.UpdateNodeAutodetectDisabled(host, true)
 		}
 		simplelog.HostLog(host, line)
-	}, localCollectArgs...)
+	}, dremioPAT, localCollectArgs...)
 	if err != nil {
 		consoleprint.UpdateNodeState(consoleprint.NodeState{
 			Node:       c.Host,

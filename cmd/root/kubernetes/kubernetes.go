@@ -109,7 +109,7 @@ func (c *KubectlK8sActions) Name() string {
 	return "Kube API"
 }
 
-func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, args ...string) (err error) {
+func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	cmd := []string{
 		"sh",
 		"-c",
@@ -118,12 +118,24 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 	logArgs(mask, args)
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")
-	option := &v1.PodExecOptions{
-		Command: cmd,
-		Stdin:   false,
-		Stdout:  true,
-		Stderr:  true,
-		TTY:     true,
+	var option *v1.PodExecOptions
+	if pat != "" {
+
+		option = &v1.PodExecOptions{
+			Command: cmd,
+			Stdin:   true,
+			Stdout:  true,
+			Stderr:  true,
+			TTY:     true,
+		}
+	} else {
+		option = &v1.PodExecOptions{
+			Command: cmd,
+			Stdin:   false,
+			Stdout:  true,
+			Stderr:  true,
+			TTY:     true,
+		}
 	}
 
 	req.VersionedParams(
@@ -138,6 +150,19 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 	writer := &K8SWriter{
 		Buff:   &buff,
 		Output: output,
+	}
+	if pat != "" {
+
+		stdIn := bytes.Buffer{}
+		_, err = stdIn.WriteString(pat)
+		if err != nil {
+			return err
+		}
+		return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+			Stdin:  &stdIn,
+			Stdout: writer,
+			Stderr: writer,
+		})
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: writer,
@@ -173,7 +198,7 @@ func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...st
 	writer := func(line string) {
 		outBuilder.WriteString(line)
 	}
-	err = c.HostExecuteAndStream(mask, hostString, writer, args...)
+	err = c.HostExecuteAndStream(mask, hostString, writer, "", args...)
 	out = outBuilder.String()
 	return
 }

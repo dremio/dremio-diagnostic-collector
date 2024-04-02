@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -40,12 +41,12 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
 )
 
@@ -589,6 +590,16 @@ var LocalCollectCmd = &cobra.Command{
 				overrides[flag.Name] = flag.Value.String()
 			}
 		})
+		var inputReader io.Reader = cobraCmd.InOrStdin()
+		b, err := io.ReadAll(inputReader)
+		if err != nil {
+			fmt.Printf("\nCRITICAL ERROR: %v\n", err)
+			os.Exit(1)
+		}
+		pat := strings.TrimSpace(string(b[:]))
+		if pat != "" {
+			overrides[conf.KeyDremioPatToken] = pat
+		}
 		msg, err := Execute(args, overrides)
 		if err != nil {
 			fmt.Printf("\nCRITICAL ERROR: %v\n", err)
@@ -626,6 +637,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	if err := validation.ValidateCollectMode(collectionMode); err != nil {
 		return "", err
 	}
+
 	c, err := conf.ReadConf(overrides, ddcYamlLoc, collectionMode)
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)

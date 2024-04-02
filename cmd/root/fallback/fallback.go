@@ -16,11 +16,12 @@
 package fallback
 
 import (
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 )
 
 type Fallback struct {
@@ -41,8 +42,8 @@ func (c *Fallback) HelpText() string {
 	return "this occurs when k8s namespace detection is requested and the rights are not present"
 }
 
-func (c *Fallback) HostExecuteAndStream(mask bool, _ string, output cli.OutputHandler, args ...string) (err error) {
-	return c.cli.ExecuteAndStreamOutput(mask, output, args...)
+func (c *Fallback) HostExecuteAndStream(mask bool, _ string, output cli.OutputHandler, pat string, args ...string) (err error) {
+	return c.cli.ExecuteAndStreamOutput(mask, output, pat, args...)
 }
 
 func (c *Fallback) HostExecute(mask bool, _ string, args ...string) (string, error) {
@@ -50,7 +51,7 @@ func (c *Fallback) HostExecute(mask bool, _ string, args ...string) (string, err
 	writer := func(line string) {
 		out.WriteString(line)
 	}
-	err := c.HostExecuteAndStream(mask, "", writer, args...)
+	err := c.HostExecuteAndStream(mask, "", writer, "", args...)
 	return out.String(), err
 }
 

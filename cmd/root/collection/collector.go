@@ -50,7 +50,7 @@ type Collector interface {
 	GetCoordinators() (podName []string, err error)
 	GetExecutors() (podName []string, err error)
 	HostExecute(mask bool, hostString string, args ...string) (stdOut string, err error)
-	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, args ...string) error
+	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) error
 	HelpText() string
 	Name() string
 }

@@ -59,12 +59,12 @@ func (c *CmdSSHActions) Name() string {
 	return "SSH/SCP"
 }
 
-func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, args ...string) (err error) {
+func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 	sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, hostString))
 	sshArgs = c.addSSHUser(sshArgs)
 	sshArgs = append(sshArgs, strings.Join(args, " "))
-	return c.cli.ExecuteAndStreamOutput(mask, output, sshArgs...)
+	return c.cli.ExecuteAndStreamOutput(mask, output, pat, sshArgs...)
 }
 
 func (c *CmdSSHActions) CopyFromHost(hostName, source, destination string) (string, error) {
@@ -96,7 +96,7 @@ func (c *CmdSSHActions) HostExecute(mask bool, hostName string, args ...string) 
 	writer := func(line string) {
 		out.WriteString(line)
 	}
-	err := c.HostExecuteAndStream(mask, hostName, writer, args...)
+	err := c.HostExecuteAndStream(mask, hostName, writer, "", args...)
 	return out.String(), err
 }
 
