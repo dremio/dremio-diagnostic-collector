@@ -18,8 +18,8 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
-	"io"
 	"os/exec"
 	"strings"
 	"sync"
@@ -84,13 +84,13 @@ func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	}
 	stdErrScanner := bufio.NewScanner(stderr)
 
-	var stdin io.WriteCloser
 	if pat != "" {
-		stdin, err = cmd.StdinPipe()
+		buff := bytes.Buffer{}
+		_, err := buff.WriteString(pat)
 		if err != nil {
-			return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
+			return err
 		}
-		defer stdin.Close()
+		cmd.Stdin = &buff
 	}
 	// Start the command
 	if err := cmd.Start(); err != nil {
@@ -98,14 +98,6 @@ func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
-
-	if pat != "" {
-		wg.Add(1)
-		go func() {
-			io.WriteString(stdin, pat)
-			wg.Done()
-		}()
-	}
 	// Asynchronously read the output from the command line by line
 	// and pass it to the outputHandler. This runs in a goroutine
 	// so that we can also read the error output at the same time.
