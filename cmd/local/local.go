@@ -590,15 +590,22 @@ var LocalCollectCmd = &cobra.Command{
 				overrides[flag.Name] = flag.Value.String()
 			}
 		})
-		var inputReader io.Reader = cobraCmd.InOrStdin()
-		b, err := io.ReadAll(inputReader)
+		fi, err := os.Stdin.Stat()
 		if err != nil {
 			fmt.Printf("\nCRITICAL ERROR: %v\n", err)
 			os.Exit(1)
 		}
-		pat := strings.TrimSpace(string(b[:]))
-		if pat != "" {
-			overrides[conf.KeyDremioPatToken] = pat
+		if fi.Size() > 0 {
+			var inputReader io.Reader = cobraCmd.InOrStdin()
+			b, err := io.ReadAll(inputReader)
+			if err != nil {
+				fmt.Printf("\nCRITICAL ERROR: %v\n", err)
+				os.Exit(1)
+			}
+			pat := strings.TrimSpace(string(b[:]))
+			if pat != "" {
+				overrides[conf.KeyDremioPatToken] = pat
+			}
 		}
 		msg, err := Execute(args, overrides)
 		if err != nil {

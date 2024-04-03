@@ -85,6 +85,7 @@ func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	stdErrScanner := bufio.NewScanner(stderr)
 
 	if pat != "" {
+		fmt.Println("enabling standard in on ssh call")
 		buff := bytes.Buffer{}
 		_, err := buff.WriteString(pat)
 		if err != nil {

@@ -115,26 +115,32 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		"-c",
 		strings.Join(args, " "),
 	}
+	// cmd := args
 	logArgs(mask, args)
+	containerName, err := c.getPrimaryContainer(hostString)
+	if err != nil {
+		return fmt.Errorf("failed looking for pod %v: %v", hostString, err)
+	}
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")
 	var option *v1.PodExecOptions
 	if pat != "" {
-
 		option = &v1.PodExecOptions{
-			Command: cmd,
-			Stdin:   true,
-			Stdout:  true,
-			Stderr:  true,
-			TTY:     true,
+			Container: containerName,
+			Command:   cmd,
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
 		}
 	} else {
 		option = &v1.PodExecOptions{
-			Command: cmd,
-			Stdin:   false,
-			Stdout:  true,
-			Stderr:  true,
-			TTY:     true,
+			Container: containerName,
+			Command:   cmd,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
 		}
 	}
 
@@ -153,15 +159,17 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 	}
 	if pat != "" {
 
-		stdIn := bytes.Buffer{}
-		_, err = stdIn.WriteString(pat)
+		buff := bytes.Buffer{}
+		_, err = buff.WriteString(pat)
 		if err != nil {
 			return err
 		}
+
 		return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
-			Stdin:  &stdIn,
+			Stdin:  &buff,
 			Stdout: writer,
 			Stderr: writer,
+			Tty:    true,
 		})
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{

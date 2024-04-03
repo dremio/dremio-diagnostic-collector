@@ -391,15 +391,19 @@ func Execute(args []string) error {
 
 		dremioPAT := confData[conf.KeyDremioPatToken].(string)
 		if cliAuthToken == "" {
-			var inputReader io.Reader = RootCmd.InOrStdin()
-			b, err := io.ReadAll(inputReader)
+			fi, err := os.Stdin.Stat()
 			if err != nil {
 				return err
 			}
-			cliAuthToken = strings.TrimSpace(string(b[:]))
-		}
-		if cliAuthToken != "" {
-			dremioPAT = cliAuthToken
+			if fi.Size() > 0 {
+				simplelog.Info("accepting PAT from standard in")
+				var inputReader io.Reader = RootCmd.InOrStdin()
+				b, err := io.ReadAll(inputReader)
+				if err != nil {
+					return err
+				}
+				dremioPAT = strings.TrimSpace(string(b[:]))
+			}
 		}
 		if err := validation.ValidateCollectMode(collectionMode); err != nil {
 			return err
