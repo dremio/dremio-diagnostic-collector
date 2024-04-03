@@ -248,8 +248,8 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		//if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableRESTAPI))
 	} else if dremioPAT != "" {
-		//if the dremio PAT is set, mask its logging then go ahead and pass it in
-		// localCollectArgs = append(localCollectArgs, "--dremio-pat-token", dremioPAT)
+		//if the dremio PAT is set, set the pat-stdin value so we can pass it in via that mechanism
+		localCollectArgs = append(localCollectArgs, "--pat-stdin")
 		mask = true
 	} else {
 		mask = false

@@ -30,6 +30,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf/autodetect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -310,6 +311,9 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
+	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && !c.disableRESTAPI {
+		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one")
+	}
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
 	c.numberJobProfilesToCollect = GetInt(confData, KeyNumberJobProfiles)
 

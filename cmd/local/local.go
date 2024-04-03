@@ -51,6 +51,7 @@ import (
 )
 
 var ddcYamlLoc, collectionMode, pid string
+var patStdIn bool
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0750
@@ -590,12 +591,7 @@ var LocalCollectCmd = &cobra.Command{
 				overrides[flag.Name] = flag.Value.String()
 			}
 		})
-		fi, err := os.Stdin.Stat()
-		if err != nil {
-			fmt.Printf("\nCRITICAL ERROR: %v\n", err)
-			os.Exit(1)
-		}
-		if fi.Size() > 0 {
+		if patStdIn {
 			var inputReader io.Reader = cobraCmd.InOrStdin()
 			b, err := io.ReadAll(inputReader)
 			if err != nil {
@@ -694,6 +690,7 @@ func init() {
 		os.Exit(1)
 	}
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
+	LocalCollectCmd.Flags().BoolVar(&patStdIn, "pat-stdin", false, "allows one to pipe the pat to standard in")
 	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
 	LocalCollectCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := LocalCollectCmd.Flags().MarkHidden("pid"); err != nil {

@@ -132,7 +132,7 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		TTY:       false,
 	}
 
-	req.VersionedParams(
+	req = req.VersionedParams(
 		option,
 		scheme.ParameterCodec,
 	)
@@ -146,27 +146,15 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		Output: output,
 	}
 	if pat != "" {
-		option.Command = append(option.Command, "<< EOF")
-		var wg sync.WaitGroup
-		reader, stdInWriter := io.Pipe()
-		wg.Add(1)
-		go func() {
-			defer stdInWriter.Close()
-			defer wg.Done()
-			_, err := stdInWriter.Write([]byte(pat))
-			if err != nil {
-				simplelog.Errorf("unable to write pat %v", err)
-			}
-		}()
-
+		buff := bytes.Buffer{}
+		if _, err := buff.WriteString(pat); err != nil {
+			return err
+		}
 		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
-			Stdin:  reader,
+			Stdin:  &buff,
 			Stdout: writer,
 			Stderr: writer,
 		})
-		// has to be here or else the command will never fire
-		wg.Wait()
-
 		return err
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
