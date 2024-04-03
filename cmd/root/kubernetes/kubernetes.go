@@ -123,25 +123,13 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 	}
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")
-	var option *v1.PodExecOptions
-	if pat != "" {
-		option = &v1.PodExecOptions{
-			Container: containerName,
-			Command:   cmd,
-			Stdin:     true,
-			Stdout:    true,
-			Stderr:    true,
-			TTY:       true,
-		}
-	} else {
-		option = &v1.PodExecOptions{
-			Container: containerName,
-			Command:   cmd,
-			Stdin:     false,
-			Stdout:    true,
-			Stderr:    true,
-			TTY:       true,
-		}
+	option := &v1.PodExecOptions{
+		Container: containerName,
+		Command:   cmd,
+		Stdin:     pat != "",
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       false,
 	}
 
 	req.VersionedParams(
@@ -158,19 +146,28 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		Output: output,
 	}
 	if pat != "" {
+		option.Command = append(option.Command, "<< EOF")
+		var wg sync.WaitGroup
+		reader, stdInWriter := io.Pipe()
+		wg.Add(1)
+		go func() {
+			defer stdInWriter.Close()
+			defer wg.Done()
+			_, err := stdInWriter.Write([]byte(pat))
+			if err != nil {
+				simplelog.Errorf("unable to write pat %v", err)
+			}
+		}()
 
-		buff := bytes.Buffer{}
-		_, err = buff.WriteString(pat)
-		if err != nil {
-			return err
-		}
-
-		return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
-			Stdin:  &buff,
+		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+			Stdin:  reader,
 			Stdout: writer,
 			Stderr: writer,
-			Tty:    true,
 		})
+		// has to be here or else the command will never fire
+		wg.Wait()
+
+		return err
 	}
 	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: writer,
