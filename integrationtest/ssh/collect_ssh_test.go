@@ -92,7 +92,7 @@ Error was: %v`, testJSON, err)
 	return b
 }
 
-func TestSSHBasedRemoteCollect(t *testing.T) {
+func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
 	}
@@ -114,13 +114,12 @@ dremio-rocksdb-dir: %v
 number-threads: 2
 dremio-endpoint: '%v'
 dremio-username: %v
-dremio-pat-token: '%v'
 collect-dremio-configuration: true
 number-job-profiles: 25
 collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername, sshConf.DremioPAT)
+`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername)
 	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
@@ -133,8 +132,43 @@ dremio-jfr-time-seconds: 10
 	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard"}
-	err := cmd.Execute(args)
+
+	//set original stdin since we are going to overwrite it for now
+	org := os.Stdin
+	defer func() {
+		//reset std in
+		os.Stdin = org
+	}()
+	tmpfile, err := os.CreateTemp("", "stdinmock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			t.Log(err)
+		}
+	}()
+	written, err := tmpfile.WriteString(sshConf.DremioPAT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written == 0 {
+		t.Fatal("nothing written to the temp files")
+	}
+	if err := tmpfile.Sync(); err != nil {
+		t.Fatalf("cant sync file: %v", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("cant close file: %v", err)
+	}
+	tmpfile, err = os.Open(tmpfile.Name())
+	if err != nil {
+		t.Fatalf("cant open file: %v", err)
+	}
+	os.Stdin = tmpfile
+
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check"}
+	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
 	}

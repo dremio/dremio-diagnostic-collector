@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0] - 2024-04-04
+
+### Added
+
+* we now support passing the PAT via stdin
+
+### Changed
+
+* when using DDC standard collection we now pass the pat to local-collect on nodes via standard in using kubernetes and ssh. This improves security
+* bumped retries up to 200 for k8s and dropped the pause time between retries from 100 milliseconds to 50 seconds
+
+
 ## [2.3.0] - 2024-03-28
 
 ### Changed
@@ -607,6 +619,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc3...v2.3.0
 [2.3.0-rc3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc2...v2.3.0-rc3
 [2.3.0-rc2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc1...v2.3.0-rc2
