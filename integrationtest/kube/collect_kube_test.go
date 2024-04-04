@@ -391,6 +391,7 @@ func TestValidateTestWasCorrectlyRun(t *testing.T) {
 		t.Error("integration tests broken, nothing was run, if all other tests are passing this means there is an error in setup")
 	}
 }
+
 func TestRemoteCollectOnK8s(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
@@ -406,24 +407,50 @@ func TestRemoteCollectOnK8s(t *testing.T) {
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
 verbose: vvvv
-dremio-log-dir: /opt/dremio/data/logs
-dremio-conf-dir: /opt/dremio/conf
-dremio-rocksdb-dir: /opt/dremio/data/db
-number-threads: 2
-dremio-endpoint: http://localhost:9047
-dremio-username: dremio
-dremio-pat-token: %v
-collect-dremio-configuration: true
 number-job-profiles: 25
 tmp-output-dir: %v
 collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, dremioPATToken, tmpOutputDir)), 0600); err != nil {
+`, tmpOutputDir)), 0600); err != nil {
 		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
-	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "standard"}
+
+	//set original stdin since we are going to overwrite it for now
+	org := os.Stdin
+	defer func() {
+		//reset std in
+		os.Stdin = org
+	}()
+	tmpfile, err := os.CreateTemp("", "stdinmock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			t.Log(err)
+		}
+	}()
+	written, err := tmpfile.WriteString(dremioPATToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if written == 0 {
+		t.Fatal("nothing written to the temp files")
+	}
+	if err := tmpfile.Sync(); err != nil {
+		t.Fatalf("cant sync file: %v", err)
+	}
+	if err := tmpfile.Close(); err != nil {
+		t.Fatalf("cant close file: %v", err)
+	}
+	tmpfile, err = os.Open(tmpfile.Name())
+	if err != nil {
+		t.Fatalf("cant open file: %v", err)
+	}
+	os.Stdin = tmpfile
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "health-check"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -483,10 +510,6 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "statefulsets.json"))
 
 	expectedFiles := []string{
-		"dremio-executor-2-chown-data-directory.txt",
-		"dremio-executor-2-chown-cloudcache-directory.txt",
-		"dremio-executor-2-dremio-executor.txt",
-		"dremio-executor-2-wait-for-zookeeper.txt",
 		"dremio-executor-1-chown-data-directory.txt",
 		"dremio-executor-1-chown-cloudcache-directory.txt",
 		"dremio-executor-1-dremio-executor.txt",
@@ -502,8 +525,6 @@ dremio-jfr-time-seconds: 10
 		"dremio-master-0-wait-for-zookeeper.txt"}
 
 	expectedEmptyFiles := []string{
-		"dremio-executor-2-chown-data-directory.txt",
-		"dremio-executor-2-chown-cloudcache-directory.txt",
 		"dremio-executor-1-chown-data-directory.txt",
 		"dremio-executor-1-chown-cloudcache-directory.txt",
 		"dremio-executor-0-chown-data-directory.txt",
@@ -518,8 +539,9 @@ dremio-jfr-time-seconds: 10
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	if len(entries) != 17 {
-		t.Errorf("expected to find 17 entries but found %v", len(entries))
+	expectedEntries := 13
+	if len(entries) != expectedEntries {
+		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}
 	foundFiles := []string{}
 	foundEmptyFiles := []string{}
@@ -555,10 +577,10 @@ dremio-jfr-time-seconds: 10
 	if !reflect.DeepEqual(foundFiles, expectedFiles) {
 		t.Errorf("Expected the following files to be present:\n %v\n But found the following:\n %v", expectedFiles, foundFiles)
 	}
-
+	replicas := 2
 	// check server.logs
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.log.gz"))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.log.gz"))
 	}
@@ -571,7 +593,7 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback.xml"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback-access.xml"))
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "dremio.conf"))
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "dremio-env"))
@@ -584,7 +606,8 @@ dremio-jfr-time-seconds: 10
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "jvm_settings.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "rocksdb_disk_allocation.txt"))
-	for i := 0; i < 3; i++ {
+
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", host, "diskusage.txt"))
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", host, "jvm_settings.txt"))
@@ -594,7 +617,7 @@ dremio-jfr-time-seconds: 10
 	// check file contents
 	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		t.Logf("checking file %v", filepath.Join(hcDir, "node-info", host, "os_info.txt"))
 		tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", host, "os_info.txt"))
@@ -605,19 +628,19 @@ dremio-jfr-time-seconds: 10
 
 	//ttop files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-master-0", "ttop.txt"))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", host, "ttop.txt"))
 	}
 
 	//jfr files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-master-0.jfr"))
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		hostFile := fmt.Sprintf("dremio-executor-%v.jfr", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", hostFile))
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		//thread dump files
 		entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", host))

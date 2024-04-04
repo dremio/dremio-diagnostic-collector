@@ -722,7 +722,7 @@ metadata:
   
 spec:
   serviceName: "dremio-cluster-pod"
-  replicas: 3
+  replicas: 2
   podManagementPolicy: "Parallel"
   revisionHistoryLimit: 1
   selector:
