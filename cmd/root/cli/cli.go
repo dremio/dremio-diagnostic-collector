@@ -19,6 +19,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -64,6 +65,9 @@ type Cli struct {
 // it will return an error. Note that an error from the command itself (e.g., a non-zero exit status) will also
 // be returned as an error from this function.
 func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat string, args ...string) error {
+	if len(args) == 0 {
+		return errors.New("must have an argument but none was present")
+	}
 	// Log the command that's about to be run
 	logArgs(mask, args)
 
@@ -85,7 +89,6 @@ func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	stdErrScanner := bufio.NewScanner(stderr)
 
 	if pat != "" {
-		fmt.Println("enabling standard in on ssh call")
 		buff := bytes.Buffer{}
 		_, err := buff.WriteString(pat)
 		if err != nil {

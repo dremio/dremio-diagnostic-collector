@@ -45,7 +45,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		expectedOut = "file1\nfile2\n"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(false, outputHandler, "ls", "-1", filepath.Join("testdata", "ls"))
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "", "ls", "-1", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -53,7 +53,7 @@ func TestExecuteAndStreamOutput_WithValidCommand(t *testing.T) {
 	} else {
 		expectedOut = "file1\nfile2\n"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(false, outputHandler, "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "", "cmd.exe", "/c", "dir", "/B", filepath.Join("testdata", "ls"))
 		})
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
@@ -76,14 +76,14 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		expectedOut = "No such file or directory"
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(false, outputHandler, "cat", "nonexistentfile")
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "", "cat", "nonexistentfile")
 		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
 		}
 	} else {
 		out, captureErr = output.CaptureOutput(func() {
-			err = c.ExecuteAndStreamOutput(false, outputHandler, "cmd.exe", "/c", "dir", "doesntexist")
+			err = c.ExecuteAndStreamOutput(false, outputHandler, "", "cmd.exe", "/c", "dir", "doesntexist")
 		})
 		if err == nil {
 			t.Errorf("Expected error but got nil")
@@ -99,7 +99,7 @@ func TestExecuteAndStreamOutput_WithCommandProducesStderr(t *testing.T) {
 
 func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 	setupTestCLI()
-	err := c.ExecuteAndStreamOutput(false, outputHandler, "22JIDJMJMHHF")
+	err := c.ExecuteAndStreamOutput(false, outputHandler, "", "22JIDJMJMHHF")
 	if err == nil {
 		t.Errorf("Expected error but got nil")
 	}
