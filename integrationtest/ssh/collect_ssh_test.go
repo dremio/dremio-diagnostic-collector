@@ -92,6 +92,119 @@ Error was: %v`, testJSON, err)
 	return b
 }
 
+func TestSSHBasedRemoteCollect(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
+	var sshConf SSHTestConf
+	b := GetJSON(t)
+	if err := json.Unmarshal(b, &sshConf); err != nil {
+		t.Errorf("failed unmarshalling string: %v", err)
+	}
+	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
+	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
+	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
+		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	}
+	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
+	yamlText := fmt.Sprintf(`verbose: vvvv
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-rocksdb-dir: %v
+`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir)
+	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
+		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	}
+
+	privateKey := filepath.Join(t.TempDir(), "ssh_key")
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+		t.Fatalf("unable to write ssh private key: %v", err)
+	}
+	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
+	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
+		t.Fatalf("unable to write ssh public key: %v", err)
+	}
+
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light"}
+	err := cmd.Execute(args)
+	if err != nil {
+		t.Fatalf("unable to run collect: %v", err)
+	}
+	simplelog.Info("remote collect complete now verifying the results")
+	testOut := filepath.Join(t.TempDir(), "ddcout")
+	err = os.Mkdir(testOut, 0700)
+	if err != nil {
+		t.Fatalf("could not make test out dir %v", err)
+	}
+	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
+
+	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
+		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+	}
+	simplelog.Infof("now we are reading the %v dir", testOut)
+	entries, err := os.ReadDir(testOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hcDir := ""
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+		if e.IsDir() {
+			hcDir = filepath.Join(testOut, e.Name())
+			simplelog.Infof("now found the health check directory which is %v", hcDir)
+		}
+	}
+
+	if len(names) != 2 {
+		t.Fatalf("expected 1 entry but had %v", strings.Join(names, ","))
+	}
+	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
+
+	coordinator, err := getHostName(sshConf.Coordinator, privateKey, sshConf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executor, err := getHostName(sshConf.Executor, privateKey, sshConf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check server.logs
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", coordinator, "server.log.gz"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", executor, "server.log.gz"))
+	// check queries.json
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", coordinator, "queries.json.gz"))
+	// check conf files
+
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", coordinator, "dremio.conf"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", coordinator, "dremio-env"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", coordinator, "logback.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", coordinator, "logback-access.xml"))
+
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", executor, "dremio.conf"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", executor, "dremio-env"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", executor, "logback.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", executor, "logback-access.xml"))
+
+	// check nodeinfo files
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "diskusage.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "jvm_settings.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", coordinator, "rocksdb_disk_allocation.txt"))
+
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "diskusage.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "jvm_settings.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
+
+	// check file contents
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
+
+}
+
 func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
@@ -332,7 +445,7 @@ dremio-jfr-time-seconds: 10
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "job-profiles", coordinator))
 	if err != nil {
-		t.Fatalf("cannot read job profiles dir for the "+coordinator+" due to: %v", err)
+		t.Fatalf("cannot read job profiles dir for the %v due to: %v", coordinator, err)
 	}
 
 	// so there is some vagueness and luck with how many job profiles we download, so we are going to see if there are at least 10 of them and call that good enough
