@@ -37,7 +37,20 @@ do the following in the ddc.yaml:
 
 ## What is captured by DDC?
 
-### By default
+DDC has 3 modes - but you can alter the `ddc.yaml` and override collection modes to suit your own configuration
+
+### Light mode
+
+* Perf metrics (cpu and GC usage by thread)
+* System disk usage
+* server.log and 2 days of archives
+* metadata\_refresh.log and 2 days of archives
+* reflection.log and 2 days of archives
+* queries.json and up to 2 days of archives
+* all dremio configurations
+* All gc logs if present
+
+### Standard mode
 
 * Perf metrics (cpu and GC usage by thread)
 * System disk usage
@@ -50,15 +63,16 @@ do the following in the ddc.yaml:
 * all dremio configurations
 * All gc logs if present
 
+### Healthcheck mode (with a Dremio Personal Access Token)
+
+* a sampling of job profiles (note 25000 jobs can take 15 minutes to collect)
+* dremio key value store report
+* dremio work load manager details
+* system tables and their details
+
 ### Optionally with the appropriate change to ddc.yaml
 
 * access.log and 7 days of archives
 * audit.log and 7 days of archives
 * java heap dump
 
-### Optionally with a Dremio Personal Access Token
-
-* a sampling of job profiles (note 25000 jobs can take 15 minutes to collect)
-* dremio key value store report
-* dremio work load manager details
-* system tables and their details
