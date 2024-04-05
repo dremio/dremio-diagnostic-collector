@@ -41,38 +41,37 @@ DDC has 3 modes - but you can alter the `ddc.yaml` and override collection modes
 
 ### Light mode
 
-* Perf metrics (cpu and GC usage by thread)
-* System disk usage
+* system disk usage
 * server.log and 2 days of archives
 * metadata\_refresh.log and 2 days of archives
 * reflection.log and 2 days of archives
 * queries.json and up to 2 days of archives
-* all dremio configurations
-* All gc logs if present
+* all Dremio configurations
+* all GC logs if present
 
 ### Standard mode
 
-* Perf metrics (cpu and GC usage by thread)
-* System disk usage
+* perf metrics (cpu and GC usage by thread)
+* system disk usage
 * Java Flight Recorder recording of 60 seconds
-* Jstack thread dump every second for approximately 60 seconds
 * server.log and 7 days of archives
 * metadata\_refresh.log and 7 days of archives
 * reflection.log and 7 days of archives
-* queries.json and up to 28 days of archives 
-* all dremio configurations
-* All gc logs if present
+* queries.json and up to 30 days of archives 
+* all Dremio configurations
+* all GC logs if present
 
 ### Healthcheck mode (with a Dremio Personal Access Token)
 
 * a sampling of job profiles (note 25000 jobs can take 15 minutes to collect)
-* dremio key value store report
-* dremio work load manager details
+* Dremio key value store report
+* Dremio work load manager details
 * system tables and their details
 
 ### Optionally with the appropriate change to ddc.yaml
 
 * access.log and 7 days of archives
 * audit.log and 7 days of archives
-* java heap dump
+* Jstack thread dump every second for approximately 60 seconds
+* Java heap dump
 
