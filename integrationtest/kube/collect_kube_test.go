@@ -416,7 +416,7 @@ dremio-jfr-time-seconds: 10
 	}
 	outputDir = tmpOutputDir
 
-	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", 5}
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", "5"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -648,7 +648,7 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("cant open file: %v", err)
 	}
 	os.Stdin = tmpfile
-	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb", 5}
+	args := []string{"ddc", "-n", namespace, "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb","5"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
