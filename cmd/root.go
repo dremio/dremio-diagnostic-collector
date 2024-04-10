@@ -224,11 +224,7 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 	emptyOverrides := make(map[string]string)
 	confData, err := conf.ParseConfig(ddcYaml, emptyOverrides)
 	if err != nil {
-		simplelog.Warningf("ddc.yaml is unreadable at location '%v' due to error: %v using empty ddc.yaml", ddcYaml, err)
-		if err := os.WriteFile(ddcYaml, []byte(""), 0600); err != nil {
-			return make(map[string]interface{}), err
-		}
-
+		return make(map[string]interface{}), err
 	}
 	conf.SetViperDefaults(confData, "", 0, collectionMode)
 	simplelog.Infof("parsed configuration for %v follows", ddcYaml)

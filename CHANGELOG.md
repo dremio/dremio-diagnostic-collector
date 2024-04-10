@@ -10,7 +10,6 @@
 
 * timeout for transfers dropped to 30 minutes from an hour
 * dropped retries from 200 to 100 for network transfer
-* ddc.yaml is no longer required to be present
 
 ## [2.4.0] - 2024-04-04
 
