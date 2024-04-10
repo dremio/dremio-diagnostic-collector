@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.1] - UNRELEASED
+
+### Added
+
+* more logging around transfer lifecycle
+
+### Changed
+
+* timeout for transfers dropped to 30 minutes from an hour
+* dropped retries from 200 to 100 for network transfer
+* ddc.yaml is no longer required to be present
+
 ## [2.4.0] - 2024-04-04
 
 ### Added
@@ -619,6 +631,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc3...v2.3.0
 [2.3.0-rc3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0-rc2...v2.3.0-rc3

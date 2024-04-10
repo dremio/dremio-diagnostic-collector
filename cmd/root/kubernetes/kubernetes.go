@@ -209,7 +209,7 @@ type TarPipe struct {
 func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
 	t.src = src
-	t.maxRetries = 200
+	t.maxRetries = 100
 	t.executor = executor
 	t.initReadFrom(0)
 	return t
@@ -279,8 +279,8 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 			return
 		}
 		var errBuff bytes.Buffer
-		// hard coding a 1 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
+		// hard coding a 30 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 			Stdin:  os.Stdin,
@@ -291,14 +291,14 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		if err != nil {
 			msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
 			simplelog.Error(msg)
-			// ok this is non intuitive but this may fail..but not really fail
-			//failed = errors.New(msg)
 		}
 	}
 	reader := newTarPipe(source, executor)
+	simplelog.Infof("untarring file '%v' from stdout", destination)
 	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
+	simplelog.Infof("file %v untarred fully and transfer is now complete", destination)
 	return "", nil
 }
 
