@@ -279,7 +279,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 			return
 		}
 		var errBuff bytes.Buffer
-		// hard coding a 30 hour timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
+		// hard coding a 30 minute timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
