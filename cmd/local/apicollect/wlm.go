@@ -42,6 +42,7 @@ func RunCollectWLM(c *conf.CollectConf) error {
 		apiobjects = [][]string{
 			{"/api/v3/wlm/queue", "queues.json"},
 			{"/api/v3/wlm/rule", "rules.json"},
+            {"/apiv2/provision/clusters", "awse_engines.json"},
 		}
 	} else {
 		apiobjects = [][]string{
