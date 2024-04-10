@@ -125,7 +125,7 @@ dremio-rocksdb-dir: %v
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light"}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", 5}
 	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -280,7 +280,7 @@ dremio-jfr-time-seconds: 10
 	}
 	os.Stdin = tmpfile
 
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check"}
+	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb", 5}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
