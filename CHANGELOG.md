@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.2] - 2024-04-23
+
+### Added
+
+* support for retrieving GC logs by the jdk-11 compatible flags
+
 ## [2.4.1] - 2024-04-12
 
 ### Added

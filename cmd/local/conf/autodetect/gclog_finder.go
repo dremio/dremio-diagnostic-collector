@@ -61,6 +61,46 @@ func FindGCLogLocation() (gcLogLoc string, err error) {
 
 // ParseGCLogFromFlags takes a given string with java startup flags and finds the gclog directive
 func ParseGCLogFromFlags(startupFlagsStr string) (gcLogLocation string, err error) {
+	logDir, errorFromPost25 := ParseGCLogFromFlagsPost25(startupFlagsStr)
+	if logDir == "" {
+		logDir, err := ParseGCLogFromFlagsPre25(startupFlagsStr)
+		if err != nil {
+			return "", fmt.Errorf("uanble to parse gc flags due the following errors: '%v' and '%v'", errorFromPost25, err)
+		}
+		return logDir, nil
+	}
+	return logDir, nil
+}
+
+// ParseGCLogFromFlags takes a given string with java startup flags and finds the gclog directive
+func ParseGCLogFromFlagsPost25(startupFlagsStr string) (gcLogLocation string, err error) {
+	tokens := strings.Split(startupFlagsStr, " ")
+	var found []int
+	for i, token := range tokens {
+		if strings.HasPrefix(token, "-Xlog:") {
+			found = append(found, i)
+		}
+	}
+	if len(found) == 0 {
+		return "", nil
+	}
+	lastIndex := found[len(found)-1]
+	last := tokens[lastIndex]
+	gcLogLocationTokens := strings.Split(last, "-Xlog:")
+	if len(gcLogLocationTokens) != 2 {
+		return "", fmt.Errorf("unexpected items in string '%v', expected only 2 items but found %v", last, len(gcLogLocationTokens))
+	}
+	tokens = strings.Split(gcLogLocationTokens[1], ":")
+	for _, t := range tokens {
+		if strings.HasPrefix(t, "file=") {
+			return path.Dir(strings.Split(t, "file=")[1]), nil
+		}
+	}
+	return "", fmt.Errorf("could not find an Xlog parameter with file= in the string %v", startupFlagsStr)
+}
+
+// ParseGCLogFromFlags takes a given string with java startup flags and finds the gclog directive
+func ParseGCLogFromFlagsPre25(startupFlagsStr string) (gcLogLocation string, err error) {
 	tokens := strings.Split(startupFlagsStr, " ")
 	var found []int
 	for i, token := range tokens {
