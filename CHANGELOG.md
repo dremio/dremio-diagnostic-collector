@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.4.3] - UNRELEASED
+
+* removing sys.boot and sys.cache.objects from health check capture
+
 ## [2.4.2] - 2024-04-23
 
 ### Added
@@ -637,6 +641,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
 
+[2.4.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.3.0...v2.4.0

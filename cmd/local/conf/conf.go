@@ -164,7 +164,6 @@ func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 func SystemTableList() []string {
 	return []string{
 		"\\\"tables\\\"",
-		"boot",
 		"copy_errors_history",
 		"fragments",
 		"jobs",
@@ -188,7 +187,6 @@ func SystemTableList() []string {
 		"views",
 		"cache.datasets",
 		"cache.mount_points",
-		"cache.objects",
 		"cache.storage_plugins",
 	}
 }
