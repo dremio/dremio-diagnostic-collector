@@ -64,14 +64,16 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 		joburl = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID() + "/job/"
 	}
 
-	simplelog.Debugf("Collecting sys." + systable + " (Limit: " + tablerowlimit + " rows)")
 	sql := "SELECT * FROM sys." + systable
 	// job history is limited by the number of days, all other sys tables are limited by the number of rows
-	if strings.Contains(systable, "project.history.jobs") {
-		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + strconv.Itoa(c.DremioQueriesJSONNumDays()) + " AS INTERVAL DAY))"
+	if strings.Contains(systable, "project.history.jobs") || strings.Contains(systable, "jobs_recent") {
+		daylimit := strconv.Itoa(c.DremioQueriesJSONNumDays())
+		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + daylimit + " AS INTERVAL DAY))"
 		sql += " ORDER BY submitted_ts DESC"
+		simplelog.Debugf("Collecting sys." + systable + " (Limit: Last " + daylimit + " days)")
 	} else {
 		sql += " LIMIT " + tablerowlimit
+		simplelog.Debugf("Collecting sys." + systable + " (Limit: " + tablerowlimit + " rows)")
 	}
 	simplelog.Debugf(sql)
 	sqlbody := "{\"sql\": \"" + sql + "\"}"

@@ -1,0 +1,7 @@
+{
+    "rowCount": 999,
+    "rows": [
+        {"wrong_key": 123},
+        {"missing_value": null}
+    ]
+}

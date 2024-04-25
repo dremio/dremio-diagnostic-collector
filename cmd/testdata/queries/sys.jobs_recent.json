@@ -1,0 +1,291 @@
+{
+    "rowCount": 2,
+    "schema": [
+        {
+            "name": "job_id",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "status",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "query_type",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "user_name",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "queried_datasets",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "scanned_datasets",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "attempt_count",
+            "type": {
+                "name": "INTEGER"
+            }
+        },
+        {
+            "name": "submitted_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "attempt_started_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "metadata_retrieval_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "planning_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "query_enqueued_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "engine_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "execution_planning_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "execution_start_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "final_state_ts",
+            "type": {
+                "name": "TIMESTAMP"
+            }
+        },
+        {
+            "name": "submitted_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "attempt_started_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "metadata_retrieval_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "planning_start_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "query_enqueued_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "engine_start_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "execution_planning_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "execution_start_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "final_state_epoch_millis",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "planner_estimated_cost",
+            "type": {
+                "name": "DOUBLE"
+            }
+        },
+        {
+            "name": "rows_scanned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "bytes_scanned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "rows_returned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "bytes_returned",
+            "type": {
+                "name": "BIGINT"
+            }
+        },
+        {
+            "name": "accelerated",
+            "type": {
+                "name": "BOOLEAN"
+            }
+        },
+        {
+            "name": "queue_name",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "engine",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "error_msg",
+            "type": {
+                "name": "VARCHAR"
+            }
+        },
+        {
+            "name": "query",
+            "type": {
+                "name": "VARCHAR"
+            }
+        }
+    ],
+    "rows": [
+        {
+            "job_id": "Query1",
+            "status": "FAILED",
+            "query_type": "REST",
+            "user_name": "dremio_user",
+            "queried_datasets": "",
+            "scanned_datasets": "",
+            "attempt_count": 1,
+            "submitted_ts": "2024-04-24 14:26:23.248",
+            "attempt_started_ts": "2024-04-24 14:26:23.248",
+            "metadata_retrieval_ts": "2024-04-24 14:26:23.248",
+            "planning_start_ts": "1970-01-01 00:00:00.000",
+            "query_enqueued_ts": "1970-01-01 00:00:00.000",
+            "engine_start_ts": "1970-01-01 00:00:00.000",
+            "execution_planning_ts": "1970-01-01 00:00:00.000",
+            "execution_start_ts": "1970-01-01 00:00:00.000",
+            "final_state_ts": "2024-04-24 14:26:23.250",
+            "submitted_epoch_millis": 1713968783248,
+            "attempt_started_epoch_millis": 1713968783248,
+            "metadata_retrieval_epoch_millis": 1713968783248,
+            "planning_start_epoch_millis": 0,
+            "query_enqueued_epoch_millis": 0,
+            "engine_start_epoch_millis": 0,
+            "execution_planning_epoch_millis": 0,
+            "execution_start_epoch_millis": 0,
+            "final_state_epoch_millis": 1713968783250,
+            "planner_estimated_cost": 1.0,
+            "rows_scanned": 0,
+            "bytes_scanned": 0,
+            "rows_returned": 0,
+            "bytes_returned": 0,
+            "accelerated": false,
+            "queue_name": "",
+            "engine": "",
+            "error_msg": "Object 'example_view' not found [...]",
+            "query": "SELECT * FROM example_view"
+        },
+        {
+            "job_id": "Query2",
+            "status": "COMPLETED",
+            "query_type": "REST",
+            "user_name": "dremio_user",
+            "queried_datasets": "[sys.jobs]",
+            "scanned_datasets": "[jobs]",
+            "attempt_count": 1,
+            "submitted_ts": "2024-04-25 08:24:18.006",
+            "attempt_started_ts": "2024-04-25 08:24:18.006",
+            "metadata_retrieval_ts": "2024-04-25 08:24:18.006",
+            "planning_start_ts": "2024-04-25 08:24:18.008",
+            "query_enqueued_ts": "2024-04-25 08:24:18.031",
+            "engine_start_ts": "2024-04-25 08:24:18.031",
+            "execution_planning_ts": "2024-04-25 08:24:18.040",
+            "execution_start_ts": "2024-04-25 08:24:18.042",
+            "final_state_ts": "2024-04-25 08:24:18.061",
+            "submitted_epoch_millis": 1714033458006,
+            "attempt_started_epoch_millis": 1714033458006,
+            "metadata_retrieval_epoch_millis": 1714033458006,
+            "planning_start_epoch_millis": 1714033458008,
+            "query_enqueued_epoch_millis": 1714033458031,
+            "engine_start_epoch_millis": 1714033458031,
+            "execution_planning_epoch_millis": 1714033458040,
+            "execution_start_epoch_millis": 1714033458042,
+            "final_state_epoch_millis": 1714033458061,
+            "planner_estimated_cost": 3.8154000035E9,
+            "rows_scanned": 1,
+            "bytes_scanned": 0,
+            "rows_returned": 1,
+            "bytes_returned": 441,
+            "accelerated": false,
+            "queue_name": "Low Cost User Queries",
+            "engine": "",
+            "error_msg": "",
+            "query": "SELECT * FROM sys.jobs LIMIT 100000"
+        }
+    ]
+}

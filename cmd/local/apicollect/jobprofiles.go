@@ -35,39 +35,42 @@ import (
 func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
 	var files []fs.DirEntry
 	var queriesrows []queriesjson.QueriesRow
-	if !c.IsDremioCloud() {
-		files, err = os.ReadDir(c.QueriesOutDir())
-		if err != nil {
-			return 0, 0, err
-		}
-		queriesjsons := []string{}
-		for _, file := range files {
-			queriesjsons = append(queriesjsons, path.Join(c.QueriesOutDir(), file.Name()))
-		}
 
-		if len(queriesjsons) == 0 {
-			simplelog.Warning("no queries.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
-			return
+	files, err = os.ReadDir(c.SystemTablesOutDir())
+	if err != nil {
+		return 0, 0, err
+	}
+	jobhistoryjsons := []string{}
+	for _, file := range files {
+		if strings.Contains(file.Name(), "project.history.jobs") || strings.Contains(file.Name(), "jobs_recent") {
+			jobhistoryjsons = append(jobhistoryjsons, path.Join(c.SystemTablesOutDir(), file.Name()))
 		}
+	}
 
-		queriesrows = queriesjson.CollectQueriesJSON(queriesjsons)
-	} else {
-		files, err = os.ReadDir(c.SystemTablesOutDir())
-		if err != nil {
-			return 0, 0, err
-		}
-		jobhistoryjsons := []string{}
-		for _, file := range files {
-			if strings.Contains(file.Name(), "project.history.jobs") {
-				jobhistoryjsons = append(jobhistoryjsons, path.Join(c.SystemTablesOutDir(), file.Name()))
+	if len(jobhistoryjsons) == 0 {
+
+		// Attempt to read job history from queries.json, if not Dremio Cloud
+		if !c.IsDremioCloud() {
+			files, err = os.ReadDir(c.QueriesOutDir())
+			if err != nil {
+				return 0, 0, err
 			}
-		}
+			queriesjsons := []string{}
+			for _, file := range files {
+				queriesjsons = append(queriesjsons, path.Join(c.QueriesOutDir(), file.Name()))
+			}
 
-		if len(jobhistoryjsons) == 0 {
-			simplelog.Warning("no valid records or sys.project.history.jobs.json files found. Therefore, we are skipping collection of Job Profiles")
+			if len(queriesjsons) == 0 {
+				simplelog.Warning("no queries.json or jobs.json files found. This is probably an executor, so we are skipping collection of Job Profiles")
+				return
+			}
+
+			queriesrows = queriesjson.CollectQueriesJSON(queriesjsons)
+		} else {
+			simplelog.Warning("no valid records or jobs.json files found. Therefore, we are skipping collection of Job Profiles")
 			return
 		}
-
+	} else {
 		queriesrows = queriesjson.CollectJobHistoryJSON(jobhistoryjsons)
 	}
 

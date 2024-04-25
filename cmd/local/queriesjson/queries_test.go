@@ -317,7 +317,7 @@ func TestReadGzippedJSONFile(t *testing.T) {
 	}
 }
 
-func TestReadHistoryHobsJSONFile(t *testing.T) {
+func TestReadHistoryJobsJSONFile(t *testing.T) {
 	filename := "../../testdata/queries/sys.project.history.jobs.json"
 	actual, err := ReadHistoryJobsJSONFile(filename)
 	if err != nil {
@@ -327,6 +327,40 @@ func TestReadHistoryHobsJSONFile(t *testing.T) {
 	if len(actual) != 2 {
 		t.Errorf("%v", len(actual))
 		t.Errorf("The sys.project.history.jobs.json should produce 2 valid entries")
+	}
+}
+
+func TestReadJobsRecentJSONFile(t *testing.T) {
+	filename := "../../testdata/queries/sys.jobs_recent.json"
+	actual, err := ReadHistoryJobsJSONFile(filename)
+	if err != nil {
+		t.Errorf("%v", err)
+		t.Errorf("There should not be an error here")
+	}
+	if len(actual) != 2 {
+		t.Errorf("%v", len(actual))
+		t.Errorf("The sys.jobs_recent.json should produce 2 valid entries")
+	} else if actual[1].QueryID != "Query2" ||
+		actual[1].QueryType != "REST" ||
+		actual[1].QueryCost != 3.8154000035e9 ||
+		actual[1].Start != 1714033458006 ||
+		actual[1].ExecutionPlanningTime != 2 ||
+		actual[1].RunningTime != 55 ||
+		actual[1].Outcome != "COMPLETED" {
+		t.Errorf("The second sys.jobs_recent.json entry was not parsed correctly")
+	}
+}
+
+func TestReadBadJobsRecentJSONFile(t *testing.T) {
+	filename := "../../testdata/queries/bad_sys.jobs_recent.json"
+	actual, err := ReadHistoryJobsJSONFile(filename)
+	if err != nil {
+		t.Errorf("%v", err)
+		t.Errorf("There should not be an error here")
+	}
+	if len(actual) != 0 {
+		t.Errorf("%v", len(actual))
+		t.Errorf("The bad_sys.jobs_recent.json should produce 0 valid entries")
 	}
 }
 
@@ -370,7 +404,7 @@ func TestCollectJobHistoryJSON(t *testing.T) {
 	for _, file := range files {
 		queriesjsons = append(queriesjsons, path.Join(queriesDir, file.Name()))
 	}
-	numValidEntries := 2
+	numValidEntries := 4
 	queriesrows := CollectJobHistoryJSON(queriesjsons)
 	if len(queriesrows) != numValidEntries {
 		t.Errorf("The queries files in testdata should produce %v entries", numValidEntries)

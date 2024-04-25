@@ -90,49 +90,53 @@ type HistoryJobs struct {
 }
 
 type Row struct {
-	JobID                       string  `json:"job_id"`
-	Status                      string  `json:"status"`
-	QueryType                   string  `json:"query_type"`
-	UserName                    string  `json:"user_name"`
-	QueriedDatasets             any     `json:"queried_datasets"`
-	ScannedDatasets             any     `json:"scanned_datasets"`
-	ExecutionCPUTimeNs          int     `json:"execution_cpu_time_ns"`
-	AttemptCount                int     `json:"attempt_count"`
-	SubmittedTs                 string  `json:"submitted_ts"`
-	AttemptStartedTs            string  `json:"attempt_started_ts"`
-	MetadataRetrievalTs         any     `json:"metadata_retrieval_ts"`
-	PlanningStartTs             any     `json:"planning_start_ts"`
-	QueryEnqueuedTs             any     `json:"query_enqueued_ts"`
-	EngineStartTs               any     `json:"engine_start_ts"`
-	ExecutionPlanningStartTs    any     `json:"execution_planning_start_ts"`
-	ExecutionStartTs            any     `json:"execution_start_ts"`
-	FinalStateTs                string  `json:"final_state_ts"`
-	SubmittedEpoch              int64   `json:"submitted_epoch"`
-	AttemptStartedEpoch         int64   `json:"attempt_started_epoch"`
-	MetadataRetrievalEpoch      int     `json:"metadata_retrieval_epoch"`
-	PlanningStartEpoch          int     `json:"planning_start_epoch"`
-	QueryEnqueuedEpoch          int     `json:"query_enqueued_epoch"`
-	EngineStartEpoch            int     `json:"engine_start_epoch"`
+	JobID     string `json:"job_id"`
+	Status    string `json:"status"`
+	QueryType string `json:"query_type"`
+	// UserName                     string  `json:"user_name"`
+	// QueriedDatasets              any     `json:"queried_datasets"`
+	// ScannedDatasets              any     `json:"scanned_datasets"`
+	// ExecutionCPUTimeNs           int     `json:"execution_cpu_time_ns"`
+	// AttemptCount                 int     `json:"attempt_count"`
+	// SubmittedTs                  string  `json:"submitted_ts"`
+	// AttemptStartedTs             string  `json:"attempt_started_ts"`
+	// MetadataRetrievalTs          any     `json:"metadata_retrieval_ts"`
+	// PlanningStartTs              any     `json:"planning_start_ts"`
+	// QueryEnqueuedTs              any     `json:"query_enqueued_ts"`
+	// EngineStartTs                any     `json:"engine_start_ts"`
+	// ExecutionPlanningStartTs     any     `json:"execution_planning_start_ts"`
+	// ExecutionStartTs             any     `json:"execution_start_ts"`
+	// FinalStateTs                 string  `json:"final_state_ts"`
+	SubmittedEpoch int64 `json:"submitted_epoch"`
+	// AttemptStartedEpoch          int64   `json:"attempt_started_epoch"`
+	// MetadataRetrievalEpoch       int     `json:"metadata_retrieval_epoch"`
+	// PlanningStartEpoch           int     `json:"planning_start_epoch"`
+	// QueryEnqueuedEpoch           int     `json:"query_enqueued_epoch"`
+	// EngineStartEpoch             int     `json:"engine_start_epoch"`
 	ExecutionPlanningStartEpoch int     `json:"execution_planning_start_epoch,omitempty"`
 	ExecutionStartEpoch         int     `json:"execution_start_epoch"`
 	FinalStateEpoch             int64   `json:"final_state_epoch"`
 	PlannerEstimatedCost        float64 `json:"planner_estimated_cost"`
-	RowsScanned                 int     `json:"rows_scanned"`
-	BytesScanned                int     `json:"bytes_scanned"`
-	RowsReturned                int     `json:"rows_returned"`
-	BytesReturned               int     `json:"bytes_returned"`
-	Accelerated                 bool    `json:"accelerated"`
-	QueueName                   any     `json:"queue_name"`
-	Engine                      any     `json:"engine"`
-	ExecutionNodes              any     `json:"execution_nodes"`
-	MemoryAvailable             int     `json:"memory_available"`
-	ErrorMsg                    string  `json:"error_msg"`
-	Query                       string  `json:"query"`
-	QueryChunks                 any     `json:"query_chunks"`
-	ReflectionMatches           any     `json:"reflection_matches"`
-	StartingTs                  any     `json:"starting_ts"`
-	StartingEpoch               int     `json:"starting_epoch"`
-	ExecutionPlanningStart      int64   `json:"execution_planning_start_,omitempty"`
+	// RowsScanned                  int     `json:"rows_scanned"`
+	// BytesScanned                 int     `json:"bytes_scanned"`
+	// RowsReturned                 int     `json:"rows_returned"`
+	// BytesReturned                int     `json:"bytes_returned"`
+	// Accelerated                  bool    `json:"accelerated"`
+	// QueueName                    any     `json:"queue_name"`
+	// Engine                       any     `json:"engine"`
+	// ExecutionNodes               any     `json:"execution_nodes"`
+	// MemoryAvailable              int     `json:"memory_available"`
+	// ErrorMsg                     string  `json:"error_msg"`
+	// Query                        string  `json:"query"`
+	// QueryChunks                  any     `json:"query_chunks"`
+	// ReflectionMatches            any     `json:"reflection_matches"`
+	// StartingTs                   any     `json:"starting_ts"`
+	// StartingEpoch                int     `json:"starting_epoch"`
+	// ExecutionPlanningStart       int64   `json:"execution_planning_start_,omitempty"`
+	SubmittedEpochMillis         int64 `json:"submitted_epoch_millis"`          // Used in sys.jobs_recent
+	ExecutionStartEpochMillis    int64 `json:"execution_start_epoch_millis"`    // Used in sys.jobs_recent
+	ExecutionPlanningEpochMillis int64 `json:"execution_planning_epoch_millis"` // Used in sys.jobs_recent
+	FinalStateEpochMillis        int64 `json:"final_state_epoch_millis"`        // Used in sys.jobs_recent
 }
 
 func ReadGzFile(filename string) ([]QueriesRow, error) {
@@ -218,7 +222,7 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 		return queriesrows, fmt.Errorf("can't JSON unmarshall %v due to error %v", filename, err)
 	}
 	for _, line := range dat.Rows {
-		row, err := parseLineDC(line)
+		row, err := parseLineJobsJson(line)
 		if err != nil {
 			simplelog.Errorf("can't parse line %v from file %v due to error %v", row, filename, err)
 		} else {
@@ -309,14 +313,25 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	return queriesrow, err
 }
 
-func parseLineDC(line Row) (QueriesRow, error) {
+func parseLineJobsJson(line Row) (QueriesRow, error) {
 	var row = new(QueriesRow)
+	if line.JobID == "" {
+		return *new(QueriesRow), fmt.Errorf("no job ID found")
+	}
 	row.QueryID = line.JobID
 	row.QueryType = line.QueryType
 	row.QueryCost = line.PlannerEstimatedCost
-	row.Start = float64(line.SubmittedEpoch)
-	row.ExecutionPlanningTime = float64(line.ExecutionStartEpoch) - float64(line.ExecutionPlanningStartEpoch)
-	row.RunningTime = float64(line.FinalStateEpoch) - float64(line.SubmittedEpoch)
+	// Column names used for Dremio Cloud sys.project.history.jobs
+	if line.SubmittedEpoch != 0 {
+		row.Start = float64(line.SubmittedEpoch)                                                                  // submitted_epoch_millis in sys.jobs_recent
+		row.ExecutionPlanningTime = float64(line.ExecutionStartEpoch) - float64(line.ExecutionPlanningStartEpoch) // execution_start_epoch_millis and execution_planning_epoch_millis in sys.jobs_recent
+		row.RunningTime = float64(line.FinalStateEpoch) - float64(line.SubmittedEpoch)                            // submitted_epoch_millis and final_state_epoch_millis in sys.jobs_recent
+	} else {
+		// Column names used for Dremio Software sys.jobs_recent
+		row.Start = float64(line.SubmittedEpochMillis)
+		row.ExecutionPlanningTime = float64(line.ExecutionStartEpochMillis) - float64(line.ExecutionPlanningEpochMillis)
+		row.RunningTime = float64(line.FinalStateEpochMillis) - float64(line.SubmittedEpochMillis)
+	}
 	row.Outcome = line.Status
 	queriesrow := *row
 	return queriesrow, nil
