@@ -644,7 +644,7 @@ spec:
       
       containers:
       - name: dremio-coordinator
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -669,7 +669,7 @@ spec:
           value: "2048"
         - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
           value: >-
-            -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log  -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181
+            -Ddremio.log.path=/opt/dremio/data/logs -Xlog:gc*,classhisto*=trace:file=/opt/dremio/data/gc-%t.log:uptime,time,tags,level:filecount=1,filesize=4M -Dzookeeper=zk-hs:2181
             -Dservices.coordinator.enabled=true
             -Dservices.coordinator.master.enabled=false
             -Dservices.coordinator.master.embedded-zookeeper.enabled=false
@@ -741,7 +741,7 @@ spec:
       
       containers:
       - name: dremio-executor
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -771,7 +771,7 @@ spec:
           value: "2048"
         - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
           value: >-
-            -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log  -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181
+            -Ddremio.log.path=/opt/dremio/data/logs -Xlog:gc*,classhisto*=trace:file=/opt/dremio/data/gc-%t.log:uptime,time,tags,level:filecount=1,filesize=4M -Dzookeeper=zk-hs:2181
             -Dservices.coordinator.enabled=false
             -Dservices.coordinator.master.enabled=false
             -Dservices.coordinator.master.embedded-zookeeper.enabled=false
@@ -792,7 +792,7 @@ spec:
       initContainers:
       
       - name: chown-data-directory
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -802,7 +802,7 @@ spec:
         command: ["chown"]
         args: ["dremio:dremio", "/opt/dremio/data"]
       - name: chown-cloudcache-directory
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -880,7 +880,7 @@ spec:
       
       containers:
       - name: dremio-master-coordinator
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -907,7 +907,7 @@ spec:
           value: "2048"
         - name: DREMIO_JAVA_SERVER_EXTRA_OPTS
           value: >-
-            -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log  -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181
+            -Ddremio.log.path=/opt/dremio/data/logs -Xlog:gc*,classhisto*=trace:file=/opt/dremio/data/gc-%t.log:uptime,time,tags,level:filecount=1,filesize=4M -Dzookeeper=zk-hs:2181
             -Dservices.coordinator.enabled=true
             -Dservices.coordinator.master.enabled=true
             -Dservices.coordinator.master.embedded-zookeeper.enabled=false
@@ -946,7 +946,7 @@ spec:
         image: busybox
         command:  ["sh", "-c", "until ping -c 1 -W 1 zk-hs > /dev/null; do echo Waiting for Zookeeper to be ready.; sleep 2; done;"]
       - name: chown-data-directory
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -958,7 +958,7 @@ spec:
         - "dremio:dremio"
         - "/opt/dremio/data"
       - name: upgrade-task
-        image: dremio/dremio-oss:24.3
+        image: dremio/dremio-oss:25.0
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: dremio-master-volume

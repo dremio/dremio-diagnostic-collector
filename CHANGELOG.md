@@ -4,6 +4,7 @@
 
 * removing sys.boot and sys.cache.objects from health check capture
 * using sys.jobs_recent when available instead of queries.json
+* sjk jar updated
 
 ## [2.4.2] - 2024-04-23
 
