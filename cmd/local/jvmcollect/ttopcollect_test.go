@@ -149,6 +149,7 @@ func TestTtopExec(t *testing.T) {
 	} else {
 		t.Logf("text for ttop was `%v`", text)
 	}
+
 }
 
 func TestTtopExecHasNoPidToFind(t *testing.T) {

@@ -222,7 +222,7 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 		return queriesrows, fmt.Errorf("can't JSON unmarshall %v due to error %v", filename, err)
 	}
 	for _, line := range dat.Rows {
-		row, err := parseLineJobsJson(line)
+		row, err := parseLineJobsJSON(line)
 		if err != nil {
 			simplelog.Errorf("can't parse line %v from file %v due to error %v", row, filename, err)
 		} else {
@@ -313,7 +313,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	return queriesrow, err
 }
 
-func parseLineJobsJson(line Row) (QueriesRow, error) {
+func parseLineJobsJSON(line Row) (QueriesRow, error) {
 	var row = new(QueriesRow)
 	if line.JobID == "" {
 		return *new(QueriesRow), fmt.Errorf("no job ID found")

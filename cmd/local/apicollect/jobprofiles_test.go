@@ -57,6 +57,11 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	tmpDir := t.TempDir()
+	sysTablesFolder := filepath.Join(tmpDir, "system-tables", "node1")
+	err = os.MkdirAll(sysTablesFolder, 0700) //"queries is from
+	if err != nil {
+		t.Fatalf("cant make queries dir %v", err)
+	}
 	queriesDir := filepath.Join(tmpDir, "queries", "node1")
 	err = os.MkdirAll(queriesDir, 0700) //"queries is from
 	if err != nil {
