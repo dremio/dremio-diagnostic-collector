@@ -57,10 +57,10 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	tmpDir := t.TempDir()
-	sysTablesFolder := filepath.Join(tmpDir, "system-tables", "node1")
-	err = os.MkdirAll(sysTablesFolder, 0700) //"queries is from
+	sysTableDir := filepath.Join(tmpDir, "system-tables", "node1")
+	err = os.MkdirAll(sysTableDir, 0700)
 	if err != nil {
-		t.Fatalf("cant make queries dir %v", err)
+		t.Fatalf("cant make system-tables dir %v", err)
 	}
 	queriesDir := filepath.Join(tmpDir, "queries", "node1")
 	err = os.MkdirAll(queriesDir, 0700) //"queries is from
@@ -98,6 +98,7 @@ dremio-endpoint: %v
 		t.Fatalf("unable to read conf %v", err)
 	}
 
+	// Get number of profiles to collect based on queries.json
 	tried, collected, err := apicollect.GetNumberOfJobProfilesCollected(c)
 	if err != nil {
 		t.Fatalf("failed running job profile numbers generation\n%v", err)
@@ -106,6 +107,27 @@ dremio-endpoint: %v
 		t.Errorf("collected was supposed to be 0 but got %v", collected)
 	}
 	if tried != 3 {
+		t.Errorf("tried was supposed to be 3 but got %v", tried)
+	}
+
+	if err := os.WriteFile(filepath.Join(sysTableDir, "sys.jobs_recent.json"), []byte(`
+{"rows": [
+	{"job_id": "Query1", "status": "FAILED", "query_type": "REST", "submitted_epoch_millis": 1713968783248,	"planning_start_epoch_millis": 0, "execution_start_epoch_millis": 0, "final_state_epoch_millis": 1713968783250, "planner_estimated_cost": 2.8234000035E5},
+	{"job_id": "Query2", "status": "COMPLETED", "query_type": "REST", "submitted_epoch_millis": 1714033458006, "planning_start_epoch_millis": 1714033458008, "execution_start_epoch_millis": 1714033458042, "final_state_epoch_millis": 1714033458061, "planner_estimated_cost": 3.8154000035E9}
+]}
+`), 0600); err != nil {
+		t.Fatalf("unable to write sys.jobs_recent.json %v", err)
+	}
+
+	// Get number of profiles to collect based on sys.jobs_recent
+	tried, collected, err = apicollect.GetNumberOfJobProfilesCollected(c)
+	if err != nil {
+		t.Fatalf("failed running job profile numbers generation\n%v", err)
+	}
+	if collected != 0 {
+		t.Errorf("collected was supposed to be 0 but got %v", collected)
+	}
+	if tried != 2 {
 		t.Errorf("tried was supposed to be 3 but got %v", tried)
 	}
 }

@@ -54,10 +54,10 @@ type QueriesRow struct {
 	// PoolWaitTime            int    `json:"poolWaitTime"`
 	// PendingTime             int    `json:"pendingTime"`
 	// MetadataRetrievalTime   int    `json:"metadataRetrievalTime"`
-	// PlanningTime            int    `json:"planningTime"`
+	PlanningTime float64 `json:"planningTime"`
 	// EngineStartTime         int    `json:"engineStartTime"`
 	// QueuedTime              int    `json:"queuedTime"`
-	ExecutionPlanningTime float64 `json:"executionPlanningTime"`
+	// ExecutionPlanningTime float64 `json:"executionPlanningTime"`
 	// StartingTime            int    `json:"startingTime"`
 	RunningTime float64 `json:"runningTime"`
 	// EngineName              string `json:"engineName"`
@@ -110,13 +110,13 @@ type Row struct {
 	SubmittedEpoch int64 `json:"submitted_epoch"`
 	// AttemptStartedEpoch          int64   `json:"attempt_started_epoch"`
 	// MetadataRetrievalEpoch       int     `json:"metadata_retrieval_epoch"`
-	// PlanningStartEpoch           int     `json:"planning_start_epoch"`
+	PlanningStartEpoch int `json:"planning_start_epoch"`
 	// QueryEnqueuedEpoch           int     `json:"query_enqueued_epoch"`
 	// EngineStartEpoch             int     `json:"engine_start_epoch"`
-	ExecutionPlanningStartEpoch int     `json:"execution_planning_start_epoch,omitempty"`
-	ExecutionStartEpoch         int     `json:"execution_start_epoch"`
-	FinalStateEpoch             int64   `json:"final_state_epoch"`
-	PlannerEstimatedCost        float64 `json:"planner_estimated_cost"`
+	// ExecutionPlanningStartEpoch  int     `json:"execution_planning_start_epoch,omitempty"`
+	ExecutionStartEpoch  int     `json:"execution_start_epoch"`
+	FinalStateEpoch      int64   `json:"final_state_epoch"`
+	PlannerEstimatedCost float64 `json:"planner_estimated_cost"`
 	// RowsScanned                  int     `json:"rows_scanned"`
 	// BytesScanned                 int     `json:"bytes_scanned"`
 	// RowsReturned                 int     `json:"rows_returned"`
@@ -133,10 +133,10 @@ type Row struct {
 	// StartingTs                   any     `json:"starting_ts"`
 	// StartingEpoch                int     `json:"starting_epoch"`
 	// ExecutionPlanningStart       int64   `json:"execution_planning_start_,omitempty"`
-	SubmittedEpochMillis         int64 `json:"submitted_epoch_millis"`          // Used in sys.jobs_recent
-	ExecutionStartEpochMillis    int64 `json:"execution_start_epoch_millis"`    // Used in sys.jobs_recent
-	ExecutionPlanningEpochMillis int64 `json:"execution_planning_epoch_millis"` // Used in sys.jobs_recent
-	FinalStateEpochMillis        int64 `json:"final_state_epoch_millis"`        // Used in sys.jobs_recent
+	SubmittedEpochMillis      int64 `json:"submitted_epoch_millis"`       // Used in sys.jobs_recent
+	ExecutionStartEpochMillis int64 `json:"execution_start_epoch_millis"` // Used in sys.jobs_recent
+	PlanningStartEpochMillis  int64 `json:"planning_start_epoch_millis"`  // Used in sys.jobs_recent
+	FinalStateEpochMillis     int64 `json:"final_state_epoch_millis"`     // Used in sys.jobs_recent
 }
 
 func ReadGzFile(filename string) ([]QueriesRow, error) {
@@ -269,15 +269,15 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	} else {
 		simplelog.Warningf("queries.json is missing field 'queryCost'")
 	}
-	if val, ok := dat["executionPlanningTime"]; ok {
+	if val, ok := dat["planningTime"]; ok {
 		pt, ok := val.(float64)
 		if ok {
-			row.ExecutionPlanningTime = pt
+			row.PlanningTime = pt
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'executionPlanningTime'")
+			return *new(QueriesRow), fmt.Errorf("incorrect type for 'planningTime'")
 		}
 	} else {
-		simplelog.Warningf("queries.json is missing field 'executionPlanningTime'")
+		simplelog.Warningf("queries.json is missing field 'planningTime'")
 	}
 	if val, ok := dat["runningTime"]; ok {
 		rt, ok := val.(float64)
@@ -323,13 +323,13 @@ func parseLineJobsJSON(line Row) (QueriesRow, error) {
 	row.QueryCost = line.PlannerEstimatedCost
 	// Column names used for Dremio Cloud sys.project.history.jobs
 	if line.SubmittedEpoch != 0 {
-		row.Start = float64(line.SubmittedEpoch)                                                                  // submitted_epoch_millis in sys.jobs_recent
-		row.ExecutionPlanningTime = float64(line.ExecutionStartEpoch) - float64(line.ExecutionPlanningStartEpoch) // execution_start_epoch_millis and execution_planning_epoch_millis in sys.jobs_recent
-		row.RunningTime = float64(line.FinalStateEpoch) - float64(line.SubmittedEpoch)                            // submitted_epoch_millis and final_state_epoch_millis in sys.jobs_recent
+		row.Start = float64(line.SubmittedEpoch)
+		row.PlanningTime = float64(line.ExecutionStartEpoch) - max(float64(line.PlanningStartEpoch), float64(line.SubmittedEpoch))
+		row.RunningTime = float64(line.FinalStateEpoch) - float64(line.SubmittedEpoch)
 	} else {
 		// Column names used for Dremio Software sys.jobs_recent
 		row.Start = float64(line.SubmittedEpochMillis)
-		row.ExecutionPlanningTime = float64(line.ExecutionStartEpochMillis) - float64(line.ExecutionPlanningEpochMillis)
+		row.PlanningTime = float64(line.ExecutionStartEpochMillis) - max(float64(line.PlanningStartEpochMillis), float64(line.SubmittedEpochMillis))
 		row.RunningTime = float64(line.FinalStateEpochMillis) - float64(line.SubmittedEpochMillis)
 	}
 	row.Outcome = line.Status
@@ -366,7 +366,7 @@ func GetSlowPlanningJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
 
 	totalrows := len(queriesrows)
 	sort.Slice(queriesrows, func(i, j int) bool {
-		return queriesrows[i].ExecutionPlanningTime > queriesrows[j].ExecutionPlanningTime
+		return queriesrows[i].PlanningTime > queriesrows[j].PlanningTime
 	})
 	return queriesrows[:min(totalrows, limit)]
 }

@@ -35,7 +35,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row1.QueryID = "Row1"
 	row1.QueryType = "REST"
 	row1.QueryCost = 500
-	row1.ExecutionPlanningTime = 5
+	row1.PlanningTime = 5
 	row1.RunningTime = 100
 	row1.Start = 11111
 	row1.Outcome = "FAILED"
@@ -44,7 +44,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row2.QueryID = "Row2"
 	row2.QueryType = "ODBC"
 	row2.QueryCost = 10
-	row2.ExecutionPlanningTime = 500
+	row2.PlanningTime = 500
 	row2.RunningTime = 1
 	row2.Start = 22222
 	row2.Outcome = "FAILED"
@@ -53,7 +53,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row3.QueryID = "Row3"
 	row3.QueryType = "META"
 	row3.QueryCost = 1000
-	row3.ExecutionPlanningTime = 1
+	row3.PlanningTime = 1
 	row3.RunningTime = 50
 	row3.Start = 33333
 	row3.Outcome = "CANCELLED"
@@ -62,7 +62,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row4.QueryID = "Row4"
 	row4.QueryType = "REFLECTION"
 	row4.QueryCost = 10
-	row4.ExecutionPlanningTime = 100
+	row4.PlanningTime = 100
 	row4.RunningTime = 10
 	row4.Start = 44444
 	row4.Outcome = "FINISHED"
@@ -71,7 +71,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row5.QueryID = "Row5"
 	row5.QueryType = "UI"
 	row5.QueryCost = 99
-	row5.ExecutionPlanningTime = 1000
+	row5.PlanningTime = 1000
 	row5.RunningTime = 25
 	row5.Start = 55555
 	row5.Outcome = "FAILED"
@@ -194,7 +194,7 @@ func TestParseLine_ValidJson(t *testing.T) {
 		"outcome":"COMPLETED",
 		"queryType":"METADATA_REFRESH",
 		"queryCost":5.1003501E7,
-		"executionPlanningTime":340,
+		"planningTime":340,
 		"runningTime":4785
 	}`
 	actual, err := parseLine(s, 1)
@@ -205,7 +205,7 @@ func TestParseLine_ValidJson(t *testing.T) {
 	expected.QueryID = "1b9b9629-8289-b46c-c765-455d24da7800"
 	expected.QueryType = "METADATA_REFRESH"
 	expected.QueryCost = 5.1003501e7
-	expected.ExecutionPlanningTime = 340
+	expected.PlanningTime = 340
 	expected.RunningTime = 4785
 	expected.Start = 100
 	expected.Outcome = "COMPLETED"
@@ -265,7 +265,7 @@ func TestParseLine_IncorrectTypes(t *testing.T) {
 		"outcome":` + fields[2][isField(i, 2)] + `,
 		"queryType":` + fields[3][isField(i, 3)] + `,
 		"queryCost":` + fields[4][isField(i, 4)] + `,
-		"executionPlanningTime":` + fields[5][isField(i, 5)] + `,
+		"planningTime":` + fields[5][isField(i, 5)] + `,
 		"runningTime":` + fields[6][isField(i, 6)] + `
 		}`
 		_, err := parseLine(s, 1)
@@ -344,7 +344,7 @@ func TestReadJobsRecentJSONFile(t *testing.T) {
 		actual[1].QueryType != "REST" ||
 		actual[1].QueryCost != 3.8154000035e9 ||
 		actual[1].Start != 1714033458006 ||
-		actual[1].ExecutionPlanningTime != 2 ||
+		actual[1].PlanningTime != 34 ||
 		actual[1].RunningTime != 55 ||
 		actual[1].Outcome != "COMPLETED" {
 		t.Errorf("The second sys.jobs_recent.json entry was not parsed correctly")
