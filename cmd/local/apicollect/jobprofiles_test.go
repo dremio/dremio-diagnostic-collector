@@ -128,6 +128,6 @@ dremio-endpoint: %v
 		t.Errorf("collected was supposed to be 0 but got %v", collected)
 	}
 	if tried != 2 {
-		t.Errorf("tried was supposed to be 3 but got %v", tried)
+		t.Errorf("tried was supposed to be 2 but got %v", tried)
 	}
 }
