@@ -309,7 +309,8 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 
 	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("error accessing path %q: %v", path, err)
+			simplelog.Errorf("error accessing path %q: %v", path, err)
+			return nil
 		}
 
 		if clusterID != "" {
@@ -320,7 +321,8 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 			f, err := os.Open(filepath.Clean(path))
 			simplelog.Debugf("checking file %v for cluster version", f.Name())
 			if err != nil {
-				return fmt.Errorf("error reading file %q: %v", path, err)
+				simplelog.Errorf("error reading file %q: %v", path, err)
+				return nil
 			}
 			defer f.Close()
 			var tempString string

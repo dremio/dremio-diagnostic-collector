@@ -1,6 +1,14 @@
 # Changelog
 
+## [2.4.4] - 2024-05-24
+
+### Fixed
+
+* ignoring errors when searching for cluster ID as high usage clusters have files vanish during search
+
 ## [2.4.3] - 2024-04-25
+
+### Changed
 
 * removing sys.boot and sys.cache.objects from health check capture
 * using sys.jobs_recent when available instead of queries.json
@@ -641,8 +649,9 @@ someone has added the PAT which is always available
 
 ### Added
 
-- able to capture logs, configuration and diagnostic data from dremio clusters deployed on Kubernetes and on-prem
+- able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[2.4.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.3...v2.4.4
 [2.4.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.1...v2.4.2
 [2.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.0...v2.4.1

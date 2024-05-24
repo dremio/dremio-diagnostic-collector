@@ -209,7 +209,7 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 	today := time.Now()
 	files, err := os.ReadDir(filepath.Join(srcLogDir, "archive"))
 	if err != nil {
-		//no archives to read go ahead and exist as there is nothing to do
+		//no archives to read go ahead and exit as there is nothing to do
 		return fmt.Errorf("unable to read archive folder due to error %v", err)
 	}
 	for i := 0; i <= archiveDays; i++ {
@@ -236,7 +236,6 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 					if err := os.Remove(path.Clean(dst)); err != nil {
 						errs = append(errs, fmt.Errorf("cleanup of old log file %v failed due to error %v", unzippedFile, err))
 					}
-
 				}
 			}
 		}
