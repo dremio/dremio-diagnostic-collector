@@ -16,6 +16,7 @@
 package ddcio
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -146,7 +148,7 @@ func GetFilesInDir(dir string) ([]os.DirEntry, error) {
 }
 
 // Shell executes a shell command with shell expansion and appends its output to the provided io.Writer.
-func Shell(writer io.Writer, commandLine string) error {
+func Shell(hook *shutdown.Hook, writer io.Writer, commandLine string) error {
 	//this is a hack before we can do a longer term improvement of separating local-collect
 	// and the ddc command into different clis
 	shell := "bash"
@@ -155,7 +157,9 @@ func Shell(writer io.Writer, commandLine string) error {
 		shell = "cmd.exe"
 		fileArg = "/C"
 	}
-	cmd := exec.Command(shell, fileArg, commandLine)
+	ctx, cancel := context.WithCancel(context.Background())
+	hook.Add(cancel)
+	cmd := exec.CommandContext(ctx, shell, fileArg, commandLine)
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 

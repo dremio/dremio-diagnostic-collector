@@ -24,9 +24,11 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,6 +44,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/clusterstats"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/validation"
 
@@ -103,7 +106,7 @@ func createAllDirs(c *conf.CollectConf) error {
 	return nil
 }
 
-func collect(c *conf.CollectConf) error {
+func collect(c *conf.CollectConf, hook *shutdown.Hook) error {
 	if !c.DisableFreeSpaceCheck() {
 		if err := dirs.CheckFreeSpace(c.TarballOutDir(), uint64(c.MinFreeSpaceGB())); err != nil {
 			return fmt.Errorf("%v. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
@@ -119,10 +122,10 @@ func collect(c *conf.CollectConf) error {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}
 
-	wrapConfigJob := func(name string, j func(c *conf.CollectConf) error) threading.Job {
+	wrapConfigJob := func(name string, j func(c *conf.CollectConf, h *shutdown.Hook) error) threading.Job {
 		return threading.Job{
 			Name:    name,
-			Process: func() error { return j(c) },
+			Process: func() error { return j(c, hook) },
 		}
 	}
 
@@ -291,11 +294,11 @@ func collect(c *conf.CollectConf) error {
 	if c.NumberJobProfilesToCollect() == 0 {
 		simplelog.Debugf("Skipping job profiles collection")
 	} else {
-		if err := apicollect.RunCollectJobProfiles(c); err != nil {
+		if err := apicollect.RunCollectJobProfiles(c, hook); err != nil {
 			simplelog.Errorf("during job profile collection there was an error: %v", err)
 		}
 	}
-	if err := runCollectClusterStats(c); err != nil {
+	if err := runCollectClusterStats(c, hook); err != nil {
 		simplelog.Errorf("during unable to collect cluster stats like cluster ID: %v", err)
 	}
 	return nil
@@ -420,9 +423,9 @@ func parseVersionFromClassPath(classPath string) string {
 	return ""
 }
 
-func getClassPath(pid int) (string, error) {
+func getClassPath(hook *shutdown.Hook, pid int) (string, error) {
 	var w bytes.Buffer
-	if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v VM.system_properties", pid)); err != nil {
+	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v VM.system_properties", pid)); err != nil {
 		return "", err
 	}
 	out := w.String()
@@ -441,9 +444,9 @@ func getClassPath(pid int) (string, error) {
 	return "", fmt.Errorf("no matches for java.class.path= found in '%v'", pid)
 }
 
-func runCollectClusterStats(c *conf.CollectConf) error {
+func runCollectClusterStats(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debugf("Collecting cluster stats")
-	classPath, err := getClassPath(c.DremioPID())
+	classPath, err := getClassPath(hook, c.DremioPID())
 	if err != nil {
 		return err
 	}
@@ -465,16 +468,13 @@ func runCollectClusterStats(c *conf.CollectConf) error {
 	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0600)
 }
 
-func runCollectOSConfig(c *conf.CollectConf) error {
+func runCollectOSConfig(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debug("Collecting OS Information")
 	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
 	w, err := os.Create(filepath.Clean(osInfoFile))
 	if err != nil {
 		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(osInfoFile), err)
 	}
-	defer func() {
-
-	}()
 
 	simplelog.Debug("/etc/*-release")
 
@@ -483,7 +483,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		simplelog.Warningf("unable to write release file header for os_info.txt due to error %v", err)
 	}
 
-	err = ddcio.Shell(w, "cat /etc/*-release")
+	err = ddcio.Shell(hook, w, "cat /etc/*-release")
 	if err != nil {
 		simplelog.Warningf("unable to write release files for os_info.txt due to error %v", err)
 	}
@@ -493,7 +493,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		simplelog.Warningf("unable to write uname header for os_info.txt due to error %v", err)
 	}
 
-	err = ddcio.Shell(w, "uname -r")
+	err = ddcio.Shell(hook, w, "uname -r")
 	if err != nil {
 		simplelog.Warningf("unable to write uname -r for os_info.txt due to error %v", err)
 	}
@@ -501,7 +501,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write cat /etc/issue header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "cat /etc/issue")
+	err = ddcio.Shell(hook, w, "cat /etc/issue")
 	if err != nil {
 		simplelog.Warningf("unable to write /etc/issue for os_info.txt due to error %v", err)
 	}
@@ -509,7 +509,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "cat /proc/sys/kernel/hostname")
+	err = ddcio.Shell(hook, w, "cat /proc/sys/kernel/hostname")
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
 	}
@@ -517,7 +517,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write /proc/meminfo header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "cat /proc/meminfo")
+	err = ddcio.Shell(hook, w, "cat /proc/meminfo")
 	if err != nil {
 		simplelog.Warningf("unable to write /proc/meminfo for os_info.txt due to error %v", err)
 	}
@@ -525,7 +525,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write lscpu header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "lscpu")
+	err = ddcio.Shell(hook, w, "lscpu")
 	if err != nil {
 		simplelog.Warningf("unable to write lscpu for os_info.txt due to error %v", err)
 	}
@@ -533,7 +533,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write mount header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "mount")
+	err = ddcio.Shell(hook, w, "mount")
 	if err != nil {
 		simplelog.Warningf("unable to write mount for os_info.txt due to error %v", err)
 	}
@@ -541,7 +541,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 	if err != nil {
 		simplelog.Warningf("unable to write lsblk header for os_info.txt due to error %v", err)
 	}
-	err = ddcio.Shell(w, "lsblk")
+	err = ddcio.Shell(hook, w, "lsblk")
 	if err != nil {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
@@ -551,7 +551,7 @@ func runCollectOSConfig(c *conf.CollectConf) error {
 		if err != nil {
 			simplelog.Warningf("unable to write ps eww header for os_info.txt due to error %v", err)
 		}
-		err = ddcio.Shell(w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", c.DremioPID()))
+		err = ddcio.Shell(hook, w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", c.DremioPID()))
 		if err != nil {
 			simplelog.Warningf("unable to write ps eww output for os_info.txt due to error %v", err)
 		}
@@ -615,6 +615,15 @@ var LocalCollectCmd = &cobra.Command{
 }
 
 func Execute(args []string, overrides map[string]string) (string, error) {
+	hook := &shutdown.Hook{}
+	defer hook.Cleanup()
+	cSignal := make(chan os.Signal, 1)
+	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-cSignal
+		hook.Cleanup()
+		os.Exit(1)
+	}()
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
 	simplelog.Infof("args: %v", strings.Join(args, " "))
 	fmt.Println(strings.TrimSpace(versions.GetCLIVersion()))
@@ -643,7 +652,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		return "", err
 	}
 
-	c, err := conf.ReadConf(overrides, ddcYamlLoc, collectionMode)
+	c, err := conf.ReadConf(hook, overrides, ddcYamlLoc, collectionMode)
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
@@ -652,7 +661,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 
 	// Run application
 	simplelog.Info("Starting collection...")
-	if err := collect(c); err != nil {
+	if err := collect(c, hook); err != nil {
 		return "", fmt.Errorf("unable to collect: %w", err)
 	}
 

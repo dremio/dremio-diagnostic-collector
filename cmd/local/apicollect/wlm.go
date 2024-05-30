@@ -24,12 +24,13 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 // RunCollectWLM is a function that collects Workload Management (WLM) data from a Dremio cluster.
 // It interacts with Dremio's WLM API endpoints, and collects WLM Queue and Rule information.
-func RunCollectWLM(c *conf.CollectConf) error {
+func RunCollectWLM(c *conf.CollectConf, hook *shutdown.Hook) error {
 	// Check if the configuration pointer is nil
 	if c == nil {
 		// Return an error if 'c' is nil
@@ -61,7 +62,7 @@ func RunCollectWLM(c *conf.CollectConf) error {
 		headers := map[string]string{"Content-Type": "application/json"}
 
 		// Make a GET request to the respective API endpoint
-		body, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
+		body, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
 
 		// Log and return if there was an error with the API request
 		if err != nil {

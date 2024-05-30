@@ -22,11 +22,12 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
-func CaptureFlagsFromPID(pid int) (string, error) {
+func CaptureFlagsFromPID(hook *shutdown.Hook, pid int) (string, error) {
 	var buf bytes.Buffer
-	if err := ddcio.Shell(&buf, "jps -v"); err != nil {
+	if err := ddcio.Shell(hook, &buf, "jps -v"); err != nil {
 		return "", fmt.Errorf("failed getting flags: '%w', output was: '%v'", err, buf.String())
 	}
 	scanner := bufio.NewScanner(&buf)

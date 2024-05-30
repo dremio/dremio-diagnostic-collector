@@ -23,10 +23,12 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 var (
-	c             = &cli.Cli{}
+	hook          = &shutdown.Hook{}
+	c             = cli.NewCli(hook)
 	outputHandler cli.OutputHandler
 )
 

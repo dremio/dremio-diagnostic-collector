@@ -32,6 +32,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,7 @@ type KubeArgs struct {
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(kubeArgs KubeArgs) (*KubectlK8sActions, error) {
+func NewKubectlK8sActions(kubeArgs KubeArgs, hook *shutdown.Hook) (*KubectlK8sActions, error) {
 	clientset, config, err := GetClientset()
 	if err != nil {
 		return &KubectlK8sActions{}, err
@@ -60,6 +61,7 @@ func NewKubectlK8sActions(kubeArgs KubeArgs) (*KubectlK8sActions, error) {
 		client:        clientset,
 		config:        config,
 		labelSelector: kubeArgs.LabelSelector,
+		hook:          hook,
 	}, nil
 }
 
@@ -99,6 +101,7 @@ type KubectlK8sActions struct {
 	labelSelector string
 	client        *kubernetes.Clientset
 	config        *rest.Config
+	hook          *shutdown.Hook
 }
 
 func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
@@ -150,14 +153,18 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		if _, err := buff.WriteString(pat); err != nil {
 			return err
 		}
-		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+		ctx, cancel := context.WithCancel(context.Background())
+		c.hook.Add(cancel)
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 			Stdin:  &buff,
 			Stdout: writer,
 			Stderr: writer,
 		})
 		return err
 	}
-	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	ctx, cancel := context.WithCancel(context.Background())
+	c.hook.Add(cancel)
+	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: writer,
 		Stderr: writer,
 	})
@@ -197,6 +204,7 @@ func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...st
 }
 
 type TarPipe struct {
+	hook       *shutdown.Hook
 	reader     *io.PipeReader
 	outStream  *io.PipeWriter
 	bytesRead  uint64
@@ -206,20 +214,28 @@ type TarPipe struct {
 	executor   func(writer *io.PipeWriter, cmdArr []string)
 }
 
-func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
+func newTarPipe(hook *shutdown.Hook, src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
+	t.hook = hook
 	t.src = src
 	t.maxRetries = 100
 	t.executor = executor
 	t.initReadFrom(0)
+	// add to shutdown hook so we make sure
+	t.hook.Add(func() {
+		t.outStream.Close()
+		t.reader.Close()
+	})
 	return t
 }
 
 func (t *TarPipe) initReadFrom(n uint64) {
-	t.reader, t.outStream = io.Pipe()
+	reader, outStream := io.Pipe()
+	t.reader = reader
+	t.outStream = outStream
 	copyCommand := []string{"sh", "-c", fmt.Sprintf("tar cf - %s | tail -c+%d", t.src, n)}
 	go func() {
-		defer t.outStream.Close()
+		defer outStream.Close()
 		t.executor(t.outStream, copyCommand)
 	}()
 }
@@ -279,9 +295,12 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 			return
 		}
 		var errBuff bytes.Buffer
+		ctx, cancel := context.WithCancel(context.Background())
+		c.hook.Add(cancel)
 		// hard coding a 30 minute timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
+		duration := 30 * time.Minute
+		ctx, timeout := context.WithTimeoutCause(ctx, duration, fmt.Errorf("transferring file %v from host %v timeout exceeded %v", source, hostString, duration))
+		defer timeout()
 		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 			Stdin:  os.Stdin,
 			Stdout: writer,
@@ -289,11 +308,18 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 			Tty:    false,
 		})
 		if err != nil {
-			msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
-			simplelog.Error(msg)
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				msg := fmt.Sprintf("%v", context.Cause(ctx))
+				simplelog.Error(msg)
+			default:
+				msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
+				simplelog.Error(msg)
+			}
+
 		}
 	}
-	reader := newTarPipe(source, executor)
+	reader := newTarPipe(c.hook, source, executor)
 	simplelog.Infof("untarring file '%v' from stdout", destination)
 	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)

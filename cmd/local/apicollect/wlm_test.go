@@ -26,6 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/apicollect"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
@@ -94,14 +95,16 @@ func TestRunCollectWLM(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	confDir := setupConfigDir(t, server.URL)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
+	hook := &shutdown.Hook{}
+	defer hook.Cleanup()
 	// Prepare the configuration
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatalf("unable to read conf due to error %v", err)
 	}
 
-	err = apicollect.RunCollectWLM(c)
+	err = apicollect.RunCollectWLM(c, hook)
 	if err != nil {
 		t.Errorf("RunCollectWLM() returned an error: %v", err)
 	}

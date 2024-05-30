@@ -24,23 +24,24 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectJStacks(c *conf.CollectConf) error {
-	return RunCollectJStacksWithTimeService(c, func() time.Time {
+func RunCollectJStacks(c *conf.CollectConf, hook *shutdown.Hook) error {
+	return RunCollectJStacksWithTimeService(c, hook, func() time.Time {
 		return time.Now()
 	})
 }
 
-func RunCollectJStacksWithTimeService(c *conf.CollectConf, timer func() time.Time) error {
+func RunCollectJStacksWithTimeService(c *conf.CollectConf, hook *shutdown.Hook, timer func() time.Time) error {
 	simplelog.Debug("Collecting Jstack ...")
 	threadDumpFreq := c.DremioJStackFreqSeconds()
 	iterations := c.DremioJStackTimeSeconds() / threadDumpFreq
 	simplelog.Debugf("Running Java thread dumps every %v second(s) for a total of %v iterations ...", threadDumpFreq, iterations)
 	for i := 0; i < iterations; i++ {
 		var w bytes.Buffer
-		if err := ddcio.Shell(&w, fmt.Sprintf("jcmd %v Thread.print -l", c.DremioPID())); err != nil {
+		if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v Thread.print -l", c.DremioPID())); err != nil {
 			simplelog.Warningf("unable to capture jstack of pid %v due to error %v", c.DremioPID(), err)
 		}
 		date := timer().Format("2006-01-02_15_04_05")

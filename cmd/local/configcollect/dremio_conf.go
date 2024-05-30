@@ -20,10 +20,11 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectDremioConfig(c *conf.CollectConf) error {
+func RunCollectDremioConfig(c *conf.CollectConf, _ *shutdown.Hook) error {
 	simplelog.Debugf("Collecting Configuration Information from %v ...", c.NodeName())
 
 	dremioConfDest := filepath.Join(c.ConfigurationOutDir(), "dremio.conf")

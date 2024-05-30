@@ -24,15 +24,16 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectKvReport(c *conf.CollectConf) error {
+func RunCollectKvReport(c *conf.CollectConf, hook *shutdown.Hook) error {
 	filename := "kvstore-report.zip"
 	apipath := "/apiv2/kvstore/report"
 	url := c.DremioEndpoint() + apipath
 	headers := map[string]string{"Accept": "application/octet-stream"}
-	body, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
+	body, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve KV store report from %s due to error %v", url, err)
 	}

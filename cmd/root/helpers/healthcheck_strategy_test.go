@@ -95,10 +95,6 @@ func TestArchiveDiagHC(t *testing.T) {
 			t.Fatalf("unexpected error getting file size for file %v due to error %v", testFile, err)
 		}
 		archiveFile := tmpDir + ".tgz"
-		if err != nil {
-			t.Fatalf("not able to get absolute path for testdata dir %v", err)
-		}
-
 		// Test Archive, pushes a teal test file into a zip archive
 		err = testStrat.ArchiveDiag("test", archiveFile)
 		if err != nil {

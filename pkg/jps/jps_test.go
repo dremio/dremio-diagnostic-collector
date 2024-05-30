@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/jps"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 func TestJvmFlagCapture(t *testing.T) {
@@ -37,7 +38,9 @@ func TestJvmFlagCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	flags, err := jps.CaptureFlagsFromPID(cmd.Process.Pid)
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	flags, err := jps.CaptureFlagsFromPID(&hook, cmd.Process.Pid)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

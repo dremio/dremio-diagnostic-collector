@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 func TestAPIRequest(t *testing.T) {
@@ -31,8 +33,9 @@ func TestAPIRequest(t *testing.T) {
 	defer server.Close()
 
 	InitClient(true, 10)
-
-	_, err := APIRequest(server.URL, "token", "GET", map[string]string{})
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	_, err := APIRequest(&hook, server.URL, "token", "GET", map[string]string{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -51,7 +54,9 @@ func TestPostQuery(t *testing.T) {
 	InitClient(true, 10)
 
 	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
-	_, err := PostQuery(server.URL, "token", map[string]string{}, sqlbody)
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	_, err := PostQuery(&hook, server.URL, "token", map[string]string{}, sqlbody)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -66,7 +71,9 @@ func TestPostQueryBadStatusCode(t *testing.T) {
 	InitClient(true, 10)
 
 	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
-	_, err := PostQuery(server.URL, "token", map[string]string{}, sqlbody)
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	_, err := PostQuery(&hook, server.URL, "token", map[string]string{}, sqlbody)
 	if err == nil {
 		t.Fatal("Expected error, got nil")
 	}
@@ -86,14 +93,15 @@ func TestClientTimeout(t *testing.T) {
 
 	// Init the client with a timeout of 1 second
 	InitClient(true, 1)
-
-	_, err := APIRequest(server.URL, "token", "GET", map[string]string{})
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	_, err := APIRequest(&hook, server.URL, "token", "GET", map[string]string{})
 	if err == nil {
 		t.Fatal("Expected error due to client timeout, got nil")
 	}
 
 	// We expect a timeout error
-	if !strings.Contains(err.Error(), "Client.Timeout exceeded while awaiting headers") {
+	if err.Error() != fmt.Sprintf("API request to url %v exceeded timeout 1s", server.URL) {
 		t.Fatalf("Expected timeout error, got %v", err)
 	}
 }

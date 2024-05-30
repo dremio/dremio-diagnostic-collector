@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// kubernetes package provides access to log collections on k8s
-package kubernetes
+package shutdown_test
 
 import (
 	"testing"
@@ -21,17 +20,26 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
-func TestNewKubectlK8sActions(t *testing.T) {
-	namespace := "mynamespace"
-	hook := &shutdown.Hook{}
-	defer hook.Cleanup()
-	actions, err := NewKubectlK8sActions(KubeArgs{
-		Namespace: namespace,
-	}, hook)
-	if err != nil {
-		t.Fatal(err)
+func TestShutdownRunsAllTasksInOrder(t *testing.T) {
+	hook := shutdown.Hook{}
+	items := []int{}
+	hook.Add(func() {
+		items = append(items, 1)
+	})
+	hook.Add(func() {
+		items = append(items, 2)
+	})
+	hook.Add(func() {
+		items = append(items, 3)
+	})
+	hook.Cleanup()
+	if items[0] != 1 {
+		t.Errorf("expected 1 but was %v", items[0])
 	}
-	if actions.namespace != namespace {
-		t.Errorf("\nexpected \n%v\nbut got\n%v", namespace, actions.namespace)
+	if items[1] != 2 {
+		t.Errorf("expected 2 but was %v", items[1])
+	}
+	if items[2] != 3 {
+		t.Errorf("expected 3 but was %v", items[2])
 	}
 }

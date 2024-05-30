@@ -26,6 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 func TestJvmFlagsAreWritten(t *testing.T) {
@@ -69,7 +70,9 @@ dremio-pid: %v
 	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	c, err := conf.ReadConf(&hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +81,8 @@ dremio-pid: %v
 	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	err = jvmcollect.RunCollectJVMFlags(c)
+
+	err = jvmcollect.RunCollectJVMFlags(c, &hook)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

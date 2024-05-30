@@ -24,13 +24,14 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 // RunCollectDiskUsage collects disk usage information and writes it to files.
 // It takes a pointer to a CollectConf struct (c)
 // It returns an error if any operation fails.
-func RunCollectDiskUsage(c *conf.CollectConf) error {
+func RunCollectDiskUsage(c *conf.CollectConf, hook *shutdown.Hook) error {
 
 	diskWriter, err := os.Create(path.Clean(filepath.Join(c.NodeInfoOutDir(), "diskusage.txt")))
 	if err != nil {
@@ -44,7 +45,7 @@ func RunCollectDiskUsage(c *conf.CollectConf) error {
 			simplelog.Warningf("unable to close the os_info.txt file due to error: %v", err)
 		}
 	}()
-	err = ddcio.Shell(diskWriter, "df -h")
+	err = ddcio.Shell(hook, diskWriter, "df -h")
 	if err != nil {
 		simplelog.Warningf("unable to read df -h due to error %v", err)
 	}
@@ -60,7 +61,7 @@ func RunCollectDiskUsage(c *conf.CollectConf) error {
 				simplelog.Warningf("unable to close rocksdb usage writer the file maybe incomplete %v", err)
 			}
 		}()
-		err = ddcio.Shell(rocksDbDiskUsageWriter, "du -sh /opt/dremio/data/db/*")
+		err = ddcio.Shell(hook, rocksDbDiskUsageWriter, "du -sh /opt/dremio/data/db/*")
 		if err != nil {
 			simplelog.Warningf("unable to write du -sh to rocksdb_disk_allocation.txt due to error %v", err)
 		}

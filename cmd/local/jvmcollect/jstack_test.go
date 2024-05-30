@@ -27,6 +27,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 func TestJStackCapture(t *testing.T) {
@@ -74,7 +75,9 @@ dremio-jstack-freq-seconds: 1
 	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
+	hook := &shutdown.Hook{}
+	defer hook.Cleanup()
+	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +88,7 @@ dremio-jstack-freq-seconds: 1
 	now := time.Now()
 	counter := 0
 	var times []time.Time
-	err = jvmcollect.RunCollectJStacksWithTimeService(c, func() time.Time {
+	err = jvmcollect.RunCollectJStacksWithTimeService(c, hook, func() time.Time {
 		counter++
 		current := now.Add(time.Duration(counter) * time.Second)
 		times = append(times, current)

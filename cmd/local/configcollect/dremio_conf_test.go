@@ -24,6 +24,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/configcollect"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
 	"github.com/rogpeppe/go-internal/diff"
 )
@@ -56,13 +57,15 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
+	hook := &shutdown.Hook{}
+	defer hook.Cleanup()
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := configcollect.RunCollectDremioConfig(c); err != nil {
+	if err := configcollect.RunCollectDremioConfig(c, hook); err != nil {
 		t.Fatal(err)
 	}
 
@@ -150,13 +153,15 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
+	hook := &shutdown.Hook{}
+	defer hook.Cleanup()
 	overrides := make(map[string]string)
-	c, err := conf.ReadConf(overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := configcollect.RunCollectDremioConfig(c); err != nil {
+	if err := configcollect.RunCollectDremioConfig(c, hook); err != nil {
 		t.Fatal(err)
 	}
 

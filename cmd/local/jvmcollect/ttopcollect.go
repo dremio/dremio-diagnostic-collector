@@ -16,6 +16,7 @@ package jvmcollect
 
 import (
 	"bufio"
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -27,11 +28,12 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 type TtopService interface {
-	StartTtop(TtopArgs) error
+	StartTtop(TtopArgs, *shutdown.Hook) error
 	KillTtop() (string, error)
 }
 
@@ -45,6 +47,7 @@ type Ttop struct {
 	output      []byte
 	outputMutex sync.Mutex // Mutex to protect concurrent access to p.output
 	tmpMu       sync.Mutex //mutext for tmpDir
+	hook        *shutdown.Hook
 }
 
 type TtopArgs struct {
@@ -53,7 +56,8 @@ type TtopArgs struct {
 	TempDir  string
 }
 
-func (t *Ttop) StartTtop(args TtopArgs) error {
+func (t *Ttop) StartTtop(args TtopArgs, hook *shutdown.Hook) error {
+	t.hook = hook
 	interval := args.Interval
 	pid := args.PID
 	if interval == 0 {
@@ -78,8 +82,9 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 	if err := os.WriteFile(sjk, data, 0600); err != nil {
 		return err
 	}
-
-	t.cmd = exec.Command("java", "-jar", sjk, "ttop", "-ri", fmt.Sprintf("%vs", interval), "-n", "100", "-p", fmt.Sprintf("%v", pid))
+	ctx, cancel := context.WithCancel(context.Background())
+	t.hook.Add(cancel)
+	t.cmd = exec.CommandContext(ctx, "java", "-jar", sjk, "ttop", "-ri", fmt.Sprintf("%vs", interval), "-n", "100", "-p", fmt.Sprintf("%v", pid))
 
 	stdout, err := t.cmd.StdoutPipe()
 	if err != nil {
@@ -119,6 +124,7 @@ func (t *Ttop) StartTtop(args TtopArgs) error {
 func (t *Ttop) KillTtop() (string, error) {
 	t.tmpMu.Lock()
 	defer t.tmpMu.Unlock()
+
 	if err := t.cmd.Process.Kill(); err != nil {
 		return "", fmt.Errorf("failed to kill process: %w", err)
 	}
@@ -126,9 +132,11 @@ func (t *Ttop) KillTtop() (string, error) {
 		return "", errors.New("unable to get data from ttop as it is not yet started")
 	}
 	jar := filepath.Join(t.tmpDir, "sjk.jar")
-	if err := os.Remove(jar); err != nil {
-		simplelog.Warningf("must remove file '%v' manually due to error: '%v'", jar, err)
-	}
+	t.hook.Add(func() {
+		if err := os.Remove(jar); err != nil {
+			simplelog.Warningf("must remove file '%v' manually due to error: '%v'", jar, err)
+		}
+	})
 	t.tmpDir = ""
 	t.outputMutex.Lock()
 	defer t.outputMutex.Unlock()
@@ -146,18 +154,18 @@ func (d *DateTimeTicker) WaitSeconds(interval int) {
 	time.Sleep(time.Duration(interval) * time.Second)
 }
 
-func RunTtopCollect(c *conf.CollectConf) error {
+func RunTtopCollect(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debug("Starting ttop collection")
 	ttopArgs := TtopArgs{
 		Interval: c.DremioTtopFreqSeconds(),
 		PID:      c.DremioPID(),
 		TempDir:  c.OutputDir(),
 	}
-	return OnLoop(ttopArgs, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
+	return OnLoop(ttopArgs, hook, c.DremioTtopTimeSeconds(), c.TtopOutDir(), &Ttop{}, &DateTimeTicker{})
 }
 
-func OnLoop(ttopArgs TtopArgs, duration int, outDir string, ttopService TtopService, timeTicker TimeTicker) error {
-	err := ttopService.StartTtop(ttopArgs)
+func OnLoop(ttopArgs TtopArgs, hook *shutdown.Hook, duration int, outDir string, ttopService TtopService, timeTicker TimeTicker) error {
+	err := ttopService.StartTtop(ttopArgs, hook)
 	if err != nil {
 		return fmt.Errorf("unable to start ttop: %w", err)
 	}

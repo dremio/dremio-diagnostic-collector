@@ -24,10 +24,11 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectHeapDump(c *conf.CollectConf) error {
+func RunCollectHeapDump(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debug("Capturing Java Heap Dump")
 	dremioPID := c.DremioPID()
 	baseName := fmt.Sprintf("%v.hprof", c.NodeName())
@@ -40,8 +41,17 @@ func RunCollectHeapDump(c *conf.CollectConf) error {
 	if err := os.Remove(path.Clean(hprofFile)); err != nil {
 		simplelog.Warningf("unable to remove hprof file with error %v", err)
 	}
+	hook.Add(func() {
+		// make sure they're removed on ctrl+c so run them again in the shutdown hook
+		if err := os.Remove(path.Clean(hprofGzFile)); err != nil {
+			simplelog.Warningf("unable to remove hprof.gz file with error %v", err)
+		}
+		if err := os.Remove(path.Clean(hprofFile)); err != nil {
+			simplelog.Warningf("unable to remove hprof file with error %v", err)
+		}
+	})
 	var w bytes.Buffer
-	if err := ddcio.Shell(&w, fmt.Sprintf("jmap -dump:format=b,file=%v %v", hprofFile, dremioPID)); err != nil {
+	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jmap -dump:format=b,file=%v %v", hprofFile, dremioPID)); err != nil {
 		return fmt.Errorf("unable to capture heap dump %v", err)
 	}
 	simplelog.Debugf("heap dump output %v", w.String())
@@ -51,7 +61,12 @@ func RunCollectHeapDump(c *conf.CollectConf) error {
 	if err := os.Remove(path.Clean(hprofFile)); err != nil {
 		simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
 	}
-
+	hook.Add(func() {
+		// run cleanup a second time to make sure it happens
+		if err := os.Remove(path.Clean(hprofFile)); err != nil {
+			simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
+		}
+	})
 	dest := filepath.Join(c.HeapDumpsOutDir(), baseName+".gz")
 	if err := os.Rename(path.Clean(hprofGzFile), path.Clean(dest)); err != nil {
 		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)

@@ -33,6 +33,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	"github.com/google/uuid"
 	"github.com/spf13/cast"
@@ -128,7 +129,7 @@ type CollectConf struct {
 	dremioPID               int
 }
 
-func ValidateAPICredentials(c *CollectConf) error {
+func ValidateAPICredentials(c *CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debugf("Validating REST API user credentials...")
 	var url string
 	if !c.IsDremioCloud() {
@@ -137,7 +138,7 @@ func ValidateAPICredentials(c *CollectConf) error {
 		url = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID()
 	}
 	headers := map[string]string{"Content-Type": "application/json"}
-	_, err := restclient.APIRequest(url, c.DremioPATToken(), "GET", headers)
+	_, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
 	return err
 }
 
@@ -200,7 +201,7 @@ func LogConfData(confData map[string]string) {
 		}
 	}
 }
-func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
+func ReadConf(hook *shutdown.Hook, overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
 	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {
 		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
@@ -333,7 +334,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 
 	c.dremioPID = GetInt(confData, KeyDremioPid)
 	if c.dremioPID < 1 && c.dremioPIDDetection {
-		dremioPID, err := autodetect.GetDremioPID()
+		dremioPID, err := autodetect.GetDremioPID(hook)
 		if err != nil {
 			simplelog.Errorf("disabling Heap Dump Capture, Jstack and JFR collection: %v", err)
 		} else {
@@ -342,7 +343,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 	}
 	dremioPIDIsValid := c.dremioPID > 0
 	if dremioPIDIsValid {
-		logDir, err := autodetect.FindGCLogLocation()
+		logDir, err := autodetect.FindGCLogLocation(hook)
 		if err != nil {
 			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 			consoleprint.ErrorPrint(msg)
@@ -367,7 +368,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 			// enable some autodetected directories
 			if dremioPIDIsValid {
 				var err error
-				detectedConfig, err = GetConfiguredDremioValuesFromPID(c.dremioPID)
+				detectedConfig, err = GetConfiguredDremioValuesFromPID(hook, c.dremioPID)
 				if err != nil {
 					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 					consoleprint.ErrorPrint(msg)
@@ -520,7 +521,7 @@ func ReadConf(overrides map[string]string, ddcYamlLoc, collectionMode string) (*
 		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
 		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 		//validate rest api configuration
-		if err := ValidateAPICredentials(c); err != nil {
+		if err := ValidateAPICredentials(c, hook); err != nil {
 			return &CollectConf{}, fmt.Errorf("CRITICAL ERROR invalid Dremio API configuration: (url: %v, user: %v) %v", c.dremioEndpoint, c.dremioUsername, err)
 		}
 	}
@@ -598,17 +599,17 @@ type DremioConfig struct {
 	ConfDir string
 }
 
-func GetConfiguredDremioValuesFromPID(dremioPID int) (DremioConfig, error) {
-	psOut, err := ReadPSEnv(dremioPID)
+func GetConfiguredDremioValuesFromPID(hook *shutdown.Hook, dremioPID int) (DremioConfig, error) {
+	psOut, err := ReadPSEnv(hook, dremioPID)
 	if err != nil {
 		return DremioConfig{}, err
 	}
 	return ParsePSForConfig(psOut)
 }
 
-func ReadPSEnv(dremioPID int) (string, error) {
+func ReadPSEnv(hook *shutdown.Hook, dremioPID int) (string, error) {
 	var w bytes.Buffer
-	err := ddcio.Shell(&w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
+	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
 	if err != nil {
 		return "", err
 	}

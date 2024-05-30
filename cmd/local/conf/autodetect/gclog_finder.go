@@ -23,17 +23,18 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 // findGCLogLocation retrieves the gc log location with a search string to greedily retrieve everything by prefix
-func FindGCLogLocation() (gcLogLoc string, err error) {
+func FindGCLogLocation(hook *shutdown.Hook) (gcLogLoc string, err error) {
 
 	var jpsVerbose bytes.Buffer
-	err = ddcio.Shell(&jpsVerbose, "jps -v")
+	err = ddcio.Shell(hook, &jpsVerbose, "jps -v")
 	if err != nil {
 		return "", fmt.Errorf("unable to find gc logs due to error '%v'", err)
 	}
-	pid, err := GetDremioPID()
+	pid, err := GetDremioPID(hook)
 	if err != nil {
 		return "", fmt.Errorf("unable to find gc logs due to error '%v'", err)
 	}

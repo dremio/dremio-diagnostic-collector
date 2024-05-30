@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -55,9 +56,9 @@ func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
 	return false, nil
 }
 
-func IsAWSE() (bool, error) {
+func IsAWSE(hook *shutdown.Hook) (bool, error) {
 	var dremioPIDOutput bytes.Buffer
-	if err := ddcio.Shell(&dremioPIDOutput, "jps -v"); err != nil {
+	if err := ddcio.Shell(hook, &dremioPIDOutput, "jps -v"); err != nil {
 		return false, fmt.Errorf("grepping from Dremio from jps -v failed %v with output %v", err, dremioPIDOutput.String())
 	}
 	dremioPIDString := dremioPIDOutput.String()

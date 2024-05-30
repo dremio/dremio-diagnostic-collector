@@ -19,6 +19,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -26,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -51,9 +53,16 @@ type ExecuteCliErr struct {
 // OutputHandler is a function type that processes lines of output
 type OutputHandler func(line string)
 
-// Cli
-type Cli struct {
-	m sync.Mutex
+func NewCli(hook *shutdown.Hook) CmdExecutor {
+	return &cli{
+		hook: hook,
+	}
+}
+
+// cli
+type cli struct {
+	m    sync.Mutex
+	hook *shutdown.Hook
 }
 
 // ExecuteAndStreamOutput runs a system command and streams the output (stdout)
@@ -64,15 +73,16 @@ type Cli struct {
 // If the command runs successfully, the function will return nil. If there's an error executing the command,
 // it will return an error. Note that an error from the command itself (e.g., a non-zero exit status) will also
 // be returned as an error from this function.
-func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat string, args ...string) error {
+func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat string, args ...string) error {
 	if len(args) == 0 {
 		return errors.New("must have an argument but none was present")
 	}
 	// Log the command that's about to be run
 	logArgs(mask, args)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	c.hook.Add(cancel)
 	// Create the command based on the passed arguments
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 
 	// Create a pipe to get the standard output from the command
 	stdout, err := cmd.StdoutPipe()
@@ -137,10 +147,12 @@ func (c *Cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	return nil
 }
 
-func (c *Cli) Execute(mask bool, args ...string) (string, error) {
+func (c *cli) Execute(mask bool, args ...string) (string, error) {
 	// Log the command that's about to be run
 	logArgs(mask, args)
-	cmd := exec.Command(args[0], args[1:]...)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.hook.Add(cancel)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
@@ -158,9 +170,11 @@ func logArgs(mask bool, args []string) {
 	}
 }
 
-func (c *Cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
+func (c *cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
 	logArgs(mask, args)
-	cmd := exec.Command(args[0], args[1:]...)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.hook.Add(cancel)
+	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return output, UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}

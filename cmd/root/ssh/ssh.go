@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
@@ -32,9 +33,9 @@ type Args struct {
 	CoordinatorStr string
 }
 
-func NewCmdSSHActions(sshArgs Args) *CmdSSHActions {
+func NewCmdSSHActions(sshArgs Args, hook *shutdown.Hook) *CmdSSHActions {
 	return &CmdSSHActions{
-		cli:            &cli.Cli{},
+		cli:            cli.NewCli(hook),
 		sshKey:         sshArgs.SSHKeyLoc,
 		sshUser:        sshArgs.SSHUser,
 		sudoUser:       sshArgs.SudoUser,

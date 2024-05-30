@@ -28,10 +28,11 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectDremioSystemTables(c *conf.CollectConf) error {
+func RunCollectDremioSystemTables(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debugf("Collecting results from Export System Tables...")
 	var systables []string
 	if !c.IsDremioCloud() {
@@ -41,7 +42,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 	}
 
 	for _, systable := range systables {
-		err := downloadSysTable(c, systable)
+		err := downloadSysTable(c, hook, systable)
 		if err != nil {
 			simplelog.Errorf("%v", err) // Print instead of Error
 		}
@@ -51,7 +52,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf) error {
 	return nil
 }
 
-func downloadSysTable(c *conf.CollectConf, systable string) error {
+func downloadSysTable(c *conf.CollectConf, hook *shutdown.Hook, systable string) error {
 	tablerowlimit := strconv.Itoa(c.SystemTablesRowLimit())
 
 	headers := map[string]string{"Content-Type": "application/json"}
@@ -78,30 +79,30 @@ func downloadSysTable(c *conf.CollectConf, systable string) error {
 	simplelog.Debugf(sql)
 	sqlbody := "{\"sql\": \"" + sql + "\"}"
 
-	jobid, err := restclient.PostQuery(sqlurl, c.DremioPATToken(), headers, sqlbody)
+	jobid, err := restclient.PostQuery(hook, sqlurl, c.DremioPATToken(), headers, sqlbody)
 	if err != nil {
 		return err
 	}
 	jobstateurl := joburl + jobid
-	err = checkJobState(c, jobstateurl, headers)
+	err = checkJobState(c, hook, jobstateurl, headers)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
 	}
 	jobresultsurl = joburl + jobid + "/results"
 	simplelog.Debugf("Retrieving job results ...")
-	err = retrieveJobResults(c, jobresultsurl, headers, systable)
+	err = retrieveJobResults(c, hook, jobresultsurl, headers, systable)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve job results due to error %v", err)
 	}
 	return nil
 }
 
-func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]string) error {
+func checkJobState(c *conf.CollectConf, hook *shutdown.Hook, jobstateurl string, headers map[string]string) error {
 	sleepms := 200 // Consider moving to config
 	jobstate := "RUNNING"
 	for jobstate != "COMPLETED" {
 		time.Sleep(time.Duration(sleepms) * time.Millisecond)
-		body, err := restclient.APIRequest(jobstateurl, c.DremioPATToken(), "GET", headers)
+		body, err := restclient.APIRequest(hook, jobstateurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
 			return fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)
 		}
@@ -126,7 +127,7 @@ func checkJobState(c *conf.CollectConf, jobstateurl string, headers map[string]s
 	return nil
 }
 
-func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[string]string, systable string) error {
+func retrieveJobResults(c *conf.CollectConf, hook *shutdown.Hook, jobresultsurl string, headers map[string]string, systable string) error {
 	apilimit := 500 // Consider moving to config
 	tablerowlimit := c.SystemTablesRowLimit()
 
@@ -135,7 +136,7 @@ func retrieveJobResults(c *conf.CollectConf, jobresultsurl string, headers map[s
 	for {
 		urlsuffix := "?offset=" + strconv.Itoa(offset) + "&limit=" + strconv.Itoa(apilimit)
 		resultsurl := jobresultsurl + urlsuffix
-		body, err := restclient.APIRequest(resultsurl, c.DremioPATToken(), "GET", headers)
+		body, err := restclient.APIRequest(hook, resultsurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
 			return fmt.Errorf("unable to retrieve job results from %s due to error %v", resultsurl, err)
 		}

@@ -29,6 +29,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +37,7 @@ import (
 
 var clusterRequestTimeout = 120
 
-func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
+func ClusterK8sExecute(hook *shutdown.Hook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
 	if err != nil {
@@ -46,7 +47,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 
 	for _, cmd := range cmds {
 		resource := cmd
-		out, err := clusterExecuteBytes(namespace, resource)
+		out, err := clusterExecuteBytes(hook, namespace, resource)
 		if err != nil {
 			simplelog.Errorf("when getting cluster config, error was %v", err)
 			continue
@@ -69,7 +70,7 @@ func ClusterK8sExecute(namespace string, cs CopyStrategy, ddfs helpers.Filesyste
 	return nil
 }
 
-func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
+func GetClusterLogs(hook *shutdown.Hook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -96,36 +97,49 @@ func GetClusterLogs(namespace string, cs CopyStrategy, ddfs helpers.Filesystem, 
 		// Loop over each container, construct a path and log file name
 		// write the output of the kubectl logs command to a file
 		for _, container := range containers {
-			copyContainerLog(cs, ddfs, container, namespace, path, podname)
+			copyContainerLog(hook, cs, ddfs, container, namespace, path, podname)
 		}
 		consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
 	}
 	return err
 }
 
-func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string) {
+func copyContainerLog(hook *shutdown.Hook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string) {
 	client, _, err := kubernetes.GetClientset()
 	if err != nil {
 		simplelog.Errorf("unable to get k8s client for collecting logs on pod: %v container: %v with error: %v", pod, container, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(clusterRequestTimeout)*time.Second)
-	defer cancel() // releases resources if slowOperation completes before timeout elapses
+	ctx, cancel := context.WithCancel(context.Background())
+	hook.Add(cancel)
+	timeoutDuration := time.Duration(clusterRequestTimeout) * time.Second
+	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while copying container %s from pod %s in namespace %s timeout exceeded %v", container, pod, namespace, timeoutDuration))
+	defer timeout() // releases resources if slowOperation completes before timeout elapses
 	req := client.CoreV1().Pods(namespace).GetLogs(pod, &corev1.PodLogOptions{
 		Container: container,
 	})
 	r, err := req.Stream(ctx)
 	if err != nil {
-		simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
-		return
+		switch ctx.Err() {
+		case context.DeadlineExceeded:
+			simplelog.Errorf("%v", context.Cause(ctx))
+		default:
+			simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
+			return
+		}
 	}
 	defer r.Close()
 
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, r)
 	if err != nil {
-		simplelog.Errorf("unable to copy log into string for pod: %v container: %v with error: %v", pod, container, err)
-		return
+		switch ctx.Err() {
+		case context.DeadlineExceeded:
+			simplelog.Errorf("%v", context.Cause(ctx))
+		default:
+			simplelog.Errorf("unable to copy log into string for pod: %v container: %v with error: %v", pod, container, err)
+			return
+		}
 	}
 	out := buf.String()
 	outFile := filepath.Join(path, pod+"-"+container+".txt")
@@ -145,20 +159,28 @@ func copyContainerLog(cs CopyStrategy, ddfs helpers.Filesystem, container, names
 // Execute commands at the cluster level
 // Calls a raw execute function and simply writes out the byte array read from the response
 // that comes in directly from kubectl
-func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
+func clusterExecuteBytes(hook *shutdown.Hook, namespace, resource string) ([]byte, error) {
 	c, _, err := kubernetes.GetClientset()
 	if err != nil {
 		return []byte(""), err
 	}
 	options := metav1.ListOptions{}
 	var b []byte
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	hook.Add(cancel)
+	timeoutDuration := 60 * time.Second
+	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while getting resource %v in namespace %s timeout exceeded %v", resource, namespace, timeoutDuration))
+	defer timeout()
 	switch resource {
 	case "nodes":
 		list, err := c.CoreV1().Nodes().List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -173,7 +195,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "sc":
 		list, err := c.StorageV1().StorageClasses().List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -188,7 +215,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "pvc":
 		list, err := c.CoreV1().PersistentVolumeClaims(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -203,7 +235,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "pv":
 		list, err := c.CoreV1().PersistentVolumes().List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -218,7 +255,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "service":
 		list, err := c.CoreV1().Services(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -233,7 +275,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "endpoints":
 		list, err := c.CoreV1().Endpoints(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -248,7 +295,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "pods":
 		list, err := c.CoreV1().Pods(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -263,7 +315,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "deployments":
 		list, err := c.AppsV1().Deployments(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -278,7 +335,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "statefulsets":
 		list, err := c.AppsV1().StatefulSets(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -293,7 +355,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "daemonset":
 		list, err := c.AppsV1().StatefulSets(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -308,7 +375,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "replicaset":
 		list, err := c.AppsV1().ReplicaSets(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -323,7 +395,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "cronjob":
 		list, err := c.BatchV1().CronJobs(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -338,7 +415,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "job":
 		list, err := c.BatchV1().Jobs(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -353,7 +435,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "events":
 		list, err := c.EventsV1().Events(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -368,7 +455,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "ingress":
 		list, err := c.NetworkingV1().Ingresses(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -383,7 +475,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "limitrange":
 		list, err := c.CoreV1().LimitRanges(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -398,7 +495,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "resourcequota":
 		list, err := c.CoreV1().LimitRanges(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -413,7 +515,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "hpa":
 		list, err := c.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -428,7 +535,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "pdb":
 		list, err := c.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {
@@ -443,7 +555,12 @@ func clusterExecuteBytes(namespace, resource string) ([]byte, error) {
 	case "pc":
 		list, err := c.SchedulingV1().PriorityClasses().List(ctx, options)
 		if err != nil {
-			return []byte(""), err
+			switch ctx.Err() {
+			case context.DeadlineExceeded:
+				return nil, context.Cause(ctx)
+			default:
+				return []byte(""), err
+			}
 		}
 		list.Kind = "list"
 		for i, c := range list.Items {

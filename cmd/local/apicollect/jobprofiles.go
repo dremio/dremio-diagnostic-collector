@@ -29,10 +29,11 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/queriesjson"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int, err error) {
+func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook *shutdown.Hook) (tried, collected int, err error) {
 	var files []fs.DirEntry
 	var queriesrows []queriesjson.QueriesRow
 
@@ -107,7 +108,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 			downloadThreadPool.AddJob(threading.Job{
 				Name: keyToDownload,
 				Process: func() error {
-					err := DownloadJobProfile(c, keyToDownload)
+					err := DownloadJobProfile(c, hook, keyToDownload)
 					if err != nil {
 						simplelog.Errorf("unable to download %v, err: %v", keyToDownload, err) // Print instead of Error
 						return nil
@@ -131,9 +132,9 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf) (tried, collected int,
 	return tried, collected, nil
 }
 
-func RunCollectJobProfiles(c *conf.CollectConf) error {
+func RunCollectJobProfiles(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Info("Collecting Job Profiles...")
-	tried, collected, err := GetNumberOfJobProfilesCollected(c)
+	tried, collected, err := GetNumberOfJobProfilesCollected(c, hook)
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func RunCollectJobProfiles(c *conf.CollectConf) error {
 	return nil
 }
 
-func DownloadJobProfile(c *conf.CollectConf, jobid string) error {
+func DownloadJobProfile(c *conf.CollectConf, hook *shutdown.Hook, jobid string) error {
 	var url, apipath string
 	if !c.IsDremioCloud() {
 		apipath = "/apiv2/support/" + jobid + "/download"
@@ -153,7 +154,7 @@ func DownloadJobProfile(c *conf.CollectConf, jobid string) error {
 	}
 	filename := jobid + ".zip"
 	headers := map[string]string{"Accept": "application/octet-stream"}
-	body, err := restclient.APIRequest(url, c.DremioPATToken(), "POST", headers)
+	body, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "POST", headers)
 	if err != nil {
 		return err
 	}

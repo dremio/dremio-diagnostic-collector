@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 )
 
 type MockTtopService struct {
@@ -37,7 +38,7 @@ type MockTtopService struct {
 	pid        int
 }
 
-func (m *MockTtopService) StartTtop(args jvmcollect.TtopArgs) error {
+func (m *MockTtopService) StartTtop(args jvmcollect.TtopArgs, _ *shutdown.Hook) error {
 	if m.writeError != nil {
 		return m.writeError
 	}
@@ -79,7 +80,9 @@ func TestTtopCollects(t *testing.T) {
 		Interval: interval,
 		TempDir:  outDir,
 	}
-	if err := jvmcollect.OnLoop(ttopArgs, duration, outDir, ttopService, timeTicker); err != nil {
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	if err := jvmcollect.OnLoop(ttopArgs, &hook, duration, outDir, ttopService, timeTicker); err != nil {
 		t.Fatalf("unable to collect %v", err)
 	}
 
@@ -140,7 +143,9 @@ func TestTtopExec(t *testing.T) {
 		Interval: 1,
 		TempDir:  tmp,
 	}
-	if err := ttop.StartTtop(ttopArgs); err != nil {
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	if err := ttop.StartTtop(ttopArgs, &hook); err != nil {
 		t.Error(err.Error())
 	}
 	time.Sleep(time.Duration(500) * time.Millisecond)
@@ -159,7 +164,9 @@ func TestTtopExecHasNoPidToFind(t *testing.T) {
 		Interval: 1,
 		TempDir:  t.TempDir(),
 	}
-	if err := ttop.StartTtop(ttopArgs); err != nil {
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	if err := ttop.StartTtop(ttopArgs, &hook); err != nil {
 		t.Error("expected an error on ttop but none happened")
 	}
 	time.Sleep(time.Duration(500) * time.Millisecond)
@@ -175,7 +182,9 @@ func TestTtopExecHasNoPid(t *testing.T) {
 		Interval: 1,
 		TempDir:  t.TempDir(),
 	}
-	resp := ttop.StartTtop(ttopArgs)
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	resp := ttop.StartTtop(ttopArgs, &hook)
 	time.Sleep(time.Duration(500) * time.Millisecond)
 	actual := fmt.Sprint(resp)
 	expected := fmt.Sprintf("invalid pid of '%v'", ttopArgs.PID)
@@ -210,7 +219,9 @@ func TestTtopHasAndInvalidInterval(t *testing.T) {
 		Interval: 0,
 		TempDir:  t.TempDir(),
 	}
-	if err := ttop.StartTtop(ttopArgs); err == nil {
+	hook := shutdown.Hook{}
+	defer hook.Cleanup()
+	if err := ttop.StartTtop(ttopArgs, &hook); err == nil {
 		t.Error("expected ttop start to fail with interval 0")
 	}
 }

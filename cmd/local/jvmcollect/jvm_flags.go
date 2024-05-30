@@ -22,12 +22,13 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/jps"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
 // RunCollectJVM collects JVM flags from a java process
-func RunCollectJVMFlags(c *conf.CollectConf) error {
-	txt, err := jps.CaptureFlagsFromPID(c.DremioPID())
+func RunCollectJVMFlags(c *conf.CollectConf, hook *shutdown.Hook) error {
+	txt, err := jps.CaptureFlagsFromPID(hook, c.DremioPID())
 	if err != nil {
 		return err
 	}
