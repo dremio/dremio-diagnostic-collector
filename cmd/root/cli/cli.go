@@ -148,9 +148,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 func (c *cli) Execute(mask bool, args ...string) (string, error) {
 	// Log the command that's about to be run
 	logArgs(mask, args)
-	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
@@ -170,9 +168,7 @@ func logArgs(mask bool, args []string) {
 
 func (c *cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
 	logArgs(mask, args)
-	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return output, UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}

@@ -16,11 +16,13 @@
 package kubectl
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
@@ -102,7 +104,7 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "5", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "25", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
@@ -174,28 +176,38 @@ func (c *CliK8sActions) SetHostPid(host, pidFile string) {
 }
 
 func (c *CliK8sActions) CleanupRemote() error {
-	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
+		if pidFile == "" {
+			simplelog.Debugf("pidfile is blank for %v skipping", host)
+		}
 		container, err := c.getContainerName(host)
 		if err != nil {
 			simplelog.Warningf("output of container for host %v: %v", host, err)
 			return
 		}
-		kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", container, host, "--"}
+		kubectlArgs := []string{"exec", "-n", c.namespace, "-c", container, host, "--"}
 		kubectlArgs = append(kubectlArgs, "cat")
 		kubectlArgs = append(kubectlArgs, pidFile)
-		out, err := c.cli.Execute(false, kubectlArgs...)
+		ctx, timeoutPid := context.WithTimeout(context.Background(), time.Second*time.Duration(30))
+		defer timeoutPid()
+		simplelog.Infof("getting pid for host %v", host)
+		cmd := exec.CommandContext(ctx, c.kubectlPath, kubectlArgs...)
+		out, err := cmd.CombinedOutput()
 		if err != nil {
-			simplelog.Warningf("output of pidfile failed for host %v: %v", host, err)
+			simplelog.Warningf("output of pidfile failed for host %v: %v -%v", host, err, string(out[:]))
 			return
 		}
-		kubectlArgs = []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", container, host, "--"}
+		simplelog.Infof("pid for host %v is %v", host, string(out[:]))
+		kubectlArgs = []string{"exec", "-n", c.namespace, "-c", container, host, "--"}
 		kubectlArgs = append(kubectlArgs, "kill")
 		kubectlArgs = append(kubectlArgs, "-15")
-		kubectlArgs = append(kubectlArgs, out)
-		out, err = c.cli.Execute(false, kubectlArgs...)
+		kubectlArgs = append(kubectlArgs, string(out[:]))
+		ctx, timeoutKill := context.WithTimeout(context.Background(), time.Second*time.Duration(120))
+		defer timeoutKill()
+		cmd = exec.CommandContext(ctx, c.kubectlPath, kubectlArgs...)
+		killOut, err := cmd.CombinedOutput()
 		if err != nil {
-			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
+			simplelog.Warningf("failed killing process %v host %v: %v -%v", out, host, err, string(killOut[:]))
 			return
 		}
 		consoleprint.UpdateNodeState(consoleprint.NodeState{
@@ -204,6 +216,8 @@ func (c *CliK8sActions) CleanupRemote() error {
 			StatusUX: "FAILED - CANCELLED",
 			Result:   consoleprint.ResultFailure,
 		})
+		//cancel out so we can skip if it's called again
+		c.pidHosts[host] = ""
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()

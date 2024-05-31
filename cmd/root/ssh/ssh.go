@@ -68,8 +68,11 @@ func (c *CmdSSHActions) SetHostPid(host, pidFile string) {
 }
 
 func (c *CmdSSHActions) CleanupRemote() error {
-	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
+		if pidFile == "" {
+			simplelog.Debugf("pidfile is blank for %v skipping", host)
+			return
+		}
 		sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 		sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, host))
 		sshArgs = c.addSSHUser(sshArgs)
@@ -97,6 +100,8 @@ func (c *CmdSSHActions) CleanupRemote() error {
 			StatusUX: "FAILED - CANCELLED",
 			Result:   consoleprint.ResultFailure,
 		})
+		//cancel out so we can skip if it's called again
+		c.pidHosts[host] = ""
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()

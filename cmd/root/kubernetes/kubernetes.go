@@ -111,8 +111,10 @@ func (c *KubeCtlAPIActions) SetHostPid(host, pidFile string) {
 	c.pidHosts[host] = pidFile
 }
 func (c *KubeCtlAPIActions) CleanupRemote() error {
-	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
+		if pidFile == "" {
+			simplelog.Debugf("pidfile is blank for %v skipping", host)
+		}
 		containerName, err := c.getPrimaryContainer(host)
 		if err != nil {
 			simplelog.Warningf("failed looking for pod %v: %v", host, err)
@@ -196,6 +198,8 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 			StatusUX: "FAILED - CANCELLED",
 			Result:   consoleprint.ResultFailure,
 		})
+		//cancel out so we can skip if it's called again
+		c.pidHosts[host] = ""
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()

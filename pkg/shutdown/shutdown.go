@@ -52,20 +52,18 @@ func (h *Hook) AddPriorityCancel(p func(), name string) {
 // Cleanup runs in order all cleanup tasks that have been added
 // Is thread safe
 func (h *Hook) Cleanup() {
+	h.mu.Lock()
 	defer h.mu.Unlock()
 	simplelog.Debugf("%v tasks to run on cleanup", len(h.cleanups)+len(h.priorityCleanup))
 	for _, j := range h.priorityCleanup {
 		simplelog.Debugf("cleaning up %v", j.name)
 		j.p()
 	}
-	h.mu.Lock()
+	h.priorityCleanup = []cleanupTask{}
 	for _, j := range h.cleanups {
 		simplelog.Debugf("cleaning up %v", j.name)
 		j.p()
 	}
-
 	//blank
-	h.priorityCleanup = []cleanupTask{}
 	h.cleanups = []cleanupTask{}
-
 }

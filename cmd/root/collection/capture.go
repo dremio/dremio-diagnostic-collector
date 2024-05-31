@@ -129,12 +129,6 @@ func StartCapture(c HostCaptureConfiguration, hook *shutdown.Hook, localDDCPath,
 	pathToDDCYAML := path.Join(c.TransferDir, "ddc.yaml")
 	dremioPAT := c.DremioPAT
 	versionMatch := false
-	// if out, err := ComposeExecute(conf, []string{pathToDDC, "version"}); err != nil {
-	// 	simplelog.Warningf("host %v unable to find ddc version due to error '%v' with output '%v'", host, err, out)
-	// } else {
-	// 	simplelog.Infof("host %v has ddc version '%v' already installed", host, out)
-	// 	versionMatch = out == versions.GetDDCRuntimeVersion()
-	// }
 	//if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
 		consoleprint.UpdateNodeState(consoleprint.NodeState{

@@ -265,6 +265,7 @@ func Execute(args []string) error {
 		go func() {
 			<-c
 			simplelog.Info("CTRL+C interrupt starting graceful shutdown")
+			consoleprint.UpdateResult("CANCELLING")
 			hook.Cleanup()
 			os.Exit(1)
 		}()
