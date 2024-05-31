@@ -32,6 +32,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/fallback"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubectl"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
 	version "github.com/dremio/dremio-diagnostic-collector/cmd/version"
@@ -168,10 +169,17 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	} else if kubeArgs.Namespace != "" {
 		simplelog.Info("using Kubernetes api based collection")
 		consoleprint.UpdateCollectionArgs(fmt.Sprintf("namespace: '%v', label selector: '%v'", kubeArgs.Namespace, kubeArgs.LabelSelector))
-		collectorStrategy, err = kubernetes.NewKubectlK8sActions(kubeArgs, hook)
+		potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace)
 		if err != nil {
-			return err
+			simplelog.Warningf("kubectl not available failling back to kubeapi: %v", err)
+			collectorStrategy, err = kubernetes.NewK8sAPI(kubeArgs, hook)
+			if err != nil {
+				return err
+			}
+		} else {
+			collectorStrategy = potentialStrategy
 		}
+
 		consoleprint.UpdateRuntime(
 			versions.GetCLIVersion(),
 			simplelog.GetLogLoc(),
@@ -439,7 +447,7 @@ func Execute(args []string) error {
 				simplelog.Error(msg)
 			}
 			validateK8s := func(namespace string) {
-				rightsTester, err := kubernetes.NewKubectlK8sActions(kubernetes.KubeArgs{Namespace: namespace}, hook)
+				rightsTester, err := kubernetes.NewK8sAPI(kubernetes.KubeArgs{Namespace: namespace}, hook)
 				if err != nil {
 					enableFallback(err)
 					return

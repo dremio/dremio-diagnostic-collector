@@ -49,14 +49,14 @@ type KubeArgs struct {
 	LabelSelector string
 }
 
-// NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
+// NewK8sAPI is the only supported way to initialize the NewK8sAPI struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(kubeArgs KubeArgs, hook *shutdown.Hook) (*KubectlK8sActions, error) {
+func NewK8sAPI(kubeArgs KubeArgs, hook *shutdown.Hook) (*KubeCtlAPIActions, error) {
 	clientset, config, err := GetClientset()
 	if err != nil {
-		return &KubectlK8sActions{}, err
+		return &KubeCtlAPIActions{}, err
 	}
-	return &KubectlK8sActions{
+	return &KubeCtlAPIActions{
 		namespace:     kubeArgs.Namespace,
 		client:        clientset,
 		config:        config,
@@ -96,8 +96,8 @@ func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 	return clientset, config, nil
 }
 
-// KubectlK8sActions provides a way to collect and copy files using kubectl
-type KubectlK8sActions struct {
+// KubeCtlAPIActions provides a way to collect and copy files using kubectl
+type KubeCtlAPIActions struct {
 	namespace     string
 	labelSelector string
 	client        *kubernetes.Clientset
@@ -106,10 +106,10 @@ type KubectlK8sActions struct {
 	pidHosts      map[string]string
 }
 
-func (c *KubectlK8sActions) SetHostPid(host, pidFile string) {
+func (c *KubeCtlAPIActions) SetHostPid(host, pidFile string) {
 	c.pidHosts[host] = pidFile
 }
-func (c *KubectlK8sActions) CleanupRemote() error {
+func (c *KubeCtlAPIActions) CleanupRemote() error {
 	kill := func(host string, pidFile string) {
 		out, err := c.HostExecute(false, host, "cat", pidFile)
 		if err != nil {
@@ -158,15 +158,15 @@ func (c *KubectlK8sActions) CleanupRemote() error {
 	return nil
 }
 
-func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
+func (c *KubeCtlAPIActions) GetClient() *kubernetes.Clientset {
 	return c.client
 }
 
-func (c *KubectlK8sActions) Name() string {
+func (c *KubeCtlAPIActions) Name() string {
 	return "Kube API"
 }
 
-func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
+func (c *KubeCtlAPIActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	cmd := []string{
 		"sh",
 		"-c",
@@ -244,7 +244,7 @@ func logArgs(mask bool, args []string) {
 	}
 }
 
-func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
+func (c *KubeCtlAPIActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
 	var outBuilder strings.Builder
 	writer := func(line string) {
 		outBuilder.WriteString(line)
@@ -310,7 +310,7 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
+func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
@@ -379,7 +379,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 	return "", nil
 }
 
-func (c *KubectlK8sActions) getPrimaryContainer(hostString string) (string, error) {
+func (c *KubeCtlAPIActions) getPrimaryContainer(hostString string) (string, error) {
 	pods, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{})
 	if err != nil {
 		return "", err
@@ -396,7 +396,7 @@ func (c *KubectlK8sActions) getPrimaryContainer(hostString string) (string, erro
 	return containerName, nil
 }
 
-func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
+func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(source, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
@@ -466,13 +466,13 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	return errBuff.String() + outBuff.String(), nil
 }
 
-func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
+func (c *KubeCtlAPIActions) GetCoordinators() (podName []string, err error) {
 	return c.SearchPods(func(container string) bool {
 		return strings.Contains(container, "coordinator")
 	})
 }
 
-func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
+func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{
 		LabelSelector: c.labelSelector,
 	})
@@ -492,13 +492,13 @@ func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (pod
 	return podName, nil
 }
 
-func (c *KubectlK8sActions) GetExecutors() (podName []string, err error) {
+func (c *KubeCtlAPIActions) GetExecutors() (podName []string, err error) {
 	return c.SearchPods(func(container string) bool {
 		return container == "dremio-executor"
 	})
 }
 
-func (c *KubectlK8sActions) HelpText() string {
+func (c *KubeCtlAPIActions) HelpText() string {
 	return "Make sure namespace you use actually has a dremio cluster installed by dremio, if not then this is not supported"
 }
 

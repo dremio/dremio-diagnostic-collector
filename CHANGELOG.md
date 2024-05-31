@@ -4,7 +4,8 @@
 
 ### Changed
 
-* removed ttop and replaced it with top -H 
+* removed ttop and replaced it with `LINES=50 COLUMNS=512 top -H -n <iterations> -p <pid> -d <interval> -1 -bw` 
+* will try and use kubectl for file transfers and command execution if present, but for cluster discovery and k8s right checks the api is still used
 
 ### Fixed
 

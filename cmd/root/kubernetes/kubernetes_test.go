@@ -25,7 +25,7 @@ func TestNewKubectlK8sActions(t *testing.T) {
 	namespace := "mynamespace"
 	hook := &shutdown.Hook{}
 	defer hook.Cleanup()
-	actions, err := NewKubectlK8sActions(KubeArgs{
+	actions, err := NewK8sAPI(KubeArgs{
 		Namespace: namespace,
 	}, hook)
 	if err != nil {
