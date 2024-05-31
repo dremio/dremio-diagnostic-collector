@@ -347,7 +347,7 @@ func TransferCapture(c HostCaptureConfiguration, hook *shutdown.Hook, outputLoc 
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
 			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", c.Host, err, out)
 		} else {
-			simplelog.Debugf("on host %v file %v has been removed", c.Host, c.TransferDir)
+			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
 		}
 	}()
 

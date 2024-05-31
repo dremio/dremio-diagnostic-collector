@@ -682,6 +682,9 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		if err := os.RemoveAll(c.OutputDir()); err != nil {
 			simplelog.Errorf("unable to cleanup %v: %v", c.OutputDir(), err)
 		}
+		if err := os.RemoveAll(c.TarballOutDir()); err != nil {
+			simplelog.Errorf("unable to cleanup %v: %v", c.TarballOutDir(), err)
+		}
 	}
 	fmt.Println("looking for logs in: " + c.DremioLogDir())
 
