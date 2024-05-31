@@ -343,7 +343,9 @@ func TransferCapture(c HostCaptureConfiguration, hook *shutdown.Hook, outputLoc 
 	tarGZ := path.Join(c.TransferDir, tgzFileName)
 	// double up the cleanup execution
 	shutDownCleanup := func() {
-		c.Collector.HostExecute(false, c.Host, "rm", tarGZ)
+		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
+			simplelog.Warningf("failed cleaning up %v on host %v: %v - %v", tarGZ, c.Host, err, out)
+		}
 	}
 	hook.Add(shutDownCleanup, fmt.Sprintf("removing tarball %v on host %v", tarGZ, c.Host))
 	// defer delete tar.gz

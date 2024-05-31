@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -67,6 +68,7 @@ func (c *CmdSSHActions) SetHostPid(host, pidFile string) {
 }
 
 func (c *CmdSSHActions) CleanupRemote() error {
+	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
 		sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
 		sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, host))
@@ -89,6 +91,12 @@ func (c *CmdSSHActions) CleanupRemote() error {
 			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
 			return
 		}
+		consoleprint.UpdateNodeState(consoleprint.NodeState{
+			Node:     host,
+			Status:   consoleprint.Starting,
+			StatusUX: "FAILED - CANCELLED",
+			Result:   consoleprint.ResultFailure,
+		})
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()

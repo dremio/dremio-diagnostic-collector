@@ -31,6 +31,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -110,17 +111,91 @@ func (c *KubeCtlAPIActions) SetHostPid(host, pidFile string) {
 	c.pidHosts[host] = pidFile
 }
 func (c *KubeCtlAPIActions) CleanupRemote() error {
+	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
-		out, err := c.HostExecute(false, host, "cat", pidFile)
+		containerName, err := c.getPrimaryContainer(host)
 		if err != nil {
-			simplelog.Warningf("output of pidfile failed for host %v: %v", host, err)
+			simplelog.Warningf("failed looking for pod %v: %v", host, err)
 			return
 		}
-		out, err = c.HostExecute(false, host, "kill", "-15", out)
+		req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(host).
+			Namespace(c.namespace).SubResource("exec")
+		cmd := []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("cat  %v", pidFile),
+		}
+		option := &v1.PodExecOptions{
+			Container: containerName,
+			Command:   cmd,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}
+		req = req.VersionedParams(
+			option,
+			scheme.ParameterCodec,
+		)
+		exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
 		if err != nil {
-			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
+			simplelog.Warningf("failed getting pidfile %v on host %v: %v", pidFile, host, err)
 			return
 		}
+		var w bytes.Buffer
+		var errOut bytes.Buffer
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+		defer cancel()
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdout: &w,
+			Stderr: &errOut,
+		})
+		if err != nil {
+			simplelog.Warningf("failed getting pidfile %v on host %v: %v - %v", pidFile, host, err, errOut.String())
+			return
+		}
+
+		req = c.client.CoreV1().RESTClient().Post().Resource("pods").Name(host).
+			Namespace(c.namespace).SubResource("exec")
+		cmd = []string{
+			"sh",
+			"-c",
+			fmt.Sprintf("kill -15 %v", w.String()),
+		}
+		option = &v1.PodExecOptions{
+			Container: containerName,
+			Command:   cmd,
+			Stdin:     false,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}
+		req = req.VersionedParams(
+			option,
+			scheme.ParameterCodec,
+		)
+		exec, err = remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
+		if err != nil {
+			simplelog.Warningf("failed killing ddc %v on host %v: %v", w.String(), host, err)
+			return
+		}
+		var buff bytes.Buffer
+		ctx, timeout := context.WithTimeout(context.Background(), time.Duration(120)*time.Second)
+		defer timeout()
+		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+			Stdout: &buff,
+			Stderr: &buff,
+		})
+		if err != nil {
+			simplelog.Warningf("failed killing ddc %v on host %v: %v - %v", w.String(), host, err, buff.String())
+			return
+		}
+		consoleprint.UpdateNodeState(consoleprint.NodeState{
+			Node:     host,
+			Status:   consoleprint.Starting,
+			StatusUX: "FAILED - CANCELLED",
+			Result:   consoleprint.ResultFailure,
+		})
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()
@@ -274,8 +349,12 @@ func newTarPipe(hook *shutdown.Hook, src string, executor func(writer *io.PipeWr
 	t.initReadFrom(0)
 	// add to shutdown hook so we make sure
 	t.hook.Add(func() {
-		t.outStream.Close()
-		t.reader.Close()
+		if err := t.outStream.Close(); err != nil {
+			simplelog.Debugf("failed closing tar pipe :%v", err)
+		}
+		if err := t.reader.Close(); err != nil {
+			simplelog.Debugf("failed closing tar pipe reader :%v", err)
+		}
 	}, fmt.Sprintf("closing tar pipe %v", src))
 	return t
 }

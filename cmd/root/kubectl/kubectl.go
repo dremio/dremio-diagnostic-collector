@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
@@ -33,12 +34,12 @@ type KubeArgs struct {
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(hook *shutdown.Hook, namespace string) (*KubectlK8sActions, error) {
+func NewKubectlK8sActions(hook *shutdown.Hook, namespace string) (*CliK8sActions, error) {
 	_, err := exec.LookPath("kubectl")
 	if err != nil {
-		return &KubectlK8sActions{}, fmt.Errorf("no kubectl found: %v", err)
+		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %v", err)
 	}
-	return &KubectlK8sActions{
+	return &CliK8sActions{
 		cli:         cli.NewCli(hook),
 		kubectlPath: "kubectl",
 		namespace:   namespace,
@@ -46,20 +47,20 @@ func NewKubectlK8sActions(hook *shutdown.Hook, namespace string) (*KubectlK8sAct
 	}, nil
 }
 
-// KubectlK8sActions provides a way to collect and copy files using kubectl
-type KubectlK8sActions struct {
+// CliK8sActions provides a way to collect and copy files using kubectl
+type CliK8sActions struct {
 	cli         cli.CmdExecutor
 	kubectlPath string
 	namespace   string
 	pidHosts    map[string]string
 }
 
-func (c *KubectlK8sActions) cleanLocal(rawDest string) string {
+func (c *CliK8sActions) cleanLocal(rawDest string) string {
 	//windows does the wrong thing for kubectl here and provides a path with C:\ we need to remove it as kubectl detects this as a remote destination
 	return strings.TrimPrefix(rawDest, "C:")
 }
 
-func (c *KubectlK8sActions) getContainerName(podName string) (string, error) {
+func (c *CliK8sActions) getContainerName(podName string) (string, error) {
 	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[0].name}`)
 	if err != nil {
 		return "", err
@@ -67,11 +68,11 @@ func (c *KubectlK8sActions) getContainerName(podName string) (string, error) {
 	return strings.TrimSpace(conts), nil
 }
 
-func (c *KubectlK8sActions) Name() string {
+func (c *CliK8sActions) Name() string {
 	return "Kubectl"
 }
 
-func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
+func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	container, err := c.getContainerName(hostString)
 	if err != nil {
 		return fmt.Errorf("unable to get container name: %v", err)
@@ -81,7 +82,7 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 	return c.cli.ExecuteAndStreamOutput(mask, output, pat, kubectlArgs...)
 }
 
-func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
+func (c *CliK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
 	var outBuilder strings.Builder
 	writer := func(line string) {
 		outBuilder.WriteString(line)
@@ -91,7 +92,7 @@ func (c *KubectlK8sActions) HostExecute(mask bool, hostString string, args ...st
 	return
 }
 
-func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
+func (c *CliK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
@@ -104,7 +105,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "5", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
-func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
+func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(destination, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
@@ -114,16 +115,16 @@ func (c *KubectlK8sActions) CopyToHost(hostString string, source, destination st
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "5", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "50", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
-func (c *KubectlK8sActions) GetCoordinators() (podName []string, err error) {
+func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 	return c.SearchPods(func(container string) bool {
 		return strings.Contains(container, "coordinator")
 	})
 }
 
-func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
+func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", "role=dremio-cluster-pod", "-o", "name")
 	if err != nil {
 		return []string{}, err
@@ -158,21 +159,22 @@ func (c *KubectlK8sActions) SearchPods(compare func(container string) bool) (pod
 	sort.Strings(pods)
 	return pods, nil
 }
-func (c *KubectlK8sActions) GetExecutors() (podName []string, err error) {
+func (c *CliK8sActions) GetExecutors() (podName []string, err error) {
 	return c.SearchPods(func(container string) bool {
 		return container == "dremio-executor"
 	})
 }
 
-func (c *KubectlK8sActions) HelpText() string {
+func (c *CliK8sActions) HelpText() string {
 	return "Make sure the labels and namespace you use actually correspond to your dremio pods: try something like 'ddc -n mynamespace --coordinator app=dremio-coordinator --executor app=dremio-executor'.  You can also run 'kubectl get pods --show-labels' to see what labels are available to use for your dremio pods"
 }
 
-func (c *KubectlK8sActions) SetHostPid(host, pidFile string) {
+func (c *CliK8sActions) SetHostPid(host, pidFile string) {
 	c.pidHosts[host] = pidFile
 }
 
-func (c *KubectlK8sActions) CleanupRemote() error {
+func (c *CliK8sActions) CleanupRemote() error {
+	consoleprint.UpdateResult("CANCELLING")
 	kill := func(host string, pidFile string) {
 		container, err := c.getContainerName(host)
 		if err != nil {
@@ -196,6 +198,12 @@ func (c *KubectlK8sActions) CleanupRemote() error {
 			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
 			return
 		}
+		consoleprint.UpdateNodeState(consoleprint.NodeState{
+			Node:     host,
+			Status:   consoleprint.Starting,
+			StatusUX: "FAILED - CANCELLED",
+			Result:   consoleprint.ResultFailure,
+		})
 	}
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()

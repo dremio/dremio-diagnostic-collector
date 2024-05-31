@@ -31,7 +31,7 @@ func TestKubectlExec(t *testing.T) {
 		StoredResponse: []string{"dremio-executor", "success"},
 		StoredErrors:   []error{nil, nil},
 	}
-	k := KubectlK8sActions{
+	k := CliK8sActions{
 		cli:         cli,
 		kubectlPath: "kubectl",
 		namespace:   namespace,
@@ -66,7 +66,7 @@ func TestKubectlSearch(t *testing.T) {
 		StoredResponse: []string{"pod/pod1\npod/pod2\npod/pod3\n", "dremio-coordinator", "dremio-coordinator", "dremio-coordinator"},
 		StoredErrors:   []error{nil, nil, nil, nil},
 	}
-	k := KubectlK8sActions{
+	k := CliK8sActions{
 		cli:         cli,
 		kubectlPath: "kubectl",
 		namespace:   namespace,
@@ -101,7 +101,7 @@ func TestKubectCopyFrom(t *testing.T) {
 		StoredResponse: []string{"dremio-executor", "success"},
 		StoredErrors:   []error{nil, nil},
 	}
-	k := KubectlK8sActions{
+	k := CliK8sActions{
 		cli:         cli,
 		kubectlPath: "kubectl",
 		namespace:   namespace,
@@ -133,7 +133,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 		StoredResponse: []string{"dremio-executor", "success"},
 		StoredErrors:   []error{nil, nil},
 	}
-	k := KubectlK8sActions{
+	k := CliK8sActions{
 		cli:         cli,
 		kubectlPath: "kubectl",
 		namespace:   namespace,

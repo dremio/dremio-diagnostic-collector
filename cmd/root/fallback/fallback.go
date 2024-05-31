@@ -35,7 +35,7 @@ func NewFallback(hook *shutdown.Hook) *Fallback {
 	}
 }
 
-func (c *Fallback) SetHostPid(host, pidFile string) {
+func (c *Fallback) SetHostPid(_, _ string) {
 	// not needed as normal cancellation will work
 }
 func (c *Fallback) CleanupRemote() error {
