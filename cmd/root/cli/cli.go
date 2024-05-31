@@ -61,7 +61,7 @@ func NewCli(hook *shutdown.Hook) CmdExecutor {
 
 // cli
 type cli struct {
-	m    sync.Mutex
+	// m    sync.Mutex
 	hook *shutdown.Hook
 }
 
@@ -80,11 +80,8 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	// Log the command that's about to be run
 	logArgs(mask, args)
 	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel)
-	// Create the command based on the passed arguments
+	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
-
-	// Create a pipe to get the standard output from the command
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
@@ -110,6 +107,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	if err := cmd.Start(); err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
+	var m sync.Mutex
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// Asynchronously read the output from the command line by line
@@ -117,9 +115,9 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	// so that we can also read the error output at the same time.
 	go func() {
 		for stdOutScanner.Scan() {
-			c.m.Lock()
+			m.Lock()
 			outputHandler(stdOutScanner.Text())
-			c.m.Unlock()
+			m.Unlock()
 		}
 		wg.Done()
 	}()
@@ -128,9 +126,9 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	// and pass it to the outputHandler.
 	go func() {
 		for stdErrScanner.Scan() {
-			c.m.Lock()
+			m.Lock()
 			outputHandler(stdErrScanner.Text())
-			c.m.Unlock()
+			m.Unlock()
 		}
 		wg.Done()
 	}()
@@ -151,7 +149,7 @@ func (c *cli) Execute(mask bool, args ...string) (string, error) {
 	// Log the command that's about to be run
 	logArgs(mask, args)
 	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel)
+	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -173,7 +171,7 @@ func logArgs(mask bool, args []string) {
 func (c *cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
 	logArgs(mask, args)
 	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel)
+	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

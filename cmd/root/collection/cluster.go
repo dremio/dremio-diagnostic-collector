@@ -111,7 +111,7 @@ func copyContainerLog(hook *shutdown.Hook, cs CopyStrategy, ddfs helpers.Filesys
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel)
+	hook.Add(cancel, "cancelling container log copy")
 	timeoutDuration := time.Duration(clusterRequestTimeout) * time.Second
 	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while copying container %s from pod %s in namespace %s timeout exceeded %v", container, pod, namespace, timeoutDuration))
 	defer timeout() // releases resources if slowOperation completes before timeout elapses
@@ -167,7 +167,7 @@ func clusterExecuteBytes(hook *shutdown.Hook, namespace, resource string) ([]byt
 	options := metav1.ListOptions{}
 	var b []byte
 	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel)
+	hook.Add(cancel, fmt.Sprintf("cancelling copy of resource %v", resource))
 	timeoutDuration := 60 * time.Second
 	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while getting resource %v in namespace %s timeout exceeded %v", resource, namespace, timeoutDuration))
 	defer timeout()

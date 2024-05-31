@@ -16,7 +16,6 @@
 package ddcio
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"syscall"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -157,12 +157,15 @@ func Shell(hook *shutdown.Hook, writer io.Writer, commandLine string) error {
 		shell = "cmd.exe"
 		fileArg = "/C"
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel)
-	cmd := exec.CommandContext(ctx, shell, fileArg, commandLine)
+	// ctx, cancel := context.WithCancel(context.Background())
+	cmd := exec.Command(shell, fileArg, commandLine)
+	hook.Add(func() {
+		if err := syscall.Kill(cmd.Process.Pid, syscall.SIGKILL); err != nil {
+			simplelog.Warningf("sending signal to %v - %v failed: %v", cmd.Process.Pid, commandLine, err)
+		}
+	}, fmt.Sprintf("cancelling %v", commandLine))
 	cmd.Stdout = writer
 	cmd.Stderr = writer
-
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("command execution failed: %w", err)

@@ -14,31 +14,58 @@
 
 package shutdown
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+)
 
 // Hook is a thread safe queue of cleanup work to be run.
 // this is to be used for things that need to be cleaned up if the process
 // receives an interrupt (as defers would not be run)
 type Hook struct {
-	mu       sync.Mutex
-	cleanups []func()
+	mu              sync.Mutex
+	cleanups        []cleanupTask
+	priorityCleanup []cleanupTask
+}
+
+type cleanupTask struct {
+	name string
+	p    func()
 }
 
 // Add will add a function call to a list to be cleaned up later
 // Is thread safe.
-func (h *Hook) Add(f func()) {
+func (h *Hook) Add(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
-	h.cleanups = append(h.cleanups, f)
+	h.cleanups = append(h.cleanups, cleanupTask{name: name, p: p})
+}
+
+// AddPriorityCancel are run first as their order is important
+func (h *Hook) AddPriorityCancel(p func(), name string) {
+	defer h.mu.Unlock()
+	h.mu.Lock()
+	h.priorityCleanup = append(h.priorityCleanup, cleanupTask{name: name, p: p})
 }
 
 // Cleanup runs in order all cleanup tasks that have been added
 // Is thread safe
 func (h *Hook) Cleanup() {
 	defer h.mu.Unlock()
+	simplelog.Debugf("%v tasks to run on cleanup", len(h.cleanups)+len(h.priorityCleanup))
+	for _, j := range h.priorityCleanup {
+		simplelog.Debugf("cleaning up %v", j.name)
+		j.p()
+	}
 	h.mu.Lock()
 	for _, j := range h.cleanups {
-		j()
+		simplelog.Debugf("cleaning up %v", j.name)
+		j.p()
 	}
-	h.cleanups = []func(){}
+
+	//blank
+	h.priorityCleanup = []cleanupTask{}
+	h.cleanups = []cleanupTask{}
+
 }

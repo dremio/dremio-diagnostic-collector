@@ -70,9 +70,9 @@ dremio-pid: %v
 	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	hook := shutdown.Hook{}
+	hook := &shutdown.Hook{}
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ dremio-pid: %v
 		t.Fatal(err)
 	}
 
-	err = jvmcollect.RunCollectJVMFlags(c, &hook)
+	err = jvmcollect.RunCollectJVMFlags(c, hook)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

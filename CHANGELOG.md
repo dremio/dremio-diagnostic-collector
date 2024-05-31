@@ -2,7 +2,11 @@
 
 ## [3.0.0] - 2024-05-31
 
-## Fixed
+### Changed
+
+* removed ttop and replaced it with top -H 
+
+### Fixed
 
 * CTRL+C cancels all running processes and remote calls also executes any file or folder cleanup that was pending
 * ignoring errors when searching for cluster ID as high usage clusters have files vanish during search

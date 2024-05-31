@@ -62,6 +62,7 @@ func NewKubectlK8sActions(kubeArgs KubeArgs, hook *shutdown.Hook) (*KubectlK8sAc
 		config:        config,
 		labelSelector: kubeArgs.LabelSelector,
 		hook:          hook,
+		pidHosts:      make(map[string]string),
 	}, nil
 }
 
@@ -102,6 +103,59 @@ type KubectlK8sActions struct {
 	client        *kubernetes.Clientset
 	config        *rest.Config
 	hook          *shutdown.Hook
+	pidHosts      map[string]string
+}
+
+func (c *KubectlK8sActions) SetHostPid(host, pidFile string) {
+	c.pidHosts[host] = pidFile
+}
+func (c *KubectlK8sActions) CleanupRemote() error {
+	kill := func(host string, pidFile string) {
+		out, err := c.HostExecute(false, host, "cat", pidFile)
+		if err != nil {
+			simplelog.Warningf("output of pidfile failed for host %v: %v", host, err)
+			return
+		}
+		out, err = c.HostExecute(false, host, "kill", "-15", out)
+		if err != nil {
+			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
+			return
+		}
+	}
+	var criticalErrors []string
+	coordinators, err := c.GetCoordinators()
+	if err != nil {
+		msg := fmt.Sprintf("unable to get coordinators for cleanup %v", err)
+		simplelog.Error(msg)
+		criticalErrors = append(criticalErrors, msg)
+	} else {
+		for _, coordinator := range coordinators {
+			if v, ok := c.pidHosts[coordinator]; ok {
+				kill(coordinator, v)
+			} else {
+				simplelog.Errorf("missing key %v in pidHosts skipping host", coordinator)
+			}
+		}
+	}
+
+	executors, err := c.GetExecutors()
+	if err != nil {
+		msg := fmt.Sprintf("unable to get executors for cleanup %v", err)
+		simplelog.Error(msg)
+		criticalErrors = append(criticalErrors, msg)
+	} else {
+		for _, executor := range executors {
+			if v, ok := c.pidHosts[executor]; ok {
+				kill(executor, v)
+			} else {
+				simplelog.Errorf("missing key %v in pidHosts skipping host", executor)
+			}
+		}
+	}
+	if len(criticalErrors) > 0 {
+		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
+	}
+	return nil
 }
 
 func (c *KubectlK8sActions) GetClient() *kubernetes.Clientset {
@@ -148,23 +202,20 @@ func (c *KubectlK8sActions) HostExecuteAndStream(mask bool, hostString string, o
 		Buff:   &buff,
 		Output: output,
 	}
+
 	if pat != "" {
-		buff := bytes.Buffer{}
-		if _, err := buff.WriteString(pat); err != nil {
+		stdIn := bytes.Buffer{}
+		if _, err := stdIn.WriteString(pat); err != nil {
 			return err
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		c.hook.Add(cancel)
-		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
-			Stdin:  &buff,
+		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+			Stdin:  &stdIn,
 			Stdout: writer,
 			Stderr: writer,
 		})
 		return err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel)
-	return exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
 		Stdout: writer,
 		Stderr: writer,
 	})
@@ -225,7 +276,7 @@ func newTarPipe(hook *shutdown.Hook, src string, executor func(writer *io.PipeWr
 	t.hook.Add(func() {
 		t.outStream.Close()
 		t.reader.Close()
-	})
+	}, fmt.Sprintf("closing tar pipe %v", src))
 	return t
 }
 
@@ -296,7 +347,7 @@ func (c *KubectlK8sActions) CopyFromHost(hostString string, source, destination 
 		}
 		var errBuff bytes.Buffer
 		ctx, cancel := context.WithCancel(context.Background())
-		c.hook.Add(cancel)
+		c.hook.Add(cancel, fmt.Sprintf("cancelling transfer %v", hostString))
 		// hard coding a 30 minute timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
 		duration := 30 * time.Minute
 		ctx, timeout := context.WithTimeoutCause(ctx, duration, fmt.Errorf("transferring file %v from host %v timeout exceeded %v", source, hostString, duration))

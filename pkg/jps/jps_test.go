@@ -38,9 +38,9 @@ func TestJvmFlagCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	hook := shutdown.Hook{}
+	hook := &shutdown.Hook{}
 	defer hook.Cleanup()
-	flags, err := jps.CaptureFlagsFromPID(&hook, cmd.Process.Pid)
+	flags, err := jps.CaptureFlagsFromPID(hook, cmd.Process.Pid)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

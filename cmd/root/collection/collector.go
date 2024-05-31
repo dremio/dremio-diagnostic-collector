@@ -54,6 +54,8 @@ type Collector interface {
 	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) error
 	HelpText() string
 	Name() string
+	SetHostPid(host, pidFile string)
+	CleanupRemote() error
 }
 
 type Args struct {
@@ -104,7 +106,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 		if err := os.RemoveAll(tmpInstallDir); err != nil {
 			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
 		}
-	})
+	}, "cleaning temp install dir")
 	ddcFilePath, err := ddcbinary.WriteOutDDC(tmpInstallDir)
 	if err != nil {
 		return fmt.Errorf("making ddc binary failed: '%v'", err)
@@ -174,7 +176,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
+			err := StartCapture(coordinatorCaptureConf, hook, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
@@ -183,7 +185,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 			transferWg.Add(1)
 			go func() {
 				defer transferWg.Done()
-				size, f, err := TransferCapture(coordinatorCaptureConf, s.GetTmpDir())
+				size, f, err := TransferCapture(coordinatorCaptureConf, hook, s.GetTmpDir())
 				if err != nil {
 					m.Lock()
 					totalFailedFiles = append(totalFailedFiles, f)
@@ -218,7 +220,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 			}
 			//always skip executor calls
 			skipRESTCalls := true
-			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
+			err := StartCapture(executorCaptureConf, hook, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
@@ -227,7 +229,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 			transferWg.Add(1)
 			go func() {
 				defer transferWg.Done()
-				size, f, err := TransferCapture(executorCaptureConf, s.GetTmpDir())
+				size, f, err := TransferCapture(executorCaptureConf, hook, s.GetTmpDir())
 				if err != nil {
 					m.Lock()
 					totalFailedFiles = append(totalFailedFiles, f)
@@ -287,7 +289,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 				if err := os.Remove(t); err != nil {
 					simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)
 				}
-			})
+			}, fmt.Sprintf("removing local tarball %v", t))
 			simplelog.Debugf("removed %v", t)
 		}
 	}

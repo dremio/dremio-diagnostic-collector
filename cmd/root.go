@@ -148,7 +148,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		return fmt.Errorf("error when getting directory for copy strategy: %v", err)
 	}
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
-	hook.Add(cs.Close)
+	hook.Add(cs.Close, "running cleanup on copy strategy")
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
@@ -247,18 +247,19 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
-	hook := &shutdown.Hook{}
-	defer hook.Cleanup()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		hook.Cleanup()
-		os.Exit(1)
-	}()
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+		hook := &shutdown.Hook{}
+		defer hook.Cleanup()
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			<-c
+			simplelog.Info("CTRL+C interrupt starting graceful shutdown")
+			hook.Cleanup()
+			os.Exit(1)
+		}()
 		if disablePrompt {
 			consoleprint.EnableStatusOutput()
 		}
@@ -277,7 +278,7 @@ func Execute(args []string) error {
 						consoleprint.ErrorPrint(msg)
 						simplelog.Error(msg)
 					}
-				})
+				}, fmt.Sprintf("removing root pid file %v", pid))
 			} else {
 				return fmt.Errorf("DDC is running based on pid file '%v'. If this is a stale file then please remove", pid)
 			}
@@ -495,7 +496,7 @@ func Execute(args []string) error {
 		}
 		if !disablePrompt {
 			stop := startTicker()
-			hook.Add(stop)
+			defer stop()
 		}
 		collectionArgs := collection.Args{
 			OutputLoc:             filepath.Clean(outputLoc),

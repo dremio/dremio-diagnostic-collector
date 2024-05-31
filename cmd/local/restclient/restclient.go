@@ -54,7 +54,7 @@ func APIRequest(hook *shutdown.Hook, url string, pat string, request string, hea
 
 	// wiring cancel to shutdown hook
 	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel)
+	hook.Add(cancel, fmt.Sprintf("cancelling api request %v", url))
 	// making sure the global timeout does not get overriden
 	ctx, timeout := context.WithTimeoutCause(ctx, client.Timeout, fmt.Errorf("API request to url %v exceeded timeout %v", url, client.Timeout))
 	defer timeout()
@@ -92,7 +92,7 @@ func PostQuery(hook *shutdown.Hook, url string, pat string, headers map[string]s
 	ctx, timeout := context.WithTimeoutCause(context.Background(), client.Timeout, fmt.Errorf("POST request to %v exceeded timeout %v", url, client.Timeout))
 	defer timeout()
 	ctx, cancel := context.WithCancel(ctx)
-	hook.Add(cancel)
+	hook.Add(cancel, fmt.Sprintf("cancelling post %v", url))
 	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(sqlbody))
 	if err != nil {
 

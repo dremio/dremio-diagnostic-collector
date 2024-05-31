@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -265,7 +266,7 @@ func collect(c *conf.CollectConf, hook *shutdown.Hook) error {
 		if !c.CollectTtop() {
 			simplelog.Debugf("Skipping ttop collection")
 		} else {
-			t.AddJob(wrapConfigJob("TTOP COLLECTION", jvmcollect.RunTtopCollect))
+			t.AddJob(wrapConfigJob("TTOP COLLECTION", RunTtopCollect))
 		}
 		if !c.CollectJFR() {
 			simplelog.Debugf("Skipping Java Flight Recorder collection")
@@ -468,6 +469,22 @@ func runCollectClusterStats(c *conf.CollectConf, hook *shutdown.Hook) error {
 	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0600)
 }
 
+func RunTtopCollect(c *conf.CollectConf, hook *shutdown.Hook) error {
+	simplelog.Debug("Running top -H to get thread information")
+	duration := c.DremioTtopTimeSeconds() / c.DremioTtopFreqSeconds()
+	if duration == 0 {
+		return fmt.Errorf("cannot have duration of 0 for ttop")
+	}
+	var w bytes.Buffer
+	err := ddcio.Shell(hook, &w, fmt.Sprintf("LINES=50 COLUMNS=512 top -H -n %v -p %v -d %v -1 -bw > %v/ttop.txt", duration, c.DremioPID(), c.DremioTtopFreqSeconds(), c.TtopOutDir()))
+	if err != nil {
+		return fmt.Errorf("failed collecting top %v", err)
+	}
+	out := w.String()
+	simplelog.Debugf("top -H output %v", out)
+	return nil
+}
+
 func runCollectOSConfig(c *conf.CollectConf, hook *shutdown.Hook) error {
 	simplelog.Debug("Collecting OS Information")
 	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
@@ -615,13 +632,18 @@ var LocalCollectCmd = &cobra.Command{
 }
 
 func Execute(args []string, overrides map[string]string) (string, error) {
-	hook := &shutdown.Hook{}
+	hook := shutdown.Hook{}
 	defer hook.Cleanup()
 	cSignal := make(chan os.Signal, 1)
 	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
+	killOnlyCleanup := func() {}
 	go func() {
 		<-cSignal
+		simplelog.Infof("graceful shutdown initiated")
 		hook.Cleanup()
+		simplelog.Infof("removing tarball out folder if present")
+		killOnlyCleanup()
+		simplelog.Infof("cleanup complete")
 		os.Exit(1)
 	}()
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())
@@ -633,16 +655,16 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 				return "", fmt.Errorf("unable to read pid location '%v' with error: '%w'", pid, err)
 			}
 			// this means nothing is present great continue
-			if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
+			if err := os.WriteFile(filepath.Clean(pid), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 				return "", fmt.Errorf("unable to write pid file '%v: %w", pid, err)
 			}
-			defer func() {
+			hook.Add(func() {
 				if err := os.Remove(pid); err != nil {
 					msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
 					fmt.Println(msg)
 					simplelog.Error(msg)
 				}
-			}()
+			}, fmt.Sprintf("removing pid file %v", pid))
 		} else {
 			return "", fmt.Errorf("DDC is running based on pid file '%v'. If this is a stale file then please remove", pid)
 		}
@@ -652,16 +674,20 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		return "", err
 	}
 
-	c, err := conf.ReadConf(hook, overrides, ddcYamlLoc, collectionMode)
+	c, err := conf.ReadConf(&hook, overrides, ddcYamlLoc, collectionMode)
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
-
+	killOnlyCleanup = func() {
+		if err := os.RemoveAll(c.OutputDir()); err != nil {
+			simplelog.Errorf("unable to cleanup %v: %v", c.OutputDir(), err)
+		}
+	}
 	fmt.Println("looking for logs in: " + c.DremioLogDir())
 
 	// Run application
 	simplelog.Info("Starting collection...")
-	if err := collect(c, hook); err != nil {
+	if err := collect(c, &hook); err != nil {
 		return "", fmt.Errorf("unable to collect: %w", err)
 	}
 
@@ -679,6 +705,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	if err := os.RemoveAll(c.OutputDir()); err != nil {
 		simplelog.Errorf("unable to remove %v: %v", c.OutputDir(), err)
 	}
+
 	simplelog.Infof("Archive %v complete", tarballName)
 	endTime := time.Now().Unix()
 	fi, err := os.Stat(tarballName)
@@ -715,5 +742,5 @@ func init() {
 	}
 	execLocDir := filepath.Dir(execLoc)
 	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
-	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop, jstack or jfr). 'standard' - includes jfr, ttop, jstack, 7 days of logs and 30 days of queries.json logs. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top, jstack or jfr). 'standard' - includes jfr, top, jstack, 7 days of logs and 30 days of queries.json logs. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
 }

@@ -25,13 +25,13 @@ func TestShutdownRunsAllTasksInOrder(t *testing.T) {
 	items := []int{}
 	hook.Add(func() {
 		items = append(items, 1)
-	})
+	}, "")
 	hook.Add(func() {
 		items = append(items, 2)
-	})
+	}, "")
 	hook.Add(func() {
 		items = append(items, 3)
-	})
+	}, "")
 	hook.Cleanup()
 	if items[0] != 1 {
 		t.Errorf("expected 1 but was %v", items[0])

@@ -41,6 +41,7 @@ func NewCmdSSHActions(sshArgs Args, hook *shutdown.Hook) *CmdSSHActions {
 		sudoUser:       sshArgs.SudoUser,
 		executorStr:    sshArgs.ExecutorStr,
 		coordinatorStr: sshArgs.CoordinatorStr,
+		pidHosts:       make(map[string]string),
 	}
 }
 
@@ -54,10 +55,75 @@ type CmdSSHActions struct {
 	sudoUser       string
 	executorStr    string
 	coordinatorStr string
+	pidHosts       map[string]string
 }
 
 func (c *CmdSSHActions) Name() string {
 	return "SSH/SCP"
+}
+
+func (c *CmdSSHActions) SetHostPid(host, pidFile string) {
+	c.pidHosts[host] = pidFile
+}
+
+func (c *CmdSSHActions) CleanupRemote() error {
+	kill := func(host string, pidFile string) {
+		sshArgs := []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+		sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, host))
+		sshArgs = c.addSSHUser(sshArgs)
+		sshArgs = append(sshArgs, "cat")
+		sshArgs = append(sshArgs, pidFile)
+		out, err := c.cli.Execute(false, sshArgs...)
+		if err != nil {
+			simplelog.Warningf("output of pidfile failed for host %v: %v", host, err)
+			return
+		}
+		sshArgs = []string{"ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no"}
+		sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, host))
+		sshArgs = c.addSSHUser(sshArgs)
+		sshArgs = append(sshArgs, "kill")
+		sshArgs = append(sshArgs, "-15")
+		sshArgs = append(sshArgs, out)
+		out, err = c.cli.Execute(false, sshArgs...)
+		if err != nil {
+			simplelog.Warningf("failed killing process %v host %v: %v", out, host, err)
+			return
+		}
+	}
+	var criticalErrors []string
+	coordinators, err := c.GetCoordinators()
+	if err != nil {
+		msg := fmt.Sprintf("unable to get coordinators for cleanup %v", err)
+		simplelog.Error(msg)
+		criticalErrors = append(criticalErrors, msg)
+	} else {
+		for _, coordinator := range coordinators {
+			if v, ok := c.pidHosts[coordinator]; ok {
+				kill(coordinator, v)
+			} else {
+				simplelog.Errorf("missing key %v in pidHosts skipping host", coordinator)
+			}
+		}
+	}
+
+	executors, err := c.GetExecutors()
+	if err != nil {
+		msg := fmt.Sprintf("unable to get executors for cleanup %v", err)
+		simplelog.Error(msg)
+		criticalErrors = append(criticalErrors, msg)
+	} else {
+		for _, executor := range executors {
+			if v, ok := c.pidHosts[executor]; ok {
+				kill(executor, v)
+			} else {
+				simplelog.Errorf("missing key %v in pidHosts skipping host", executor)
+			}
+		}
+	}
+	if len(criticalErrors) > 0 {
+		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
+	}
+	return nil
 }
 
 func (c *CmdSSHActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {

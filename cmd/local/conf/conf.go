@@ -278,6 +278,10 @@ func ReadConf(hook *shutdown.Hook, overrides map[string]string, ddcYamlLoc, coll
 	var entryNames []string
 	var entryCount int
 	allowedList := []string{"ddc", "ddc.log", "ddc.yaml", fmt.Sprintf("%v.tar.gz", c.nodeName)}
+	pidFile := GetString(confData, "pid")
+	if pidFile != "" {
+		allowedList = append(allowedList, filepath.Base(pidFile))
+	}
 	for _, e := range dirEntries {
 		if slices.Contains[[]string](allowedList, e.Name()) {
 			continue
