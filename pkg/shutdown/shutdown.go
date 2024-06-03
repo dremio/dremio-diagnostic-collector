@@ -33,10 +33,10 @@ type Hook interface {
 	Cleanup()
 }
 
-// HookImpl is a thread safe queue of cleanup work to be run.
+// hookImpl is a thread safe queue of cleanup work to be run.
 // this is to be used for things that need to be cleaned up if the process
 // receives an interrupt (as defers would not be run)
-type HookImpl struct {
+type hookImpl struct {
 	mu              sync.Mutex
 	cleanups        []cleanupTask
 	priorityCleanup []cleanupTask
@@ -46,7 +46,7 @@ type HookImpl struct {
 
 func NewHook() Hook {
 	ctx, cancel := context.WithCancel(context.Background())
-	hook := &HookImpl{
+	hook := &hookImpl{
 		ctx: ctx,
 	}
 	hook.Add(cancel, "cancelling all cancellable executions")
@@ -59,27 +59,27 @@ type cleanupTask struct {
 }
 
 // GetContext provides a cancel context for everyone to share
-func (h *HookImpl) GetContext() context.Context {
+func (h *hookImpl) GetContext() context.Context {
 	return h.ctx
 }
 
 // Add will add a function call to a list to be cleaned up later
 // Is thread safe.
-func (h *HookImpl) Add(p func(), name string) {
+func (h *hookImpl) Add(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
 	h.cleanups = append(h.cleanups, cleanupTask{name: name, p: p})
 }
 
 // AddPriorityCancel are run first as their order is important
-func (h *HookImpl) AddPriorityCancel(p func(), name string) {
+func (h *hookImpl) AddPriorityCancel(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
 	h.priorityCleanup = append(h.priorityCleanup, cleanupTask{name: name, p: p})
 }
 
 // AddFinalSteps run last after everything has stopped
-func (h *HookImpl) AddFinalSteps(p func(), name string) {
+func (h *hookImpl) AddFinalSteps(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
 	h.finalSteps = append(h.finalSteps, cleanupTask{name: name, p: p})
@@ -87,7 +87,7 @@ func (h *HookImpl) AddFinalSteps(p func(), name string) {
 
 // Cleanup runs in order all cleanup tasks that have been added
 // Is thread safe
-func (h *HookImpl) Cleanup() {
+func (h *hookImpl) Cleanup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	simplelog.Debugf("%v tasks to run on cleanup", len(h.cleanups)+len(h.priorityCleanup))

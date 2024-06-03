@@ -19,6 +19,7 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -375,6 +376,14 @@ func (t *TarPipe) initReadFrom(n uint64) {
 func (t *TarPipe) Read(p []byte) (n int, err error) {
 	n, err = t.reader.Read(p)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			simplelog.Warning("cancelling transfer")
+			return 0, err
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			simplelog.Warning("timed out stopping retries")
+			return 0, err
+		}
 		if t.maxRetries < 0 || t.retries < t.maxRetries {
 			// short pause between retries
 			t.retries++
@@ -530,7 +539,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	var outBuff bytes.Buffer
 
 	// hard coding a 4 minute timeout on copy to host we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(c.hook.GetContext(), 4*time.Minute)
 	defer cancel()
 	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  reader,

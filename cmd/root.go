@@ -63,6 +63,7 @@ var outputLoc string
 var sudoUser string
 var namespace string
 var disableFreeSpaceCheck bool
+var disableKubeCtl bool
 var minFreeSpaceGB int
 var disablePrompt bool
 var detectNamespace bool
@@ -169,15 +170,17 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	} else if kubeArgs.Namespace != "" {
 		simplelog.Info("using Kubernetes api based collection")
 		consoleprint.UpdateCollectionArgs(fmt.Sprintf("namespace: '%v', label selector: '%v'", kubeArgs.Namespace, kubeArgs.LabelSelector))
-		potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace)
+		collectorStrategy, err = kubernetes.NewK8sAPI(kubeArgs, hook)
 		if err != nil {
-			simplelog.Warningf("kubectl not available failling back to kubeapi: %v", err)
-			collectorStrategy, err = kubernetes.NewK8sAPI(kubeArgs, hook)
+			return err
+		}
+		if !disableKubeCtl {
+			potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace)
 			if err != nil {
-				return err
+				simplelog.Warningf("kubectl not available failling back to kubeapi: %v", err)
+			} else {
+				collectorStrategy = potentialStrategy
 			}
-		} else {
-			collectorStrategy = potentialStrategy
 		}
 
 		consoleprint.UpdateRuntime(
@@ -505,7 +508,7 @@ func Execute(args []string) error {
 		}
 		if !disablePrompt {
 			stop := startTicker()
-			defer stop()
+			hook.AddPriorityCancel(stop, "stopping UI")
 		}
 		collectionArgs := collection.Args{
 			OutputLoc:             filepath.Clean(outputLoc),
@@ -584,20 +587,13 @@ func init() {
 	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop or jfr). 'standard' - includes jfr, ttop, 7 days of logs and 30 days of queries.json logs. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
-	if err := RootCmd.Flags().MarkHidden("disable-prompt"); err != nil {
-		fmt.Printf("unable to mark flag hidden critical error %v", err)
-		os.Exit(1)
-	}
+	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
 	RootCmd.Flags().StringVar(&cliAuthToken, conf.KeyDremioPatToken, "", "Dremio Personal Access Token (PAT) for ui")
 	if err := RootCmd.Flags().MarkHidden(conf.KeyDremioPatToken); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}
 	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
-	if err := RootCmd.Flags().MarkHidden("detect-namespace"); err != nil {
-		fmt.Printf("unable to mark flag hidden critical error %v", err)
-		os.Exit(1)
-	}
 	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)

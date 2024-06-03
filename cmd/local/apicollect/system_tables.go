@@ -120,7 +120,7 @@ func checkJobState(c *conf.CollectConf, hook shutdown.CancelHook, jobstateurl st
 			return fmt.Errorf("returned json does not contain required field 'jobState'")
 		}
 		simplelog.Debugf("job state: %s", jobstate)
-		if jobstate == "FAILED" || jobstate == "CANCELED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
+		if jobstate == "FAILED" || jobstate == "CANCELLED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
 			return fmt.Errorf("unable to retrieve job results - job state: " + jobstate)
 		}
 	}

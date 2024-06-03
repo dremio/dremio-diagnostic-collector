@@ -17,6 +17,7 @@ package collection
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -365,6 +366,15 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 		})
 		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, c.Host, outDir, err, out)
 	}
+
+	hook.AddFinalSteps(func() {
+		if _, err := os.Stat(outputLoc); err == nil {
+			if err := os.Remove(outputLoc); err != nil {
+				simplelog.Warningf("unable to cleanup tgz %v: %v", outputLoc, err)
+			}
+			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
+		}
+	}, fmt.Sprintf("removing local tarball if present %v", tarGZ))
 
 	fileInfo, err := c.DDCfs.Stat(destFile)
 	//we assume a file size of zero if we are not able to retrieve the file size for some reason
