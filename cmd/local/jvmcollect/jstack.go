@@ -28,13 +28,13 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectJStacks(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectJStacks(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	return RunCollectJStacksWithTimeService(c, hook, func() time.Time {
 		return time.Now()
 	})
 }
 
-func RunCollectJStacksWithTimeService(c *conf.CollectConf, hook *shutdown.Hook, timer func() time.Time) error {
+func RunCollectJStacksWithTimeService(c *conf.CollectConf, hook shutdown.CancelHook, timer func() time.Time) error {
 	simplelog.Debug("Collecting Jstack ...")
 	threadDumpFreq := c.DremioJStackFreqSeconds()
 	iterations := c.DremioJStackTimeSeconds() / threadDumpFreq

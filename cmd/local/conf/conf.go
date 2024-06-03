@@ -129,7 +129,7 @@ type CollectConf struct {
 	dremioPID               int
 }
 
-func ValidateAPICredentials(c *CollectConf, hook *shutdown.Hook) error {
+func ValidateAPICredentials(c *CollectConf, hook shutdown.Hook) error {
 	simplelog.Debugf("Validating REST API user credentials...")
 	var url string
 	if !c.IsDremioCloud() {
@@ -201,7 +201,7 @@ func LogConfData(confData map[string]string) {
 		}
 	}
 }
-func ReadConf(hook *shutdown.Hook, overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
+func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
 	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {
 		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
@@ -603,7 +603,7 @@ type DremioConfig struct {
 	ConfDir string
 }
 
-func GetConfiguredDremioValuesFromPID(hook *shutdown.Hook, dremioPID int) (DremioConfig, error) {
+func GetConfiguredDremioValuesFromPID(hook shutdown.CancelHook, dremioPID int) (DremioConfig, error) {
 	psOut, err := ReadPSEnv(hook, dremioPID)
 	if err != nil {
 		return DremioConfig{}, err
@@ -611,7 +611,7 @@ func GetConfiguredDremioValuesFromPID(hook *shutdown.Hook, dremioPID int) (Dremi
 	return ParsePSForConfig(psOut)
 }
 
-func ReadPSEnv(hook *shutdown.Hook, dremioPID int) (string, error) {
+func ReadPSEnv(hook shutdown.CancelHook, dremioPID int) (string, error) {
 	var w bytes.Buffer
 	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
 	if err != nil {

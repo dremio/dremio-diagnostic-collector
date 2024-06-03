@@ -128,7 +128,7 @@ func startTicker() (stop func()) {
 	}
 }
 
-func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool, hook *shutdown.Hook) error {
+func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool, hook shutdown.Hook) error {
 	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
@@ -149,7 +149,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		return fmt.Errorf("error when getting directory for copy strategy: %v", err)
 	}
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
-	hook.Add(cs.Close, "running cleanup on copy strategy")
+	hook.AddFinalSteps(cs.Close, "running cleanup on copy strategy")
 	var clusterCollect = func([]string) {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
@@ -258,7 +258,7 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
-		hook := &shutdown.Hook{}
+		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM)
@@ -281,7 +281,7 @@ func Execute(args []string) error {
 				if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
 					return fmt.Errorf("unable to write pid file '%v: %v", pid, err)
 				}
-				hook.Add(func() {
+				hook.AddFinalSteps(func() {
 					if err := os.Remove(pid); err != nil {
 						msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
 						consoleprint.ErrorPrint(msg)
@@ -604,16 +604,7 @@ func init() {
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
-	if err := RootCmd.Flags().MarkHidden("transfer-threads"); err != nil {
-		fmt.Printf("unable to mark flag hidden critical error %v", err)
-		os.Exit(1)
-	}
 	RootCmd.Flags().IntVar(&minFreeSpaceGB, "min-free-space-gb", 40, "min free space needed in GB for the process to run")
-	if err := RootCmd.Flags().MarkHidden("min-free-space-gb"); err != nil {
-		fmt.Printf("unable to mark flag hidden critical error %v", err)
-		os.Exit(1)
-	}
-
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 	execLoc, err := os.Executable()

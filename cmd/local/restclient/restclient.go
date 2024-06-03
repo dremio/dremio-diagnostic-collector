@@ -46,17 +46,14 @@ func InitClient(allowInsecureSSL bool, restHTTPTimeout int) {
 	}
 }
 
-func APIRequest(hook *shutdown.Hook, url string, pat string, request string, headers map[string]string) ([]byte, error) {
+func APIRequest(hook shutdown.CancelHook, url string, pat string, request string, headers map[string]string) ([]byte, error) {
 	if client == nil {
 		return []byte(""), errors.New("critical error call InitClient first")
 	}
 	simplelog.Debugf("Requesting %s", url)
 
-	// wiring cancel to shutdown hook
-	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel, fmt.Sprintf("cancelling api request %v", url))
 	// making sure the global timeout does not get overriden
-	ctx, timeout := context.WithTimeoutCause(ctx, client.Timeout, fmt.Errorf("API request to url %v exceeded timeout %v", url, client.Timeout))
+	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), client.Timeout, fmt.Errorf("API request to url %v exceeded timeout %v", url, client.Timeout))
 	defer timeout()
 	req, err := http.NewRequestWithContext(ctx, request, url, nil)
 	if err != nil {
@@ -87,15 +84,12 @@ func APIRequest(hook *shutdown.Hook, url string, pat string, request string, hea
 	return body, nil
 }
 
-func PostQuery(hook *shutdown.Hook, url string, pat string, headers map[string]string, sqlbody string) (string, error) {
+func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[string]string, sqlbody string) (string, error) {
 	// making sure the global timeout does not get overriden
-	ctx, timeout := context.WithTimeoutCause(context.Background(), client.Timeout, fmt.Errorf("POST request to %v exceeded timeout %v", url, client.Timeout))
+	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), client.Timeout, fmt.Errorf("POST request to %v exceeded timeout %v", url, client.Timeout))
 	defer timeout()
-	ctx, cancel := context.WithCancel(ctx)
-	hook.Add(cancel, fmt.Sprintf("cancelling post %v", url))
 	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(sqlbody))
 	if err != nil {
-
 		return "", fmt.Errorf("unable to create request due to error %v", err)
 
 	}

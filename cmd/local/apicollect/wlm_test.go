@@ -95,7 +95,7 @@ func TestRunCollectWLM(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	confDir := setupConfigDir(t, server.URL)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	// Prepare the configuration
 	overrides := make(map[string]string)

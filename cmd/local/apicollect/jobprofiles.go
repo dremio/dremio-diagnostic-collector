@@ -33,7 +33,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook *shutdown.Hook) (tried, collected int, err error) {
+func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (tried, collected int, err error) {
 	var files []fs.DirEntry
 	var queriesrows []queriesjson.QueriesRow
 
@@ -132,7 +132,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook *shutdown.Hook) (
 	return tried, collected, nil
 }
 
-func RunCollectJobProfiles(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectJobProfiles(c *conf.CollectConf, hook shutdown.Hook) error {
 	simplelog.Info("Collecting Job Profiles...")
 	tried, collected, err := GetNumberOfJobProfilesCollected(c, hook)
 	if err != nil {
@@ -143,7 +143,7 @@ func RunCollectJobProfiles(c *conf.CollectConf, hook *shutdown.Hook) error {
 	return nil
 }
 
-func DownloadJobProfile(c *conf.CollectConf, hook *shutdown.Hook, jobid string) error {
+func DownloadJobProfile(c *conf.CollectConf, hook shutdown.Hook, jobid string) error {
 	var url, apipath string
 	if !c.IsDremioCloud() {
 		apipath = "/apiv2/support/" + jobid + "/download"

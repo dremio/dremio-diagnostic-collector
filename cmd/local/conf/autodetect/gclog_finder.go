@@ -27,7 +27,7 @@ import (
 )
 
 // findGCLogLocation retrieves the gc log location with a search string to greedily retrieve everything by prefix
-func FindGCLogLocation(hook *shutdown.Hook) (gcLogLoc string, err error) {
+func FindGCLogLocation(hook shutdown.Hook) (gcLogLoc string, err error) {
 
 	var jpsVerbose bytes.Buffer
 	err = ddcio.Shell(hook, &jpsVerbose, "jps -v")

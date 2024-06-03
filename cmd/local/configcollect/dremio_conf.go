@@ -24,7 +24,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectDremioConfig(c *conf.CollectConf, _ *shutdown.Hook) error {
+func RunCollectDremioConfig(c *conf.CollectConf, _ shutdown.CancelHook) error {
 	simplelog.Debugf("Collecting Configuration Information from %v ...", c.NodeName())
 
 	dremioConfDest := filepath.Join(c.ConfigurationOutDir(), "dremio.conf")

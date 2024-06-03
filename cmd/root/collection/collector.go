@@ -84,7 +84,7 @@ type HostCaptureConfiguration struct {
 	CollectionMode string
 }
 
-func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Hook, clusterCollection ...func([]string)) error {
+func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection ...func([]string)) error {
 	start := time.Now().UTC()
 	outputLoc := collectionArgs.OutputLoc
 	outputLocDir := filepath.Dir(outputLoc)
@@ -102,7 +102,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 	if err != nil {
 		return err
 	}
-	hook.Add(func() {
+	hook.AddFinalSteps(func() {
 		if err := os.RemoveAll(tmpInstallDir); err != nil {
 			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
 		}
@@ -284,7 +284,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook *shutdown.Ho
 			if err := os.Remove(t); err != nil {
 				simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)
 			}
-			hook.Add(func() {
+			hook.AddFinalSteps(func() {
 				// run it again on cleanup just to be sure it's removed in case we got a ctrl+c
 				if err := os.Remove(t); err != nil {
 					simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)

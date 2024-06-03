@@ -52,7 +52,7 @@ type KubeArgs struct {
 
 // NewK8sAPI is the only supported way to initialize the NewK8sAPI struct
 // one must pass the path to kubectl
-func NewK8sAPI(kubeArgs KubeArgs, hook *shutdown.Hook) (*KubeCtlAPIActions, error) {
+func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions, error) {
 	clientset, config, err := GetClientset()
 	if err != nil {
 		return &KubeCtlAPIActions{}, err
@@ -103,7 +103,7 @@ type KubeCtlAPIActions struct {
 	labelSelector string
 	client        *kubernetes.Clientset
 	config        *rest.Config
-	hook          *shutdown.Hook
+	hook          shutdown.CancelHook
 	pidHosts      map[string]string
 }
 
@@ -114,6 +114,7 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 	kill := func(host string, pidFile string) {
 		if pidFile == "" {
 			simplelog.Debugf("pidfile is blank for %v skipping", host)
+			return
 		}
 		containerName, err := c.getPrimaryContainer(host)
 		if err != nil {
@@ -287,14 +288,14 @@ func (c *KubeCtlAPIActions) HostExecuteAndStream(mask bool, hostString string, o
 		if _, err := stdIn.WriteString(pat); err != nil {
 			return err
 		}
-		err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+		err = exec.StreamWithContext(c.hook.GetContext(), remotecommand.StreamOptions{
 			Stdin:  &stdIn,
 			Stdout: writer,
 			Stderr: writer,
 		})
 		return err
 	}
-	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+	return exec.StreamWithContext(c.hook.GetContext(), remotecommand.StreamOptions{
 		Stdout: writer,
 		Stderr: writer,
 	})
@@ -334,7 +335,6 @@ func (c *KubeCtlAPIActions) HostExecute(mask bool, hostString string, args ...st
 }
 
 type TarPipe struct {
-	hook       *shutdown.Hook
 	reader     *io.PipeReader
 	outStream  *io.PipeWriter
 	bytesRead  uint64
@@ -344,22 +344,20 @@ type TarPipe struct {
 	executor   func(writer *io.PipeWriter, cmdArr []string)
 }
 
-func newTarPipe(hook *shutdown.Hook, src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
+func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
-	t.hook = hook
 	t.src = src
-	t.maxRetries = 100
+	t.maxRetries = 25
 	t.executor = executor
 	t.initReadFrom(0)
-	// add to shutdown hook so we make sure
-	t.hook.Add(func() {
+	defer func() {
 		if err := t.outStream.Close(); err != nil {
 			simplelog.Debugf("failed closing tar pipe :%v", err)
 		}
 		if err := t.reader.Close(); err != nil {
 			simplelog.Debugf("failed closing tar pipe reader :%v", err)
 		}
-	}, fmt.Sprintf("closing tar pipe %v", src))
+	}()
 	return t
 }
 
@@ -379,7 +377,6 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	if err != nil {
 		if t.maxRetries < 0 || t.retries < t.maxRetries {
 			// short pause between retries
-			time.Sleep(50 * time.Millisecond)
 			t.retries++
 			simplelog.Warningf("resuming copy at %d bytes, retry %d/%d - %v", t.bytesRead, t.retries, t.maxRetries, err)
 			t.initReadFrom(t.bytesRead + 1)
@@ -429,11 +426,9 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 			return
 		}
 		var errBuff bytes.Buffer
-		ctx, cancel := context.WithCancel(context.Background())
-		c.hook.Add(cancel, fmt.Sprintf("cancelling transfer %v", hostString))
 		// hard coding a 30 minute timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
 		duration := 30 * time.Minute
-		ctx, timeout := context.WithTimeoutCause(ctx, duration, fmt.Errorf("transferring file %v from host %v timeout exceeded %v", source, hostString, duration))
+		ctx, timeout := context.WithTimeoutCause(c.hook.GetContext(), duration, fmt.Errorf("transferring file %v from host %v timeout exceeded %v", source, hostString, duration))
 		defer timeout()
 		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 			Stdin:  os.Stdin,
@@ -443,6 +438,9 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 		})
 		if err != nil {
 			switch ctx.Err() {
+			case context.Canceled:
+				msg := fmt.Sprintf("manually cancelled transfer - %v", context.Cause(ctx))
+				simplelog.Warningf(msg)
 			case context.DeadlineExceeded:
 				msg := fmt.Sprintf("%v", context.Cause(ctx))
 				simplelog.Error(msg)
@@ -450,10 +448,9 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 				msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
 				simplelog.Error(msg)
 			}
-
 		}
 	}
-	reader := newTarPipe(c.hook, source, executor)
+	reader := newTarPipe(source, executor)
 	simplelog.Infof("untarring file '%v' from stdout", destination)
 	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)

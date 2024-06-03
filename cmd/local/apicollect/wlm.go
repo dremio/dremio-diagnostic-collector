@@ -30,7 +30,7 @@ import (
 
 // RunCollectWLM is a function that collects Workload Management (WLM) data from a Dremio cluster.
 // It interacts with Dremio's WLM API endpoints, and collects WLM Queue and Rule information.
-func RunCollectWLM(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectWLM(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	// Check if the configuration pointer is nil
 	if c == nil {
 		// Return an error if 'c' is nil

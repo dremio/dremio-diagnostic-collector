@@ -66,9 +66,9 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -90,9 +90,9 @@ func TestCreateAllDirs(t *testing.T) {
 		log.Fatal(err)
 	}
 	yamlLocation := writeConf(tmpDirForConf)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		log.Fatalf("reading config %v", err)
 	}
@@ -175,13 +175,13 @@ min-free-space-gb: 5
 
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
-	if err := collect(c, &hook); err != nil {
+	if err := collect(c, hook); err != nil {
 		t.Fatal(err)
 	}
 	if err := cmd.Process.Kill(); err != nil {
@@ -270,13 +270,13 @@ is-dremio-cloud: false
 min-free-space-gb: 5
 `, cmd.Process.Pid)
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}
-	if err := collect(c, &hook); err != nil {
+	if err := collect(c, hook); err != nil {
 		t.Fatal(err)
 	}
 	if err := cmd.Process.Kill(); err != nil {
@@ -334,9 +334,9 @@ func TestFindClusterID(t *testing.T) {
 dremio-rocksdb-dir: %v
 `, filepath.Join(dremioHome, "db"))
 	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(&hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
 	if err != nil {
 		t.Fatalf("reading config %v", err)
 	}

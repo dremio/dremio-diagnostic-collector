@@ -75,7 +75,7 @@ dremio-jstack-freq-seconds: 1
 	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
 		t.Fatal(err)
 	}
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {

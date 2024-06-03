@@ -29,7 +29,7 @@ type Fallback struct {
 	cli cli.CmdExecutor
 }
 
-func NewFallback(hook *shutdown.Hook) *Fallback {
+func NewFallback(hook shutdown.CancelHook) *Fallback {
 	return &Fallback{
 		cli: cli.NewCli(hook),
 	}

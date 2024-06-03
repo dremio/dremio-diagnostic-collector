@@ -94,7 +94,7 @@ dremio-endpoint: %v
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {

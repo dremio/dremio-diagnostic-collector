@@ -27,7 +27,7 @@ import (
 )
 
 // RunCollectJVM collects JVM flags from a java process
-func RunCollectJVMFlags(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	txt, err := jps.CaptureFlagsFromPID(hook, c.DremioPID())
 	if err != nil {
 		return err

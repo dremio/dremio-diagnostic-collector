@@ -32,7 +32,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectDremioSystemTables(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debugf("Collecting results from Export System Tables...")
 	var systables []string
 	if !c.IsDremioCloud() {
@@ -52,7 +52,7 @@ func RunCollectDremioSystemTables(c *conf.CollectConf, hook *shutdown.Hook) erro
 	return nil
 }
 
-func downloadSysTable(c *conf.CollectConf, hook *shutdown.Hook, systable string) error {
+func downloadSysTable(c *conf.CollectConf, hook shutdown.CancelHook, systable string) error {
 	tablerowlimit := strconv.Itoa(c.SystemTablesRowLimit())
 
 	headers := map[string]string{"Content-Type": "application/json"}
@@ -97,7 +97,7 @@ func downloadSysTable(c *conf.CollectConf, hook *shutdown.Hook, systable string)
 	return nil
 }
 
-func checkJobState(c *conf.CollectConf, hook *shutdown.Hook, jobstateurl string, headers map[string]string) error {
+func checkJobState(c *conf.CollectConf, hook shutdown.CancelHook, jobstateurl string, headers map[string]string) error {
 	sleepms := 200 // Consider moving to config
 	jobstate := "RUNNING"
 	for jobstate != "COMPLETED" {
@@ -127,7 +127,7 @@ func checkJobState(c *conf.CollectConf, hook *shutdown.Hook, jobstateurl string,
 	return nil
 }
 
-func retrieveJobResults(c *conf.CollectConf, hook *shutdown.Hook, jobresultsurl string, headers map[string]string, systable string) error {
+func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresultsurl string, headers map[string]string, systable string) error {
 	apilimit := 500 // Consider moving to config
 	tablerowlimit := c.SystemTablesRowLimit()
 

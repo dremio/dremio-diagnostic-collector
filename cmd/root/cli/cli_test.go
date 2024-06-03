@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	hook          = &shutdown.Hook{}
+	hook          = shutdown.NewHook()
 	c             = cli.NewCli(hook)
 	outputHandler cli.OutputHandler
 )

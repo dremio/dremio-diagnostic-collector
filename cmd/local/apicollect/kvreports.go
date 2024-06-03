@@ -28,7 +28,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectKvReport(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectKvReport(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	filename := "kvstore-report.zip"
 	apipath := "/apiv2/kvstore/report"
 	url := c.DremioEndpoint() + apipath

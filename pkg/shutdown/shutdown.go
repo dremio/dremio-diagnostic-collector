@@ -15,18 +15,42 @@
 package shutdown
 
 import (
+	"context"
 	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-// Hook is a thread safe queue of cleanup work to be run.
+type CancelHook interface {
+	GetContext() context.Context
+}
+
+type Hook interface {
+	GetContext() context.Context
+	AddFinalSteps(p func(), name string)
+	Add(p func(), name string)
+	AddPriorityCancel(p func(), name string)
+	Cleanup()
+}
+
+// HookImpl is a thread safe queue of cleanup work to be run.
 // this is to be used for things that need to be cleaned up if the process
 // receives an interrupt (as defers would not be run)
-type Hook struct {
+type HookImpl struct {
 	mu              sync.Mutex
 	cleanups        []cleanupTask
 	priorityCleanup []cleanupTask
+	finalSteps      []cleanupTask
+	ctx             context.Context
+}
+
+func NewHook() Hook {
+	ctx, cancel := context.WithCancel(context.Background())
+	hook := &HookImpl{
+		ctx: ctx,
+	}
+	hook.Add(cancel, "cancelling all cancellable executions")
+	return hook
 }
 
 type cleanupTask struct {
@@ -34,36 +58,54 @@ type cleanupTask struct {
 	p    func()
 }
 
+// GetContext provides a cancel context for everyone to share
+func (h *HookImpl) GetContext() context.Context {
+	return h.ctx
+}
+
 // Add will add a function call to a list to be cleaned up later
 // Is thread safe.
-func (h *Hook) Add(p func(), name string) {
+func (h *HookImpl) Add(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
 	h.cleanups = append(h.cleanups, cleanupTask{name: name, p: p})
 }
 
 // AddPriorityCancel are run first as their order is important
-func (h *Hook) AddPriorityCancel(p func(), name string) {
+func (h *HookImpl) AddPriorityCancel(p func(), name string) {
 	defer h.mu.Unlock()
 	h.mu.Lock()
 	h.priorityCleanup = append(h.priorityCleanup, cleanupTask{name: name, p: p})
 }
 
+// AddFinalSteps run last after everything has stopped
+func (h *HookImpl) AddFinalSteps(p func(), name string) {
+	defer h.mu.Unlock()
+	h.mu.Lock()
+	h.finalSteps = append(h.finalSteps, cleanupTask{name: name, p: p})
+}
+
 // Cleanup runs in order all cleanup tasks that have been added
 // Is thread safe
-func (h *Hook) Cleanup() {
+func (h *HookImpl) Cleanup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	simplelog.Debugf("%v tasks to run on cleanup", len(h.cleanups)+len(h.priorityCleanup))
 	for _, j := range h.priorityCleanup {
-		simplelog.Debugf("cleaning up %v", j.name)
+		simplelog.Debugf("shutdown initial stage: %v", j.name)
 		j.p()
 	}
 	h.priorityCleanup = []cleanupTask{}
 	for _, j := range h.cleanups {
-		simplelog.Debugf("cleaning up %v", j.name)
+		simplelog.Debugf("shutdown task: %v", j.name)
 		j.p()
 	}
 	//blank
 	h.cleanups = []cleanupTask{}
+	for _, j := range h.finalSteps {
+		simplelog.Debugf("shutdown task final stage: %v", j.name)
+		j.p()
+	}
+	//blank
+	h.finalSteps = []cleanupTask{}
 }

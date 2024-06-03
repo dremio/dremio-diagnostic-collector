@@ -23,7 +23,6 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
-	"syscall"
 
 	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
@@ -148,7 +147,7 @@ func GetFilesInDir(dir string) ([]os.DirEntry, error) {
 }
 
 // Shell executes a shell command with shell expansion and appends its output to the provided io.Writer.
-func Shell(hook *shutdown.Hook, writer io.Writer, commandLine string) error {
+func Shell(hook shutdown.CancelHook, writer io.Writer, commandLine string) error {
 	//this is a hack before we can do a longer term improvement of separating local-collect
 	// and the ddc command into different clis
 	shell := "bash"
@@ -157,13 +156,7 @@ func Shell(hook *shutdown.Hook, writer io.Writer, commandLine string) error {
 		shell = "cmd.exe"
 		fileArg = "/C"
 	}
-	// ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.Command(shell, fileArg, commandLine)
-	hook.Add(func() {
-		if err := syscall.Kill(cmd.Process.Pid, syscall.SIGKILL); err != nil {
-			simplelog.Warningf("sending signal to %v - %v failed: %v", cmd.Process.Pid, commandLine, err)
-		}
-	}, fmt.Sprintf("cancelling %v", commandLine))
+	cmd := exec.CommandContext(hook.GetContext(), shell, fileArg, commandLine)
 	cmd.Stdout = writer
 	cmd.Stderr = writer
 	err := cmd.Run()

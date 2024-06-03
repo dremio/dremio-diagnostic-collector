@@ -140,19 +140,17 @@ func (s *CopyStrategyHC) ClusterPath() (path string, err error) {
 
 func (s *CopyStrategyHC) Close() {
 	// cleanup when done
-	defer func() {
-		simplelog.Infof("cleaning up temp directory %v", s.GetTmpDir())
-		//temp folders stay around forever unless we tell them to go away
-		if err := s.Fs.RemoveAll(s.GetTmpDir()); err != nil {
-			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.GetTmpDir(), err)
-		}
-		summaryFile := filepath.Join(s.TmpDir, "summary.json")
-		simplelog.Infof("cleaning up file %v", summaryFile)
-		//temp folders stay around forever unless we tell them to go away
-		if err := s.Fs.Remove(summaryFile); err != nil {
-			simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", summaryFile, err)
-		}
-	}()
+	simplelog.Infof("cleaning up temp directory %v", s.GetTmpDir())
+	//temp folders stay around forever unless we tell them to go away
+	if err := s.Fs.RemoveAll(s.GetTmpDir()); err != nil {
+		simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", s.GetTmpDir(), err)
+	}
+	summaryFile := filepath.Join(s.TmpDir, "summary.json")
+	simplelog.Infof("cleaning up file %v", summaryFile)
+	//temp folders stay around forever unless we tell them to go away
+	if err := s.Fs.Remove(summaryFile); err != nil {
+		simplelog.Warningf("unable to remove %v due to error %v. It will need to be removed manually", summaryFile, err)
+	}
 }
 
 // Archive calls out to the main archive function

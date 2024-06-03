@@ -36,7 +36,7 @@ type KubeArgs struct {
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(hook *shutdown.Hook, namespace string) (*CliK8sActions, error) {
+func NewKubectlK8sActions(hook shutdown.CancelHook, namespace string) (*CliK8sActions, error) {
 	_, err := exec.LookPath("kubectl")
 	if err != nil {
 		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %v", err)
@@ -117,7 +117,7 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "50", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "25", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
@@ -179,6 +179,7 @@ func (c *CliK8sActions) CleanupRemote() error {
 	kill := func(host string, pidFile string) {
 		if pidFile == "" {
 			simplelog.Debugf("pidfile is blank for %v skipping", host)
+			return
 		}
 		container, err := c.getContainerName(host)
 		if err != nil {

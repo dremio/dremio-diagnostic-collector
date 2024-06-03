@@ -19,7 +19,6 @@ package cli
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -53,7 +52,7 @@ type ExecuteCliErr struct {
 // OutputHandler is a function type that processes lines of output
 type OutputHandler func(line string)
 
-func NewCli(hook *shutdown.Hook) CmdExecutor {
+func NewCli(hook shutdown.CancelHook) CmdExecutor {
 	return &cli{
 		hook: hook,
 	}
@@ -61,8 +60,7 @@ func NewCli(hook *shutdown.Hook) CmdExecutor {
 
 // cli
 type cli struct {
-	// m    sync.Mutex
-	hook *shutdown.Hook
+	hook shutdown.CancelHook
 }
 
 // ExecuteAndStreamOutput runs a system command and streams the output (stdout)
@@ -79,9 +77,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	}
 	// Log the command that's about to be run
 	logArgs(mask, args)
-	ctx, cancel := context.WithCancel(context.Background())
-	c.hook.Add(cancel, fmt.Sprintf("cancelling %#v", args))
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd := exec.CommandContext(c.hook.GetContext(), args[0], args[1:]...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
@@ -164,14 +160,4 @@ func logArgs(mask bool, args []string) {
 	} else {
 		simplelog.Infof("args: %v", strings.Join(args, " "))
 	}
-}
-
-func (c *cli) ExecuteBytes(mask bool, args ...string) ([]byte, error) {
-	logArgs(mask, args)
-	cmd := exec.Command(args[0], args[1:]...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return output, UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
-	}
-	return output, nil
 }

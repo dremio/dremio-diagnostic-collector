@@ -31,7 +31,7 @@ import (
 // RunCollectDiskUsage collects disk usage information and writes it to files.
 // It takes a pointer to a CollectConf struct (c)
 // It returns an error if any operation fails.
-func RunCollectDiskUsage(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectDiskUsage(c *conf.CollectConf, hook shutdown.CancelHook) error {
 
 	diskWriter, err := os.Create(path.Clean(filepath.Join(c.NodeInfoOutDir(), "diskusage.txt")))
 	if err != nil {

@@ -28,7 +28,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectHeapDump(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectHeapDump(c *conf.CollectConf, hook shutdown.Hook) error {
 	simplelog.Debug("Capturing Java Heap Dump")
 	dremioPID := c.DremioPID()
 	baseName := fmt.Sprintf("%v.hprof", c.NodeName())

@@ -33,9 +33,9 @@ func TestAPIRequest(t *testing.T) {
 	defer server.Close()
 
 	InitClient(true, 10)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	_, err := APIRequest(&hook, server.URL, "token", "GET", map[string]string{})
+	_, err := APIRequest(hook, server.URL, "token", "GET", map[string]string{})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -54,9 +54,9 @@ func TestPostQuery(t *testing.T) {
 	InitClient(true, 10)
 
 	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	_, err := PostQuery(&hook, server.URL, "token", map[string]string{}, sqlbody)
+	_, err := PostQuery(hook, server.URL, "token", map[string]string{}, sqlbody)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -71,9 +71,9 @@ func TestPostQueryBadStatusCode(t *testing.T) {
 	InitClient(true, 10)
 
 	sqlbody := "{\"sql\": \"SELECT * FROM test_table\"}"
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	_, err := PostQuery(&hook, server.URL, "token", map[string]string{}, sqlbody)
+	_, err := PostQuery(hook, server.URL, "token", map[string]string{}, sqlbody)
 	if err == nil {
 		t.Fatal("Expected error, got nil")
 	}
@@ -93,9 +93,9 @@ func TestClientTimeout(t *testing.T) {
 
 	// Init the client with a timeout of 1 second
 	InitClient(true, 1)
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	_, err := APIRequest(&hook, server.URL, "token", "GET", map[string]string{})
+	_, err := APIRequest(hook, server.URL, "token", "GET", map[string]string{})
 	if err == nil {
 		t.Fatal("Expected error due to client timeout, got nil")
 	}

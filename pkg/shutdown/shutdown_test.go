@@ -21,7 +21,7 @@ import (
 )
 
 func TestShutdownRunsAllTasksInOrder(t *testing.T) {
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	items := []int{}
 	hook.Add(func() {
 		items = append(items, 1)

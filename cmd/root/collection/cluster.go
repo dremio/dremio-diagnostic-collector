@@ -37,7 +37,7 @@ import (
 
 var clusterRequestTimeout = 120
 
-func ClusterK8sExecute(hook *shutdown.Hook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
+func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
 	if err != nil {
@@ -70,7 +70,7 @@ func ClusterK8sExecute(hook *shutdown.Hook, namespace string, cs CopyStrategy, d
 	return nil
 }
 
-func GetClusterLogs(hook *shutdown.Hook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
+func GetClusterLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -104,16 +104,14 @@ func GetClusterLogs(hook *shutdown.Hook, namespace string, cs CopyStrategy, ddfs
 	return err
 }
 
-func copyContainerLog(hook *shutdown.Hook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string) {
+func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string) {
 	client, _, err := kubernetes.GetClientset()
 	if err != nil {
 		simplelog.Errorf("unable to get k8s client for collecting logs on pod: %v container: %v with error: %v", pod, container, err)
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel, "cancelling container log copy")
 	timeoutDuration := time.Duration(clusterRequestTimeout) * time.Second
-	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while copying container %s from pod %s in namespace %s timeout exceeded %v", container, pod, namespace, timeoutDuration))
+	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while copying container %s from pod %s in namespace %s timeout exceeded %v", container, pod, namespace, timeoutDuration))
 	defer timeout() // releases resources if slowOperation completes before timeout elapses
 	req := client.CoreV1().Pods(namespace).GetLogs(pod, &corev1.PodLogOptions{
 		Container: container,
@@ -159,17 +157,15 @@ func copyContainerLog(hook *shutdown.Hook, cs CopyStrategy, ddfs helpers.Filesys
 // Execute commands at the cluster level
 // Calls a raw execute function and simply writes out the byte array read from the response
 // that comes in directly from kubectl
-func clusterExecuteBytes(hook *shutdown.Hook, namespace, resource string) ([]byte, error) {
+func clusterExecuteBytes(hook shutdown.CancelHook, namespace, resource string) ([]byte, error) {
 	c, _, err := kubernetes.GetClientset()
 	if err != nil {
 		return []byte(""), err
 	}
 	options := metav1.ListOptions{}
 	var b []byte
-	ctx, cancel := context.WithCancel(context.Background())
-	hook.Add(cancel, fmt.Sprintf("cancelling copy of resource %v", resource))
 	timeoutDuration := 60 * time.Second
-	ctx, timeout := context.WithTimeoutCause(ctx, timeoutDuration, fmt.Errorf("while getting resource %v in namespace %s timeout exceeded %v", resource, namespace, timeoutDuration))
+	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while getting resource %v in namespace %s timeout exceeded %v", resource, namespace, timeoutDuration))
 	defer timeout()
 	switch resource {
 	case "nodes":

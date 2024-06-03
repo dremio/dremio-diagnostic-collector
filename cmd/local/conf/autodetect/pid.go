@@ -50,7 +50,7 @@ func GetDremioPIDFromText(jpsOutput string) (int, error) {
 	return -1, fmt.Errorf("found no matching process named %v in text %v therefore cannot get the pid", procName, strings.Join(lines, ", "))
 }
 
-func GetDremioPID(hook *shutdown.Hook) (int, error) {
+func GetDremioPID(hook shutdown.Hook) (int, error) {
 	var jpsOutput bytes.Buffer
 	if err := ddcio.Shell(hook, &jpsOutput, "jps -v"); err != nil {
 		simplelog.Warningf("attempting to get full jps output failed: %v", err)

@@ -23,7 +23,7 @@ import (
 
 func TestNewKubectlK8sActions(t *testing.T) {
 	namespace := "mynamespace"
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	actions, err := NewK8sAPI(KubeArgs{
 		Namespace: namespace,

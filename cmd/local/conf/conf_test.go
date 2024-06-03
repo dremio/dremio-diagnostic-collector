@@ -133,7 +133,7 @@ is-dremio-cloud: true
 dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: eu.dremio.cloud
 `)
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	//should parse the configuration correctly
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
@@ -191,7 +191,7 @@ func TestConfCanUseTarballOutputDirWithAllowedFiles(t *testing.T) {
 	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0600); err != nil {
 		t.Fatal(err)
 	}
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	defer os.Remove(cfgFilePath)
 	_, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
@@ -224,7 +224,7 @@ func TestConfCannotUseTarballOutputDirWithFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Remove(cfgFilePath)
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err == nil {
@@ -243,7 +243,7 @@ dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: dremio.cloud
 `)
 	//should parse the configuration correctly
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -274,7 +274,7 @@ dremio-endpoint: dremio.cloud
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	genericConfSetup("")
 	//should parse the configuration correctly
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -388,7 +388,7 @@ collect-kvstore-report: true
 `, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
 	genericConfSetup(yaml)
 	defer afterEachConfTest()
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -428,7 +428,7 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	testLog := filepath.Join(t.TempDir(), "ddc.log")
 	simplelog.InitLoggerWithFile(4, testLog)
 	//should log redacted when token is present
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -472,7 +472,7 @@ func TestURLsuffix(t *testing.T) {
 
 func TestClusterStatsDirectory(t *testing.T) {
 	genericConfSetup("")
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -532,7 +532,7 @@ dremio-log-dir: %v
 dremio-conf-dir: %v
 `, filepath.Join("testdata", "badlogs"), filepath.Join("testdata", "conf"))
 	genericConfSetup(yaml)
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	// we expect an error since "badlogs" doesnt have the right files
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)

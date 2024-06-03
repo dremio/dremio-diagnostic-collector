@@ -34,7 +34,7 @@ type Args struct {
 	CoordinatorStr string
 }
 
-func NewCmdSSHActions(sshArgs Args, hook *shutdown.Hook) *CmdSSHActions {
+func NewCmdSSHActions(sshArgs Args, hook shutdown.CancelHook) *CmdSSHActions {
 	return &CmdSSHActions{
 		cli:            cli.NewCli(hook),
 		sshKey:         sshArgs.SSHKeyLoc,

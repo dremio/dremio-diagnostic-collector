@@ -57,7 +57,7 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	overrides := make(map[string]string)
 	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
@@ -153,7 +153,7 @@ node-name: %v
 		nodeName)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	hook := &shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	overrides := make(map[string]string)
 	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)

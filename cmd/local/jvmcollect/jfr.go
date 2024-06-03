@@ -27,7 +27,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
 )
 
-func RunCollectJFR(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunCollectJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	var w bytes.Buffer
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v VM.unlock_commercial_features", c.DremioPID())); err != nil {

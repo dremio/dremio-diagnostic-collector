@@ -56,7 +56,7 @@ func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
 	return false, nil
 }
 
-func IsAWSE(hook *shutdown.Hook) (bool, error) {
+func IsAWSE(hook shutdown.Hook) (bool, error) {
 	var dremioPIDOutput bytes.Buffer
 	if err := ddcio.Shell(hook, &dremioPIDOutput, "jps -v"); err != nil {
 		return false, fmt.Errorf("grepping from Dremio from jps -v failed %v with output %v", err, dremioPIDOutput.String())

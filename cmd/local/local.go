@@ -107,7 +107,7 @@ func createAllDirs(c *conf.CollectConf) error {
 	return nil
 }
 
-func collect(c *conf.CollectConf, hook *shutdown.Hook) error {
+func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 	if !c.DisableFreeSpaceCheck() {
 		if err := dirs.CheckFreeSpace(c.TarballOutDir(), uint64(c.MinFreeSpaceGB())); err != nil {
 			return fmt.Errorf("%v. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
@@ -123,7 +123,14 @@ func collect(c *conf.CollectConf, hook *shutdown.Hook) error {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}
 
-	wrapConfigJob := func(name string, j func(c *conf.CollectConf, h *shutdown.Hook) error) threading.Job {
+	wrapConfigJob := func(name string, j func(c *conf.CollectConf, h shutdown.CancelHook) error) threading.Job {
+		return threading.Job{
+			Name:    name,
+			Process: func() error { return j(c, hook) },
+		}
+	}
+
+	wrapConfigJobWithFileRemovalTasks := func(name string, j func(c *conf.CollectConf, h shutdown.Hook) error) threading.Job {
 		return threading.Job{
 			Name:    name,
 			Process: func() error { return j(c, hook) },
@@ -283,7 +290,7 @@ func collect(c *conf.CollectConf, hook *shutdown.Hook) error {
 		if !c.CaptureHeapDump() {
 			simplelog.Debugf("Skipping Java heap dump collection")
 		} else {
-			t.AddJob(wrapConfigJob("HEAP DUMP COLLECTION", jvmcollect.RunCollectHeapDump))
+			t.AddJob(wrapConfigJobWithFileRemovalTasks("HEAP DUMP COLLECTION", jvmcollect.RunCollectHeapDump))
 		}
 	}
 
@@ -424,7 +431,7 @@ func parseVersionFromClassPath(classPath string) string {
 	return ""
 }
 
-func getClassPath(hook *shutdown.Hook, pid int) (string, error) {
+func getClassPath(hook shutdown.CancelHook, pid int) (string, error) {
 	var w bytes.Buffer
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v VM.system_properties", pid)); err != nil {
 		return "", err
@@ -445,7 +452,7 @@ func getClassPath(hook *shutdown.Hook, pid int) (string, error) {
 	return "", fmt.Errorf("no matches for java.class.path= found in '%v'", pid)
 }
 
-func runCollectClusterStats(c *conf.CollectConf, hook *shutdown.Hook) error {
+func runCollectClusterStats(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debugf("Collecting cluster stats")
 	classPath, err := getClassPath(hook, c.DremioPID())
 	if err != nil {
@@ -469,23 +476,26 @@ func runCollectClusterStats(c *conf.CollectConf, hook *shutdown.Hook) error {
 	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0600)
 }
 
-func RunTtopCollect(c *conf.CollectConf, hook *shutdown.Hook) error {
+func RunTtopCollect(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debug("Running top -H to get thread information")
 	duration := c.DremioTtopTimeSeconds() / c.DremioTtopFreqSeconds()
 	if duration == 0 {
 		return fmt.Errorf("cannot have duration of 0 for ttop")
 	}
 	var w bytes.Buffer
-	err := ddcio.Shell(hook, &w, fmt.Sprintf("LINES=50 COLUMNS=512 top -H -n %v -p %v -d %v -1 -bw > %v/ttop.txt", duration, c.DremioPID(), c.DremioTtopFreqSeconds(), c.TtopOutDir()))
+	err := ddcio.Shell(hook, &w, fmt.Sprintf("top -H -n %v -p %v -d %v -1 -bw", duration, c.DremioPID(), c.DremioTtopFreqSeconds()))
 	if err != nil {
 		return fmt.Errorf("failed collecting top %v", err)
 	}
-	out := w.String()
-	simplelog.Debugf("top -H output %v", out)
+	loc := fmt.Sprintf("%v/ttop.txt", c.TtopOutDir())
+	if err := os.WriteFile(loc, w.Bytes(), 0600); err != nil {
+		return fmt.Errorf("unable to write top out %v", err)
+	}
+	simplelog.Debugf("top -H written to %v", loc)
 	return nil
 }
 
-func runCollectOSConfig(c *conf.CollectConf, hook *shutdown.Hook) error {
+func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debug("Collecting OS Information")
 	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
 	w, err := os.Create(filepath.Clean(osInfoFile))
@@ -632,7 +642,7 @@ var LocalCollectCmd = &cobra.Command{
 }
 
 func Execute(args []string, overrides map[string]string) (string, error) {
-	hook := shutdown.Hook{}
+	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cSignal := make(chan os.Signal, 1)
 	signal.Notify(cSignal, os.Interrupt, syscall.SIGTERM)
@@ -658,7 +668,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 			if err := os.WriteFile(filepath.Clean(pid), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
 				return "", fmt.Errorf("unable to write pid file '%v: %w", pid, err)
 			}
-			hook.Add(func() {
+			hook.AddFinalSteps(func() {
 				if err := os.Remove(pid); err != nil {
 					msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
 					fmt.Println(msg)
@@ -674,7 +684,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		return "", err
 	}
 
-	c, err := conf.ReadConf(&hook, overrides, ddcYamlLoc, collectionMode)
+	c, err := conf.ReadConf(hook, overrides, ddcYamlLoc, collectionMode)
 	if err != nil {
 		return "", fmt.Errorf("unable to read configuration %w", err)
 	}
@@ -690,7 +700,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 
 	// Run application
 	simplelog.Info("Starting collection...")
-	if err := collect(c, &hook); err != nil {
+	if err := collect(c, hook); err != nil {
 		return "", fmt.Errorf("unable to collect: %w", err)
 	}
 
@@ -722,7 +732,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 func init() {
 	//wire up override flags
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
-	LocalCollectCmd.Flags().String("dremio-pat-token", "", "Dremio Personal Access Token (PAT)")
+	LocalCollectCmd.Flags().String("dremio-pat-token", "	", "Dremio Personal Access Token (PAT)")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
 	LocalCollectCmd.Flags().Int(conf.KeyMinFreeSpaceGB, 40, "min free space needed in GB for the process to run")
