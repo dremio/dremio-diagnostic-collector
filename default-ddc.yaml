@@ -36,16 +36,16 @@
 # collect-meta-refresh-log: true
 # collect-reflection-log: true
 # collect-gc-logs: true
-collect-jfr: false
-collect-jstack: true
-collect-ttop: false
+# collect-jfr: true
+# collect-jstack: false
+# collect-ttop: true
 # collect-system-tables-export: true
 # system-tables-row-limit: 100000
 # collect-wlm: true
 # collect-kvstore-report: true
-dremio-jstack-time-seconds: 60
+# dremio-jstack-time-seconds: 60
 # dremio-jfr-time-seconds: 60
-dremio-jstack-freq-seconds: 1
+# dremio-jstack-freq-seconds: 1
 # dremio-ttop-time-seconds: 60
 # dremio-ttop-freq-seconds: 1
 # node-name: "" //dynamically set normally
