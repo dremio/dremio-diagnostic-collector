@@ -590,6 +590,204 @@ dremio-jfr-time-seconds: 10
 	}
 }
 
+func TestRemoteCollectOnK8sUsingTheK8sGoAPI(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
+	var err error
+	transferDir := "/opt/dremio/data/ddc-transfer"
+	tmpOutputDir := "/opt/dremio/data/ddc-tmp-out"
+	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
+	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
+	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
+		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	}
+	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
+	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
+verbose: vvvv
+tmp-output-dir: %v
+collect-jstack: true
+dremio-jstack-time-seconds: 10
+dremio-jfr-time-seconds: 10
+`, tmpOutputDir)), 0600); err != nil {
+		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	}
+	outputDir = tmpOutputDir
+
+	args := []string{"ddc", "-n", namespace, "--disable-kubectl", "--ddc-yaml", localYamlFile, "--transfer-dir", transferDir, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", "5"}
+	err = cmd.Execute(args)
+	if err != nil {
+		t.Fatalf("unable to run collect: %v", err)
+	}
+	log.Printf("remote collect complete now verifying the results")
+	testOut := filepath.Join(t.TempDir(), "ddcout")
+	err = os.Mkdir(testOut, 0700)
+	if err != nil {
+		t.Fatalf("could not make test out dir %v", err)
+	}
+	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
+
+	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
+		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+	}
+
+	t.Logf("now we are reading the %v dir", testOut)
+	entries, err := os.ReadDir(testOut)
+	if err != nil {
+		t.Fatalf("uanble to read dir %v: %v", testOut, err)
+	}
+	hcDir := ""
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+		if e.IsDir() {
+			hcDir = filepath.Join(testOut, e.Name())
+			t.Logf("now found the health check directory which is %v", hcDir)
+		}
+	}
+
+	if len(names) != 2 {
+		t.Fatalf("expected 2 entries but had %v", strings.Join(names, ","))
+	}
+	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
+
+	//check k8s files
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "endpoints.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "events.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "hpa.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "ingress.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "job.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "limitrange.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "nodes.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pdb.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pods.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pv.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "pvc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "replicaset.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "resourcequota.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "sc.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "service.json"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "statefulsets.json"))
+
+	expectedFiles := []string{
+		"dremio-executor-1-chown-data-directory.txt",
+		"dremio-executor-1-chown-cloudcache-directory.txt",
+		"dremio-executor-1-dremio-executor.txt",
+		"dremio-executor-1-wait-for-zookeeper.txt",
+		"dremio-executor-0-chown-data-directory.txt",
+		"dremio-executor-0-chown-cloudcache-directory.txt",
+		"dremio-executor-0-dremio-executor.txt",
+		"dremio-executor-0-wait-for-zookeeper.txt",
+		"dremio-master-0-chown-data-directory.txt",
+		"dremio-master-0-dremio-master-coordinator.txt",
+		"dremio-master-0-start-only-one-dremio-master.txt",
+		"dremio-master-0-upgrade-task.txt",
+		"dremio-master-0-wait-for-zookeeper.txt"}
+
+	expectedEmptyFiles := []string{
+		"dremio-executor-1-chown-data-directory.txt",
+		"dremio-executor-1-chown-cloudcache-directory.txt",
+		"dremio-executor-0-chown-data-directory.txt",
+		"dremio-executor-0-chown-cloudcache-directory.txt",
+		"dremio-master-0-chown-data-directory.txt",
+		"dremio-master-0-start-only-one-dremio-master.txt"}
+	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
+	entries, err = os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("unable to read dir %v: %v", dir, err)
+	}
+	for _, entry := range entries {
+		t.Logf("directories %v", entry.Name())
+	}
+	expectedEntries := 13
+	if len(entries) != expectedEntries {
+		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
+	}
+	foundFiles := []string{}
+	foundEmptyFiles := []string{}
+	compareEmptyFiles := []string{}
+	for _, e := range entries {
+		fs, err := e.Info()
+		if err != nil {
+			t.Fatalf("error getting entry %v info: %v", e, err)
+		}
+		if fs.Size() == 0 {
+			foundEmptyFiles = append(foundEmptyFiles, fs.Name())
+		}
+		foundFiles = append(foundFiles, fs.Name())
+	}
+
+	// sort the strings before checking equality
+	sort.Strings(foundEmptyFiles)
+	sort.Strings(expectedEmptyFiles)
+	sort.Strings(foundFiles)
+	sort.Strings(expectedFiles)
+
+	for _, expectedEmptyFile := range expectedEmptyFiles {
+		for _, foundEmptyFile := range foundEmptyFiles {
+			if expectedEmptyFile == foundEmptyFile {
+				compareEmptyFiles = append(compareEmptyFiles, expectedEmptyFile)
+			}
+		}
+	}
+	if !reflect.DeepEqual(expectedEmptyFiles, compareEmptyFiles) {
+		t.Errorf("Expected the following files to be empty:\n %v\n But found the following:\n %v", expectedEmptyFiles, compareEmptyFiles)
+	}
+
+	if !reflect.DeepEqual(foundFiles, expectedFiles) {
+		t.Errorf("Expected the following files to be present:\n %v\n But found the following:\n %v", expectedFiles, foundFiles)
+	}
+	replicas := 2
+	// check server.logs
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.log.gz"))
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.log.gz"))
+	}
+	// check queries.json
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
+	// check conf files
+
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio.conf"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "dremio-env"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback.xml"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", "dremio-master-0", "logback-access.xml"))
+
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "dremio.conf"))
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "dremio-env"))
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "logback.xml"))
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "configuration", host, "logback-access.xml"))
+	}
+
+	// check nodeinfo files
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "diskusage.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "jvm_settings.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", "dremio-master-0", "rocksdb_disk_allocation.txt"))
+
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", host, "diskusage.txt"))
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", host, "jvm_settings.txt"))
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", host, "os_info.txt"))
+	}
+
+	// check file contents
+	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", "dremio-master-0", "os_info.txt"))
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		t.Logf("checking file %v", filepath.Join(hcDir, "node-info", host, "os_info.txt"))
+		tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", host, "os_info.txt"))
+	}
+}
+
 func TestRemoteCollectOnK8sWithPAT(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
