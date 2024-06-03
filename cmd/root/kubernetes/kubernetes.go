@@ -59,12 +59,13 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 		return &KubeCtlAPIActions{}, err
 	}
 	return &KubeCtlAPIActions{
-		namespace:     kubeArgs.Namespace,
-		client:        clientset,
-		config:        config,
-		labelSelector: kubeArgs.LabelSelector,
-		hook:          hook,
-		pidHosts:      make(map[string]string),
+		namespace:      kubeArgs.Namespace,
+		client:         clientset,
+		config:         config,
+		labelSelector:  kubeArgs.LabelSelector,
+		hook:           hook,
+		pidHosts:       make(map[string]string),
+		timeoutMinutes: 30,
 	}, nil
 }
 
@@ -100,12 +101,14 @@ func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 
 // KubeCtlAPIActions provides a way to collect and copy files using kubectl
 type KubeCtlAPIActions struct {
-	namespace     string
-	labelSelector string
-	client        *kubernetes.Clientset
-	config        *rest.Config
-	hook          shutdown.CancelHook
-	pidHosts      map[string]string
+	namespace      string
+	labelSelector  string
+	client         *kubernetes.Clientset
+	config         *rest.Config
+	hook           shutdown.CancelHook
+	pidHosts       map[string]string
+	timeoutMinutes int
+	m              sync.Mutex
 }
 
 func (c *KubeCtlAPIActions) SetHostPid(host, pidFile string) {
@@ -348,7 +351,7 @@ type TarPipe struct {
 func newTarPipe(src string, executor func(writer *io.PipeWriter, cmdArr []string)) *TarPipe {
 	t := new(TarPipe)
 	t.src = src
-	t.maxRetries = 25
+	t.maxRetries = 100
 	t.executor = executor
 	t.initReadFrom(0)
 	defer func() {
@@ -435,8 +438,7 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 			return
 		}
 		var errBuff bytes.Buffer
-		// hard coding a 30 minute timeout, we could add a flag but feedback is thare are too many already. Make a PR if you want to change this
-		duration := 30 * time.Minute
+		duration := time.Duration(c.timeoutMinutes) * time.Minute
 		ctx, timeout := context.WithTimeoutCause(c.hook.GetContext(), duration, fmt.Errorf("transferring file %v from host %v timeout exceeded %v", source, hostString, duration))
 		defer timeout()
 		err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
@@ -568,7 +570,9 @@ func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (pod
 	if err != nil {
 		return podName, err
 	}
+	count := 0
 	for _, p := range podList.Items {
+		count++
 		if len(p.Spec.Containers) == 0 {
 			return podName, fmt.Errorf("unsupported pod %v which has no containers attached", p)
 		}
@@ -577,6 +581,10 @@ func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (pod
 			podName = append(podName, p.Name)
 		}
 	}
+	c.m.Lock()
+	// so 100 pods would get 63 minutes to transfer before the transfers timed out
+	c.timeoutMinutes = (count / 3) + 30
+	c.m.Unlock()
 	sort.Strings(podName)
 	return podName, nil
 }

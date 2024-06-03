@@ -71,6 +71,7 @@ var collectionMode string
 var cliAuthToken string
 var pid string
 var transferThreads int
+var transferTimeout int
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool

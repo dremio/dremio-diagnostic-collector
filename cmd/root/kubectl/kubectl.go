@@ -79,7 +79,7 @@ func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, outpu
 	if err != nil {
 		return fmt.Errorf("unable to get container name: %v", err)
 	}
-	kubectlArgs := []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", container, hostString, "--"}
+	kubectlArgs := []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "-c", container, hostString, "--"}
 	kubectlArgs = append(kubectlArgs, args...)
 	return c.cli.ExecuteAndStreamOutput(mask, output, pat, kubectlArgs...)
 }
@@ -104,7 +104,7 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "25", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "99", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
@@ -117,7 +117,7 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "25", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "99", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {

@@ -7,6 +7,7 @@
 * removed ttop and replaced it with `LINES=50 COLUMNS=512 top -H -n <iterations> -p <pid> -d <interval> -1 -bw` 
 * will try and use `kubectl` for file transfers and command execution if present, but for cluster discovery and k8s right checks the api is still used, use the `-d` flag to disable this behavior and just use the Kubernetes api directly.
 * unhide most of the hidden flags so that people can use the more advanced features if they want
+* in k8s pod tarball transfer now increases with node count (coordinators will have more queries.json size) the base is still 30 minutes but we add a minute for every 3 pods
 
 ### Fixed
 

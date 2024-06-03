@@ -115,7 +115,6 @@ func CopyFile(srcPath, dstPath string) error {
 	defer func() {
 		if err := dstFile.Close(); err != nil {
 			simplelog.Errorf("unable to close file %v due to error %v", path.Clean(dstPath), err)
-			os.Exit(1)
 		}
 	}()
 
