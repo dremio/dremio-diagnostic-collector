@@ -94,7 +94,7 @@ for kubernetes deployments:
 	# run against a specific namespace and retrieve 2 days of logs
 	ddc --namespace mynamespace
 
-	# run against a specific namespace with a standard collection (includes jfr, ttop, jstack and 28 days of queries.json logs)
+	# run against a specific namespace with a standard collection (includes jfr, top and 30 days of queries.json logs)
 	ddc --namespace mynamespace	--collect standard
 
 	# run against a specific namespace with a Health Check (runs 2 threads and includes everything in a standard collection plus collect 25,000 job profiles, system tables, kv reports and Work Load Manager (WLM) reports)
@@ -379,8 +379,8 @@ func Execute(args []string) error {
 				}
 			}
 			prompt = promptui.Select{
-				Label: "Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), health-check (needs PAT)",
-				Items: []string{"light", "standard", "health-check"},
+				Label: "Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), standard+jstack (standard w jstack), health-check (needs PAT)",
+				Items: []string{"light", "standard", "standard+jstack", "health-check"},
 			}
 			_, collectionMode, err = prompt.Run()
 			if err != nil {
@@ -582,7 +582,7 @@ func init() {
 	RootCmd.Flags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 
 	// shared flags
-	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no ttop or jfr). 'standard' - includes jfr, ttop, 7 days of logs and 30 days of queries.json logs. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
 	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")

@@ -22,8 +22,8 @@ import (
 )
 
 func ValidateCollectMode(collectionMode string) error {
-	if collectionMode != collects.HealthCheckCollection && collectionMode != collects.QuickCollection && collectionMode != collects.StandardCollection {
-		return fmt.Errorf("invalid --collect option '%v' the only valid options are %v, %v, and %v", collectionMode, collects.QuickCollection, collects.StandardCollection, collects.HealthCheckCollection)
+	if collectionMode != collects.HealthCheckCollection && collectionMode != collects.QuickCollection && collectionMode != collects.StandardCollection && collectionMode != collects.StandardPlusJSTACKCollection {
+		return fmt.Errorf("invalid --collect option '%v' the only valid options are %v, %v, %v, and %v", collectionMode, collects.QuickCollection, collects.StandardCollection, collects.StandardPlusJSTACKCollection, collects.HealthCheckCollection)
 	}
 	return nil
 }

@@ -15,7 +15,8 @@
 package collects
 
 const (
-	QuickCollection       = "light"
-	StandardCollection    = "standard"
-	HealthCheckCollection = "health-check"
+	QuickCollection              = "light"
+	StandardCollection           = "standard"
+	StandardPlusJSTACKCollection = "standard+jstack"
+	HealthCheckCollection        = "health-check"
 )

@@ -2,6 +2,10 @@
 
 ## [3.0.0] - UNRELEASED
 
+### Added
+
+* added a standard+jstack option for the --collects flag
+
 ### Changed
 
 * removed ttop and replaced it with `LINES=100 top -H -n <iterations> -p <pid> -d <interval> -bw` 

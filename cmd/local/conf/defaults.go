@@ -41,6 +41,11 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
 		setDefault(confData, KeyNumberThreads, 2)
 	}
+	if collectionMode == collects.StandardPlusJSTACKCollection {
+		setDefault(confData, KeyCollectJStack, true)
+	} else {
+		setDefault(confData, KeyCollectJStack, false)
+	}
 	if collectionMode == collects.HealthCheckCollection {
 		setDefault(confData, KeyNumberJobProfiles, 25000)
 	} else {
@@ -48,7 +53,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	}
 
 	// set default config
-	setDefault(confData, KeyCollectJStack, false)
 	setDefault(confData, KeyVerbose, "vv")
 	setDefault(confData, KeyDisableRESTAPI, false)
 	setDefault(confData, KeyCollectAccelerationLog, false)
