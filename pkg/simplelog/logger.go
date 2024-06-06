@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
 )
 
@@ -132,7 +133,7 @@ func createLog(adjustedLevel int, fileName string) {
 			fmt.Println("falling back to standard out")
 		} else {
 			setDDCLog(fallbackPath, fallbackLog)
-			fmt.Printf("falling back to %v\n", fallbackPath)
+			consoleprint.WarningPrint(fmt.Sprintf("falling back to %v", fallbackPath))
 		}
 	} else {
 		setDDCLog(logLocation, f)

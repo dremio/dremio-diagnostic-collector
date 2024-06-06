@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.0.1] - 2024-06-05
+
+### Fixed
+
+* improved logging
+
 ## [3.0.0] - 2024-06-04
 
 ### Added
@@ -665,6 +671,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.0.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.3...v3.0.0
 [2.4.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.2...v2.4.3
 [2.4.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v2.4.1...v2.4.2

@@ -287,8 +287,8 @@ func Execute(args []string) error {
 				hook.AddFinalSteps(func() {
 					if err := os.Remove(pid); err != nil {
 						msg := fmt.Sprintf("unable to remove pid '%v': '%v', it will need to be removed manually", pid, err)
-						consoleprint.ErrorPrint(msg)
-						simplelog.Error(msg)
+						consoleprint.WarningPrint(msg)
+						simplelog.Warning(msg)
 					}
 				}, fmt.Sprintf("removing root pid file %v", pid))
 			} else {
@@ -447,7 +447,7 @@ func Execute(args []string) error {
 				enableFallback = true
 				// falling back to local collect
 				msg := fmt.Sprintf("unable to detect namespace (%v) falling back to local-collect", err)
-				consoleprint.ErrorPrint(msg)
+				consoleprint.WarningPrint(msg)
 				simplelog.Error(msg)
 			}
 			validateK8s := func(namespace string) {

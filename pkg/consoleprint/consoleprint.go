@@ -67,6 +67,18 @@ type ErrorOut struct {
 	Error string `json:"error"`
 }
 
+func WarningPrint(msg string) {
+	if statusOut {
+		b, err := json.Marshal(ErrorOut{Error: msg})
+		if err != nil {
+			fmt.Printf("{\"warning\": \"%q\", \"nested\": \"%q\"}\n", err, msg)
+			return
+		}
+		fmt.Println(string(b))
+	} else {
+		fmt.Println(msg)
+	}
+}
 func ErrorPrint(msg string) {
 	if statusOut {
 		b, err := json.Marshal(ErrorOut{Error: msg})
