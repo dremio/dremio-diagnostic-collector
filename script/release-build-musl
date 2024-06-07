@@ -55,11 +55,11 @@ rm ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
-GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=musl-gcc GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 echo "Building darwin-os-x-amd64…"
 date "+%H:%M:%S"

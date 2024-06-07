@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# script/test: Run all but the integration tests
+
+#set -e
+
+cd "$(dirname "$0")/.."
+
+[ -z "$DEBUG" ] || set -x
+
+./script/clean
+./script/build-musl
+export SKIP_INTEGRATION_SETUP=true
+ CGO_ENABLED=1 CC=musl-gcc go test --ldflags '-linkmode external -extldflags "-static"' -race -short -coverpkg=./... -coverprofile=covprofile ./...

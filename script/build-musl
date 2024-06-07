@@ -44,13 +44,13 @@ fi
 # this is also set in script/release and is a copy paste
 GIT_SHA=`git rev-parse --short HEAD`
 VERSION=`git rev-parse --abbrev-ref HEAD`
-LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION -linkmode external -extldflags \"-static\""
+LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION -linkmode external -extldflags \"-static\""
 touch ./cmd/root/ddcbinary/output/ddc.zip
-CC=/usr/bin/musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 rm ./bin/ddc
 
-CC=/usr/bin/musl-gcc go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=musl-gcc go build -ldflags "$LDFLAGS" -o ./bin/ddc
 
 cp ./default-ddc.yaml ./bin/ddc.yaml

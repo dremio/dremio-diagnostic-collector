@@ -9,7 +9,7 @@ Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definit
 # Get Git SHA and Version
 $GIT_SHA = git rev-parse --short HEAD
 $VERSION = $args[0]
-$LDFLAGS = "-X github.com/dremio/dremio-diagnostic-collector/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/pkg/versions.Version=$VERSION"
+$LDFLAGS = "-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION"
 
 Write-Output "Cleaning bin folder"
 Get-Date -Format "HH:mm:ss"

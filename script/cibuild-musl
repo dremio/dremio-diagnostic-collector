@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# script/cibuild: Setup environment for CI to run tests. This is primarily
+#                 designed to run on the continuous integration server.
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "Validating if all dependencies are fullfilled…"
+date "+%H:%M:%S"
+./script/bootstrap
+
+
+echo "Tests started at…"
+date "+%H:%M:%S"
+# have to start this before the other functions so that we embed the binary
+./script/test-musl
+
+echo "Coverage file started at…"
+date "+%H:%M:%S"
+
+./script/cover
+
+echo "Linting started at…"
+date "+%H:%M:%S"
+
+./script/lint
+
+echo "Linting finished at…"
+date "+%H:%M:%S"
+
+echo "Audit started at"
+date "+%H:%M:%S"
+
+./script/audit
+
+echo "Audit finished at…"
+date "+%H:%M:%S"

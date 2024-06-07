@@ -2,12 +2,9 @@ module github.com/dremio/dremio-diagnostic-collector/v3
 
 go 1.22.0
 
-toolchain go1.22.1
-
 require github.com/spf13/cobra v1.7.0 // direct
 
 require (
-	github.com/dremio/dremio-diagnostic-collector v1.0.1
 	github.com/google/uuid v1.3.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/rogpeppe/go-internal v1.10.0

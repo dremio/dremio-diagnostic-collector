@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/dirs"
 )
 
 func TestGetFreeSpace(t *testing.T) {
