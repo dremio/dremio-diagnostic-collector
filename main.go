@@ -19,9 +19,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func main() {

@@ -15,7 +15,7 @@
 package conf
 
 import (
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlowExec, defaultJobProfilesNumRecentErrors, defaultJobProfilesNumSlowPlanning, defaultJobProfilesNumHighQueryCost int) {

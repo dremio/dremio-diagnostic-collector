@@ -30,12 +30,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 

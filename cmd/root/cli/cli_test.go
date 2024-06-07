@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 var (

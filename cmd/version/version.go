@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/versions"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions"
 	"github.com/spf13/cobra"
 )
 

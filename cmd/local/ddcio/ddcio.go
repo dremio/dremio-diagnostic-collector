@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func DeleteDirContents(dir string) error {

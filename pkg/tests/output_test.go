@@ -20,7 +20,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
 )
 
 // TestTree will create a temporary directory, create some files and directories in it

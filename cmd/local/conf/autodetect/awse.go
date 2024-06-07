@@ -22,9 +22,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func IsAWSEFromJPSOutput(jpsText string) (bool, error) {

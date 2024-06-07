@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
 )
 
 func TestGzipContainsFile(t *testing.T) {

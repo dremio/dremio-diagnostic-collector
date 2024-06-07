@@ -22,7 +22,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func GzipFile(src, dst string) error {

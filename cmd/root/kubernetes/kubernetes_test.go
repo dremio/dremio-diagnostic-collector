@@ -18,7 +18,7 @@ package kubernetes
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 func TestNewKubectlK8sActions(t *testing.T) {

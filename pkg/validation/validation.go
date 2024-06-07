@@ -18,7 +18,7 @@ package validation
 import (
 	"fmt"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
 )
 
 func ValidateCollectMode(collectionMode string) error {

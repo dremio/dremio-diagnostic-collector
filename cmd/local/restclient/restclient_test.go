@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 func TestAPIRequest(t *testing.T) {

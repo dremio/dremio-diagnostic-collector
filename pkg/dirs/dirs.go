@@ -20,7 +20,7 @@ import (
 	"io/fs"
 	"os"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 // CheckDirectory checks if a directory exists and contains files.

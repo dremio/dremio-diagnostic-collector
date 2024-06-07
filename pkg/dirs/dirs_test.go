@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/dirs"
 )
 
 func TestCheckDirectoryFull(t *testing.T) {

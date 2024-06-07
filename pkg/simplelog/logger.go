@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
 )
 
 const (

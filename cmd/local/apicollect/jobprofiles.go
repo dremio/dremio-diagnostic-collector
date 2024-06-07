@@ -24,13 +24,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/queriesjson"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/restclient"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/queriesjson"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/restclient"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/threading"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (tried, collected int, err error) {

@@ -14,7 +14,7 @@
 
 package conf
 
-import "github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+import "github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
 
 func setDefault(confData map[string]interface{}, key string, value interface{}) {
 	// if key is not present go ahead and set it

@@ -17,7 +17,7 @@ package strutils_test
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
 )
 
 func TestLimitStringTooLong(t *testing.T) {

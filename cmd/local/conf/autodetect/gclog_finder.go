@@ -22,8 +22,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 // findGCLogLocation retrieves the gc log location with a search string to greedily retrieve everything by prefix

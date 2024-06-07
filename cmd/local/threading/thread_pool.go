@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 type ThreadPool struct {

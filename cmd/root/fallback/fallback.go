@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 type Fallback struct {

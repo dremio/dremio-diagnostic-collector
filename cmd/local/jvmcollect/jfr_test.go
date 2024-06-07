@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/jvmcollect"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func TestJFRCapture(t *testing.T) {

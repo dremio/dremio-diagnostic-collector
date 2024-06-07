@@ -32,10 +32,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
 )
 
 type AuthResponse struct {

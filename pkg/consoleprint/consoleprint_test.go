@@ -18,8 +18,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
 )
 
 func TestClearsScreen(t *testing.T) {

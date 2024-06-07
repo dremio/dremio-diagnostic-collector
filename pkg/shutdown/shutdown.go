@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 type CancelHook interface {

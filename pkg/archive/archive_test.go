@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func TestTarGzDir(t *testing.T) {

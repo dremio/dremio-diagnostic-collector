@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/configcollect"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/configcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
 	"github.com/rogpeppe/go-internal/diff"
 )
 

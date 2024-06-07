@@ -1,4 +1,4 @@
-module github.com/dremio/dremio-diagnostic-collector
+module github.com/dremio/dremio-diagnostic-collector/v3
 
 go 1.21
 

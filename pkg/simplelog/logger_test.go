@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
 )
 
 func TestLogger(t *testing.T) {

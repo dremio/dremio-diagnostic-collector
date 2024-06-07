@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
 )
 
 func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {

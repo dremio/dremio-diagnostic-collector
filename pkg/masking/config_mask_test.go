@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
 )
 
 func TestConfig_WhenRemoveSecretsFromDremioConfAndConfIsNotFound(t *testing.T) {

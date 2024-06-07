@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/collection"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/ssh"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/output"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/ssh"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func TestSSHDefault(t *testing.T) {

@@ -18,7 +18,7 @@ package tests
 import (
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
 )
 
 type MockCli struct {

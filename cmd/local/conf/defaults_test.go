@@ -19,8 +19,8 @@ package conf_test
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
 )
 
 func setupTestSetViperDefaults(collectionType string) (map[string]interface{}, string, int) {

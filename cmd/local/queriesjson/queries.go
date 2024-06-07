@@ -27,8 +27,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/strutils"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
 )
 
 type QueriesRow struct {

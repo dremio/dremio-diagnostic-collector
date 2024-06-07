@@ -25,9 +25,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/masking"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 type CmdExecutor interface {

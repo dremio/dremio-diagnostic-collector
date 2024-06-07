@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	local "github.com/dremio/dremio-diagnostic-collector/cmd/local"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/simplelog"
+	local "github.com/dremio/dremio-diagnostic-collector/v3/cmd/local"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 	"github.com/spf13/cobra"
 )
 

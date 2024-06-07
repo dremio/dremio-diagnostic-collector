@@ -21,9 +21,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/logcollect"
-	"github.com/dremio/dremio-diagnostic-collector/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/logcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
 )
 
 func cleanUp(dirs ...string) {
@@ -829,9 +829,7 @@ func TestLogCollect_WhenQueriesJsonIsMissing(t *testing.T) {
 	yesterdaysLog = "queries." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".json.gz"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "queries.2022-04-30.json.gz"), filepath.Join(testLogDir, "archive", yesterdaysLog)); err != nil {
 		t.Logf("ERROR test should fail as we had an error setting up the test directory: %v", err)
-		if err != nil {
-			t.Errorf("unexpected error %v", err)
-		}
+		t.Errorf("unexpected error %v", err)
 	}
 	err = logCollector.RunCollectQueriesJSON()
 	if err == nil {

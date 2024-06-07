@@ -17,7 +17,7 @@ package shutdown_test
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 )
 
 func TestShutdownRunsAllTasksInOrder(t *testing.T) {

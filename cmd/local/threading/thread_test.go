@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/cmd/local/threading"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/threading"
 )
 
 var (
