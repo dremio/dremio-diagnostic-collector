@@ -1,0 +1,56 @@
+#!/bin/sh
+
+# script/release: build binaries in all supported platforms and upload them with the gh client
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+echo "Checking if gh is installed…"
+date "+%H:%M:%S"
+
+if ! type "gh" > /dev/null; then
+    echo "gh not found installing…"
+    date "+%H:%M:%S"
+    OS="`uname`"
+    case $OS in
+      'Linux')
+        if type "apt" > /dev/null; then
+            echo "detected debian based system installing via apt"
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update -y
+            sudo apt install gh -y 
+        fi
+        if type "yum" > /dev/null; then
+            echo "detected rpm based system installing via yum"
+            sudo dnf install 'dnf-command(config-manager)' -y
+            sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            sudo dnf install gh -y
+        fi
+        ;;
+      'WindowsNT')
+        echo "install gh and try again https://github.com/cli/cli/releases"
+        exit 1
+        ;;
+      'Darwin') 
+        if type "brew" > /dev/null; then
+            brew install gh
+        else
+            echo "install homebrew to have zip https://brew.sh/"
+            exit 1
+        fi
+        ;;
+      *) ;;
+      esac
+fi
+
+# this is also set in script/build-release and is a copy paste
+GIT_SHA=`git rev-parse --short HEAD`
+VERSION=$1
+
+./script/release-build-musl $VERSION
+
+
+gh release create $VERSION --title $VERSION --generate-notes  ./bin/ddc-windows-amd64.zip ./bin/ddc-windows-arm64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip 
+ 

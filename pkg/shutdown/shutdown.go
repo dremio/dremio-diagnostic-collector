@@ -108,20 +108,26 @@ func (h *hookImpl) Cleanup() {
 		return
 	}
 	consoleprint.UpdateResult("CLEANUP TASKS")
-
+	var counter int
 	simplelog.Debugf("%v tasks to run on cleanup", totalTasks)
 	for _, j := range h.priorityCleanup {
+		counter++
+		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown initial stage: %v", j.name)
 		j.p()
 	}
 	h.priorityCleanup = []cleanupTask{}
 	for _, j := range h.cleanups {
+		counter++
+		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task: %v", j.name)
 		j.p()
 	}
 	//blank
 	h.cleanups = []cleanupTask{}
 	for _, j := range h.finalSteps {
+		counter++
+		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task final stage: %v", j.name)
 		j.p()
 	}

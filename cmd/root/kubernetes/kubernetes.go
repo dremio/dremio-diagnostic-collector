@@ -207,6 +207,8 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 		c.pidHosts[host] = ""
 	}
 	var criticalErrors []string
+
+	var wg sync.WaitGroup
 	coordinators, err := c.GetCoordinators()
 	if err != nil {
 		msg := fmt.Sprintf("unable to get coordinators for cleanup %v", err)
@@ -215,13 +217,16 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 	} else {
 		for _, coordinator := range coordinators {
 			if v, ok := c.pidHosts[coordinator]; ok {
-				kill(coordinator, v)
+				wg.Add(1)
+				go func(host, pid string) {
+					defer wg.Done()
+					kill(host, pid)
+				}(coordinator, v)
 			} else {
 				simplelog.Errorf("missing key %v in pidHosts skipping host", coordinator)
 			}
 		}
 	}
-
 	executors, err := c.GetExecutors()
 	if err != nil {
 		msg := fmt.Sprintf("unable to get executors for cleanup %v", err)
@@ -230,12 +235,17 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 	} else {
 		for _, executor := range executors {
 			if v, ok := c.pidHosts[executor]; ok {
-				kill(executor, v)
+				wg.Add(1)
+				go func(host, pid string) {
+					defer wg.Done()
+					kill(host, pid)
+				}(executor, v)
 			} else {
 				simplelog.Errorf("missing key %v in pidHosts skipping host", executor)
 			}
 		}
 	}
+	wg.Wait()
 	if len(criticalErrors) > 0 {
 		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
 	}
@@ -454,7 +464,8 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 	}
 	reader := newTarPipe(source, executor)
 	simplelog.Infof("untarring file '%v' from stdout", destination)
-	if err := archive.ExtractTarStream(reader, path.Dir(destination), path.Dir(source)); err != nil {
+	// has to be filepath or else we get weird outcomes
+	if err := archive.ExtractTarStream(reader, filepath.Dir(destination), path.Dir(source)); err != nil {
 		return "", fmt.Errorf("unable to copy %v", err)
 	}
 	simplelog.Infof("file %v untarred fully and transfer is now complete", destination)
@@ -482,7 +493,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	if strings.HasPrefix(source, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
 		// only replace once because more doesn't make sense
-		destination = strings.Replace(source, `C:`, ``, 1)
+		source = strings.Replace(source, `C:`, ``, 1)
 	}
 	if _, err := os.Stat(source); err != nil {
 		return "", fmt.Errorf("%s doesn't exist in local filesystem", source)
@@ -492,21 +503,25 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	reader, writer := io.Pipe()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(src string, dest string, w io.WriteCloser) {
+	go func(src string, w io.WriteCloser) {
 		defer writer.Close()
 		defer wg.Done()
-		srcDir := path.Dir(src)
+		//use filepath here or else we will get surprises
+		srcDir := filepath.Dir(src)
+		simplelog.Debugf("k8s API transfer archiving %v to transfer file %v to make it visible on host %v", srcDir, src, hostString)
 		if err := archive.TarGzDirFilteredStream(srcDir, writer, func(s string) bool {
 			return s == src
 		}); err != nil {
 			simplelog.Errorf("unable to archive %v", err)
 		}
-	}(source, destination, writer)
+	}(source, writer)
+	//use path here since it's always going to a linux destination
 	destDir := path.Dir(destination)
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
 		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
 	}
+	simplelog.Debugf("k8s API transfer unarchive %v to send file %v to make it visible on host %v", destDir, destination, hostString)
 	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -xzmf - -C %v", destDir)}
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")

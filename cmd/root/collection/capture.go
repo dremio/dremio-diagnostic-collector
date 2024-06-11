@@ -118,12 +118,14 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 // are first logged and then returned at the end with the reason for the failure.
 func StartCapture(c HostCaptureConfiguration, hook shutdown.Hook, localDDCPath, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB int) error {
 	host := c.Host
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState := consoleprint.NodeState{
 		Node:     host,
 		Status:   consoleprint.Starting,
 		StatusUX: "STARTING",
 		Result:   consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 	// we cannot use filepath.join here as it will break everything during the transfer
 	pathToDDC := path.Join(c.TransferDir, "ddc")
 	// we cannot use filepath.join here as it will break everything during the transfer
@@ -132,40 +134,49 @@ func StartCapture(c HostCaptureConfiguration, hook shutdown.Hook, localDDCPath, 
 	versionMatch := false
 	//if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState = consoleprint.NodeState{
 			Node:     host,
 			Status:   consoleprint.CreatingRemoteDir,
 			StatusUX: "CREATING REMOTE DIR",
 			Result:   consoleprint.ResultPending,
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
+
 		//remotely make TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "mkdir", "-p", c.TransferDir); err != nil {
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState = consoleprint.NodeState{
 				Node:       host,
 				Status:     consoleprint.CreatingRemoteDir,
 				Message:    fmt.Sprintf("(%v) %v", err, out),
 				Result:     consoleprint.ResultFailure,
 				EndProcess: true,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 			return fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, c.TransferDir, err, out)
 		}
 
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState = consoleprint.NodeState{
 			Node:     host,
 			Status:   consoleprint.CopyDDCToHost,
 			StatusUX: "COPY DDC TO HOST",
 			Result:   consoleprint.ResultPending,
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		//copy file to TransferDir assume there is
 		if out, err := c.Collector.CopyToHost(c.Host, localDDCPath, pathToDDC); err != nil {
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState = consoleprint.NodeState{
 				Node:       host,
 				Status:     consoleprint.CopyDDCToHost,
 				StatusUX:   "COPY DDC TO HOST",
 				Result:     consoleprint.ResultFailure,
 				Message:    fmt.Sprintf("(%v) %v", err, out),
 				EndProcess: true,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 			return fmt.Errorf("unable to copy local ddc %v to remote path due to error: '%v' with output '%v'", localDDCPath, err, out)
 			//this is a critical error so it is safe to exit
 		}
@@ -182,41 +193,49 @@ func StartCapture(c HostCaptureConfiguration, hook shutdown.Hook, localDDCPath, 
 				simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
 			}
 		}()
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState = consoleprint.NodeState{
 			Node:     host,
 			Status:   consoleprint.SettingDDCPermissions,
 			StatusUX: "SETTING DDC PERMISSIONS",
 			Result:   consoleprint.ResultPending,
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		//make  exec TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "chmod", "+x", pathToDDC); err != nil {
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState = consoleprint.NodeState{
 				Node:       host,
 				Status:     consoleprint.SettingDDCPermissions,
 				StatusUX:   "SETTING DDC PERMISSIONS",
 				Result:     consoleprint.ResultFailure,
 				Message:    fmt.Sprintf("(%v) %v", err, out),
 				EndProcess: true,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 			return fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
 		}
 	}
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState = consoleprint.NodeState{
 		Node:     host,
 		Status:   consoleprint.CopyDDCYaml,
 		StatusUX: "COPY DDC YAML",
 		Result:   consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 	//always update the configuration
 	if out, err := c.Collector.CopyToHost(c.Host, localDDCYamlPath, pathToDDCYAML); err != nil {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState := consoleprint.NodeState{
 			Node:       host,
 			Status:     consoleprint.CopyDDCYaml,
 			StatusUX:   "COPY DDC YAML",
 			Result:     consoleprint.ResultFailure,
 			Message:    fmt.Sprintf("(%v) %v", err, out),
 			EndProcess: true,
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		return fmt.Errorf("unable to copy local ddc yaml '%v' to remote path due to error: '%v' with output '%v'", localDDCYamlPath, err, out)
 		//this is a critical step and will not work without it so exit
 	}
@@ -228,12 +247,14 @@ func StartCapture(c HostCaptureConfiguration, hook shutdown.Hook, localDDCPath, 
 		}
 	}()
 
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState = consoleprint.NodeState{
 		Node:     host,
 		Status:   consoleprint.Collecting,
 		StatusUX: "COLLECTING",
 		Result:   consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 
 	//execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
 	var mask bool // to mask PAT token in logs
@@ -254,81 +275,88 @@ func StartCapture(c HostCaptureConfiguration, hook shutdown.Hook, localDDCPath, 
 		mask = false
 	}
 
-	hook.AddPriorityCancel(func() {
-		err := c.Collector.CleanupRemote()
-		if err != nil {
-			simplelog.Errorf("error during cleanup %v", err)
-		}
-	}, "killing ddc local-collect processes")
 	var allHostLog []string
 	err := c.Collector.HostExecuteAndStream(mask, c.Host, func(line string) {
 		if strings.HasPrefix(line, "JOB START") {
 			status, statusUX := extractJobText(line)
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultPending,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else if strings.HasPrefix(line, "JOB FAILED") {
 			status, statusUX, message := extractJobFailedText(line)
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
 				Message:  message,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultFailure,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else if strings.HasPrefix(line, "JOB PROGRESS") {
 			status, statusUX, message := extractJobProgressText(line)
-			consoleprint.UpdateNodeState(consoleprint.NodeState{
+			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
 				Message:  message,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultPending,
-			})
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else {
 			allHostLog = append(allHostLog, line)
 		}
 		if strings.Contains(line, "AUTODETECTION DISABLED") {
 			consoleprint.UpdateNodeAutodetectDisabled(host, true)
+			simplelog.HostLog(host, "autodetection disabled")
 		}
 		simplelog.HostLog(host, line)
 	}, dremioPAT, localCollectArgs...)
 	if err != nil {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState := consoleprint.NodeState{
 			Node:       c.Host,
 			Status:     consoleprint.Collecting,
 			StatusUX:   "LOCAL-COLLECT",
 			Result:     consoleprint.ResultFailure,
 			EndProcess: true,
 			Message:    strutils.LimitString(strings.Join(allHostLog, " - "), 1024),
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		return fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
 	}
 
 	simplelog.Debugf("on host %v capture successful", host)
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState = consoleprint.NodeState{
 		Node:     c.Host,
 		Status:   consoleprint.CollectingAwaitingTransfer,
 		StatusUX: "COLLECTED - AWAITING TRANSFER",
 		Result:   consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 	return nil
 }
 
 func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc string) (int64, string, error) {
 	hostname, err := c.Collector.HostExecute(false, c.Host, "cat", "/proc/sys/kernel/hostname")
 	if err != nil {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState := consoleprint.NodeState{
 			Node:       c.Host,
 			Status:     consoleprint.Collecting,
 			StatusUX:   "COLLECT HOSTNAME",
 			Result:     consoleprint.ResultFailure,
 			EndProcess: true,
 			Message:    err.Error(),
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 		return 0, c.Host, fmt.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", c.Host, err)
 	}
 
@@ -341,12 +369,14 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	if outDir == "" {
 		outDir = fmt.Sprintf(".%v", filepath.Separator)
 	}
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState := consoleprint.NodeState{
 		Node:     c.Host,
 		Status:   consoleprint.TarballTransfer,
 		StatusUX: "TARBALL TRANSFER",
 		Result:   consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 	hook.AddFinalSteps(func() {
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
 			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", c.Host, err, out)
@@ -356,14 +386,16 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	}, fmt.Sprintf("removing tarball %v on host %v", tarGZ, c.Host))
 	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := c.Collector.CopyFromHost(c.Host, tarGZ, destFile); err != nil {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
+		nodeState := consoleprint.NodeState{
 			Node:       c.Host,
 			Status:     consoleprint.TarballTransfer,
 			StatusUX:   "TARBALL TRANSFER",
 			Result:     consoleprint.ResultFailure,
 			EndProcess: true,
 			Message:    fmt.Sprintf("(%v) %v", err, out),
-		})
+		}
+		consoleprint.UpdateNodeState(nodeState)
+		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, c.Host, outDir, err, out)
 	}
 
@@ -384,13 +416,15 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	} else {
 		size = fileInfo.Size()
 	}
-	consoleprint.UpdateNodeState(consoleprint.NodeState{
+	nodeState = consoleprint.NodeState{
 		Node:       c.Host,
 		Status:     consoleprint.Completed,
 		StatusUX:   "COMPLETED",
 		EndProcess: true,
 		Result:     consoleprint.ResultPending,
-	})
+	}
+	consoleprint.UpdateNodeState(nodeState)
+	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 	simplelog.Infof("host %v copied %v to %v it was %v bytes", c.Host, tarGZ, destFile, size)
 
 	return size, destFile, nil

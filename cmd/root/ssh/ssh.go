@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
@@ -103,6 +104,7 @@ func (c *CmdSSHActions) CleanupRemote() error {
 		//cancel out so we can skip if it's called again
 		c.pidHosts[host] = ""
 	}
+	var wg sync.WaitGroup
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()
 	if err != nil {
@@ -112,7 +114,11 @@ func (c *CmdSSHActions) CleanupRemote() error {
 	} else {
 		for _, coordinator := range coordinators {
 			if v, ok := c.pidHosts[coordinator]; ok {
-				kill(coordinator, v)
+				wg.Add(1)
+				go func(host, pid string) {
+					defer wg.Done()
+					kill(host, pid)
+				}(coordinator, v)
 			} else {
 				simplelog.Errorf("missing key %v in pidHosts skipping host", coordinator)
 			}
@@ -127,12 +133,17 @@ func (c *CmdSSHActions) CleanupRemote() error {
 	} else {
 		for _, executor := range executors {
 			if v, ok := c.pidHosts[executor]; ok {
-				kill(executor, v)
+				wg.Add(1)
+				go func(host, pid string) {
+					defer wg.Done()
+					kill(host, pid)
+				}(executor, v)
 			} else {
 				simplelog.Errorf("missing key %v in pidHosts skipping host", executor)
 			}
 		}
 	}
+	wg.Wait()
 	if len(criticalErrors) > 0 {
 		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
 	}

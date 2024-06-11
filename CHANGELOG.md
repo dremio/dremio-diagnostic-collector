@@ -1,10 +1,20 @@
 # Changelog
 
-## [3.1.0] - UNRELEASED
+## [3.1.0] - 2024-06-11
 
-* We now use libmusl for tests and builds, this means DDC will work on older versions of Linux
+### Changed
+
+* DDC will now work on older versions of Linux as we now compile with libmusl
+* enhanced output of cleanup tasks in UI
+
+### Fixed
+
+* Windows installs without kubectl now function correctly
+* Cleanup tasks were slower than they needed to be. Large speedup on large clusters.
 
 ## [3.0.3] - 2024-06-07
+
+### Fixed
 
 * spelling and logging fixes
 
