@@ -182,7 +182,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 			}
 			//we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
-			err := StartCapture(coordinatorCaptureConf, hook, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
+			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
