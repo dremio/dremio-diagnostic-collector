@@ -66,10 +66,13 @@ func EnableStatusOutput() {
 type ErrorOut struct {
 	Error string `json:"error"`
 }
+type WarnOut struct {
+	Warning string `json:"warning"`
+}
 
 func WarningPrint(msg string) {
 	if statusOut {
-		b, err := json.Marshal(ErrorOut{Error: msg})
+		b, err := json.Marshal(WarnOut{Warning: msg})
 		if err != nil {
 			fmt.Printf("{\"warning\": \"%q\", \"nested\": \"%q\"}\n", err, msg)
 			return
@@ -79,6 +82,7 @@ func WarningPrint(msg string) {
 		fmt.Println(msg)
 	}
 }
+
 func ErrorPrint(msg string) {
 	if statusOut {
 		b, err := json.Marshal(ErrorOut{Error: msg})
