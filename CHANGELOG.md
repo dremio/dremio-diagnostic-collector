@@ -1,4 +1,15 @@
 # Changelog
+
+## [3.1.2] - 2024-06-17
+
+### Added
+
+* added oidc auth for the k8s api
+
+### Changed
+
+* only run task kill on interrupt
+
 ## [3.1.1] - 2024-06-12
 
 ### Fixed

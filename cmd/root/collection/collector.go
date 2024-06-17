@@ -159,7 +159,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		0,
 		len(coordinators)+len(executors),
 	)
-	hook.AddPriorityCancel(func() {
+	hook.AddCancelOnlyTasks(func() {
 		err := c.CleanupRemote()
 		if err != nil {
 			simplelog.Errorf("error during cleanup %v", err)

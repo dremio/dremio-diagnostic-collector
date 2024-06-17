@@ -47,6 +47,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc" // in case one needs oidc auth
 )
 
 // var scaleoutCoordinatorContainer string
@@ -269,7 +270,7 @@ func Execute(args []string) error {
 			<-c
 			simplelog.Info("CTRL+C interrupt starting graceful shutdown")
 			consoleprint.UpdateResult("CANCELLING")
-			hook.Cleanup()
+			hook.Interrupt()
 			os.Exit(1)
 		}()
 		if disablePrompt {
