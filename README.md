@@ -88,7 +88,10 @@ Log-only collection from a Dremio AWSE coordinator is possible via the following
 ```
 
 ### Dremio Cloud
-To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
+
+We can only collect job profiles, system tables, and wlm via REST API, therefore the PAT token is required. 
+To collect dremio cloud dignostics specify the following parameters in the `ddc.yaml`
+
 ```yaml
 is-dremio-cloud: true
 dremio-endpoint: "[eu.]dremio.cloud"    # Specify whether EU Dremio Cloud or not

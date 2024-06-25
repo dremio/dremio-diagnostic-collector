@@ -26,6 +26,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf/autodetect"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
@@ -483,8 +484,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
 	if c.isDremioCloud {
-		if len(c.dremioCloudProjectID) != 36 {
-			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the following provided id may be incorrect: %v", c.dremioCloudProjectID)
+		if utf8.RuneCountInString(c.dremioCloudProjectID) != 36 {
+			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the id: %v, shows a length of %v", c.dremioCloudProjectID, utf8.RuneCountInString(c.dremioCloudProjectID))
 		}
 		if strings.Contains(c.dremioEndpoint, "eu.dremio.cloud") {
 			c.dremioEndpoint = "https://api.eu.dremio.cloud"
