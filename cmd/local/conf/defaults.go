@@ -73,7 +73,7 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyCollectOSConfig, true)
 	setDefault(confData, KeyCollectDiskUsage, true)
 
-	setDefault(confData, KeyDremioGCFilePattern, "gc*.log*")
+	setDefault(confData, KeyDremioGCFilePattern, "server*.gc*")
 	setDefault(confData, KeyCollectQueriesJSON, true)
 	setDefault(confData, KeyCollectServerLogs, true)
 	setDefault(confData, KeyCollectMetaRefreshLog, true)

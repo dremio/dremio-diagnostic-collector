@@ -45,6 +45,16 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, cs CopyStrate
 		return err
 	}
 
+	// zookeeper logs specifically
+	path, err := cs.CreatePath("kubernetes", "zookeeper-container-logs", "")
+	if err != nil {
+		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
+		return err
+	}
+	if err := saveZookeeperPodLogs(hook, namespace, cs, ddfs, path); err != nil {
+		simplelog.Errorf("unable to save zookeeper pod logs: %v", err)
+	}
+	// everything else
 	for _, cmd := range cmds {
 		resource := cmd
 		out, err := clusterExecuteBytes(hook, namespace, resource)
@@ -80,31 +90,38 @@ func GetClusterLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy,
 	if err != nil {
 		return err
 	}
-	// Loop over dremio pods
+	// Loop over pods
 	for _, podname := range pods {
 		podObj, err := clientSet.CoreV1().Pods(namespace).Get(context.Background(), podname, metav1.GetOptions{})
 		if err != nil {
 			simplelog.Errorf("unable to get pod %v: %v", podname, err)
 			continue
 		}
-		var containers []string
-		for _, c := range podObj.Spec.Containers {
-			containers = append(containers, c.Name)
-		}
-		for _, c := range podObj.Spec.InitContainers {
-			containers = append(containers, c.Name)
-		}
-		// Loop over each container, construct a path and log file name
-		// write the output of the kubectl logs command to a file
-		for _, container := range containers {
-			copyContainerLog(hook, cs, ddfs, container, namespace, path, podname)
-		}
-		consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
+		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, path, podname)
 	}
 	return err
 }
 
-func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string) {
+func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace, path, podname string) {
+	var containers []string
+	for _, c := range podObj.Spec.Containers {
+		containers = append(containers, c.Name)
+	}
+	for _, c := range podObj.Spec.InitContainers {
+		containers = append(containers, c.Name)
+	}
+	// Loop over each container, construct a path and log file name
+	// write the output of the kubectl logs command to a file
+	for _, container := range containers {
+		// save previous logs if present
+		copyContainerLog(hook, cs, ddfs, container, namespace, path, podname, true)
+		// save current logs
+		copyContainerLog(hook, cs, ddfs, container, namespace, path, podname, false)
+	}
+	consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
+}
+
+func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string, previous bool) {
 	client, _, err := kubernetes.GetClientset()
 	if err != nil {
 		simplelog.Errorf("unable to get k8s client for collecting logs on pod: %v container: %v with error: %v", pod, container, err)
@@ -115,6 +132,7 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 	defer timeout() // releases resources if slowOperation completes before timeout elapses
 	req := client.CoreV1().Pods(namespace).GetLogs(pod, &corev1.PodLogOptions{
 		Container: container,
+		Previous:  previous,
 	})
 	r, err := req.Stream(ctx)
 	if err != nil {
@@ -140,7 +158,12 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 		}
 	}
 	out := buf.String()
-	outFile := filepath.Join(path, pod+"-"+container+".txt")
+	var outFile string
+	if previous {
+		outFile = filepath.Join(path, pod+"-"+container+"-previous.txt")
+	} else {
+		outFile = filepath.Join(path, pod+"-"+container+".txt")
+	}
 	simplelog.Debugf("getting logs for pod: %v container: %v", pod, container)
 	p, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
@@ -152,6 +175,33 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 	if err != nil {
 		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
 	}
+}
+
+func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, path string) error {
+	c, _, err := kubernetes.GetClientset()
+	if err != nil {
+		return err
+	}
+	options := metav1.ListOptions{
+		LabelSelector: "app=zk",
+	}
+	timeoutDuration := 60 * time.Second
+	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while getting resource zk pod in namespace %s timeout exceeded %v", namespace, timeoutDuration))
+	defer timeout()
+	list, err := c.CoreV1().Pods(namespace).List(ctx, options)
+	if err != nil {
+		switch ctx.Err() {
+		case context.DeadlineExceeded:
+			return context.Cause(ctx)
+		default:
+			return err
+		}
+	}
+	for _, c := range list.Items {
+		cb := c
+		saveLogsFromPod(&cb, hook, cs, ddfs, namespace, path, c.Name)
+	}
+	return nil
 }
 
 // Execute commands at the cluster level
@@ -571,6 +621,7 @@ func clusterExecuteBytes(hook shutdown.CancelHook, namespace, resource string) (
 	default:
 		simplelog.Errorf("resource (%v) does not have an implementation", resource)
 	}
+
 	return b, nil
 
 }
