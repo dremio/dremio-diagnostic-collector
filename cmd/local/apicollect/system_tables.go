@@ -16,6 +16,7 @@
 package apicollect
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -40,19 +41,23 @@ func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook)
 	} else {
 		systables = c.SystemtablesDremioCloud()
 	}
-
+	// wrap context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
+	defer cancel() // avoid leaks
 	for _, systable := range systables {
-		err := downloadSysTable(c, hook, systable)
+		// check to see if context is cancelled
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := downloadSysTable(ctx, c, hook, systable)
 		if err != nil {
 			simplelog.Errorf("%v", err) // Print instead of Error
 		}
-
 	}
-
 	return nil
 }
 
-func downloadSysTable(c *conf.CollectConf, hook shutdown.CancelHook, systable string) error {
+func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.CancelHook, systable string) error {
 	tablerowlimit := strconv.Itoa(c.SystemTablesRowLimit())
 
 	headers := map[string]string{"Content-Type": "application/json"}
@@ -84,7 +89,7 @@ func downloadSysTable(c *conf.CollectConf, hook shutdown.CancelHook, systable st
 		return err
 	}
 	jobstateurl := joburl + jobid
-	err = checkJobState(c, hook, jobstateurl, headers)
+	err = checkJobState(ctx, c, hook, jobstateurl, headers)
 	if err != nil {
 		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
 	}
@@ -97,11 +102,19 @@ func downloadSysTable(c *conf.CollectConf, hook shutdown.CancelHook, systable st
 	return nil
 }
 
-func checkJobState(c *conf.CollectConf, hook shutdown.CancelHook, jobstateurl string, headers map[string]string) error {
+func checkJobState(ctx context.Context, c *conf.CollectConf, hook shutdown.CancelHook, jobstateurl string, headers map[string]string) error {
 	sleepms := 200 // Consider moving to config
 	jobstate := "RUNNING"
 	for jobstate != "COMPLETED" {
+		// check for timeout before
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		time.Sleep(time.Duration(sleepms) * time.Millisecond)
+		// check for timeout after
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		body, err := restclient.APIRequest(hook, jobstateurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
 			return fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)

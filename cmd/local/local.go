@@ -18,6 +18,7 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -317,13 +318,17 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 	var clusterID string
 	rocksDBDir := c.DremioRocksDBDir()
 	simplelog.Debugf("checking dir %v for cluster version", rocksDBDir)
-
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
+	defer cancel() // avoid leaks
 	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			simplelog.Errorf("error accessing path %q: %v", path, err)
 			return nil
 		}
-
+		// check if we need to stop processing
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if clusterID != "" {
 			return nil
 		}
@@ -343,6 +348,12 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 			skipped := 0
 			var bytesRead int64
 			for {
+				// check if ctx is done every 1mb
+				if bytesRead%1048576 == 0 {
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+				}
 				// Read file byte by byte
 				b, err := reader.ReadByte()
 				if err != nil {
@@ -415,6 +426,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error walking the path %v: %v", rocksDBDir, err)
 	}
+
 	simplelog.Infof("total time to search clusterID in directory %v was %v seconds", rocksDBDir, time.Now().Unix()-startTime)
 	return clusterID, nil
 }

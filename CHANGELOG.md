@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.2.1] - 2024-08-26
+
+## Added
+
+* timeout for cluster_id search
+* timeout for system table export
+* added back -t pat prompt this fits in well with current collection strategies and passing in the pat to standard is not obvious for everyone
+
+## Changed
+
+* calling remote cleanup as soon as a tarball is transferred
+
+## Removed
+
+* removed --dremio-pat-token this flag was hidden but still in use in some cases, this was intended to be removed awhile ago use the --pat-prompt instead 
+
+## Fixed
+
+* logger was never being reset after copy to archive, this is fixed
+
 ## [3.2.0] - 2024-08-23
 
 ### Changed
@@ -721,7 +741,8 @@ someone has added the PAT which is always available
 ### Added
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
-
+ 
+[3.2.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.2...v3.2.0
 [3.1.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.0...v3.1.1

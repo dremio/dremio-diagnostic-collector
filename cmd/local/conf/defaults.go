@@ -97,5 +97,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyRestHTTPTimeout, 30)
 	setDefault(confData, KeyDisableFreeSpaceCheck, false)
 	setDefault(confData, KeyMinFreeSpaceGB, 40)
-
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 60)
+	setDefault(confData, KeyCollectClusterIDTimeoutSeconds, 60)
 }

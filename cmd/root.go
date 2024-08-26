@@ -72,6 +72,7 @@ var collectionMode string
 var cliAuthToken string
 var pid string
 var transferThreads int
+var manualPATPrompt bool
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -434,7 +435,7 @@ func Execute(args []string) error {
 			return err
 		}
 
-		if collectionMode == collects.HealthCheckCollection && dremioPAT == "" {
+		if manualPATPrompt || (collectionMode == collects.HealthCheckCollection && dremioPAT == "") {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
 				return fmt.Errorf("unable to get PAT due to: %v", err)
@@ -587,11 +588,7 @@ func init() {
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
 	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
-	RootCmd.Flags().StringVar(&cliAuthToken, conf.KeyDremioPatToken, "", "Dremio Personal Access Token (PAT) for ui")
-	if err := RootCmd.Flags().MarkHidden(conf.KeyDremioPatToken); err != nil {
-		fmt.Printf("unable to mark flag hidden critical error %v", err)
-		os.Exit(1)
-	}
+	RootCmd.Flags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
 	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
 	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {

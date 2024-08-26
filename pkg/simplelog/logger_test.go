@@ -18,6 +18,7 @@ package simplelog
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -40,8 +41,11 @@ func TestLogger(t *testing.T) {
 
 	for _, tt := range tests {
 		buf := new(bytes.Buffer)
-
-		logger := newLogger()
+		temp, err := os.CreateTemp(t.TempDir(), "logs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		logger := newLogger(temp, func() { temp.Close() })
 		logger.debugLogger.SetOutput(buf)
 		logger.infoLogger.SetOutput(buf)
 		logger.warningLogger.SetOutput(buf)
@@ -71,7 +75,7 @@ func TestLogger(t *testing.T) {
 }
 
 func TestStartLogMessage(t *testing.T) {
-	InitLogger(4)
+	InitLogger()
 	loc := GetLogLoc()
 	if loc == "" {
 		t.Error("expected log file to not be empty but it was")
@@ -88,7 +92,7 @@ func TestStartLogMessage(t *testing.T) {
 }
 
 func TestEndLogMessage(t *testing.T) {
-	InitLogger(4)
+	InitLogger()
 	loc := GetLogLoc()
 	out, err := output.CaptureOutput(func() {
 		LogEndMessage()
@@ -114,8 +118,11 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	infobuf := new(bytes.Buffer)
 	warnbuf := new(bytes.Buffer)
 	errbuf := new(bytes.Buffer)
-
-	logger := newLogger()
+	temp, err := os.CreateTemp(t.TempDir(), "log")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger := newLogger(temp, func() { temp.Close() })
 	logger.debugLogger.SetOutput(dbbuf)
 	logger.infoLogger.SetOutput(infobuf)
 	logger.warningLogger.SetOutput(warnbuf)

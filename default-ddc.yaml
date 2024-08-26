@@ -40,6 +40,8 @@
 # collect-jstack: false
 # collect-ttop: true
 # collect-system-tables-export: true
+# collect-system-tables-timeout-seconds: 60
+# collect-cluster-id-timeout-seconds: 60
 # system-tables-row-limit: 100000
 # collect-wlm: true
 # collect-kvstore-report: true

@@ -83,6 +83,8 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
 		{conf.KeyAllowInsecureSSL, true},
+		{conf.KeyCollectSystemTablesTimeoutSeconds, 60},
+		{conf.KeyCollectClusterIDTimeoutSeconds, 60},
 	}
 
 	for _, check := range checks {

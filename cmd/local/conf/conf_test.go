@@ -100,6 +100,8 @@ collect-wlm: true
 collect-ttop: true
 collect-system-tables-export: true
 collect-kvstore-report: true
+collect-system-tables-timeout-seconds: 10
+collect-cluster-id-timeout-seconds: 12
 `, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"), tarballOutDir, ts.URL)
 	}
 	cfgContent = strings.ReplaceAll(cfgContent, "\\", "\\\\")
@@ -369,6 +371,14 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("expected dremio-pid-detection to be disabled")
 	}
 
+	if cfg.CollectSystemTablesTimeoutSeconds() != 10 {
+		t.Errorf("expected timeout of 10 seconds for system tables collection")
+	}
+
+	if cfg.CollectClusterIDTimeoutSeconds() != 12 {
+		t.Errorf("expected timeout of 12 seconds for cluster id collection")
+	}
+
 	afterEachConfTest()
 }
 
@@ -426,7 +436,7 @@ collect-kvstore-report: true
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
 	testLog := filepath.Join(t.TempDir(), "ddc.log")
-	simplelog.InitLoggerWithFile(4, testLog)
+	simplelog.InitLoggerWithFile(testLog)
 	//should log redacted when token is present
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
@@ -440,7 +450,7 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	if err := simplelog.Close(); err != nil {
 		t.Fatal(err)
 	}
-	defer simplelog.InitLogger(4)
+	defer simplelog.InitLogger()
 	b, err := os.ReadFile(testLog)
 	if err != nil {
 		t.Fatal(err)

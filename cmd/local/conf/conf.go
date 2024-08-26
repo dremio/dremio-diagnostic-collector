@@ -89,39 +89,41 @@ type CollectConf struct {
 	dremioCloudAppEndpoint     string
 
 	// advanced variables settable by configuration or environment variable
-	outputDir                   string
-	tarballOutDir               string
-	dremioTtopTimeSeconds       int
-	dremioTtopFreqSeconds       int
-	dremioJFRTimeSeconds        int
-	dremioJStackFreqSeconds     int
-	dremioJStackTimeSeconds     int
-	dremioLogsNumDays           int
-	dremioGCFilePattern         string
-	dremioQueriesJSONNumDays    int
-	jobProfilesNumSlowExec      int
-	jobProfilesNumHighQueryCost int
-	jobProfilesNumSlowPlanning  int
-	jobProfilesNumRecentErrors  int
-	allowInsecureSSL            bool
-	collectJFR                  bool
-	collectJStack               bool
-	collectKVStoreReport        bool
-	collectServerLogs           bool
-	collectMetaRefreshLogs      bool
-	collectQueriesJSON          bool
-	collectDremioConfiguration  bool
-	collectReflectionLogs       bool
-	collectSystemTablesExport   bool
-	systemTablesRowLimit        int
-	collectOSConfig             bool
-	collectDiskUsage            bool
-	collectGCLogs               bool
-	collectTtop                 bool
-	collectWLM                  bool
-	nodeName                    string
-	restHTTPTimeout             int
-	minFreeSpaceCheckGB         int
+	outputDir                         string
+	tarballOutDir                     string
+	dremioTtopTimeSeconds             int
+	dremioTtopFreqSeconds             int
+	dremioJFRTimeSeconds              int
+	dremioJStackFreqSeconds           int
+	dremioJStackTimeSeconds           int
+	dremioLogsNumDays                 int
+	dremioGCFilePattern               string
+	dremioQueriesJSONNumDays          int
+	jobProfilesNumSlowExec            int
+	jobProfilesNumHighQueryCost       int
+	jobProfilesNumSlowPlanning        int
+	jobProfilesNumRecentErrors        int
+	allowInsecureSSL                  bool
+	collectJFR                        bool
+	collectJStack                     bool
+	collectKVStoreReport              bool
+	collectServerLogs                 bool
+	collectMetaRefreshLogs            bool
+	collectQueriesJSON                bool
+	collectDremioConfiguration        bool
+	collectReflectionLogs             bool
+	collectSystemTablesExport         bool
+	collectSystemTablesTimeoutSeconds int
+	systemTablesRowLimit              int
+	collectClusterIDTimeoutSeconds    int
+	collectOSConfig                   bool
+	collectDiskUsage                  bool
+	collectGCLogs                     bool
+	collectTtop                       bool
+	collectWLM                        bool
+	nodeName                          string
+	restHTTPTimeout                   int
+	minFreeSpaceCheckGB               int
 
 	// variables
 	systemtables            []string
@@ -499,6 +501,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 	c.allowInsecureSSL = GetBool(confData, KeyAllowInsecureSSL)
 	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
+	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
+	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
 	// collect rest apis
 	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
 	if disableRESTAPI {
@@ -939,4 +943,12 @@ func (c *CollectConf) DremioRocksDBDir() string {
 
 func (c *CollectConf) MinFreeSpaceGB() int {
 	return c.minFreeSpaceCheckGB
+}
+
+func (c *CollectConf) CollectSystemTablesTimeoutSeconds() int {
+	return c.collectSystemTablesTimeoutSeconds
+}
+
+func (c *CollectConf) CollectClusterIDTimeoutSeconds() int {
+	return c.collectClusterIDTimeoutSeconds
 }

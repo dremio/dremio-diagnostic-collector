@@ -377,13 +377,14 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-	hook.AddFinalSteps(func() {
+	tarballCleanup := func() {
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
 			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", c.Host, err, out)
 		} else {
 			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
 		}
-	}, fmt.Sprintf("removing tarball %v on host %v", tarGZ, c.Host))
+	}
+	hook.AddFinalSteps(tarballCleanup, fmt.Sprintf("removing tarball %v on host %v", tarGZ, c.Host))
 	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := c.Collector.CopyFromHost(c.Host, tarGZ, destFile); err != nil {
 		nodeState := consoleprint.NodeState{
@@ -398,6 +399,8 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, c.Host, outDir, err, out)
 	}
+	// cleanup tarball ASAP
+	tarballCleanup()
 
 	hook.AddFinalSteps(func() {
 		if _, err := os.Stat(outputLoc); err == nil {

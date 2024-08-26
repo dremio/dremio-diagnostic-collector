@@ -34,7 +34,7 @@ import (
 func TestJFRCapture(t *testing.T) {
 	logLoc := filepath.Join(t.TempDir(), "ddc.log")
 
-	simplelog.InitLoggerWithFile(4, logLoc)
+	simplelog.InitLoggerWithFile(logLoc)
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
 	if err := cmd.Start(); err != nil {
@@ -45,7 +45,7 @@ func TestJFRCapture(t *testing.T) {
 		if err != nil {
 			t.Log(err)
 		}
-		simplelog.InitLoggerWithFile(4, filepath.Join(os.TempDir(), "ddc.log"))
+		simplelog.InitLoggerWithFile(filepath.Join(os.TempDir(), "ddc.log"))
 	}()
 
 	defer func() {
@@ -127,13 +127,13 @@ dremio-jfr-time-seconds: 2
 func TestJFRCaptureWithExistingJFR(t *testing.T) {
 	logLoc := filepath.Join(t.TempDir(), "ddc.log")
 
-	simplelog.InitLoggerWithFile(4, logLoc)
+	simplelog.InitLoggerWithFile(logLoc)
 	defer func() {
 		err := simplelog.Close()
 		if err != nil {
 			t.Log(err)
 		}
-		simplelog.InitLoggerWithFile(4, filepath.Join(os.TempDir(), "ddc.log"))
+		simplelog.InitLoggerWithFile(filepath.Join(os.TempDir(), "ddc.log"))
 	}()
 	jarLoc := filepath.Join("testdata", "demo.jar")
 	cmd := exec.Command("java", "-jar", "-Dmyflag=1", "-Xmx128M", jarLoc)
