@@ -665,7 +665,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 		hook.Cleanup()
 		simplelog.Infof("removing tarball out folder if present")
 		killOnlyCleanup()
-		simplelog.Infof("cleanup complete")
+		simplelog.Infof("cleanup after graceful interrupt complete")
 		os.Exit(1)
 	}()
 	simplelog.Infof("ddc local-collect version: %v", versions.GetCLIVersion())

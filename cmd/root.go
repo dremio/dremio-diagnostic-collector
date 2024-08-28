@@ -110,7 +110,7 @@ for kubernetes deployments:
 // startTicker starts a ticker that ticks every specified duration and returns
 // a function that can be called to stop the ticker.
 func startTicker() (stop func()) {
-	ticker := time.NewTicker(time.Second * 2)
+	ticker := time.NewTicker(time.Second * 1)
 	quit := make(chan struct{})
 	consoleprint.PrintState()
 	go func() {
@@ -360,7 +360,7 @@ func Execute(args []string) error {
 				}
 
 				prompt = promptui.Prompt{
-					Label: "executor list ex (192.168.1.10,192.168.1.12)",
+					Label: "executor list ex (192.168.1.10,192.168.1.12) or blank to skip",
 				}
 				executorsStr, err = prompt.Run()
 				if err != nil {
@@ -537,7 +537,8 @@ func Execute(args []string) error {
 			LabelSelector: labelSelector,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, enableFallback, hook); err != nil {
-			consoleprint.UpdateResult(err.Error())
+			consoleprint.LogWarnings(err.Error())
+			return nil
 		}
 		// we put the error in result so just return nil
 		if !disablePrompt {

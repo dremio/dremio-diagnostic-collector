@@ -91,7 +91,7 @@ func (c *CmdSSHActions) CleanupRemote() error {
 		sshArgs = append(sshArgs, fmt.Sprintf("%v@%v", c.sshUser, host))
 		sshArgs = c.addSSHUser(sshArgs)
 		sshArgs = append(sshArgs, "kill")
-		sshArgs = append(sshArgs, "-15")
+		sshArgs = append(sshArgs, "-2")
 		sshArgs = append(sshArgs, out)
 		out, err = c.cli.Execute(false, sshArgs...)
 		if err != nil {

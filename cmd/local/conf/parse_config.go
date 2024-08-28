@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 	"gopkg.in/yaml.v3"
 )
@@ -42,6 +43,11 @@ func ParseConfig(ddcYamlLoc string, overrides map[string]string) (map[string]int
 
 	simplelog.Infof("conf %v parsed successfully", absPath)
 	for k, v := range overrides {
+		if k == KeyTmpOutputDir {
+			warnMsg := fmt.Sprintf("DEPRECATED option %v was set in ddc.yaml. This may break collection weird ways", k)
+			consoleprint.LogWarnings(warnMsg)
+			simplelog.Warning(warnMsg)
+		}
 		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
 		if v == "\"\"" {
 			data[k] = ""

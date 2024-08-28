@@ -54,6 +54,7 @@ type CollectionStats struct {
 	patSet               bool
 	startTime            int64
 	endTime              int64
+	warnings             []string
 	mu                   sync.RWMutex // Mutex to protect access
 }
 
@@ -68,6 +69,12 @@ type ErrorOut struct {
 }
 type WarnOut struct {
 	Warning string `json:"warning"`
+}
+
+func LogWarnings(msg string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.warnings = append(c.warnings, msg)
 }
 
 func WarningPrint(msg string) {
@@ -331,6 +338,7 @@ Collection Mode      : %v
 Collection Args      : %v
 Dremio PAT Set       : %v
 Autodetect Enabled   : %v
+Warnings:            : %v
 
 -- status --
 Transfers Complete   : %v/%v
@@ -340,7 +348,7 @@ Result               : %v
 
 
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, strings.Join(c.warnings, "\n"), c.TransfersComplete, total,
 		durationElapsed, c.tarball, c.result, nodes.String())
 	c.mu.Unlock()
 

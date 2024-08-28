@@ -84,6 +84,17 @@ type HostCaptureConfiguration struct {
 	CollectionMode string
 }
 
+func ValidateNodesDontOverlap(coordinators []string, executors []string) error {
+	for _, c := range coordinators {
+		for _, e := range executors {
+			if c == e {
+				return fmt.Errorf("node %v is in the coordinators and executors list this is not supported", c)
+			}
+		}
+	}
+	return nil
+}
+
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection ...func([]string)) error {
 	start := time.Now().UTC()
 	outputLoc := collectionArgs.OutputLoc
@@ -122,6 +133,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		return err
 	}
 
+	//validate lists
+	if err := ValidateNodesDontOverlap(executors, coordinators); err != nil {
+		return err
+	}
 	totalNodes := len(executors) + len(coordinators)
 	if totalNodes == 0 {
 		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
@@ -164,6 +179,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		if err != nil {
 			simplelog.Errorf("error during cleanup %v", err)
 		}
+		// give time to the cleanup to finish
+		time.Sleep(30 * time.Second)
 	}, "killing ddc local-collect processes")
 	for _, coordinator := range coordinators {
 		nodesConnectedTo++
@@ -184,6 +201,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 			skipRESTCalls := false
 			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
+				consoleprint.LogWarnings(fmt.Sprintf("failure capturing coordinator %v with error %v", coordinator, err))
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
 				return
 			}
@@ -196,6 +214,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 					m.Lock()
 					totalFailedFiles = append(totalFailedFiles, f)
 					m.Unlock()
+					consoleprint.LogWarnings(fmt.Sprintf("failure capturing coordinator %v with error %v", coordinator, err))
 				} else {
 					m.Lock()
 					tarballs = append(tarballs, f)

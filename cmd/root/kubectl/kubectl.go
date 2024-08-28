@@ -210,7 +210,7 @@ func (c *CliK8sActions) CleanupRemote() error {
 		simplelog.Infof("pid for host %v is %v", host, string(out[:]))
 		kubectlArgs = []string{"exec", "-n", c.namespace, "-c", container, host, "--"}
 		kubectlArgs = append(kubectlArgs, "kill")
-		kubectlArgs = append(kubectlArgs, "-15")
+		kubectlArgs = append(kubectlArgs, "-2")
 		kubectlArgs = append(kubectlArgs, string(out[:]))
 		ctx, timeoutKill := context.WithTimeout(context.Background(), time.Second*time.Duration(120))
 		defer timeoutKill()

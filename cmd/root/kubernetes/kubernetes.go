@@ -169,7 +169,7 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 		cmd = []string{
 			"sh",
 			"-c",
-			fmt.Sprintf("kill -15 %v", w.String()),
+			fmt.Sprintf("kill -2 %v", w.String()),
 		}
 		option = &v1.PodExecOptions{
 			Container: containerName,

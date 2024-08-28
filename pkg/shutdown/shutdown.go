@@ -112,6 +112,7 @@ func (h *hookImpl) Interrupt() {
 	var counter int
 	simplelog.Debugf("%v tasks to run on cleanup", totalTasks)
 	for _, j := range h.cancelOnly {
+		time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update
 		counter++
 		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown initial stage: %v", j.name)
@@ -119,6 +120,7 @@ func (h *hookImpl) Interrupt() {
 	}
 	h.cancelOnly = []cleanupTask{}
 	for _, j := range h.cleanups {
+		time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update
 		counter++
 		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task: %v", j.name)
@@ -127,6 +129,7 @@ func (h *hookImpl) Interrupt() {
 	//blank
 	h.cleanups = []cleanupTask{}
 	for _, j := range h.finalSteps {
+		time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update
 		counter++
 		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task final stage: %v", j.name)
@@ -152,6 +155,7 @@ func (h *hookImpl) Cleanup() {
 	simplelog.Debugf("%v tasks to run on cleanup", totalTasks)
 
 	for _, j := range h.cleanups {
+		time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update
 		counter++
 		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task: %v", j.name)
@@ -161,6 +165,7 @@ func (h *hookImpl) Cleanup() {
 	h.cleanups = []cleanupTask{}
 	for _, j := range h.finalSteps {
 		counter++
+		time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update
 		consoleprint.UpdateResult(fmt.Sprintf("CLEANUP TASKS - %v/%v. %v", counter, totalTasks, j.name))
 		simplelog.Debugf("shutdown task final stage: %v", j.name)
 		j.p()

@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.2.2] - 2024-08-29
+
+## Changed
+
+* log a warning when --tmp-out-dir is set in the ddc.yaml that this is may break the tarball in weird ways
+* prevent executors and coordinators from having the same host in both lists
+* allow the UI prompt to not specify an executor for ssh (blank will be accepted)
+* using SIGINT instead of SIGKILL for dremio interrupt
+* Adding sleep on CTRL+C cleanup for local-collect to allow writes in flight to finish before removing the work dir
+
 ## [3.2.1] - 2024-08-26
 
 ## Added
@@ -742,6 +752,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.2...v3.2.0
 [3.1.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.1...v3.1.2

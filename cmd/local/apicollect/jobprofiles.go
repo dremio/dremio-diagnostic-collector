@@ -126,8 +126,14 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (t
 			fmt.Println("JOB COMPLETED - JOB PROFILES COLLECTION")
 		}
 	} else {
-		simplelog.Info("No job profiles to collect exiting...")
+		msg := "No job profiles to collect exiting"
+		simplelog.Error(msg)
 		fmt.Println("JOB FAILED - JOB PROFILES COLLECTION - no profiles to collect")
+	}
+	if collected == 0 {
+		msg := "No job profiles were successfully collected"
+		simplelog.Error(msg)
+		fmt.Println("JOB FAILED - JOB PROFILES COLLECTION - no profiles collected")
 	}
 	return tried, collected, nil
 }
