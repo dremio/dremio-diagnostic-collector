@@ -243,42 +243,42 @@ func newLogger(f io.Writer, cleanup func()) *Logger {
 }
 
 func (l *Logger) Debug(format string) {
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(l.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func (l *Logger) Info(format string) {
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(l.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func (l *Logger) Warning(format string) {
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(l.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func (l *Logger) Error(format string) {
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(l.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func (l *Logger) Debugf(format string, v ...interface{}) {
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func (l *Logger) Infof(format string, v ...interface{}) {
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func (l *Logger) Warningf(format string, v ...interface{}) {
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func (l *Logger) Errorf(format string, v ...interface{}) {
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 
@@ -287,56 +287,56 @@ func (l *Logger) Errorf(format string, v ...interface{}) {
 func Debug(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(logger.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func Info(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(logger.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func Warning(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(logger.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func Error(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.LimitString(format, msgMax)
+	trimmed := strutils.GetEndOfString(format, msgMax)
 	handleLogError(logger.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func Debugf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func Infof(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func Warningf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func Errorf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.LimitString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 

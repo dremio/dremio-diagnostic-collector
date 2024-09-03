@@ -325,7 +325,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			StatusUX:   "LOCAL-COLLECT",
 			Result:     consoleprint.ResultFailure,
 			EndProcess: true,
-			Message:    strutils.LimitString(strings.Join(allHostLog, " - "), 1024),
+			Message:    strutils.GetEndOfString(strings.Join(allHostLog, " - "), 1024),
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))

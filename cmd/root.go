@@ -130,7 +130,6 @@ func startTicker() (stop func()) {
 		close(quit)
 	}
 }
-
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool, hook shutdown.Hook) error {
 	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(

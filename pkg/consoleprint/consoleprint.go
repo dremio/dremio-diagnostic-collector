@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
 )
 
 // NodeCaptureStats represents stats for a node capture.
@@ -54,6 +56,7 @@ type CollectionStats struct {
 	patSet               bool
 	startTime            int64
 	endTime              int64
+	warnings             []string
 	mu                   sync.RWMutex // Mutex to protect access
 }
 
@@ -155,6 +158,16 @@ func UpdateCollectionMode(collectionMode string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.collectionMode = collectionMode
+}
+
+// AddWarningToConsole adds a trimed string to the list of warnings
+// lines after the first line are also trimmed
+func AddWarningToConsole(warning string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	tokens := strings.Split(warning, "\n")
+	trimmed := tokens[0]
+	c.warnings = append(c.warnings, strutils.TruncateString(trimmed, 120))
 }
 
 var c *CollectionStats
@@ -315,6 +328,13 @@ func PrintState() {
 	if c.ddcVersion != "" {
 		ddcVersion = c.ddcVersion
 	}
+	var warningsBuilder strings.Builder
+	for i, w := range c.warnings {
+		_, err := warningsBuilder.WriteString(fmt.Sprintf("%v. %v\n", i+1, w))
+		if err != nil {
+			fmt.Printf("unable to write string %v: (%v)", w, err)
+		}
+	}
 	fmt.Printf(
 		`=================================
 == Dremio Diagnostic Collector ==
@@ -338,10 +358,13 @@ Collect Duration     : elapsed %v seconds
 Tarball              : %v
 Result               : %v
 
+-- Warnings --
+%v
+
 
 %v
 `, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
-		durationElapsed, c.tarball, c.result, nodes.String())
+		durationElapsed, c.tarball, c.result, warningsBuilder.String(), nodes.String())
 	c.mu.Unlock()
 
 }

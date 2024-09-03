@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.2.2] - 2024-09-03
+
+## Changed
+
+* added note that the executor can be empty during the UI prompts
+
+## Added
+
+* remove host from executor list if it is present in the coordinator list
+* remove a host from the list of nodes if it has been specified twice
+
 ## [3.2.1] - 2024-08-26
 
 ## Added

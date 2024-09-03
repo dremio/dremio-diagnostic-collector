@@ -19,7 +19,7 @@ import (
 	"unicode/utf8"
 )
 
-func LimitString(s string, maxLength int) string {
+func GetEndOfString(s string, maxLength int) string {
 	max := 0
 	if maxLength > 0 {
 		max = maxLength
@@ -29,10 +29,22 @@ func LimitString(s string, maxLength int) string {
 		return s
 	}
 
-	// Truncate the string to the desired length
+	// get the end of the string up to desired length
 	runes := []rune(s)
 	truncatedRunes := runes[len(runes)-max:]
 	return string(truncatedRunes)
+}
+
+func TruncateString(s string, maxLength int) string {
+	max := 0
+	if maxLength > 0 {
+		max = maxLength
+	}
+	// Check if the string is already within the desired length
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	return s[:max]
 }
 
 func GetLastLine(s string) string {

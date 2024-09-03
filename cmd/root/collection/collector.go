@@ -22,6 +22,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -84,6 +86,58 @@ type HostCaptureConfiguration struct {
 	CollectionMode string
 }
 
+func FilterCoordinators(coordinators []string) []string {
+	// use a map for the unique key property, so we handle duplicates in the list
+	filteredList := make(map[string]bool)
+	for _, e := range coordinators {
+		filteredList[e] = true
+	}
+	// convert back into a slice
+	// again we are dealing with not
+	// large enough sizes to warrant optimization
+	var result []string
+	for k := range filteredList {
+		result = append(result, k)
+	}
+	// sort for consistent behavior and testing
+	slices.Sort(result)
+	slices.Reverse(result)
+	return result
+}
+
+func FilterExecutors(executors []string, coordinators []string) []string {
+	// use a map for the unique key property, so we handle duplicates in the list
+	filteredList := make(map[string]bool)
+	for _, e := range executors {
+		// we're not going to bother optimizing this:
+		// the list will not be long enough to matter
+		var dupe bool
+		// if it's a coordinator we don't need it
+		for _, c := range coordinators {
+			if c == e {
+				dupe = true
+				simplelog.Warningf("found %v in coordinator and executor list, removing from executor list", e)
+				consoleprint.AddWarningToConsole(fmt.Sprintf("%v was listed as executor and coordinator, choosing coordinator", e))
+				break
+			}
+		}
+		if !dupe {
+			filteredList[e] = true
+		}
+	}
+	// convert back into a slice
+	// again we are dealing with not
+	// large enough sizes to warrant optimization
+	var result []string
+	for k := range filteredList {
+		result = append(result, k)
+	}
+	// sort for consistent behavior and testing
+	sort.Strings(result)
+	slices.Reverse(result)
+	return result
+}
+
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection ...func([]string)) error {
 	start := time.Now().UTC()
 	outputLoc := collectionArgs.OutputLoc
@@ -117,10 +171,11 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		return err
 	}
 
-	executors, err := c.GetExecutors()
+	executorsRaw, err := c.GetExecutors()
 	if err != nil {
 		return err
 	}
+	executors := FilterExecutors(executorsRaw, coordinators)
 
 	totalNodes := len(executors) + len(coordinators)
 	if totalNodes == 0 {
