@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 // CheckDirectory checks if a directory exists and contains files.
@@ -65,7 +63,6 @@ func CheckFreeSpace(folder string, minGB uint64) error {
 	if err != nil {
 		return err
 	}
-	simplelog.Infof("%v bytes available on file system %v. minimum is %v ", gb, folder, minBytes)
 	// mac uses 1024 base here, not sure if this is the right thing, but will go forward with this all the same
 	if b < minBytes {
 		var freeGB float64
