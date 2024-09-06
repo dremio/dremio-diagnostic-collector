@@ -1,33 +1,39 @@
 # Changelog
 
+## [3.2.3] - 2024-09-06
+
+### Removed
+
+* extra log showing free disk space was confusing so it has been removed
+
 ## [3.2.2] - 2024-09-03
 
-## Changed
+### Changed
 
 * added note that the executor can be empty during the UI prompts
 
-## Added
+### Added
 
 * remove host from executor list if it is present in the coordinator list
 * remove a host from the list of nodes if it has been specified twice
 
 ## [3.2.1] - 2024-08-26
 
-## Added
+### Added
 
 * timeout for cluster_id search
 * timeout for system table export
 * added back -t pat prompt this fits in well with current collection strategies and passing in the pat to standard is not obvious for everyone
 
-## Changed
+### Changed
 
 * calling remote cleanup as soon as a tarball is transferred
 
-## Removed
+### Removed
 
 * removed --dremio-pat-token this flag was hidden but still in use in some cases, this was intended to be removed awhile ago use the --pat-prompt instead 
 
-## Fixed
+### Fixed
 
 * logger was never being reset after copy to archive, this is fixed
 
