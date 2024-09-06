@@ -2,6 +2,15 @@
 
 ## [3.2.3] - 2024-09-06
 
+### Added
+
+* --context or -x flag to provide support for passing the kubernetes context into ddc, this works for both the 
+kubeAPI as well as the the kubectl based collection
+* the current context is detected if none is supplied
+* added the context used to the logs
+* added the context used to the collection type output
+* we now log the URL of the kubernetes REST api server
+
 ### Removed
 
 * extra log showing free disk space was confusing so it has been removed
@@ -759,6 +768,8 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.2...v3.2.3
+[3.2.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.2...v3.2.0
 [3.1.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.1.1...v3.1.2

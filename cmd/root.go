@@ -63,6 +63,7 @@ var outputLoc string
 
 var sudoUser string
 var namespace string
+var k8sContext string
 var disableFreeSpaceCheck bool
 var disableKubeCtl bool
 var minFreeSpaceGB int
@@ -176,7 +177,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			return err
 		}
 		if !disableKubeCtl {
-			potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace)
+			potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace, kubeArgs.K8SContext)
 			if err != nil {
 				simplelog.Warningf("kubectl not available failling back to kubeapi: %v", err)
 			} else {
@@ -197,11 +198,16 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		)
 
 		clusterCollect = func(pods []string) {
-			err = collection.ClusterK8sExecute(hook, kubeArgs.Namespace, cs, collectionArgs.DDCfs)
+			clientSet, _, err := kubernetes.GetClientset(k8sContext)
+			if err != nil {
+				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
+				return
+			}
+			err = collection.ClusterK8sExecute(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
-			err = collection.GetClusterLogs(hook, kubeArgs.Namespace, cs, collectionArgs.DDCfs, pods)
+			err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, pods)
 			if err != nil {
 				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 			}
@@ -534,6 +540,7 @@ func Execute(args []string) error {
 		kubeArgs := kubernetes.KubeArgs{
 			Namespace:     namespace,
 			LabelSelector: labelSelector,
+			K8SContext:    k8sContext,
 		}
 		if err := RemoteCollect(collectionArgs, sshArgs, kubeArgs, enableFallback, hook); err != nil {
 			consoleprint.UpdateResult(err.Error())
@@ -580,6 +587,7 @@ func init() {
 
 	// k8s flags
 	RootCmd.Flags().StringVarP(&namespace, "namespace", "n", "", "K8S ONLY: namespace to use for kubernetes pods")
+	RootCmd.Flags().StringVarP(&k8sContext, "context", "x", "", "K8S ONLY: context to use for kubernetes pods")
 	RootCmd.Flags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 
 	// shared flags

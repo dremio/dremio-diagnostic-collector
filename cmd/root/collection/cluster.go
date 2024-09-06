@@ -26,18 +26,18 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/helpers"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sapi "k8s.io/client-go/kubernetes"
 )
 
 var clusterRequestTimeout = 120
 
-func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem) error {
+func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
 	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
 	if err != nil {
@@ -51,13 +51,15 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, cs CopyStrate
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
 		return err
 	}
-	if err := saveZookeeperPodLogs(hook, namespace, cs, ddfs, path); err != nil {
+
+	if err := saveZookeeperPodLogs(hook, namespace, c, cs, ddfs, path); err != nil {
 		simplelog.Errorf("unable to save zookeeper pod logs: %v", err)
 	}
+
 	// everything else
 	for _, cmd := range cmds {
 		resource := cmd
-		out, err := clusterExecuteBytes(hook, namespace, resource)
+		out, err := clusterExecuteBytes(hook, namespace, c, resource)
 		if err != nil {
 			simplelog.Errorf("when getting cluster config, error was %v", err)
 			continue
@@ -80,16 +82,13 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, cs CopyStrate
 	return nil
 }
 
-func GetClusterLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
+func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
 		return err
 	}
-	clientSet, _, err := kubernetes.GetClientset()
-	if err != nil {
-		return err
-	}
+
 	// Loop over pods
 	for _, podname := range pods {
 		podObj, err := clientSet.CoreV1().Pods(namespace).Get(context.Background(), podname, metav1.GetOptions{})
@@ -97,12 +96,12 @@ func GetClusterLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy,
 			simplelog.Errorf("unable to get pod %v: %v", podname, err)
 			continue
 		}
-		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, path, podname)
+		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, clientSet, path, podname)
 	}
 	return err
 }
 
-func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace, path, podname string) {
+func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace string, c *k8sapi.Clientset, path string, podname string) {
 	var containers []string
 	for _, c := range podObj.Spec.Containers {
 		containers = append(containers, c.Name)
@@ -114,19 +113,14 @@ func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrate
 	// write the output of the kubectl logs command to a file
 	for _, container := range containers {
 		// save previous logs if present
-		copyContainerLog(hook, cs, ddfs, container, namespace, path, podname, true)
+		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podname, true)
 		// save current logs
-		copyContainerLog(hook, cs, ddfs, container, namespace, path, podname, false)
+		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podname, false)
 	}
 	consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
 }
 
-func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace, path, pod string, previous bool) {
-	client, _, err := kubernetes.GetClientset()
-	if err != nil {
-		simplelog.Errorf("unable to get k8s client for collecting logs on pod: %v container: %v with error: %v", pod, container, err)
-		return
-	}
+func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace string, client *k8sapi.Clientset, path string, pod string, previous bool) {
 	timeoutDuration := time.Duration(clusterRequestTimeout) * time.Second
 	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while copying container %s from pod %s in namespace %s timeout exceeded %v", container, pod, namespace, timeoutDuration))
 	defer timeout() // releases resources if slowOperation completes before timeout elapses
@@ -177,18 +171,14 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 	}
 }
 
-func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, cs CopyStrategy, ddfs helpers.Filesystem, path string) error {
-	c, _, err := kubernetes.GetClientset()
-	if err != nil {
-		return err
-	}
+func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, path string) error {
 	options := metav1.ListOptions{
 		LabelSelector: "app=zk",
 	}
 	timeoutDuration := 60 * time.Second
 	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while getting resource zk pod in namespace %s timeout exceeded %v", namespace, timeoutDuration))
 	defer timeout()
-	list, err := c.CoreV1().Pods(namespace).List(ctx, options)
+	list, err := clientSet.CoreV1().Pods(namespace).List(ctx, options)
 	if err != nil {
 		switch ctx.Err() {
 		case context.DeadlineExceeded:
@@ -199,7 +189,7 @@ func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, cs CopyStr
 	}
 	for _, c := range list.Items {
 		cb := c
-		saveLogsFromPod(&cb, hook, cs, ddfs, namespace, path, c.Name)
+		saveLogsFromPod(&cb, hook, cs, ddfs, namespace, clientSet, path, c.Name)
 	}
 	return nil
 }
@@ -207,11 +197,7 @@ func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, cs CopyStr
 // Execute commands at the cluster level
 // Calls a raw execute function and simply writes out the byte array read from the response
 // that comes in directly from kubectl
-func clusterExecuteBytes(hook shutdown.CancelHook, namespace, resource string) ([]byte, error) {
-	c, _, err := kubernetes.GetClientset()
-	if err != nil {
-		return []byte(""), err
-	}
+func clusterExecuteBytes(hook shutdown.CancelHook, namespace string, c *k8sapi.Clientset, resource string) ([]byte, error) {
 	options := metav1.ListOptions{}
 	var b []byte
 	timeoutDuration := 60 * time.Second

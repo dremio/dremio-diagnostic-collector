@@ -36,15 +36,24 @@ type KubeArgs struct {
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(hook shutdown.CancelHook, namespace string) (*CliK8sActions, error) {
+func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string) (*CliK8sActions, error) {
 	kubectl, err := exec.LookPath("kubectl")
 	if err != nil {
 		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %v", err)
 	}
+	cliInstance := cli.NewCli(hook)
+
+	if k8sContext == "" {
+		k8sContext, err = cliInstance.Execute(false, kubectl, "config", "current-context")
+		if err != nil {
+			return &CliK8sActions{}, fmt.Errorf("unable to retrieve context: %v", err)
+		}
+	}
 	return &CliK8sActions{
-		cli:         cli.NewCli(hook),
+		cli:         cliInstance,
 		kubectlPath: kubectl,
 		namespace:   namespace,
+		k8sContext:  k8sContext,
 		pidHosts:    make(map[string]string),
 	}, nil
 }
@@ -54,6 +63,7 @@ type CliK8sActions struct {
 	cli         cli.CmdExecutor
 	kubectlPath string
 	namespace   string
+	k8sContext  string
 	pidHosts    map[string]string
 	m           sync.Mutex
 }
@@ -64,7 +74,7 @@ func (c *CliK8sActions) cleanLocal(rawDest string) string {
 }
 
 func (c *CliK8sActions) getContainerName(podName string) (string, error) {
-	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[0].name}`)
+	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "--context", c.k8sContext, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[0].name}`)
 	if err != nil {
 		return "", err
 	}
@@ -82,9 +92,9 @@ func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, outpu
 	}
 	var kubectlArgs []string
 	if pat == "" {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-n", c.namespace, "-c", container, hostString, "--"}
+		kubectlArgs = []string{c.kubectlPath, "exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
 	} else {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "-c", container, hostString, "--"}
+		kubectlArgs = []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
 	}
 
 	kubectlArgs = append(kubectlArgs, args...)
@@ -111,7 +121,7 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "50", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container, "--retries", "50", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 }
 
 func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
@@ -124,7 +134,7 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "-c", container, "--retries", "50", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container, "--retries", "50", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 }
 
 func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
@@ -134,7 +144,7 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "-l", "role=dremio-cluster-pod", "-o", "name")
+	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", "role=dremio-cluster-pod", "-o", "name")
 	if err != nil {
 		return []string{}, err
 	}
@@ -195,7 +205,7 @@ func (c *CliK8sActions) CleanupRemote() error {
 			simplelog.Warningf("output of container for host %v: %v", host, err)
 			return
 		}
-		kubectlArgs := []string{"exec", "-n", c.namespace, "-c", container, host, "--"}
+		kubectlArgs := []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
 		kubectlArgs = append(kubectlArgs, "cat")
 		kubectlArgs = append(kubectlArgs, pidFile)
 		ctx, timeoutPid := context.WithTimeout(context.Background(), time.Second*time.Duration(30))
@@ -208,7 +218,7 @@ func (c *CliK8sActions) CleanupRemote() error {
 			return
 		}
 		simplelog.Infof("pid for host %v is %v", host, string(out[:]))
-		kubectlArgs = []string{"exec", "-n", c.namespace, "-c", container, host, "--"}
+		kubectlArgs = []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
 		kubectlArgs = append(kubectlArgs, "kill")
 		kubectlArgs = append(kubectlArgs, "-15")
 		kubectlArgs = append(kubectlArgs, string(out[:]))

@@ -45,6 +45,7 @@ type CollectionStats struct {
 	TransfersComplete    int
 	totalTransfers       int
 	collectionType       string
+	k8sContext           string
 	tarball              string
 	nodeCaptureStats     map[string]*NodeCaptureStats
 	nodeDetectDisabled   map[string]bool
@@ -58,6 +59,13 @@ type CollectionStats struct {
 	endTime              int64
 	warnings             []string
 	mu                   sync.RWMutex // Mutex to protect access
+}
+
+func (c *CollectionStats) GetCollectionType() string {
+	if c.k8sContext == "" {
+		return c.collectionType
+	}
+	return fmt.Sprintf("%v - context used: %v", c.collectionType, c.k8sContext)
 }
 
 var statusOut bool
@@ -158,6 +166,12 @@ func UpdateCollectionMode(collectionMode string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.collectionMode = collectionMode
+}
+
+func UpdateK8SContext(k8sContext string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.k8sContext = k8sContext
 }
 
 // AddWarningToConsole adds a trimed string to the list of warnings
@@ -363,7 +377,7 @@ Result               : %v
 
 
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.collectionType, strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.GetCollectionType(), strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
 		durationElapsed, c.tarball, c.result, warningsBuilder.String(), nodes.String())
 	c.mu.Unlock()
 

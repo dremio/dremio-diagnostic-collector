@@ -48,13 +48,14 @@ import (
 
 type KubeArgs struct {
 	Namespace     string
+	K8SContext    string
 	LabelSelector string
 }
 
 // NewK8sAPI is the only supported way to initialize the NewK8sAPI struct
 // one must pass the path to kubectl
 func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions, error) {
-	clientset, config, err := GetClientset()
+	clientset, config, err := GetClientset(kubeArgs.K8SContext)
 	if err != nil {
 		return &KubeCtlAPIActions{}, err
 	}
@@ -69,7 +70,7 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 	}, nil
 }
 
-func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
+func GetClientset(k8sContext string) (*kubernetes.Clientset, *rest.Config, error) {
 	kubeConfig := os.Getenv("KUBECONFIG")
 	if kubeConfig == "" {
 		home, err := os.UserHomeDir()
@@ -87,11 +88,29 @@ func GetClientset() (*kubernetes.Clientset, *rest.Config, error) {
 			return nil, nil, err
 		}
 	} else {
-		config, err = clientcmd.BuildConfigFromFlags("", kubeConfig)
+		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfig},
+			&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
+		)
+		// for when we have a context of "" we need to log the detected default context so we can display this
+		if k8sContext == "" {
+			startConfig, err := clientConfig.ConfigAccess().GetStartingConfig()
+			if err != nil {
+				return nil, nil, err
+			}
+			simplelog.Infof("current kubernetes context is detected as %v", startConfig.CurrentContext)
+			consoleprint.UpdateK8SContext(startConfig.CurrentContext)
+		} else {
+			simplelog.Infof("using kubernetes context of %v", k8sContext)
+			consoleprint.UpdateK8SContext(k8sContext)
+
+		}
+		config, err = clientConfig.ClientConfig()
 		if err != nil {
 			return nil, nil, err
 		}
 	}
+	simplelog.Debugf("connection to kubernetes API: %v", config.Host)
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, nil, err
@@ -615,7 +634,8 @@ func (c *KubeCtlAPIActions) HelpText() string {
 }
 
 func GetClusters() ([]string, error) {
-	clientset, _, err := GetClientset()
+	// we have just chosen to support the default context in the UI where this is used
+	clientset, _, err := GetClientset("")
 	if err != nil {
 		return []string{}, err
 	}
