@@ -17,9 +17,11 @@ package kubectl
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -50,23 +52,68 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string
 		}
 		k8sContext = strings.TrimSpace(k8sContextRaw)
 	}
+	retriesEnabled, err := CanRetryTransfers(kubectl)
+	if err != nil {
+		return &CliK8sActions{}, fmt.Errorf("unable to run kubectl version so disabling kubectl: %v", err)
+	}
 	return &CliK8sActions{
-		cli:         cliInstance,
-		kubectlPath: kubectl,
-		namespace:   namespace,
-		k8sContext:  k8sContext,
-		pidHosts:    make(map[string]string),
+		cli:            cliInstance,
+		kubectlPath:    kubectl,
+		namespace:      namespace,
+		k8sContext:     k8sContext,
+		pidHosts:       make(map[string]string),
+		retriesEnabled: retriesEnabled,
 	}, nil
 }
 
 // CliK8sActions provides a way to collect and copy files using kubectl
 type CliK8sActions struct {
-	cli         cli.CmdExecutor
-	kubectlPath string
-	namespace   string
-	k8sContext  string
-	pidHosts    map[string]string
-	m           sync.Mutex
+	cli            cli.CmdExecutor
+	kubectlPath    string
+	namespace      string
+	k8sContext     string
+	pidHosts       map[string]string
+	m              sync.Mutex
+	retriesEnabled bool
+}
+
+func CanRetryTransfers(kubectlPath string) (bool, error) {
+	kubectlExec := exec.Command(kubectlPath, "version", "-o", "json")
+	out, err := kubectlExec.Output()
+	if err != nil {
+		return false, err
+	}
+	var results k8sVersion
+	err = json.Unmarshal([]byte(out), &results)
+	if err != nil {
+		return false, err
+	}
+
+	if results.ClientVersion.Major == "1" {
+		parsed, err := strconv.ParseInt(results.ClientVersion.Minor, 10, 32)
+		if err != nil {
+			return false, err
+		}
+		// retries flag starts showing up in 1.23.0
+		if parsed > 22 {
+			return true, nil
+		}
+		msg := fmt.Sprintf("kubectl version %v no retries available, consider upgrading", results.ClientVersion.GitVersion)
+		consoleprint.AddWarningToConsole(msg)
+		simplelog.Warning(msg)
+		return false, nil
+	}
+	return false, nil
+}
+
+type k8sVersion struct {
+	ClientVersion clientVersion `json:"clientVersion"`
+}
+
+type clientVersion struct {
+	Major      string `json:"major"`
+	Minor      string `json:"minor"`
+	GitVersion string `json:"gitVersion"`
 }
 
 func (c *CliK8sActions) cleanLocal(rawDest string) string {
@@ -122,9 +169,17 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container, "--retries", "50", fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
+	args = c.addRetries(args)
+	args = append(args, fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
+	return c.cli.Execute(false, args...)
 }
-
+func (c *CliK8sActions) addRetries(args []string) []string {
+	if c.retriesEnabled {
+		args = append(args, "--retries", "50")
+	}
+	return args
+}
 func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(source, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
@@ -135,7 +190,10 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %v", err)
 	}
-	return c.cli.Execute(false, c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container, "--retries", "50", c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
+	args = c.addRetries(args)
+	args = append(args, c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
+	return c.cli.Execute(false, args...)
 }
 
 func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {

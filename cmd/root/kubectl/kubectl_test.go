@@ -17,8 +17,13 @@ package kubectl
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
@@ -164,5 +169,64 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "50", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
+	}
+}
+
+func TestKubectlCtrlVersion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
+	tmpDir := t.TempDir()
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	oldVersion := fmt.Sprintf("https://dl.k8s.io/release/v1.22.0/bin/%v/%v/kubectl", goos, goarch)
+	newVersion := fmt.Sprintf("https://dl.k8s.io/release/v1.23.0/bin/%v/%v/kubectl", goos, goarch)
+	downloadFile := func(url string, outFile string) error {
+		out, err := os.Create(outFile)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		// Get the data
+		resp, err := http.Get(url) //nolint
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		// Write the body to file
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			return err
+		}
+		if err := os.Chmod(outFile, 0700); err != nil {
+			return err
+		}
+		return nil
+	}
+	oldExec := path.Join(tmpDir, "kubectlOld")
+	if err := downloadFile(oldVersion, oldExec); err != nil {
+		t.Fatalf("unable to download file %v %v: ", oldExec, err)
+	}
+
+	newExec := path.Join(tmpDir, "kubectlNew")
+	if err := downloadFile(newVersion, newExec); err != nil {
+		t.Fatalf("unable to download file %v %v: ", newExec, err)
+	}
+
+	result, err := CanRetryTransfers(oldExec)
+	if err != nil {
+		t.Errorf("unable to execute file %v %v: ", oldExec, err)
+	}
+	if result {
+		t.Error("failed should not be able to retry on old exec")
+	}
+	result, err = CanRetryTransfers(newExec)
+	if err != nil {
+		t.Errorf("unable to execute file %v %v: ", newExec, err)
+	}
+	if !result {
+		t.Error("failed should be able to retry on new exec")
 	}
 }

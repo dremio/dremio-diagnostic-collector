@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.2.4] - 2024-09-09
+
+* added support for using older kubectl clients since the kubectl cp interface is stable, by checking client version we can safely check if retries are supported and only add them if the are
+
 ## [3.2.3] - 2024-09-06
 
 ### Added
@@ -768,6 +772,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.3...v3.2.4
 [3.2.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.1...v3.2.2
 [3.2.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.0...v3.2.1
