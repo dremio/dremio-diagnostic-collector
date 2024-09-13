@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package jps_test validates the jps package
+// go:build local,remote
+
 package jps_test
 
 import (

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package clusterstats provides a placeholder for summary information found inside of a tarball, used by local and remote collect
+// go:build local remote
+
 package clusterstats
 
 type ClusterStats struct {

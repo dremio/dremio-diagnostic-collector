@@ -14,6 +14,8 @@
 
 // package conf_test tests the conf package
 
+// go:build local
+
 package conf_test
 
 import (

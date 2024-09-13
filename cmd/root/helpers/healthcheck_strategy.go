@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // helpers module creates a strategy to determine, where to put the files we copy from the cluster.
+// go:build local remote
+
 package helpers
 
 import (

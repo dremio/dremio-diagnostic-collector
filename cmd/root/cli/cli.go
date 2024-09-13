@@ -14,6 +14,8 @@
 
 // package cli provides wrapper support for executing commands, this is so
 // we can test the rest of the implementations quickly.
+// go:build local
+
 package cli
 
 import (

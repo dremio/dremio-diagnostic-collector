@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // ddcio include helper code for io operations common to ddc
+// go:build local
+
 package ddcio
 
 import (

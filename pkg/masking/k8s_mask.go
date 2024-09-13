@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // masking hides secrets in files and replaces them with redacted text
+
+// go:build remote
+
 package masking
 
 import (

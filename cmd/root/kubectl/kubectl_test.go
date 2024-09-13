@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // kubernetes package provides access to log collections on k8s
+
+// go:build remote
+
 package kubectl
 
 import (

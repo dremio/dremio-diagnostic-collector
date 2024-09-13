@@ -47,12 +47,12 @@ date "+%H:%M:%S"
 echo "Building embedded binary for linux-arm64"
 date "+%H:%M:%S"
 touch ./cmd/root/ddcbinary/output/ddc.zip
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -tags="local" -o ./bin/ddc
 cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 rm ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 echo "Building linux-arm64"
 date "+%H:%M:%S"
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -tags="remote" -o ./bin/ddc
 zip ./bin/ddc-linux-arm64-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md

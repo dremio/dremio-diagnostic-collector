@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // main is the standard go entry point for the application
+
+// go:build local remote
+
 package main
 
 import (

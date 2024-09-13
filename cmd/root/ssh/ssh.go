@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // ssh package uses ssh and scp binaries to execute commands remotely and translate the results back to the calling node
+
+// go:build remote
+
 package ssh
 
 import (

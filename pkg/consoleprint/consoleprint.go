@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package consoleprint contains the logic to update the console UI
+// go:build local remote
+
 package consoleprint
 
 import (

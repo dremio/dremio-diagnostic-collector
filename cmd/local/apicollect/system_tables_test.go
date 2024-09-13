@@ -13,6 +13,9 @@
 // limitations under the License.
 
 // apicollect provides all the methods that collect via the API, this is a substantial part of the activities of DDC so it gets it's own package
+
+// go:build local
+
 package apicollect
 
 import "testing"

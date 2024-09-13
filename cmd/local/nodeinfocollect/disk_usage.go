@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package nodeinfocollect has all the methods for collecting the information for nodeinfo
+// go:build local
+
 package nodeinfocollect
 
 import (

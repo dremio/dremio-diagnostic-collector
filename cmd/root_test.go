@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // cmd package contains all the command line flag and initialization logic for commands
+// go:build local remote
+
 package cmd
 
 import (

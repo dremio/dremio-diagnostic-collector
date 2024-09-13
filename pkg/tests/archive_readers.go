@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package tests provides helper functions and mocks for running tests
+// go:build local remote
+
 package tests
 
 import (

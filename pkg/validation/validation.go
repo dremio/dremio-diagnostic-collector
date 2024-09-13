@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package validation concerns itself with validation configuration
+// go:build local remote
+
 package validation
 
 import (

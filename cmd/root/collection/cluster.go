@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // collection module deals with specific k8s cluster level data collection
+// go:build local remote
+
 package collection
 
 import (

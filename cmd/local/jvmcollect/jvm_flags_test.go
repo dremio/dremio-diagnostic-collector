@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package jvmcollect_test validates the jvmcollect package
+// go:build local
+
 package jvmcollect_test
 
 import (

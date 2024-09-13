@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // output provides functinos around capturing output
+// go:build local
+
 package output
 
 import (

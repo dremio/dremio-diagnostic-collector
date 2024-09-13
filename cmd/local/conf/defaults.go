@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// go:build local
+
 package conf
 
 import "github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // collection package provides the interface for collection implementation and the actual collection execution
+// go:build local remote
+
 package collection
 
 import "testing"

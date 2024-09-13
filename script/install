@@ -25,7 +25,7 @@ if [[ "$ARCH" == "x86_64" ]]; then
 fi
 
 DOWNLOAD=ddc-$OS-$ARCH.zip
-curl -o $DOWNLOAD -L "https://github.com/dremio/dremio-diagnostic-collector/releases/latest/download/$DOWNLOAD"
+curl -tags="remote" -o $DOWNLOAD -L "https://github.com/dremio/dremio-diagnostic-collector/releases/latest/download/$DOWNLOAD"
 unzip $DOWNLOAD
 
 sudo mkdir -p /usr/local/share/ddc

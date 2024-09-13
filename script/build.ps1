@@ -17,7 +17,7 @@ New-Item -ItemType File -Path .\cmd\root\ddcbinary\output\ddc.zip -Force
 # This assumes that you have 'go' installed in your environment
 $env:GOOS="linux"
 $env:GOARCH="amd64"
-go build -ldflags "$LDFLAGS" -o .\bin\ddc
+go build -ldflags "$LDFLAGS" -tags="local" -o .\bin\ddc
 
 # Use Compress-Archive to create zip file and then move it
 Compress-Archive -Path .\bin\ddc -DestinationPath .\bin\ddc.zip
@@ -27,5 +27,5 @@ Remove-Item -Path .\bin\ddc
 $env:GOOS="windows"
 $env:GOARCH="amd64"
 # Build again and copy default-ddc.yaml
-go build -ldflags "$LDFLAGS" -o .\bin\ddc.exe
+go build -ldflags "$LDFLAGS" -tags="remote" -o .\bin\ddc.exe
 Copy-Item -Path .\default-ddc.yaml -Destination .\bin\ddc.yaml

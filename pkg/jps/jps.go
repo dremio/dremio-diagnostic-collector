@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // jps package provides logic for extracting values from jps
+// go:build local remote
+
 package jps
 
 import (

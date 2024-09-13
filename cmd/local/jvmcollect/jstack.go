@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package jvmcollect handles parsing of the jvm information
+// go:build local
+
 package jvmcollect
 
 import (

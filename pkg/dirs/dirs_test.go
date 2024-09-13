@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // dirs_test tests the dirs package
+// go:build local remote
+
 package dirs_test
 
 import (

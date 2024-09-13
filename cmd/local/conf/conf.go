@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package conf provides configuration for the local-collect command
+// go:build local remote
+
 package conf
 
 import (

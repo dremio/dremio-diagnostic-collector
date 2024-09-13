@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// go:build local
+
 package tests
 
 func FindUniqueElements(array1, array2 []string) ([]string, []string) {

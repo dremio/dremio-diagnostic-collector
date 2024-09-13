@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // helpers package provides different functionality
+// go:build local remote
+
 package helpers
 
 import (

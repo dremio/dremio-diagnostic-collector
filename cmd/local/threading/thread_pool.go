@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // threading package provides support for simple concurrency and threading
+// go:build local remote
+
 package threading
 
 import (

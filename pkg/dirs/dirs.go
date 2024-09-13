@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // dirs provides helpers for working with directories on the filesystem
+// go:build local remote
+
 package dirs
 
 import (

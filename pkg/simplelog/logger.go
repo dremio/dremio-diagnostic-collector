@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // simplelog package provides a simple logger
+// go:build local remote
+
 package simplelog
 
 import (

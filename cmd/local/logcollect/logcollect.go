@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package logcollect contains the logic for log collection in the local-collect sub command
+// go:build local
+
 package logcollect
 
 import (

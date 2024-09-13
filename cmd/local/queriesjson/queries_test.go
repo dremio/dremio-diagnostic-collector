@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // queriesjson package contains the logic for collecting queries.json information
+// go:build local
+
 package queriesjson
 
 import (

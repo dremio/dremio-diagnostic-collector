@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // helpers package provides some general functions that do not have a good home
+// go:build local remote
+
 package helpers
 
 type CollectedFile struct {

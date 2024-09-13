@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // package autodetect looks at the system configuration and file names and tries to guess at the correct configuration
+
+// go:build local
 package autodetect
 
 import (

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 // packag fallback is only used when we are unable to collect with --detect namespace
+// go:build local remote
+
 package fallback
 
 import (
