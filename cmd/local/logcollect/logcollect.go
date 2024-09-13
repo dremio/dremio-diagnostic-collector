@@ -88,6 +88,7 @@ func (l *Collector) RunCollectGcLogs() error {
 		if file.IsDir() {
 			continue
 		}
+		simplelog.Debugf("found file %v in gc log folder: '%v'", file.Name(), l.gcLogsDir)
 		matched, err := filepath.Match(l.dremioGCFilePattern, file.Name())
 		if err != nil {
 			errs = append(errs, fmt.Errorf("error matching file pattern %v with error '%v'", l.dremioGCFilePattern, err))
@@ -109,6 +110,8 @@ func (l *Collector) RunCollectGcLogs() error {
 				continue
 			}
 			simplelog.Debugf("Copied file %s to %s", srcPath, destPath)
+		} else {
+			simplelog.Debugf("skipping file %v in gc log folder: '%v' did not match gc pattern: '%v'", file.Name(), l.gcLogsDir, l.dremioGCFilePattern)
 		}
 	}
 	if len(errs) > 1 {

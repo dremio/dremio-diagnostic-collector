@@ -16,7 +16,6 @@
 package autodetect
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"strconv"
@@ -27,33 +26,40 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
-func GetDremioPIDFromText(jpsOutput string) (int, error) {
-	var procName string
-	var previewName string
-	procName = "DremioDaemon"
-	previewName = "preview"
-	var lines []string
-	scanner := bufio.NewScanner(strings.NewReader(jpsOutput))
-	for scanner.Scan() {
-		line := scanner.Text()
-		lines = append(lines, line)
-		simplelog.Debugf("jps line: %v", line)
-		if strings.Contains(line, procName) && !strings.Contains(line, previewName) {
-			tokens := strings.Split(line, " ")
-			if len(tokens) == 0 {
-				return -1, fmt.Errorf("no pid for dremio found in text '%v'", line)
-			}
-			pidText := tokens[0]
-			return strconv.Atoi(pidText)
-		}
+// GetDremioPIDFromText takes the ouput from
+// "ps aux | grep DremioDaemon | grep -v grep | grep -v /etc/dremio/preview"
+// and retrieves the pid
+func GetDremioPIDFromText(psOutput string) (int, error) {
+	// should always trim trailing spaces
+	cleanedOutput := strings.TrimSpace(psOutput)
+	linesCount := len((strings.Split(cleanedOutput, "\n")))
+	if linesCount > 1 {
+		return -1, fmt.Errorf("to many lines in the ps outout, should only be one line '%v'", cleanedOutput)
 	}
-	return -1, fmt.Errorf("found no matching process named %v in text %v therefore cannot get the pid", procName, strings.Join(lines, ", "))
+	if linesCount == 0 {
+		return -1, fmt.Errorf("no lines in the ps output, should be one line '%v'", cleanedOutput)
+	}
+
+	tokens := strings.Split(cleanedOutput, " ")
+	var cleaned []string
+	for _, t := range tokens {
+		if t == "" {
+			continue
+		}
+		cleaned = append(cleaned, t)
+	}
+	if len(cleaned) < 2 {
+		return -1, fmt.Errorf("no pid for dremio found in text '%v'", cleanedOutput)
+	}
+	pidText := cleaned[1]
+	return strconv.Atoi(pidText)
 }
 
+// GetDremioPID calls ps aux and finds the DremioDaemon (filtering out the preview engine)
 func GetDremioPID(hook shutdown.Hook) (int, error) {
-	var jpsOutput bytes.Buffer
-	if err := ddcio.Shell(hook, &jpsOutput, "jps -v"); err != nil {
-		simplelog.Warningf("attempting to get full jps output failed: %v", err)
+	var psOutput bytes.Buffer
+	if err := ddcio.Shell(hook, &psOutput, "ps aux | grep DremioDaemon | grep -v grep | grep -v /etc/dremio/preview"); err != nil {
+		simplelog.Warningf("attempting to get full ps aux output failed: %v", err)
 	}
-	return GetDremioPIDFromText(jpsOutput.String())
+	return GetDremioPIDFromText(psOutput.String())
 }

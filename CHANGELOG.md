@@ -1,6 +1,15 @@
 # Changelog
 
+## [3.2.5] - 2024-09-13
+
+### Added
+
+* autodetection of gc log name from the logging parameter, this removes the need to set gc log matching pattern
+* enhanced logging during file iteration while searching for logs in the gc logging folder
+
 ## [3.2.4] - 2024-09-09
+
+### Added 
 
 * added support for using older kubectl clients since the kubectl cp interface is stable, by checking client version we can safely check if retries are supported and only add them if the are
 
@@ -772,6 +781,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.4...v3.2.5
 [3.2.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.3...v3.2.4
 [3.2.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.2...v3.2.3
 [3.2.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.1...v3.2.2

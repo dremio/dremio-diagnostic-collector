@@ -304,7 +304,6 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
 	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
-	c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
 	c.collectQueriesJSON = GetBool(confData, KeyCollectQueriesJSON)
 	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
 	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
@@ -349,17 +348,20 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	}
 	dremioPIDIsValid := c.dremioPID > 0
 	if dremioPIDIsValid {
-		logDir, err := autodetect.FindGCLogLocation(hook)
+		gcLogPattern, logDir, err := autodetect.FindGCLogLocation(hook, c.dremioPID)
 		if err != nil {
 			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 			consoleprint.ErrorPrint(msg)
 			simplelog.Errorf(msg)
 			c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+			c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
 		} else {
 			c.gcLogsDir = logDir
+			c.dremioGCFilePattern = gcLogPattern
 		}
 	} else {
 		c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
+		c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
 	}
 	// captures that wont work if the dremioPID is invalid
 	c.captureHeapDump = GetBool(confData, KeyCaptureHeapDump) && dremioPIDIsValid
@@ -617,7 +619,8 @@ func GetConfiguredDremioValuesFromPID(hook shutdown.CancelHook, dremioPID int) (
 
 func ReadPSEnv(hook shutdown.CancelHook, dremioPID int) (string, error) {
 	var w bytes.Buffer
-	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
+	// grep -v /etc/dremio/preview filters out the AWSE discount preview engine
+	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | grep -v /etc/dremio/preview | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
 	if err != nil {
 		return "", err
 	}

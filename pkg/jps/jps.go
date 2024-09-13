@@ -31,7 +31,7 @@ func CaptureFlagsFromPID(hook shutdown.CancelHook, pid int) (string, error) {
 		return "", fmt.Errorf("failed getting flags: '%w', output was: '%v'", err, buf.String())
 	}
 	scanner := bufio.NewScanner(&buf)
-	//adjust the max line size capacity as the jpv output can be large
+	//adjust the max line size capacity as the jps -v output can be large
 	const maxCapacity = 512 * 1024
 	lineBuffer := make([]byte, maxCapacity)
 	scanner.Buffer(lineBuffer, maxCapacity)

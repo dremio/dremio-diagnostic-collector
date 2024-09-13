@@ -20,31 +20,60 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf/autodetect"
 )
 
+func TestGetDremioPIDFromTextHasNoText(t *testing.T) {
+	psOutput := ""
+	pid, err := autodetect.GetDremioPIDFromText(psOutput)
+	if err == nil || err.Error() != "no pid for dremio found in text ''" {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if pid != -1 {
+		t.Errorf("Unexpected value for pid. Got %v, expected -1", pid)
+	}
+}
+
 func TestGetDremioPIDFromText(t *testing.T) {
-	jpsOutput1 := "12345 JavaProcess\n67890 AnotherProcess"
-	pid1, err1 := autodetect.GetDremioPIDFromText(jpsOutput1)
-	if err1 == nil || err1.Error() != "found no matching process named DremioDaemon in text 12345 JavaProcess, 67890 AnotherProcess therefore cannot get the pid" {
-		t.Errorf("Unexpected error: %v", err1)
+	psOutput := `dremio    3139  6.5 20.7 8311440 3340972 ?     Ssl  08:04   2:21 /usr/lib/jvm/java-1.8.0-openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/dremio/server-%t.gc -Ddremio.log.path=/var/log/dremio -Ddremio.plugins.path=/opt/dremio/plugins -Xmx5491m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -Xloggc:/var/log/dremio/server-%t.gc -XX:+UseG1GC -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2000 -XX:GCLogFileSize=50M -XX:+StartAttachListener -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/var/dremio_efs/thirdparty/*:/usr/lib/jvm/java-1.8.0-openjdk/lib/tools.jar com.dremio.dac.daemon.AwsDremioDaemon`
+	pid, err := autodetect.GetDremioPIDFromText(psOutput)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	if pid1 != -1 {
-		t.Errorf("Unexpected value for pid. Got %v, expected -1", pid1)
+	if pid != 3139 {
+		t.Errorf("Unexpected value for pid. Got %v, expected 3139", pid)
 	}
+}
 
-	jpsOutput2 := "12345 DremioDaemon\n67890 AnotherProcess"
-	pid2, err2 := autodetect.GetDremioPIDFromText(jpsOutput2)
-	if err2 != nil {
-		t.Errorf("Unexpected error: %v", err2)
+func TestGetDremioPIDFromTextWithTrailingSpace(t *testing.T) {
+	psOutput := `dremio    3139  6.5 20.7 8311440 3340972 ?     Ssl  08:04   2:21 /usr/lib/jvm/java-1.8.0-openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/dremio/server-%t.gc -Ddremio.log.path=/var/log/dremio -Ddremio.plugins.path=/opt/dremio/plugins -Xmx5491m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -Xloggc:/var/log/dremio/server-%t.gc -XX:+UseG1GC -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2000 -XX:GCLogFileSize=50M -XX:+StartAttachListener -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/var/dremio_efs/thirdparty/*:/usr/lib/jvm/java-1.8.0-openjdk/lib/tools.jar com.dremio.dac.daemon.AwsDremioDaemon
+`
+	pid, err := autodetect.GetDremioPIDFromText(psOutput)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	if pid2 != 12345 {
-		t.Errorf("Unexpected value for pid. Got %v, expected 12345", pid2)
+	if pid != 3139 {
+		t.Errorf("Unexpected value for pid. Got %v, expected 3139", pid)
 	}
+}
 
-	jpsOutput3 := "1 DremioDaemon -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/data/logs -Xloggc:/opt/dremio/data/logs/gc.log -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintTenuringDistribution -XX:+PrintGCCause -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=10 -XX:GCLogFileSize=5M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.connduit.port=45679 -Ddremio.admin-only-mode=false -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC\214 Jps -Dapplication.home=/opt/java/openjdk -Xms8m"
-	pid3, err3 := autodetect.GetDremioPIDFromText(jpsOutput3)
-	if err3 != nil {
-		t.Errorf("Unexpected error: %v", err3)
+func TestGetDremioPIDFromTextMatchesTwoRecords(t *testing.T) {
+	psOutput := `dremio    3139  6.5 20.7 8311440 3340972 ?     Ssl  08:04   2:21 /usr/lib/jvm/java-1.8.0-openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/dremio/server-%t.gc -Ddremio.log.path=/var/log/dremio -Ddremio.plugins.path=/opt/dremio/plugins -Xmx5491m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -Xloggc:/var/log/dremio/server-%t.gc -XX:+UseG1GC -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2000 -XX:GCLogFileSize=50M -XX:+StartAttachListener -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/var/dremio_efs/thirdparty/*:/usr/lib/jvm/java-1.8.0-openjdk/lib/tools.jar com.dremio.dac.daemon.AwsDremioDaemon
+dremio    3139  6.5 20.7 8311440 3340972 ?     Ssl  08:04   2:21 /usr/lib/jvm/java-1.8.0-openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/var/log/dremio/server-%t.gc -Ddremio.log.path=/var/log/dremio -Ddremio.plugins.path=/opt/dremio/plugins -Xmx5491m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -Xloggc:/var/log/dremio/server-%t.gc -XX:+UseG1GC -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=2000 -XX:GCLogFileSize=50M -XX:+StartAttachListener -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/var/dremio_efs/thirdparty/*:/usr/lib/jvm/java-1.8.0-openjdk/lib/tools.jar com.dremio.dac.daemon.AwsDremioDaemon
+`
+	pid, err := autodetect.GetDremioPIDFromText(psOutput)
+	if err == nil {
+		t.Error("expected error")
 	}
-	if pid3 != 1 {
-		t.Errorf("Unexpected value for pid. Got %v, expected 1", pid3)
+	if pid != -1 {
+		t.Errorf("Unexpected value for pid. Got %v, expected -1", pid)
+	}
+}
+
+func TestGetK8sPID(t *testing.T) {
+	psOutput := `dremio         1  0.3  2.1 5169980 2891424 ?     Ssl  Aug26  96:42 /opt/java/openjdk/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED -XX:UseAVX=2 -Xlog:gc*::time,uptime,tags,level -Ddremio.plugins.path=/opt/dremio/plugins -Xmx2048m -XX:MaxDirectMemorySize=2048m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/var/log/dremio -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/data/logs -Xlog:gc*,classhisto*=trace:file=/opt/dremio/data/gc-%t.log:uptime,time,tags,level:filecount=1,filesize=4M -Dzookeeper=zk-hs:2181 -Dservices.coordinator.enabled=true -Dservices.coordinator.master.enabled=true -Dservices.coordinator.master.embedded-zookeeper.enabled=false -Dservices.executor.enabled=false -Dservices.conduit.port=45679 -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/* com.dremio.dac.daemon.DremioDaemon`
+	pid, err := autodetect.GetDremioPIDFromText(psOutput)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if pid != 1 {
+		t.Errorf("Unexpected value for pid. Got %v, expected 1", pid)
 	}
 }

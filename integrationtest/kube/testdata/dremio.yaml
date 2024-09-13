@@ -644,7 +644,7 @@ spec:
       
       containers:
       - name: dremio-coordinator
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -741,7 +741,7 @@ spec:
       
       containers:
       - name: dremio-executor
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -792,7 +792,7 @@ spec:
       initContainers:
       
       - name: chown-data-directory
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -802,7 +802,7 @@ spec:
         command: ["chown"]
         args: ["dremio:dremio", "/opt/dremio/data"]
       - name: chown-cloudcache-directory
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -880,7 +880,7 @@ spec:
       
       containers:
       - name: dremio-master-coordinator
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -946,7 +946,7 @@ spec:
         image: busybox
         command:  ["sh", "-c", "until ping -c 1 -W 1 zk-hs > /dev/null; do echo Waiting for Zookeeper to be ready.; sleep 2; done;"]
       - name: chown-data-directory
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         securityContext:
           runAsUser: 0
@@ -958,7 +958,7 @@ spec:
         - "dremio:dremio"
         - "/opt/dremio/data"
       - name: upgrade-task
-        image: dremio/dremio-oss:25.0
+        image: dremio/dremio-oss:25.1
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: dremio-master-volume

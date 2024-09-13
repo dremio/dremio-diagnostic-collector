@@ -16,25 +16,12 @@
 package autodetect
 
 import (
-	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
-
-func IsAWSEFromJPSOutput(jpsText string) (bool, error) {
-	if strings.Contains(jpsText, "DremioDaemon") && strings.Contains(jpsText, "preview") {
-		return true, nil
-	} else if strings.Contains(jpsText, "AwsDremioDaemon") {
-		return true, nil
-	}
-	return false, nil
-}
 
 func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
 	dir, err := os.ReadDir(efsFolder)
@@ -54,15 +41,6 @@ func IsAWSEExecutorUsingDir(efsFolder, nodeName string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func IsAWSE(hook shutdown.Hook) (bool, error) {
-	var dremioPIDOutput bytes.Buffer
-	if err := ddcio.Shell(hook, &dremioPIDOutput, "jps -v"); err != nil {
-		return false, fmt.Errorf("grepping from Dremio from jps -v failed %v with output %v", err, dremioPIDOutput.String())
-	}
-	dremioPIDString := dremioPIDOutput.String()
-	return IsAWSEFromJPSOutput(dremioPIDString)
 }
 
 func IsAWSEExecutor(nodeName string) (bool, error) {
