@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -314,120 +315,60 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 }
 
 func findClusterID(c *conf.CollectConf) (string, error) {
+	simplelog.Debugf("checking %v for cluster version", c.DremioEndpoint())
 	startTime := time.Now().Unix()
-	var clusterID string
-	rocksDBDir := c.DremioRocksDBDir()
-	simplelog.Debugf("checking dir %v for cluster version", rocksDBDir)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
 	defer cancel() // avoid leaks
-	err := filepath.Walk(rocksDBDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			simplelog.Errorf("error accessing path %q: %v", path, err)
-			return nil
-		}
-		// check if we need to stop processing
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if clusterID != "" {
-			return nil
-		}
-		if !info.IsDir() {
-			// readonly cannot modify the files touched
-			f, err := os.Open(filepath.Clean(path))
-			simplelog.Debugf("checking file %v for cluster version", f.Name())
-			if err != nil {
-				simplelog.Errorf("error reading file %q: %v", path, err)
-				return nil
-			}
-			defer f.Close()
-			var tempString string
-			reader := bufio.NewReader(f)
-			matched := ""
-			nextChar := 'c'
-			skipped := 0
-			var bytesRead int64
-			for {
-				// check if ctx is done every 1mb
-				if bytesRead%1048576 == 0 {
-					if err := ctx.Err(); err != nil {
-						return err
-					}
-				}
-				// Read file byte by byte
-				b, err := reader.ReadByte()
-				if err != nil {
-					break // End of file or an error
-				}
-				bytesRead++
-				if tempString == "clusterIdentity" {
-					if skipped != 4 {
-						skipped++
-						continue
-					}
-					matched += string(b)
-					if len(matched) == 36 {
-						endTime := time.Now().Unix()
-						seconds := endTime - startTime
-						if seconds > 0 {
-							simplelog.Infof("found cluster ID '%v' in file %v in %v seconds at %.2f bytes/second", matched, path, seconds, float64(bytesRead)/float64(seconds))
-						} else {
-							simplelog.Infof("found cluster ID '%v' in file %v in less than a second", matched, path)
-						}
-						clusterID = matched
-						return nil
-					}
-				} else {
-					// looking for starting clusterIdentity
-					c := rune(b)
-					if nextChar == c {
-						tempString += string(b)
-						switch tempString {
-						case "c":
-							nextChar = 'l'
-						case "cl":
-							nextChar = 'u'
-						case "clu":
-							nextChar = 's'
-						case "clus":
-							nextChar = 't'
-						case "clust":
-							nextChar = 'e'
-						case "cluste":
-							nextChar = 'r'
-						case "cluster":
-							nextChar = 'I'
-						case "clusterI":
-							nextChar = 'd'
-						case "clusterId":
-							nextChar = 'e'
-						case "clusterIde":
-							nextChar = 'n'
-						case "clusterIden":
-							nextChar = 't'
-						case "clusterIdent":
-							nextChar = 'i'
-						case "clusterIdenti":
-							nextChar = 't'
-						case "clusterIdentit":
-							nextChar = 'y'
-						case "clusterIdentity":
-							simplelog.Infof("found clusterIdentity key in file %v", path)
-						}
-					} else {
-						tempString = ""
-						nextChar = 'c'
-					}
-				}
-			}
-		}
-		return nil
-	})
+
+	req, err := http.NewRequestWithContext(ctx, "GET", c.DremioEndpoint(), nil)
 	if err != nil {
-		return "", fmt.Errorf("error walking the path %v: %v", rocksDBDir, err)
+		return "", err
+	}
+	client := http.DefaultClient
+	res, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	if res.StatusCode != 200 {
+		return "", fmt.Errorf("invalid response %v when trying to access %v", res.Status, c.DremioEndpoint())
+	}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	endTime := time.Now().Unix()
+	seconds := endTime - startTime
+	clusterID, err := parseClusterIDFromBody(string(body))
+	if err != nil {
+		return "", err
+	}
+	simplelog.Infof("found cluster ID '%v' in html from url %v in %v seconds", clusterID, c.DremioEndpoint(), seconds)
+	return clusterID, nil
+}
+
+func parseClusterIDFromBody(body string) (string, error) {
+	// Regular expression to extract the JSON string
+	re := regexp.MustCompile(`JSON\.parse\('([^']+)'`)
+	matches := re.FindStringSubmatch(body)
+	if len(matches) < 2 {
+		return "", fmt.Errorf("no cluster ID found in the http response %v", body)
 	}
 
-	simplelog.Infof("total time to search clusterID in directory %v was %v seconds", rocksDBDir, time.Now().Unix()-startTime)
+	// Decode the JSON string
+	var config map[string]interface{}
+	// remove the javascript double quote escapes
+	cleaned := strings.ReplaceAll(matches[1], "\\\"", "\"")
+
+	err := json.Unmarshal([]byte(cleaned), &config)
+	if err != nil {
+		return "", fmt.Errorf("unable to decode json '%v': %v", cleaned, err)
+	}
+
+	// Extract the clusterID
+	clusterID, ok := config["clusterId"].(string)
+	if !ok {
+		return "", fmt.Errorf("clusterId not found in json: %v", matches[1])
+	}
 	return clusterID, nil
 }
 

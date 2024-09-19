@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
@@ -176,7 +177,8 @@ func (c *CmdSSHActions) CopyToHost(hostName, source, destination string) (string
 		return c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, destination))
 	}
 	// have to do something more complex in this case and _unfortunately_ copy to the /tmp dir
-	tmpFile := "/tmp/transfer_file"
+	tmpFile := fmt.Sprintf("/tmp/ddc-transfer-%v", time.Now().Unix())
+
 	out, err := c.cli.Execute(false, "scp", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", source, fmt.Sprintf("%v@%v:%v", c.sshUser, hostName, tmpFile))
 	if err != nil {
 		return out, err

@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.6] - 2024-09-20
+
+### Changed
+
+* easier cluster id retrieval that uses less resources
+* meaning of the cluster id timeout is now for http request timeout
+* transfer files from ssh copy now have a timestamp added, this should make collisions less problematic
+
 ## [3.2.5] - 2024-09-13
 
 ### Added

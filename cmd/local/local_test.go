@@ -309,44 +309,54 @@ func TestDDCYamlFlagDefault(t *testing.T) {
 }
 
 func TestFindClusterID(t *testing.T) {
-	tmpDirForConf := filepath.Join(t.TempDir(), "ddcSkipCollect")
-	err := os.Mkdir(tmpDirForConf, 0700)
-	if err != nil {
-		t.Fatalf("unable to make test dir: %v", err)
-	}
-	jarLoc := filepath.Join("testdata", "demo.jar")
-	cmd := exec.Command("java", "-jar", jarLoc)
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("cmd.Start() failed with %s\n", err)
-	}
+	response := `
+<!--
 
-	defer func() {
-		if cmd != nil && cmd.ProcessState != nil && !cmd.ProcessState.Exited() {
-			if err := cmd.Process.Kill(); err != nil {
-				t.Logf("failed to kill process: %s", err)
-			} else {
-				t.Log("Process killed successfully.")
-			}
-		}
-	}()
-	dremioHome := filepath.Join("testdata", "fs", "opt", "dremio")
-	yaml := fmt.Sprintf(`
-dremio-rocksdb-dir: %v
-`, filepath.Join(dremioHome, "db"))
-	yamlLocation := writeConfWithYamlText(tmpDirForConf, yaml)
-	hook := shutdown.NewHook()
-	defer hook.Cleanup()
-	c, err := conf.ReadConf(hook, make(map[string]string), yamlLocation, collects.QuickCollection)
+    Copyright (C) 2017-2019 Dremio Corporation
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Dremio</title>
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="-1">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/manifest.webmanifest">
+
+    <script>
+      window.dremioConfig = JSON.parse('{\"serverEnvironment\":\"PRODUCTION\",\"serverStatus\":\"OK\",\"intercomAppId\":\"gdcxa2zo\",\"shouldEnableBugFiling\":false,\"shouldEnableRSOD\":false,\"supportEmailTo\":\"\",\"supportEmailSubjectForJobs\":\"\",\"outsideCommunicationDisabled\":false,\"subhourAccelerationPoliciesEnabled\":false,\"lowerProvisioningSettingsEnabled\":false,\"allowFileUploads\":true,\"allowSpaceManagement\":false,\"tdsMimeType\":\"application/tds\",\"whiteLabelUrl\":\"dremio\",\"clusterId\":\"e3d54483-43b0-4e56-8042-31e8f57662fc\",\"edition\":\"EE\",\"analyzeTools\":{\"tableau\":{\"enabled\":true},\"powerbi\":{\"enabled\":true},\"qlik\":{\"enabled\":false}},\"crossSourceDisabled\":false,\"queryBundleUsersEnabled\":true,\"downloadRecordsLimit\":1000000,\"showMetadataValidityCheckbox\":false,\"showNewJobsPage\":true,\"showOldReflectionsListing\":false,\"allowAutoComplete\":true,\"allowFormatting\":true,\"patSettings\":{\"isPATEnabled\":true,\"maxMillisecondsToExpire\":15552000000},\"canAdminReflectionsWithEdit\":true,\"tableAuthorizerAvailable\":false,\"queryBundleAdminsEnabled\":true,\"externalTokenProvidersEnabled\":true,\"localUsersCreationEnabled\":true,\"SSOType\":null}');
+    </script>
+  <script defer="defer" src="/static/js/runtime.8868020f.js"></script><script defer="defer" src="/static/js/vendor.22a54c99.js"></script><script defer="defer" src="/static/js/app.a6144b01.js"></script><script defer="defer" src="/static/js/jsPlumb-2.1.4-min.js"></script><link href="/static/css/vendor.b0eb59ab.css" rel="stylesheet"><link href="/static/css/app.d72b2eb7.css" rel="stylesheet"></head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+`
+	expected := "e3d54483-43b0-4e56-8042-31e8f57662fc"
+	clusterID, err := parseClusterIDFromBody(response)
 	if err != nil {
-		t.Fatalf("reading config %v", err)
+		t.Fatal(err)
 	}
-	clusterID, err := findClusterID(c)
-	if err != nil {
-		t.Errorf("expected nil but was: %v", err)
-	}
-	expected := "4aede9fd-f5fe-4f6d-94df-b4ff17307872"
-	if clusterID != expected {
-		t.Errorf("expected %v but was: %v", expected, err)
+	if expected != clusterID {
+		t.Errorf("expected %v but was %v", expected, clusterID)
 	}
 }
 
