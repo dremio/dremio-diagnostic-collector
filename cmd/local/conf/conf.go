@@ -666,7 +666,7 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 
 // extractValue searches for a key in the input string and extracts the corresponding value.
 func extractValue(input string, key string) (string, error) {
-	startIndex := strings.Index(input, key)
+	startIndex := strings.LastIndex(input, key)
 	if startIndex == -1 {
 		return "", fmt.Errorf("key not found: %v", key)
 	}

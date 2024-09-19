@@ -7,6 +7,7 @@
 * easier cluster id retrieval that uses less resources
 * meaning of the cluster id timeout is now for http request timeout
 * transfer files from ssh copy now have a timestamp added, this should make collisions less problematic
+* now retrieving the last configuration value from dremio.log.path in case someone has duplicates we will use the final one
 
 ## [3.2.5] - 2024-09-13
 
@@ -789,6 +790,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.5...v3.2.6
 [3.2.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.4...v3.2.5
 [3.2.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.3...v3.2.4
 [3.2.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.2...v3.2.3

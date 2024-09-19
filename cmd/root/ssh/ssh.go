@@ -36,8 +36,9 @@ type Args struct {
 	CoordinatorStr string
 }
 
-func NewCmdSSHActions(sshArgs Args, hook shutdown.CancelHook) *CmdSSHActions {
+func NewCmdSSHActions(sshArgs Args, hook shutdown.Hook) *CmdSSHActions {
 	return &CmdSSHActions{
+		hook:           hook,
 		cli:            cli.NewCli(hook),
 		sshKey:         sshArgs.SSHKeyLoc,
 		sshUser:        sshArgs.SSHUser,
@@ -60,6 +61,7 @@ type CmdSSHActions struct {
 	coordinatorStr string
 	pidHosts       map[string]string
 	m              sync.Mutex
+	hook           shutdown.Hook
 }
 
 func (c *CmdSSHActions) Name() string {
@@ -183,14 +185,23 @@ func (c *CmdSSHActions) CopyToHost(hostName, source, destination string) (string
 	if err != nil {
 		return out, err
 	}
-	defer func() {
-		out, err := c.HostExecute(false, hostName, "rm", tmpFile)
+	cleanup := func() {
+		out, err := c.cli.Execute(false, "ssh", "-i", c.sshKey, "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v", c.sshUser, hostName), "rm", tmpFile)
 		if err != nil {
 			simplelog.Warningf("failed to remove file %v on node %v: %v - %v", tmpFile, hostName, err, out)
 		}
-	}()
+	}
+	c.hook.AddCancelOnlyTasks(cleanup, fmt.Sprintf("removing ssh transfer %v", tmpFile))
 	// now we can move it to it's final destination
-	return c.HostExecute(false, hostName, "cp", tmpFile, destination)
+	out, err = c.HostExecute(false, hostName, "cp", tmpFile, destination)
+	if err != nil {
+		simplelog.Infof("removing file %v", tmpFile)
+		cleanup()
+		return out, err
+	}
+	simplelog.Infof("removing file %v", tmpFile)
+	cleanup()
+	return out, err
 }
 
 func (c *CmdSSHActions) HostExecute(mask bool, hostName string, args ...string) (string, error) {
