@@ -217,18 +217,26 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				simplelog.Errorf("skipping file %v due to error %v", file, err)
-				continue
+				// any error here should fail
+				file.Close()
+				return err
+				// should error here if we error on copy
 			}
-			defer file.Close()
 			for {
 				copied, err := io.CopyN(file, tarReader, 1024)
 				if err != nil {
 					if err == io.EOF {
 						break
 					}
+					file.Close()
 					return err
 				}
 				totalCopied += copied
+			}
+			err = file.Close()
+			if err != nil {
+				simplelog.Errorf("error closing file %v : %v", file, err)
+				return err
 			}
 		}
 	}
