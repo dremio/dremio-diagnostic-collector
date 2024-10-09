@@ -48,7 +48,7 @@ date "+%H:%M:%S"
 echo "Building embedded binary for linux-amd64…"
 date "+%H:%M:%S"
 touch ./cmd/root/ddcbinary/output/ddc.zip
-GCO_ENABLED=1 CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+GCO_ENABLED=1 CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
 cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 rm ./bin/ddc

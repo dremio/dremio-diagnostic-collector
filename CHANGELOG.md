@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.7] - 2024-10-09
+
+### Added 
+
+* added collection of the vacuum log 
+* retry client id with ssl if http fails
+* have a special build for local-collect only, this shrinks binary size quite a bit
+
 ## [3.2.6] - 2024-09-20
 
 ### Changed
@@ -790,6 +798,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
  
+[3.2.7]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.6...v3.2.7
 [3.2.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.5...v3.2.6
 [3.2.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.4...v3.2.5
 [3.2.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.3...v3.2.4

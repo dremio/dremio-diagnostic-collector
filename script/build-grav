@@ -47,7 +47,7 @@ date "+%H:%M:%S"
 echo "Building embedded binary for linux-arm64"
 date "+%H:%M:%S"
 touch ./cmd/root/ddcbinary/output/ddc.zip
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
 cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 rm ./bin/ddc

@@ -17,7 +17,7 @@ New-Item -ItemType File -Path .\cmd\root\ddcbinary\output\ddc.zip -Force
 # This assumes that you have 'go' installed in your environment
 $env:GOOS="linux"
 $env:GOARCH="amd64"
-go build -ldflags "$LDFLAGS" -o .\bin\ddc
+go build -ldflags "$LDFLAGS" -o .\bin\ddc .\cmd\local\main
 
 # Use Compress-Archive to create zip file and then move it
 Compress-Archive -Path .\bin\ddc -DestinationPath .\bin\ddc.zip

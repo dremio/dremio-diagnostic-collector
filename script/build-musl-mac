@@ -47,7 +47,7 @@ VERSION=`git rev-parse --abbrev-ref HEAD`
 LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION"
 touch ./cmd/root/ddcbinary/output/ddc.zip
 # depends on https://github.com/FiloSottile/homebrew-musl-cross
-CC=x86_64-linux-musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS  -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+CC=x86_64-linux-musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS  -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 rm ./bin/ddc

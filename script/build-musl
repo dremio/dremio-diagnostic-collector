@@ -46,7 +46,7 @@ GIT_SHA=`git rev-parse --short HEAD`
 VERSION=`git rev-parse --abbrev-ref HEAD`
 LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION -linkmode external -extldflags \"-static\""
 touch ./cmd/root/ddcbinary/output/ddc.zip
-CC=musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
 rm ./bin/ddc

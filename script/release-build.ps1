@@ -21,7 +21,7 @@ Get-Date -Format "HH:mm:ss"
 $env:GOOS="linux"
 $env:GOARCH="amd64"
 New-Item -ItemType File -Path ./cmd/root/ddcbinary/output/ddc.zip -Force
-go build -ldflags "$LDFLAGS" -o ./bin/ddc
+go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
 Copy-Item -Path ./default-ddc.yaml -Destination ./bin/ddc.yaml
 Compress-Archive -Path ./bin/ddc -DestinationPath ./bin/ddc.zip
 Remove-Item ./bin/ddc
