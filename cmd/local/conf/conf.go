@@ -112,6 +112,7 @@ type CollectConf struct {
 	collectQueriesJSON                bool
 	collectDremioConfiguration        bool
 	collectReflectionLogs             bool
+	collectVacuumLogs                 bool
 	collectSystemTablesExport         bool
 	collectSystemTablesTimeoutSeconds int
 	systemTablesRowLimit              int
@@ -308,6 +309,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
 	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
 	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
+	c.collectVacuumLogs = GetBool(confData, KeyCollectVacuumLog)
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
@@ -769,6 +771,10 @@ func (c *CollectConf) CollectMetaRefreshLogs() bool {
 
 func (c *CollectConf) CollectReflectionLogs() bool {
 	return c.collectReflectionLogs
+}
+
+func (c *CollectConf) CollectVacuumLogs() bool {
+	return c.collectVacuumLogs
 }
 
 func (c *CollectConf) CollectAccelerationLogs() bool {

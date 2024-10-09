@@ -143,6 +143,16 @@ func (l *Collector) RunCollectReflectionLogs() error {
 	return nil
 }
 
+func (l *Collector) RunCollectVacuumLogs() error {
+	simplelog.Debug("Collecting vacuum logs from Coordinator(s) ...")
+	if err := l.exportArchivedLogs(l.dremioLogDir, "vacuum.json", "vacuum", l.dremioLogsNumDays); err != nil {
+		return fmt.Errorf("unable to collect vacuum logs due to error %v", err)
+	}
+	simplelog.Debug("... collecting vacuum logs from Coordinator(s) COMPLETED")
+
+	return nil
+}
+
 func (l *Collector) RunCollectDremioAccessLogs() error {
 	simplelog.Debug("Collecting access logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "access.log", "access", l.dremioLogsNumDays); err != nil {

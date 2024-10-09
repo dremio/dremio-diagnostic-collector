@@ -22,6 +22,9 @@ import (
 )
 
 func TestNewKubectlK8sActions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+	}
 	namespace := "mynamespace"
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()

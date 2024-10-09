@@ -88,6 +88,7 @@ collect-queries-json: true
 collect-server-logs: true
 collect-meta-refresh-log: true
 collect-reflection-log: true
+collect-vacuum-log: true
 collect-gc-logs: true
 collect-jfr: true
 dremio-jfr-time-seconds: 60
@@ -335,6 +336,10 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 
 	if cfg.CollectReflectionLogs() != true {
 		t.Errorf("Expected CollectReflectionLogs to be true, got false")
+	}
+
+	if cfg.CollectVacuumLogs() != true {
+		t.Errorf("Expected CollectVacuumLogs to be true, got false")
 	}
 
 	if cfg.CollectServerLogs() != true {

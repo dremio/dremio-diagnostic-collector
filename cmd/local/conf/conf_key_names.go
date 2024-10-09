@@ -46,6 +46,7 @@ const (
 	KeyCollectServerLogs                 = "collect-server-logs"
 	KeyCollectMetaRefreshLog             = "collect-meta-refresh-log"
 	KeyCollectReflectionLog              = "collect-reflection-log"
+	KeyCollectVacuumLog                  = "collect-vacuum-log"
 	KeyCollectGCLogs                     = "collect-gc-logs"
 	KeyCollectJFR                        = "collect-jfr"
 	KeyCollectJStack                     = "collect-jstack"

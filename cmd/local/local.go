@@ -240,6 +240,15 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 			})
 		}
 
+		if !c.CollectVacuumLogs() {
+			simplelog.Debug("Skipping vacuum log collection")
+		} else {
+			t.AddJob(threading.Job{
+				Name:    "VACUUM LOG COLLECTION",
+				Process: logCollector.RunCollectVacuumLogs,
+			})
+		}
+
 		if !c.CollectAccelerationLogs() {
 			simplelog.Debug("Skipping acceleration log collection")
 		} else {
