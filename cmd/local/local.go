@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -315,35 +316,58 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 }
 
 func findClusterID(c *conf.CollectConf) (string, error) {
-	simplelog.Debugf("checking %v for cluster version", c.DremioEndpoint())
-	startTime := time.Now().Unix()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
-	defer cancel() // avoid leaks
+	tries := []string{c.DremioEndpoint()}
+	if c.DremioEndpoint() == "http://localhost:9047" {
+		// try https if the default is being used, this means it's likely unconfigured and we should try ssl as well
+		tries = append(tries, "https://localhost:9047")
+	}
+	// ignore bad certs because dremio provides an easy way to use self signed certs
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	exec := func(url string) (string, error) {
+		simplelog.Debugf("checking %v for cluster version", url)
+		startTime := time.Now().Unix()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
+		defer cancel() // avoid leaks
 
-	req, err := http.NewRequestWithContext(ctx, "GET", c.DremioEndpoint(), nil)
-	if err != nil {
-		return "", err
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return "", err
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+		if res.StatusCode != 200 {
+			return "", fmt.Errorf("invalid response %v when trying to access %v", res.Status, url)
+		}
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return "", err
+		}
+		endTime := time.Now().Unix()
+		seconds := endTime - startTime
+		clusterID, err := parseClusterIDFromBody(string(body))
+		if err != nil {
+			return "", err
+		}
+		simplelog.Infof("found cluster ID '%v' in html from url %v in %v seconds", clusterID, url, seconds)
+		return clusterID, nil
 	}
-	client := http.DefaultClient
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
+	var results []string
+	for i := 0; i < len(tries); i++ {
+		url := tries[i]
+		clusterID, err := exec(url)
+		if err != nil {
+			results = append(results, fmt.Sprintf("{url: %v, error: %v}", url, err))
+			continue
+		}
+		return clusterID, nil
 	}
-	if res.StatusCode != 200 {
-		return "", fmt.Errorf("invalid response %v when trying to access %v", res.Status, c.DremioEndpoint())
-	}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	endTime := time.Now().Unix()
-	seconds := endTime - startTime
-	clusterID, err := parseClusterIDFromBody(string(body))
-	if err != nil {
-		return "", err
-	}
-	simplelog.Infof("found cluster ID '%v' in html from url %v in %v seconds", clusterID, c.DremioEndpoint(), seconds)
-	return clusterID, nil
+
+	return "", fmt.Errorf("unable to find client id tried the following urls with the following errors: %v", strings.Join(results, ","))
 }
 
 func parseClusterIDFromBody(body string) (string, error) {
