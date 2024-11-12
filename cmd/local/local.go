@@ -558,6 +558,15 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
+	const s = `stat -fc %T /sys/fs/cgroup/`
+	_, err = w.Write([]byte("___\n>>> stat -fc %T /sys/fs/cgroup/\n"))
+	if err != nil {
+		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
+	}
+	err = ddcio.Shell(hook, w, s)
+	if err != nil {
+		simplelog.Warningf("unable to write %s for os_info.txt due to error %v", s, err)
+	}
 
 	if c.DremioPID() > 0 {
 		_, err = w.Write([]byte("___\n>>> ps eww\n"))
