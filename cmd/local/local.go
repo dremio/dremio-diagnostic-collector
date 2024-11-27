@@ -559,7 +559,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
 	const s = `stat -fc %T /sys/fs/cgroup/`
-	_, err = w.Write([]byte("___\n>>> stat -fc %T /sys/fs/cgroup/\n"))
+	_, err = w.Write([]byte(s))
 	if err != nil {
 		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
 	}
