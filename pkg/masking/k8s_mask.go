@@ -125,11 +125,15 @@ func RemoveSecretsFromK8sJSON(k8sJSON []byte) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("items key not found or not a slice: %#v", dataDict)
 	}
-
+	if itemsRaw == nil {
+		simplelog.Infof("no items to mask skipping masking")
+		return string(k8sJSON), nil
+	}
 	items, ok := itemsRaw.([]interface{})
 	if !ok {
 		return "", fmt.Errorf("items must be an array but was '%T'", itemsRaw)
 	}
+
 	for _, item := range items {
 		maskLastAppliedConfig(item.(map[string]interface{}))
 		containerList, err := getContainers(item.(map[string]interface{}))

@@ -24,8 +24,25 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
+func TestK8SMasking_WhenJsonItemsAreEmpty(t *testing.T) {
+	// we should not acutally do anything in this case
+
+	input := `{
+		"items": null
+	}`
+	expected := `{
+		"items": null
+	}`
+	output, err := masking.RemoveSecretsFromK8sJSON([]byte(input))
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if jsonCompact(output) != jsonCompact(expected) {
+		t.Errorf("expected %v to equal %v", expected, output)
+	}
+}
+
 func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
-	//It("should mask secrets from k8s JSON", func() {
 	input := `{
 				"items": [
 					{
