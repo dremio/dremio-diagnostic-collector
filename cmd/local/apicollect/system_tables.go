@@ -76,12 +76,12 @@ func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.Ca
 		daylimit := strconv.Itoa(c.DremioQueriesJSONNumDays())
 		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + daylimit + " AS INTERVAL DAY))"
 		sql += " ORDER BY submitted_ts DESC"
-		simplelog.Debugf("Collecting sys." + systable + " (Limit: Last " + daylimit + " days)")
+		simplelog.Debugf("Collecting sys.%v (Limit: Last %v days)", systable, daylimit)
 	} else {
 		sql += " LIMIT " + tablerowlimit
-		simplelog.Debugf("Collecting sys." + systable + " (Limit: " + tablerowlimit + " rows)")
+		simplelog.Debugf("Collecting sys.%v (Limit: %v rows)", systable, tablerowlimit)
 	}
-	simplelog.Debugf(sql)
+	simplelog.Debug(sql)
 	sqlbody := "{\"sql\": \"" + sql + "\"}"
 
 	jobid, err := restclient.PostQuery(hook, sqlurl, c.DremioPATToken(), headers, sqlbody)
@@ -134,7 +134,7 @@ func checkJobState(ctx context.Context, c *conf.CollectConf, hook shutdown.Cance
 		}
 		simplelog.Debugf("job state: %s", jobstate)
 		if jobstate == "FAILED" || jobstate == "CANCELLED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
-			return fmt.Errorf("unable to retrieve job results - job state: " + jobstate)
+			return fmt.Errorf("unable to retrieve job results - job state: %v", jobstate)
 		}
 	}
 	return nil
@@ -164,16 +164,16 @@ func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresult
 			rowcount, ok = val.(float64)
 			if !ok {
 				rowcount = 0
-				simplelog.Warningf("returned field 'rowCount' does not have expected type float64")
+				simplelog.Warning("returned field 'rowCount' does not have expected type float64")
 			}
 		} else {
 			rowcount = 0
-			simplelog.Warningf("returned json does not contain expected field 'rowCount'")
+			simplelog.Warning("returned json does not contain expected field 'rowCount'")
 		}
 		sb := string(body)
 		filename := getSystemTableName(systable, urlsuffix)
 		systemTableFile := path.Join(c.SystemTablesOutDir(), filename)
-		simplelog.Debugf("Creating " + filename + " ...")
+		simplelog.Debugf("Creating %v ...", filename)
 		file, err := os.Create(path.Clean(systemTableFile))
 		if err != nil {
 			return fmt.Errorf("unable to create file %v due to error %v", filename, err)
@@ -183,7 +183,7 @@ func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresult
 		if err != nil {
 			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
 		}
-		simplelog.Debugf("SUCCESS - Created " + filename)
+		simplelog.Debugf("SUCCESS - Created %v", filename)
 
 		offset = offset + apilimit
 		if offset > int(rowcount) || offset >= tablerowlimit {

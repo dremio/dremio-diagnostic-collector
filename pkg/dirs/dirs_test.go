@@ -37,7 +37,7 @@ func TestCheckDirectoryFull(t *testing.T) {
 }
 
 func TestCheckDirectoryCustomChecker(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func(de []fs.DirEntry) error { return errors.New("failed") }); err == nil {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "full"), func([]fs.DirEntry) error { return errors.New("failed") }); err == nil {
 		t.Error("expected an error")
 	}
 }
@@ -55,7 +55,7 @@ func TestCheckDirectoryEmpty(t *testing.T) {
 }
 
 func TestCheckDirectoryNotPresent(t *testing.T) {
-	if err := dirs.CheckDirectory(filepath.Join("testdata", "fdljk"), func(de []fs.DirEntry) error { return nil }); err == nil {
+	if err := dirs.CheckDirectory(filepath.Join("testdata", "fdljk"), func([]fs.DirEntry) error { return nil }); err == nil {
 		t.Error("expected an error")
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -28,7 +29,7 @@ import (
 )
 
 func TarGzDir(srcDir, dest string) error {
-	return TarGzDirFiltered(srcDir, dest, func(s string) bool { return true })
+	return TarGzDirFiltered(srcDir, dest, func(string) bool { return true })
 }
 
 func TarDDC(srcDir, dest, baseDDC string) error {
@@ -214,12 +215,17 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 				}
 			}
 		case tar.TypeReg:
+			if header.Mode < 0 || header.Mode > math.MaxUint32 {
+				return fmt.Errorf("invalid header '%v' it must be positive and less than uint32", header.Mode)
+			}
 			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				simplelog.Errorf("skipping file %v due to error %v", file, err)
 				// any error here should fail
 				return err
 			}
+			// just in case we get an early exit
+			defer file.Close()
 			for {
 				copied, err := io.CopyN(file, tarReader, 1024)
 				if err != nil {

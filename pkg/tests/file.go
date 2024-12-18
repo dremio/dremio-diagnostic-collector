@@ -141,7 +141,7 @@ func echoLines(t *testing.T, filePath string) error {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		t.Logf(scanner.Text())
+		t.Log(scanner.Text())
 	}
 
 	if err := scanner.Err(); err != nil {

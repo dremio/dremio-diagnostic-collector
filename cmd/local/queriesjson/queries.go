@@ -163,7 +163,7 @@ func ReadGzFile(filename string) ([]QueriesRow, error) {
 		line := scanner.Text()
 		row, err := parseLine(line, i)
 		if err != nil {
-			simplelog.Errorf(err.Error() + `: ` + filename)
+			simplelog.Errorf("%v: %v", err.Error(), filename)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
@@ -379,13 +379,6 @@ func GetHighCostJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
 	})
 
 	return queriesrows[:min(totalrows, limit)]
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func AddRowsToSet(queriesrows []QueriesRow, profilesToCollect map[string]string) {

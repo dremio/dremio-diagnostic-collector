@@ -91,7 +91,7 @@ func RunCollectWLM(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		}
 
 		// Log a success message upon successful creation of the file
-		simplelog.Debugf("SUCCESS - Created " + filename)
+		simplelog.Debugf("SUCCESS - Created %v", filename)
 	}
 
 	// Return nil if the entire operation completes successfully

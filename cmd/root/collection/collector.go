@@ -70,7 +70,7 @@ type Args struct {
 	Disabled              []string
 	Enabled               []string
 	DisableFreeSpaceCheck bool
-	MinFreeSpaceGB        int
+	MinFreeSpaceGB        uint64
 	CollectionMode        string
 	TransferThreads       int
 }

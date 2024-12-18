@@ -76,7 +76,7 @@ func APIRequest(hook shutdown.CancelHook, url string, pat string, request string
 		}
 	}
 	if res.StatusCode != 200 {
-		return nil, fmt.Errorf(res.Status)
+		return nil, errors.New(res.Status)
 	}
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -111,7 +111,7 @@ func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[str
 		}
 	}
 	if res.StatusCode != 200 {
-		return "", fmt.Errorf(res.Status)
+		return "", errors.New(res.Status)
 	}
 
 	body, err := io.ReadAll(res.Body)

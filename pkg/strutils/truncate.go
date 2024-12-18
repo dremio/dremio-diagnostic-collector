@@ -20,31 +20,25 @@ import (
 )
 
 func GetEndOfString(s string, maxLength int) string {
-	max := 0
-	if maxLength > 0 {
-		max = maxLength
-	}
+	maxLength = max(maxLength, 0)
 	// Check if the string is already within the desired length
-	if utf8.RuneCountInString(s) <= max {
+	if utf8.RuneCountInString(s) <= maxLength {
 		return s
 	}
 
 	// get the end of the string up to desired length
 	runes := []rune(s)
-	truncatedRunes := runes[len(runes)-max:]
+	truncatedRunes := runes[len(runes)-maxLength:]
 	return string(truncatedRunes)
 }
 
 func TruncateString(s string, maxLength int) string {
-	max := 0
-	if maxLength > 0 {
-		max = maxLength
-	}
+	maxLength = max(maxLength, 0)
 	// Check if the string is already within the desired length
-	if utf8.RuneCountInString(s) <= max {
+	if utf8.RuneCountInString(s) <= maxLength {
 		return s
 	}
-	return s[:max]
+	return s[:maxLength]
 }
 
 func GetLastLine(s string) string {

@@ -52,6 +52,12 @@ func GetInt(confData map[string]interface{}, key string) int {
 	}
 	return 0
 }
+func GetUint64(confData map[string]interface{}, key string) uint64 {
+	if v, ok := confData[key]; ok {
+		return cast.ToUint64(v)
+	}
+	return 0
+}
 
 func GetBool(confData map[string]interface{}, key string) bool {
 	if v, ok := confData[key]; ok {
@@ -124,7 +130,7 @@ type CollectConf struct {
 	collectWLM                        bool
 	nodeName                          string
 	restHTTPTimeout                   int
-	minFreeSpaceCheckGB               int
+	minFreeSpaceCheckGB               uint64
 
 	// variables
 	systemtables            []string
@@ -313,7 +319,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
-	c.minFreeSpaceCheckGB = GetInt(confData, KeyMinFreeSpaceGB)
+	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
@@ -354,7 +360,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		if err != nil {
 			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 			consoleprint.ErrorPrint(msg)
-			simplelog.Errorf(msg)
+			simplelog.Error(msg)
 			c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 			c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
 		} else {
@@ -382,7 +388,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 				if err != nil {
 					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 					consoleprint.ErrorPrint(msg)
-					simplelog.Errorf(msg)
+					simplelog.Error(msg)
 				} else {
 					simplelog.Infof("configured values retrieved from ps output: %v:%v, %v:%v", KeyDremioLogDir, detectedConfig.LogDir, KeyCollectDremioConfiguration, detectedConfig.ConfDir)
 					c.dremioLogDir = detectedConfig.LogDir
@@ -438,7 +444,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			}); err != nil {
 				msg := fmt.Sprintf("configured dir %v is invalid: %v", configuredConfDir, err)
 				fmt.Println(msg)
-				simplelog.Warningf(msg)
+				simplelog.Warning(msg)
 			} else {
 				// if the configured directory is valid ALWAYS pick that
 				c.dremioConfDir = configuredConfDir
@@ -950,7 +956,7 @@ func (c *CollectConf) DremioRocksDBDir() string {
 	return c.dremioRocksDBDir
 }
 
-func (c *CollectConf) MinFreeSpaceGB() int {
+func (c *CollectConf) MinFreeSpaceGB() uint64 {
 	return c.minFreeSpaceCheckGB
 }
 

@@ -26,7 +26,7 @@ var VersionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of DDC",
 	Long:  `All software has versions. This is DDC's`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println(versions.GetCLIVersion())
 	},
 }

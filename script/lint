@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 go fmt ./...
 
 echo "executing golangci-lint run"
-golangci-lint run -E exportloopref,revive,gofmt,govet,errcheck,gosec 
+golangci-lint run -E revive,gofmt,govet,errcheck,gosec 
 
 echo "executing license-header-checker"
 license-header-checker license_header.txt . go

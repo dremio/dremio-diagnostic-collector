@@ -52,7 +52,7 @@ var genericConfSetup = func(cfgContent string) {
 	cfgFilePath = filepath.Join(tmpDir, "ddc.yaml")
 
 	if cfgContent == "" {
-		ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			fmt.Fprintln(w, "Hello, client")
 		}))
 		// Create a sample configuration file.

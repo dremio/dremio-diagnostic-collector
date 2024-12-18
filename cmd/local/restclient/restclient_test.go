@@ -26,7 +26,7 @@ import (
 )
 
 func TestAPIRequest(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		fmt.Fprintln(rw, `{"message":"success"}`)
 	}))
@@ -63,7 +63,7 @@ func TestPostQuery(t *testing.T) {
 }
 
 func TestPostQueryBadStatusCode(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusBadRequest)
 	}))
 	defer server.Close()
@@ -83,7 +83,7 @@ func TestPostQueryBadStatusCode(t *testing.T) {
 }
 
 func TestClientTimeout(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		// Delay the response
 		time.Sleep(1200 * time.Millisecond)
 		rw.WriteHeader(http.StatusOK)

@@ -66,7 +66,7 @@ var namespace string
 var k8sContext string
 var disableFreeSpaceCheck bool
 var disableKubeCtl bool
-var minFreeSpaceGB int
+var minFreeSpaceGB uint64
 var disablePrompt bool
 var detectNamespace bool
 var collectionMode string
@@ -103,7 +103,7 @@ for kubernetes deployments:
 	# run against a specific namespace with a Health Check (runs 2 threads and includes everything in a standard collection plus collect 25,000 job profiles, system tables, kv reports and Work Load Manager (WLM) reports)
 	ddc --namespace mynamespace	--collect health-check
 `,
-	Run: func(c *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 
 	},
 }
@@ -415,7 +415,7 @@ func Execute(args []string) error {
 				return err
 			}
 			outputFolder := filepath.Dir(abs)
-			if err := dirs.CheckFreeSpace(outputFolder, uint64(minFreeSpaceGB)); err != nil {
+			if err := dirs.CheckFreeSpace(outputFolder, minFreeSpaceGB); err != nil {
 				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
 			}
 		}
@@ -603,7 +603,8 @@ func init() {
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
-	RootCmd.Flags().IntVar(&minFreeSpaceGB, "min-free-space-gb", 40, "min free space needed in GB for the process to run")
+	var defaultMaxFreeSpace uint64 = 40
+	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 	execLoc, err := os.Executable()

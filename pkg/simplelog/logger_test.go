@@ -128,10 +128,10 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	logger.warningLogger.SetOutput(warnbuf)
 	logger.errorLogger.SetOutput(errbuf)
 
-	logger.Debugf(msg)
-	logger.Infof(msg)
-	logger.Warningf(msg)
-	logger.Errorf(msg)
+	logger.Debug(msg)
+	logger.Info(msg)
+	logger.Warning(msg)
+	logger.Error(msg)
 
 	expected := 1000
 	output := strings.TrimSpace(strings.Split(dbbuf.String(), ": ")[2])

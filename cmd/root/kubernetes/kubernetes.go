@@ -350,7 +350,8 @@ type K8SWriter struct {
 func (w *K8SWriter) Write(p []byte) (n int, err error) {
 	lines := strings.Split(string(p), "\n")
 	for _, line := range lines {
-		w.Output(strings.TrimSpace(line))
+		trimmed := strings.TrimSpace(line)
+		w.Output(trimmed)
 	}
 	return w.Buff.Write(p)
 }
@@ -425,7 +426,9 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 			simplelog.Errorf("dropping out copy after %d retries - %v", t.retries, err)
 		}
 	} else {
-		t.bytesRead += uint64(n)
+		if n > 0 {
+			t.bytesRead += uint64(n)
+		}
 	}
 	return
 }
@@ -478,14 +481,11 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 		if err != nil {
 			switch ctx.Err() {
 			case context.Canceled:
-				msg := fmt.Sprintf("manually cancelled transfer - %v", context.Cause(ctx))
-				simplelog.Warningf(msg)
+				simplelog.Warningf("manually cancelled transfer - %v", context.Cause(ctx))
 			case context.DeadlineExceeded:
-				msg := fmt.Sprintf("%v", context.Cause(ctx))
-				simplelog.Error(msg)
+				simplelog.Errorf("%v", context.Cause(ctx))
 			default:
-				msg := fmt.Sprintf("failed streaming %v - %v", err, errBuff.String())
-				simplelog.Error(msg)
+				simplelog.Errorf("failed streaming %v - %v", err, errBuff.String())
 			}
 		}
 	}
@@ -530,7 +530,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	reader, writer := io.Pipe()
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go func(src string, w io.WriteCloser) {
+	go func(src string) {
 		defer writer.Close()
 		defer wg.Done()
 		//use filepath here or else we will get surprises
@@ -541,7 +541,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 		}); err != nil {
 			simplelog.Errorf("unable to archive %v", err)
 		}
-	}(source, writer)
+	}(source)
 	//use path here since it's always going to a linux destination
 	destDir := path.Dir(destination)
 	containerName, err := c.getPrimaryContainer(hostString)

@@ -19,6 +19,7 @@ import (
 	"embed"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,9 +91,18 @@ func Unzip(src string) error {
 			if err != nil {
 				return err
 			}
+			defer func() {
+				if err := outFile.Close(); err != nil {
+					simplelog.Debugf("auto close for file %v failed, this is likely a non issue: %v", fpath, err)
+				}
+			}()
 
+			// guard against invalid conversion
+			if f.UncompressedSize64 > math.MaxInt64 {
+				return fmt.Errorf("beyond max size we can deploy %v where max is %v", f.UncompressedSize64, math.MaxInt64)
+			}
 			// Write the decompressed data to the file
-			_, err = io.CopyN(outFile, rc, int64(f.UncompressedSize64))
+			_, err = io.CopyN(outFile, rc, int64(f.UncompressedSize64)) // #nosec G115
 			if err != nil {
 				return err
 			}
