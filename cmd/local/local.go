@@ -559,11 +559,41 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
 	}
 	const s = `stat -fc %T /sys/fs/cgroup/`
-	_, err = w.Write([]byte(s))
+	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", s)))
 	if err != nil {
 		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
 	}
 	err = ddcio.Shell(hook, w, s)
+	if err != nil {
+		simplelog.Warningf("unable to write %s for os_info.txt due to error %v", s, err)
+	}
+
+	// this only retrieves cgroupv2 files and will fail on cgroup1 and of course on prem
+	cgroupFiles := []string{
+		"memory.current",
+		"memory.swap.current",
+		"memory.pressure",
+		"cpu.pressure",
+		"io.pressure",
+	}
+	for _, cgroupFile := range cgroupFiles {
+		commandToExecute := fmt.Sprintf("cat /sys/fs/cgroup/%v", cgroupFile)
+		_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", commandToExecute)))
+		if err != nil {
+			simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", commandToExecute, err)
+		}
+		err = ddcio.Shell(hook, w, commandToExecute)
+		if err != nil {
+			simplelog.Warningf("unable to write %s for os_info.txt due to error %v", commandToExecute, err)
+		}
+	}
+
+	loadCommand := "cat /proc/loadavg"
+	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", loadCommand)))
+	if err != nil {
+		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
+	}
+	err = ddcio.Shell(hook, w, loadCommand)
 	if err != nil {
 		simplelog.Warningf("unable to write %s for os_info.txt due to error %v", s, err)
 	}
