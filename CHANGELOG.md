@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.0] - UNRELEASED
+
+### Added
+
+* support for capturing v26 version nats servers
+
 ## [3.2.8] - 2024-12-18
 
 ### Added
@@ -816,6 +822,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.8...v3.3.0
 [3.2.8]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.7...v3.2.8
 [3.2.7]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.6...v3.2.7
 [3.2.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.5...v3.2.6

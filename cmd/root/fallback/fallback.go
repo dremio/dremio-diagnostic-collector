@@ -104,3 +104,7 @@ func (c *Fallback) GetCoordinators() (podName []string, err error) {
 func (c *Fallback) GetExecutors() (podName []string, err error) {
 	return []string{}, nil
 }
+
+func (c *Fallback) GetNats() (podName []string, err error) {
+	return []string{}, nil
+}

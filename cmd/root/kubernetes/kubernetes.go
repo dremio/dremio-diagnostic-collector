@@ -596,6 +596,12 @@ func (c *KubeCtlAPIActions) GetCoordinators() (podName []string, err error) {
 	})
 }
 
+func (c *KubeCtlAPIActions) GetNats() (podName []string, err error) {
+	return c.SearchPods(func(container string) bool {
+		return container == "nats"
+	})
+}
+
 func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{
 		LabelSelector: c.labelSelector,

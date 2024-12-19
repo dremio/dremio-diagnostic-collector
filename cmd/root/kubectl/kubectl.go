@@ -202,6 +202,12 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 	})
 }
 
+func (c *CliK8sActions) GetNats() (podName []string, err error) {
+	return c.SearchPods(func(container string) bool {
+		return container == "nats"
+	})
+}
+
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", "role=dremio-cluster-pod", "-o", "name")
 	if err != nil {
