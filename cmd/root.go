@@ -153,7 +153,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	}
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
 	hook.AddFinalSteps(cs.Close, "running cleanup on copy strategy")
-	var clusterCollect = func([]string) {}
+	var clusterCollect = func() {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
 		simplelog.Info("using fallback based collection")
@@ -197,7 +197,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			0,
 		)
 
-		clusterCollect = func(pods []string) {
+		clusterCollect = func() {
 			clientSet, _, err := kubernetes.GetClientset(k8sContext)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
@@ -207,7 +207,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
-			err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, pods)
+			err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
 			if err != nil {
 				simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 			}

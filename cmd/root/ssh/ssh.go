@@ -255,11 +255,6 @@ func (c *CmdSSHActions) GetCoordinators() (hosts []string, err error) {
 	return c.findHosts(c.coordinatorStr)
 }
 
-func (c *CmdSSHActions) GetNats() (hosts []string, err error) {
-	// no nats outside of k8s so this is a no-op
-	return []string{}, nil
-}
-
 func (c *CmdSSHActions) findHosts(searchTerm string) (hosts []string, err error) {
 	rawHosts := strings.Split(searchTerm, ",")
 	for _, host := range rawHosts {

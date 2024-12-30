@@ -4,7 +4,15 @@
 
 ### Added
 
-* support for capturing v26 version nats servers
+* capture container logs of all pods in namespace
+
+### Changed
+
+* no longer have specific zookeeper directory for container logs
+
+### Removed
+
+* removed zookeeper specific code for log capture
 
 ## [3.2.8] - 2024-12-18
 

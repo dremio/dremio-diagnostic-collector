@@ -52,7 +52,6 @@ type Collector interface {
 	CopyToHost(hostString string, source, destination string) (out string, err error)
 	GetCoordinators() (podName []string, err error)
 	GetExecutors() (podName []string, err error)
-	GetNats() (podName []string, err error)
 	HostExecute(mask bool, hostString string, args ...string) (stdOut string, err error)
 	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) error
 	HelpText() string
@@ -139,7 +138,7 @@ func FilterExecutors(executors []string, coordinators []string) []string {
 	return result
 }
 
-func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection ...func([]string)) error {
+func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection func()) error {
 	start := time.Now().UTC()
 	outputLoc := collectionArgs.OutputLoc
 	outputLocDir := filepath.Dir(outputLoc)
@@ -178,26 +177,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	}
 	executors := FilterExecutors(executorsRaw, coordinators)
 
-	// no need to filter nats
-	natsNodes, err := c.GetNats()
-	if err != nil {
-		simplelog.Warningf("unable to get nats logs: %v", err)
-	}
-	totalNodes := len(executors) + len(coordinators) + len(natsNodes)
+	totalNodes := len(executors) + len(coordinators)
 	if totalNodes == 0 {
 		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
 	}
-	hosts := append(coordinators, executors...)
-	hosts = append(hosts, natsNodes...)
 
 	var clusterWg sync.WaitGroup
 	clusterWg.Add(1)
 	go func() {
 		defer clusterWg.Done()
 		//now safe to collect cluster level information
-		for _, c := range clusterCollection {
-			c(hosts)
-		}
+		clusterCollection()
 	}()
 	var tarballs []string
 	var files []helpers.CollectedFile

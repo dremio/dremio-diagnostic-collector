@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -43,17 +44,6 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster config path %v with error %v", p, err)
 		return err
-	}
-
-	// zookeeper logs specifically
-	path, err := cs.CreatePath("kubernetes", "zookeeper-container-logs", "")
-	if err != nil {
-		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
-		return err
-	}
-
-	if err := saveZookeeperPodLogs(hook, namespace, c, cs, ddfs, path); err != nil {
-		simplelog.Errorf("unable to save zookeeper pod logs: %v", err)
 	}
 
 	// everything else
@@ -82,26 +72,25 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 	return nil
 }
 
-func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, pods []string) error {
+func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
 		return err
 	}
 
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 60*time.Second, errors.New("timeout while retrieving pods"))
+	defer cancel()
+	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	// Loop over pods
-	for _, podname := range pods {
-		podObj, err := clientSet.CoreV1().Pods(namespace).Get(context.Background(), podname, metav1.GetOptions{})
-		if err != nil {
-			simplelog.Errorf("unable to get pod %v: %v", podname, err)
-			continue
-		}
-		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, clientSet, path, podname)
+	for _, podObj := range pods.Items {
+		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, clientSet, path)
 	}
 	return err
 }
 
-func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace string, c *k8sapi.Clientset, path string, podname string) {
+func saveLogsFromPod(podObj corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace string, c *k8sapi.Clientset, path string) {
+	podName := podObj.Name
 	var containers []string
 	for _, c := range podObj.Spec.Containers {
 		containers = append(containers, c.Name)
@@ -113,11 +102,11 @@ func saveLogsFromPod(podObj *corev1.Pod, hook shutdown.CancelHook, cs CopyStrate
 	// write the output of the kubectl logs command to a file
 	for _, container := range containers {
 		// save previous logs if present
-		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podname, true)
+		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podName, true)
 		// save current logs
-		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podname, false)
+		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podName, false)
 	}
-	consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podname))
+	consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podName))
 }
 
 func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace string, client *k8sapi.Clientset, path string, pod string, previous bool) {
@@ -169,29 +158,6 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 	if err != nil {
 		simplelog.Errorf("trying to write file %v, error was %v", outFile, err)
 	}
-}
-
-func saveZookeeperPodLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, path string) error {
-	options := metav1.ListOptions{
-		LabelSelector: "app=zk",
-	}
-	timeoutDuration := 60 * time.Second
-	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), timeoutDuration, fmt.Errorf("while getting resource zk pod in namespace %s timeout exceeded %v", namespace, timeoutDuration))
-	defer timeout()
-	list, err := clientSet.CoreV1().Pods(namespace).List(ctx, options)
-	if err != nil {
-		switch ctx.Err() {
-		case context.DeadlineExceeded:
-			return context.Cause(ctx)
-		default:
-			return err
-		}
-	}
-	for _, c := range list.Items {
-		cb := c
-		saveLogsFromPod(&cb, hook, cs, ddfs, namespace, clientSet, path, c.Name)
-	}
-	return nil
 }
 
 // Execute commands at the cluster level
