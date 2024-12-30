@@ -131,7 +131,7 @@ func TestKubectCopyFrom(t *testing.T) {
 	if len(calls) != 2 {
 		t.Errorf("expected 2 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "50", fmt.Sprintf("%v:%v", podName, source), destination}
+	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), destination}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -168,7 +168,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	}
 	//we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
 	expectedDestination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
-	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "50", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
+	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}

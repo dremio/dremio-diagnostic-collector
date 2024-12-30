@@ -176,7 +176,7 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 }
 func (c *CliK8sActions) addRetries(args []string) []string {
 	if c.retriesEnabled {
-		args = append(args, "--retries", "50")
+		args = append(args, "--retries", "999")
 	}
 	return args
 }

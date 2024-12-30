@@ -489,7 +489,9 @@ dremio-jfr-time-seconds: 10
 		"dremio-master-0-dremio-master-coordinator.txt",
 		"dremio-master-0-start-only-one-dremio-master.txt",
 		"dremio-master-0-upgrade-task.txt",
-		"dremio-master-0-wait-for-zookeeper.txt"}
+		"dremio-master-0-wait-for-zookeeper.txt",
+		"zk-0-kubernetes-zookeeper.txt",
+	}
 
 	expectedEmptyFiles := []string{
 		"dremio-executor-1-chown-data-directory.txt",
@@ -506,7 +508,7 @@ dremio-jfr-time-seconds: 10
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	expectedEntries := 13
+	expectedEntries := 14
 	if len(entries) != expectedEntries {
 		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}
@@ -687,7 +689,9 @@ dremio-jfr-time-seconds: 10
 		"dremio-master-0-dremio-master-coordinator.txt",
 		"dremio-master-0-start-only-one-dremio-master.txt",
 		"dremio-master-0-upgrade-task.txt",
-		"dremio-master-0-wait-for-zookeeper.txt"}
+		"dremio-master-0-wait-for-zookeeper.txt",
+		"zk-0-kubernetes-zookeeper.txt",
+	}
 
 	expectedEmptyFiles := []string{
 		"dremio-executor-1-chown-data-directory.txt",
@@ -704,7 +708,7 @@ dremio-jfr-time-seconds: 10
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	expectedEntries := 13
+	expectedEntries := 14
 	if len(entries) != expectedEntries {
 		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}
@@ -919,7 +923,9 @@ dremio-jfr-time-seconds: 10
 		"dremio-master-0-dremio-master-coordinator.txt",
 		"dremio-master-0-start-only-one-dremio-master.txt",
 		"dremio-master-0-upgrade-task.txt",
-		"dremio-master-0-wait-for-zookeeper.txt"}
+		"dremio-master-0-wait-for-zookeeper.txt",
+		"zk-0-kubernetes-zookeeper.txt",
+	}
 
 	expectedEmptyFiles := []string{
 		"dremio-executor-1-chown-data-directory.txt",
@@ -936,7 +942,7 @@ dremio-jfr-time-seconds: 10
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	expectedEntries := 13
+	expectedEntries := 14
 	if len(entries) != expectedEntries {
 		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}
