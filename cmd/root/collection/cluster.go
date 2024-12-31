@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/helpers"
@@ -40,9 +39,9 @@ var clusterRequestTimeout = 120
 
 func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
-	p, err := cs.CreatePath("kubernetes", "dremio-master", "")
+	path, err := cs.CreatePath("kubernetes", "", "")
 	if err != nil {
-		simplelog.Errorf("trying to construct cluster config path %v with error %v", p, err)
+		simplelog.Errorf("trying to construct cluster config path %v with error %v", path, err)
 		return err
 	}
 
@@ -59,8 +58,6 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 			simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text: %v", resource, namespace, err)
 			continue
 		}
-
-		path := strings.TrimSuffix(p, "dremio-master")
 		filename := filepath.Join(path, resource+".json")
 		err = ddfs.WriteFile(filename, []byte(text), DirPerms)
 		if err != nil {
