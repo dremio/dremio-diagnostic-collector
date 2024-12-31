@@ -6,6 +6,10 @@
 
 * capture container logs of all pods in namespace
 
+### Fixed
+
+* fix for CVE-2024-45338 which could cause extremely slow parsing
+
 ### Changed
 
 * no longer have specific zookeeper directory for container logs
