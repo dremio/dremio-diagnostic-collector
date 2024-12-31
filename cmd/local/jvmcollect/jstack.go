@@ -42,12 +42,12 @@ func RunCollectJStacksWithTimeService(c *conf.CollectConf, hook shutdown.CancelH
 	for i := 0; i < iterations; i++ {
 		var w bytes.Buffer
 		if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v Thread.print -l", c.DremioPID())); err != nil {
-			simplelog.Warningf("unable to capture jstack of pid %v due to error %v", c.DremioPID(), err)
+			simplelog.Warningf("unable to capture jstack of pid %v: %v", c.DremioPID(), err)
 		}
 		date := timer().Format("2006-01-02_15_04_05")
 		threadDumpFileName := filepath.Join(c.ThreadDumpsOutDir(), fmt.Sprintf("threadDump-%s-%s.txt", c.NodeName(), date))
-		if err := os.WriteFile(filepath.Clean(threadDumpFileName), w.Bytes(), 0600); err != nil {
-			return fmt.Errorf("unable to write thread dump %v due to error %v", threadDumpFileName, err)
+		if err := os.WriteFile(filepath.Clean(threadDumpFileName), w.Bytes(), 0o600); err != nil {
+			return fmt.Errorf("unable to write thread dump %v: %w", threadDumpFileName, err)
 		}
 		simplelog.Debugf("Saved %v", threadDumpFileName)
 		simplelog.Debugf("Waiting %v second(s) ...", threadDumpFreq)

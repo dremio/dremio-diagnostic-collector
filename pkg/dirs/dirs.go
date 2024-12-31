@@ -16,6 +16,7 @@
 package dirs
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -36,7 +37,7 @@ func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) error) error {
 
 	// Check if the path is a directory
 	if !fileInfo.IsDir() {
-		return fmt.Errorf("the path is not a directory")
+		return errors.New("the path is not a directory")
 	}
 
 	// Read the contents of the directory
@@ -47,18 +48,18 @@ func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) error) error {
 
 	// Check if the directory is empty
 	if len(files) == 0 {
-		return fmt.Errorf("directory is empty")
+		return errors.New("directory is empty")
 	}
 
 	if err := fileCheck(files); err != nil {
-		return fmt.Errorf("file check function failed: %v", err)
+		return fmt.Errorf("file check function failed: %w", err)
 	}
 	return nil
 }
 
 func CheckFreeSpace(folder string, minGB uint64) error {
 	var gb uint64 = 1024 * 1024 * 1024
-	var minBytes = minGB * gb
+	minBytes := minGB * gb
 	b, err := GetFreeSpaceOnFileSystem(folder)
 	if err != nil {
 		return err

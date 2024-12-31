@@ -61,7 +61,7 @@ func GetJSON(t *testing.T) []byte {
 	if _, err := os.Stat(oldTestJSON); err == nil {
 		dirToCreate := filepath.Dir(testJSON)
 		t.Logf("making dir $%v", dirToCreate)
-		if err := os.MkdirAll(dirToCreate, 0700); err != nil {
+		if err := os.MkdirAll(dirToCreate, 0o700); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("copying %v to %v", oldTestJSON, testJSON)
@@ -69,7 +69,7 @@ func GetJSON(t *testing.T) []byte {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(testJSON, b, 0600); err != nil {
+		if err := os.WriteFile(testJSON, b, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("removing %v", oldTestJSON)
@@ -115,8 +115,8 @@ func TestSSHBasedRemoteCollect(t *testing.T) {
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	yamlText := fmt.Sprintf(`verbose: vvvv
@@ -124,16 +124,16 @@ dremio-log-dir: %v
 dremio-conf-dir: %v
 dremio-rocksdb-dir: %v
 `, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
 	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
 		t.Fatalf("unable to write ssh private key: %v", err)
 	}
 	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
+	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 
@@ -144,14 +144,14 @@ dremio-rocksdb-dir: %v
 	}
 	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 	simplelog.Infof("now we are reading the %v dir", testOut)
 	entries, err := os.ReadDir(testOut)
@@ -219,7 +219,6 @@ dremio-rocksdb-dir: %v
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
 	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
-
 }
 
 func TestSSHBasedRemoteCollectPlusJstack(t *testing.T) {
@@ -234,8 +233,8 @@ func TestSSHBasedRemoteCollectPlusJstack(t *testing.T) {
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	yamlText := fmt.Sprintf(`verbose: vvvv
@@ -243,16 +242,16 @@ dremio-log-dir: %v
 dremio-conf-dir: %v
 dremio-rocksdb-dir: %v
 `, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
 	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
 		t.Fatalf("unable to write ssh private key: %v", err)
 	}
 	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
+	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 
@@ -263,14 +262,14 @@ dremio-rocksdb-dir: %v
 	}
 	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 	simplelog.Infof("now we are reading the %v dir", testOut)
 	entries, err := os.ReadDir(testOut)
@@ -330,13 +329,13 @@ dremio-rocksdb-dir: %v
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 
 	for _, host := range []string{coordinator, executor} {
-		//thread dump files
+		// thread dump files
 		entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", host))
 		if err != nil {
-			t.Fatalf("cannot read thread dumps dir for the %v due to: %v", host, err)
+			t.Fatalf("cannot read thread dumps dir for the %v: %v", host, err)
 		}
 		if len(entries) < 9 {
-			//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
+			// giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 			t.Errorf("should be at least 9 jstack entries for %v but there was %v", host, len(entries))
 		}
 	}
@@ -346,7 +345,6 @@ dremio-rocksdb-dir: %v
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", coordinator, "os_info.txt"))
 	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
-
 }
 
 func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
@@ -361,8 +359,8 @@ func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	yamlText := fmt.Sprintf(`verbose: vvvv
@@ -378,23 +376,23 @@ collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
 `, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
 	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
 		t.Fatalf("unable to write ssh private key: %v", err)
 	}
 	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0600); err != nil {
+	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
 		t.Fatalf("unable to write ssh public key: %v", err)
 	}
 
-	//set original stdin since we are going to overwrite it for now
+	// set original stdin since we are going to overwrite it for now
 	org := os.Stdin
 	defer func() {
-		//reset std in
+		// reset std in
 		os.Stdin = org
 	}()
 	tmpfile, err := os.CreateTemp("", "stdinmock")
@@ -432,14 +430,14 @@ dremio-jfr-time-seconds: 10
 	}
 	simplelog.Info("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	simplelog.Infof("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 	simplelog.Infof("now we are reading the %v dir", testOut)
 	entries, err := os.ReadDir(testOut)
@@ -503,34 +501,34 @@ dremio-jfr-time-seconds: 10
 	t.Logf("checking file %v", filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 	tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", executor, "os_info.txt"))
 
-	//kvstore report
+	// kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", coordinator, "kvstore-report.zip"))
 
-	//ttop files
+	// ttop files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", coordinator, "ttop.txt"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", executor, "ttop.txt"))
 
-	//jfr files
+	// jfr files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", coordinator+".jfr"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", executor+".jfr"))
 
-	//thread dump files
+	// thread dump files
 	entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", executor))
 	if err != nil {
-		t.Fatalf("cannot read thread dumps dir for the "+coordinator+" due to: %v", err)
+		t.Fatalf("cannot read thread dumps dir for the %v: %v", coordinator, err)
 	}
 	if len(entries) < 9 {
-		//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
+		// giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 		t.Errorf("should be at least 9 jstack entries for "+executor+" but there was %v", len(entries))
 	}
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", coordinator))
 	if err != nil {
-		t.Fatalf("cannot read thread dumps dir for the "+coordinator+" due to: %v", err)
+		t.Fatalf("cannot read thread dumps dir for the %v: %v", coordinator, err)
 	}
 
 	if len(entries) < 9 {
-		//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
+		// giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 		t.Errorf("should be at least 9 jstack entries for "+executor+" but there was %v", len(entries))
 	}
 
@@ -538,16 +536,16 @@ dremio-jfr-time-seconds: 10
 	var systemTables []string
 	for _, e := range conf.SystemTableList() {
 		if !sshConf.IsEnterprise {
-			//we skip the known ones we don't care about when using oss for testing
+			// we skip the known ones we don't care about when using oss for testing
 			if e == "roles" || e == "membership" || e == "privileges" || e == "tables" {
 				continue
 			}
 		}
 		if e == "options" {
-			//we double up for options since it's big
+			// we double up for options since it's big
 			systemTables = append(systemTables, "sys.options_offset_500_limit_500")
 		}
-		//we do the trim because sys.\"tables\" becomes sys.tables on the filesystem
+		// we do the trim because sys.\"tables\" becomes sys.tables on the filesystem
 		fullFileName := fmt.Sprintf("sys.%v_offset_0_limit_500.json", e)
 		systemTables = append(systemTables, strings.ReplaceAll(fullFileName, "\\\"", ""))
 	}
@@ -556,7 +554,7 @@ dremio-jfr-time-seconds: 10
 	if sshConf.IsEnterprise {
 		expectedEntriesCount = len(systemTables)
 	} else {
-		//we subtract 3 of the jobs that fail due to missing features in oss
+		// we subtract 3 of the jobs that fail because of missing features in oss
 		// - sys.privileges
 		// - sys.membership
 		// - sys.roles
@@ -568,7 +566,7 @@ dremio-jfr-time-seconds: 10
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "system-tables", coordinator))
 	if err != nil {
-		t.Fatalf("cannot read system-tables dir for the "+coordinator+" due to: %v", err)
+		t.Fatalf("cannot read system-tables dir for the %v:%v", coordinator, err)
 	}
 	actualEntriesCount := len(entries)
 	if actualEntriesCount == 0 {
@@ -586,11 +584,11 @@ dremio-jfr-time-seconds: 10
 		t.Errorf("expected %v but was %v we had the following entries missing:\n\n%v\n\nextra entries on filesystem:\n\n%v\n", expectedEntriesCount, actualEntriesCount, strings.Join(uniqueToSystemTables, "\n"), strings.Join(uniqueOnFileSystem, "\n"))
 	}
 
-	//validate job downloads
+	// validate job downloads
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "job-profiles", coordinator))
 	if err != nil {
-		t.Fatalf("cannot read job profiles dir for the %v due to: %v", coordinator, err)
+		t.Fatalf("cannot read job profiles dir for the %v: %v", coordinator, err)
 	}
 
 	// so there is some vagueness and luck with how many job profiles we download, so we are going to see if there are at least 10 of them and call that good enough
@@ -607,10 +605,10 @@ func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) 
 	c.Stdout = &stdOut
 	c.Stderr = &stdErr
 	if err := c.Start(); err != nil {
-		return "", fmt.Errorf("unable to run ssh for ip: %v with error %v", ip, err)
+		return "", fmt.Errorf("unable to run ssh for ip: %v: %w", ip, err)
 	}
 	if err := c.Wait(); err != nil {
-		return "", fmt.Errorf("getting hostname for ip %v failed with stderr out of %v and stdout of %v and go error of %v", ip, stdErr.String(), stdOut.String(), err)
+		return "", fmt.Errorf("getting hostname for ip %v failed with stderr out of %v and stdout of %v: %w", ip, stdErr.String(), stdOut.String(), err)
 	}
 
 	scanner := bufio.NewScanner(&stdOut)
@@ -639,11 +637,11 @@ func TestValidateBadCollectFlag(t *testing.T) {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
 	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0600); err != nil {
+	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
 		t.Fatalf("unable to write ssh private key: %v", err)
 	}
 	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0o600); err != nil {
 		t.Fatalf("unable to write ddc yaml: %v", err)
 	}
 	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}

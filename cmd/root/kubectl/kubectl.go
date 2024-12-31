@@ -41,20 +41,20 @@ type KubeArgs struct {
 func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string) (*CliK8sActions, error) {
 	kubectl, err := exec.LookPath("kubectl")
 	if err != nil {
-		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %v", err)
+		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %w", err)
 	}
 	cliInstance := cli.NewCli(hook)
 
 	if k8sContext == "" {
 		k8sContextRaw, err := cliInstance.Execute(false, kubectl, "config", "current-context")
 		if err != nil {
-			return &CliK8sActions{}, fmt.Errorf("unable to retrieve context: %v", err)
+			return &CliK8sActions{}, fmt.Errorf("unable to retrieve context: %w", err)
 		}
 		k8sContext = strings.TrimSpace(k8sContextRaw)
 	}
 	retriesEnabled, err := CanRetryTransfers(kubectl)
 	if err != nil {
-		return &CliK8sActions{}, fmt.Errorf("unable to run kubectl version so disabling kubectl: %v", err)
+		return &CliK8sActions{}, fmt.Errorf("unable to run kubectl version so disabling kubectl: %w", err)
 	}
 	return &CliK8sActions{
 		cli:            cliInstance,
@@ -117,7 +117,7 @@ type clientVersion struct {
 }
 
 func (c *CliK8sActions) cleanLocal(rawDest string) string {
-	//windows does the wrong thing for kubectl here and provides a path with C:\ we need to remove it as kubectl detects this as a remote destination
+	// windows does the wrong thing for kubectl here and provides a path with C:\ we need to remove it as kubectl detects this as a remote destination
 	return strings.TrimPrefix(rawDest, "C:")
 }
 
@@ -136,7 +136,7 @@ func (c *CliK8sActions) Name() string {
 func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	container, err := c.getContainerName(hostString)
 	if err != nil {
-		return fmt.Errorf("unable to get container name: %v", err)
+		return fmt.Errorf("unable to get container name: %w", err)
 	}
 	var kubectlArgs []string
 	if pat == "" {
@@ -167,19 +167,21 @@ func (c *CliK8sActions) CopyFromHost(hostString string, source, destination stri
 	}
 	container, err := c.getContainerName(hostString)
 	if err != nil {
-		return "", fmt.Errorf("unable to get container name: %v", err)
+		return "", fmt.Errorf("unable to get container name: %w", err)
 	}
 	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
 	args = c.addRetries(args)
 	args = append(args, fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
 	return c.cli.Execute(false, args...)
 }
+
 func (c *CliK8sActions) addRetries(args []string) []string {
 	if c.retriesEnabled {
 		args = append(args, "--retries", "999")
 	}
 	return args
 }
+
 func (c *CliK8sActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
 	if strings.HasPrefix(source, `C:`) {
 		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
@@ -188,7 +190,7 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	}
 	container, err := c.getContainerName(hostString)
 	if err != nil {
-		return "", fmt.Errorf("unable to get container name: %v", err)
+		return "", fmt.Errorf("unable to get container name: %w", err)
 	}
 	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
 	args = c.addRetries(args)
@@ -237,6 +239,7 @@ func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName
 	sort.Strings(pods)
 	return pods, nil
 }
+
 func (c *CliK8sActions) GetExecutors() (podName []string, err error) {
 	return c.SearchPods(func(container string) bool {
 		return container == "dremio-executor"
@@ -296,7 +299,7 @@ func (c *CliK8sActions) CleanupRemote() error {
 			Result:   consoleprint.ResultFailure,
 		})
 		c.m.Lock()
-		//cancel out so we can skip if it's called again
+		// cancel out so we can skip if it's called again
 		c.pidHosts[host] = ""
 		c.m.Unlock()
 	}

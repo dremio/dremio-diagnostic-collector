@@ -72,6 +72,7 @@ func TestGzipContainsFile(t *testing.T) {
 
 	tests.GzipContainsFile(t, tmpfile.Name(), gzipFileName)
 }
+
 func TestTgzContainsFile(t *testing.T) {
 	// create a tgz file
 	content := []byte("temporary file's content")
@@ -101,20 +102,20 @@ func TestTgzContainsFile(t *testing.T) {
 		t.Fatalf("Unexpected error creating tar file: %v", err)
 	}
 
-	tw := tar.NewWriter(tarfile)
+	tarWriter := tar.NewWriter(tarfile)
 	hdr := &tar.Header{
 		Name:    tmpfile.Name(),
-		Mode:    0600,
+		Mode:    0o600,
 		ModTime: time.Now(),
 		Size:    int64(len(content)),
 	}
-	if err := tw.WriteHeader(hdr); err != nil {
+	if err := tarWriter.WriteHeader(hdr); err != nil {
 		t.Fatalf("Unexpected error writing header for tar file: %v", err)
 	}
-	if _, err := tw.Write(content); err != nil {
+	if _, err := tarWriter.Write(content); err != nil {
 		t.Fatalf("Unexpected error writing to tar file: %v", err)
 	}
-	if err := tw.Close(); err != nil {
+	if err := tarWriter.Close(); err != nil {
 		t.Fatalf("Unexpected error closing tar writer: %v", err)
 	}
 	if err := tarfile.Close(); err != nil {
@@ -126,7 +127,7 @@ func TestTgzContainsFile(t *testing.T) {
 		t.Fatalf("Unexpected error creating tgz file: %v", err)
 	}
 
-	gw := gzip.NewWriter(gzipfile)
+	gzipWriter := gzip.NewWriter(gzipfile)
 	tarfileToRead, err := os.Open(tarFileName)
 	if err != nil {
 		t.Fatalf("Unexpected error opening tar file for gzip compression: %v", err)
@@ -139,11 +140,11 @@ func TestTgzContainsFile(t *testing.T) {
 		}
 	}()
 
-	if _, err := io.Copy(gw, tarfileToRead); err != nil {
+	if _, err := io.Copy(gzipWriter, tarfileToRead); err != nil {
 		t.Fatalf("Unexpected error writing tar file to gzip writer: %v", err)
 	}
 
-	if err := gw.Close(); err != nil {
+	if err := gzipWriter.Close(); err != nil {
 		t.Fatalf("Unexpected error closing gzip writer for tgz file: %v", err)
 	}
 

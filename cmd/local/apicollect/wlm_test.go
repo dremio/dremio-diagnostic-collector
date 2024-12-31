@@ -33,16 +33,16 @@ func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 	t.Helper()
 	confDir, err := os.MkdirTemp("", "ddc-tester-wlm-test")
 	if err != nil {
-		t.Fatalf("unable to create tmp dir due to error %v", err)
+		t.Fatalf("unable to create tmp dir: %v", err)
 	}
 	outDir, err := os.MkdirTemp("", "ddc-tester-wlm-test-out")
 	if err != nil {
-		t.Fatalf("unable to create tmp dir due to error %v", err)
+		t.Fatalf("unable to create tmp dir: %v", err)
 	}
 	nodeName := "tester-node-1"
-	err = os.MkdirAll(filepath.Join(outDir, "wlm", nodeName), 0700)
+	err = os.MkdirAll(filepath.Join(outDir, "wlm", nodeName), 0o700)
 	if err != nil {
-		t.Fatalf("unable to create wlm dir due to error %v", err)
+		t.Fatalf("unable to create wlm dir: %v", err)
 	}
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
 dremio-log-dir: %v
@@ -56,9 +56,9 @@ accept-collection-consent: true
 allow-insecure-ssl: true
 node-name: %v
 tmp-output-dir: %v
-`, LogDir(), ConfDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0600)
+`, LogDir(), ConfDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0o600)
 	if err != nil {
-		t.Fatalf("unable to create ddc.yaml due to error %v", err)
+		t.Fatalf("unable to create ddc.yaml: %v", err)
 	}
 	return confDir
 }
@@ -76,22 +76,22 @@ func TestRunCollectWLM(t *testing.T) {
 	ruleAPIResponse := `{"rule": "rule data"}`
 
 	// Create a test server with a handler function
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
 		case "/apiv2/login":
-			fmt.Fprint(w, `{"token": "fake_token"}`)
+			fmt.Fprint(writer, `{"token": "fake_token"}`)
 		case "/api/v3/wlm/queue":
-			fmt.Fprint(w, `{"queue": "queue data"}`)
+			fmt.Fprint(writer, `{"queue": "queue data"}`)
 		case "/api/v3/wlm/rule":
-			fmt.Fprint(w, `{"rule": "rule data"}`)
+			fmt.Fprint(writer, `{"rule": "rule data"}`)
 		case "/apiv2/provision/clusters":
-			fmt.Fprint(w, `{"rule": "awse data"}`)
+			fmt.Fprint(writer, `{"rule": "awse data"}`)
 		default:
-			http.Error(w, "Not Found", http.StatusNotFound)
+			http.Error(writer, "Not Found", http.StatusNotFound)
 		}
 	}))
 	defer server.Close()
-	//allow the server to startup
+	// allow the server to startup
 	time.Sleep(1 * time.Second)
 	confDir := setupConfigDir(t, server.URL)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
@@ -101,12 +101,12 @@ func TestRunCollectWLM(t *testing.T) {
 	overrides := make(map[string]string)
 	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
 	if err != nil {
-		t.Fatalf("unable to read conf due to error %v", err)
+		t.Fatalf("unable to read conf: %v", err)
 	}
 
 	err = apicollect.RunCollectWLM(c, hook)
 	if err != nil {
-		t.Errorf("RunCollectWLM() returned an error: %v", err)
+		t.Errorf("RunCollectWLM() failed: %v", err)
 	}
 	// Define the file paths
 	queueFilePath := filepath.Join(c.WLMOutDir(), "queues.json")

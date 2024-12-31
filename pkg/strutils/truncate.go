@@ -19,32 +19,32 @@ import (
 	"unicode/utf8"
 )
 
-func GetEndOfString(s string, maxLength int) string {
+func GetEndOfString(str string, maxLength int) string {
 	maxLength = max(maxLength, 0)
 	// Check if the string is already within the desired length
-	if utf8.RuneCountInString(s) <= maxLength {
-		return s
+	if utf8.RuneCountInString(str) <= maxLength {
+		return str
 	}
 
 	// get the end of the string up to desired length
-	runes := []rune(s)
+	runes := []rune(str)
 	truncatedRunes := runes[len(runes)-maxLength:]
 	return string(truncatedRunes)
 }
 
-func TruncateString(s string, maxLength int) string {
+func TruncateString(str string, maxLength int) string {
 	maxLength = max(maxLength, 0)
 	// Check if the string is already within the desired length
-	if utf8.RuneCountInString(s) <= maxLength {
-		return s
+	if utf8.RuneCountInString(str) <= maxLength {
+		return str
 	}
-	return s[:maxLength]
+	return str[:maxLength]
 }
 
-func GetLastLine(s string) string {
-	index := strings.LastIndex(s, "\n")
+func GetLastLine(str string) string {
+	index := strings.LastIndex(str, "\n")
 	if index == -1 {
-		return s // No newline character, return the whole string
+		return str // No newline character, return the whole string
 	}
-	return s[index+1:] // Return the substring after the last newline character
+	return str[index+1:] // Return the substring after the last newline character
 }

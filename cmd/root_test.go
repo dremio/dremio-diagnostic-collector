@@ -75,7 +75,7 @@ func TestValidateParameters(t *testing.T) {
 func TestExecute(t *testing.T) {
 	_ = makeTestCollection()
 	actual, err := captureAllOutput(checkstds)
-	//message, err := captureAllOutput(Execute)
+	// message, err := captureAllOutput(Execute)
 	expected := "This is stdout\nThis is stderr\n"
 	if expected != actual {
 		t.Errorf("\nERROR: stdout : \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
@@ -97,21 +97,21 @@ func captureAllOutput(f func()) (string, error) {
 	var err error
 	old := os.Stdout
 	olderr := os.Stderr
-	r, w, err := os.Pipe()
+	reader, writer, err := os.Pipe()
 	if err != nil {
 		return "", err
 	}
-	os.Stdout = w
-	os.Stderr = w
+	os.Stdout = writer
+	os.Stderr = writer
 
 	f()
 
-	w.Close()
+	writer.Close()
 	os.Stdout = old
 	os.Stderr = olderr
 
 	var buf bytes.Buffer
-	_, err = io.Copy(&buf, r)
+	_, err = io.Copy(&buf, reader)
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +140,6 @@ func TestAllSubCommandsAreWiredUp(t *testing.T) {
 }
 
 func TestValidateDDCYamlValid(t *testing.T) {
-
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
 	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)
 	if err != nil {

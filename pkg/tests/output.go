@@ -41,7 +41,7 @@ func TreeToString(dir string) string {
 		Tree(dir)
 	})
 	if err != nil {
-		simplelog.Errorf("unable to capture output for tree due to error %v", err)
+		simplelog.Errorf("unable to capture output for tree: %v", err)
 		return ""
 	}
 	return out

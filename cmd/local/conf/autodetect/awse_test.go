@@ -36,7 +36,7 @@ func TestIsAWSEExecutorUsingDir(t *testing.T) {
 		nodeName = "TestNode"
 
 		subDir := testDir + "/SubDirectory"
-		err = os.Mkdir(subDir, 0755)
+		err = os.Mkdir(subDir, 0o755)
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
 		}
@@ -46,11 +46,11 @@ func TestIsAWSEExecutorUsingDir(t *testing.T) {
 		os.RemoveAll(testDir)
 	}
 
-	//should return true when node name is found
+	// should return true when node name is found
 	beforeEach()
 
 	nodeDir := testDir + "/" + nodeName
-	err = os.Mkdir(nodeDir, 0755)
+	err = os.Mkdir(nodeDir, 0o755)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -65,7 +65,7 @@ func TestIsAWSEExecutorUsingDir(t *testing.T) {
 	afterEach()
 	// end scenario
 
-	//should return false when node name is not found
+	// should return false when node name is not found
 	beforeEach()
 	isAWSE, err = autodetect.IsAWSEExecutorUsingDir(testDir, nodeName)
 	if err != nil {

@@ -17,6 +17,7 @@ package archive_test
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,11 +33,11 @@ func TestTarGzDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	dest := filepath.Join(tmpDir, "output.tgz")
 	if err := archive.TarGzDir(src, dest); err != nil {
-		t.Fatalf("unable to archive file due to error %v", err)
+		t.Fatalf("unable to archive file: %v", err)
 	}
 	f, err := os.Open(dest)
 	if err != nil {
-		t.Fatalf("unable to continue due to error %v", err)
+		t.Fatalf("unable to continue: %v", err)
 	}
 	zr, err := gzip.NewReader(f)
 	if err != nil {
@@ -48,7 +49,7 @@ func TestTarGzDir(t *testing.T) {
 	}
 
 	if _, err = io.CopyN(outf, zr, 4096); err != nil {
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			t.Fatalf("unable to copy file out %v", err)
 		}
 	}
@@ -69,10 +70,10 @@ func TestTarGzDir(t *testing.T) {
 		t.Fatalf("unable to read output tar file")
 	}
 	// Open and iterate through the files in the archive.
-	tr := tar.NewReader(tarFile)
+	tarReader := tar.NewReader(tarFile)
 	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
+		hdr, err := tarReader.Next()
+		if errors.Is(err, io.EOF) {
 			break // End of archive
 		}
 		if err != nil {
@@ -86,8 +87,8 @@ func TestTarGzDir(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create path %v: %v", outPath, err)
 		}
-		if _, err := io.CopyN(f, tr, 4096); err != nil {
-			if err != io.EOF {
+		if _, err := io.CopyN(f, tarReader, 4096); err != nil {
+			if !errors.Is(err, io.EOF) {
 				t.Fatalf("unable to copy file %v out: %v", hdr.Name, err)
 			}
 		}
@@ -107,12 +108,12 @@ func TestTarGzDir(t *testing.T) {
 	}
 	_, err = os.Stat(filepath.Join(tmpDir, "file1.txt"))
 	if err != nil {
-		t.Fatalf("file missing due to error %v", err)
+		t.Fatalf("file missing: %v", err)
 	}
 
 	_, err = os.Stat(filepath.Join(tmpDir, "file2.txt"))
 	if err != nil {
-		t.Fatalf("file missing due to error %v", err)
+		t.Fatalf("file missing: %v", err)
 	}
 
 	copied1, err := os.ReadFile(filepath.Join(tmpDir, "file1.txt"))
@@ -144,11 +145,11 @@ func TestTarDDC(t *testing.T) {
 	tmpDir := t.TempDir()
 	dest := filepath.Join(tmpDir, "output.tgz")
 	if err := archive.TarDDC(src, dest, "2050101011-DDC"); err != nil {
-		t.Fatalf("unable to archive file due to error %v", err)
+		t.Fatalf("unable to archive file: %v", err)
 	}
 	f, err := os.Open(dest)
 	if err != nil {
-		t.Fatalf("unable to continue due to error %v", err)
+		t.Fatalf("unable to continue: %v", err)
 	}
 	zr, err := gzip.NewReader(f)
 	if err != nil {
@@ -159,7 +160,7 @@ func TestTarDDC(t *testing.T) {
 		t.Fatalf("unable to open file for writing with error %v", err)
 	}
 	if _, err = io.CopyN(outf, zr, 4096); err != nil {
-		if err != io.EOF {
+		if !errors.Is(err, io.EOF) {
 			t.Fatalf("unable to copy file out %v", err)
 		}
 	}
@@ -183,7 +184,7 @@ func TestTarDDC(t *testing.T) {
 	tr := tar.NewReader(tarFile)
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break // End of archive
 		}
 		if err != nil {
@@ -192,7 +193,7 @@ func TestTarDDC(t *testing.T) {
 
 		outPath := filepath.Join(tmpDir, filepath.Clean(hdr.Name))
 		if hdr.Typeflag == tar.TypeDir {
-			if err := os.MkdirAll(outPath, 0700); err != nil {
+			if err := os.MkdirAll(outPath, 0o700); err != nil {
 				t.Fatalf("unable to create dir path %v: %v", outPath, err)
 			}
 			continue
@@ -202,7 +203,7 @@ func TestTarDDC(t *testing.T) {
 			t.Fatalf("unable to create path %v: %v", outPath, err)
 		}
 		if _, err := io.CopyN(f, tr, 4096); err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				t.Fatalf("unable to copy file %v out: %v", hdr.Name, err)
 			}
 		}
@@ -222,12 +223,12 @@ func TestTarDDC(t *testing.T) {
 	}
 	_, err = os.Stat(filepath.Join(tmpDir, "2050101011-DDC", "file1.txt"))
 	if err != nil {
-		t.Fatalf("file missing due to error %v", err)
+		t.Fatalf("file missing: %v", err)
 	}
 
 	_, err = os.Stat(filepath.Join(tmpDir, "2050101011-DDC", "file2.txt"))
 	if err != nil {
-		t.Fatalf("file missing due to error %v", err)
+		t.Fatalf("file missing: %v", err)
 	}
 
 	copied1, err := os.ReadFile(filepath.Join(tmpDir, "2050101011-DDC", "file1.txt"))

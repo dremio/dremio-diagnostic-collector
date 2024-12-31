@@ -43,7 +43,7 @@ func TestAPIRequest(t *testing.T) {
 
 func TestPostQuery(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if req.Method != "POST" {
+		if req.Method != http.MethodPost {
 			t.Fatalf("Expected 'POST', got '%v'", req.Method)
 		}
 		rw.WriteHeader(http.StatusOK)

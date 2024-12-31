@@ -32,7 +32,7 @@ func GzipFile(src, dst string) error {
 	}
 	defer func() {
 		if err := sourceFile.Close(); err != nil {
-			simplelog.Errorf("unable to close source file %v due to error %v", sourceFile, err)
+			simplelog.Errorf("unable to close source file %v: %v", sourceFile, err)
 		}
 	}()
 
@@ -42,7 +42,7 @@ func GzipFile(src, dst string) error {
 	}
 	defer func() {
 		if err := destFile.Close(); err != nil {
-			simplelog.Errorf("unable to close gzip file %v due to error %v", dst, err)
+			simplelog.Errorf("unable to close gzip file %v: %v", dst, err)
 		}
 	}()
 
@@ -51,7 +51,7 @@ func GzipFile(src, dst string) error {
 
 	_, err = io.Copy(gzipWriter, sourceFile)
 	if err != nil {
-		return fmt.Errorf("unable to create gzip due to error %v", err)
+		return fmt.Errorf("unable to create gzip: %w", err)
 	}
 
 	return nil

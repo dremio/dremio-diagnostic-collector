@@ -92,7 +92,7 @@ func TestArchiveDiagHC(t *testing.T) {
 		t.Fatalf("not able to get absolute path for test file %v", err)
 	} else {
 		if _, err := ddcfs.Stat(testFile); err != nil {
-			t.Fatalf("unexpected error getting file size for file %v due to error %v", testFile, err)
+			t.Fatalf("unexpected error getting file size for file %v: %v", testFile, err)
 		}
 		archiveFile := tmpDir + ".tgz"
 		// Test Archive, pushes a teal test file into a zip archive
@@ -101,5 +101,4 @@ func TestArchiveDiagHC(t *testing.T) {
 			t.Errorf("\nERROR: gzip file: \nexpected:\t%v\nactual:\t\t%v\n", nil, err)
 		}
 	}
-
 }

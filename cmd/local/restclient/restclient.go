@@ -58,7 +58,7 @@ func APIRequest(hook shutdown.CancelHook, url string, pat string, request string
 	defer timeout()
 	req, err := http.NewRequestWithContext(ctx, request, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create request due to error %v", err)
+		return nil, fmt.Errorf("unable to create request: %w", err)
 	}
 	authorization := "Bearer " + pat
 	req.Header.Set("Authorization", authorization)
@@ -75,7 +75,7 @@ func APIRequest(hook shutdown.CancelHook, url string, pat string, request string
 			return nil, err
 		}
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return nil, errors.New(res.Status)
 	}
 	body, err := io.ReadAll(res.Body)
@@ -89,10 +89,9 @@ func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[str
 	// making sure the global timeout does not get overridden
 	ctx, timeout := context.WithTimeoutCause(hook.GetContext(), client.Timeout, fmt.Errorf("POST request to %v exceeded timeout %v", url, client.Timeout))
 	defer timeout()
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(sqlbody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(sqlbody))
 	if err != nil {
-		return "", fmt.Errorf("unable to create request due to error %v", err)
-
+		return "", fmt.Errorf("unable to create request: %w", err)
 	}
 	authorization := "Bearer " + pat
 	req.Header.Set("Authorization", authorization)
@@ -101,7 +100,6 @@ func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[str
 		req.Header.Set(key, value)
 	}
 	res, err := client.Do(req)
-
 	if err != nil {
 		switch ctx.Err() {
 		case context.DeadlineExceeded:
@@ -110,7 +108,7 @@ func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[str
 			return "", err
 		}
 	}
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		return "", errors.New(res.Status)
 	}
 

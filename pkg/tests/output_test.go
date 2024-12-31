@@ -41,19 +41,19 @@ func TestTree(t *testing.T) {
 
 	// Creating a dummy structure
 	dirPath := filepath.Join(tempDir, "dir1/dir2")
-	err = os.MkdirAll(dirPath, 0755)
+	err = os.MkdirAll(dirPath, 0o755)
 	if err != nil {
 		t.Fatalf("Cannot create directories: %v", err)
 	}
 
 	file1 := filepath.Join(tempDir, "file1")
-	err = os.WriteFile(file1, []byte("file1"), 0600)
+	err = os.WriteFile(file1, []byte("file1"), 0o600)
 	if err != nil {
 		t.Fatalf("Cannot write to file: %v", err)
 	}
 
 	file2 := filepath.Join(tempDir, "dir1/file2")
-	err = os.WriteFile(file2, []byte("file2"), 0600)
+	err = os.WriteFile(file2, []byte("file2"), 0o600)
 	if err != nil {
 		t.Fatalf("Cannot write to file: %v", err)
 	}
@@ -62,7 +62,6 @@ func TestTree(t *testing.T) {
 	out, err := output.CaptureOutput(func() {
 		Tree(tempDir)
 	})
-
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

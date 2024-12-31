@@ -110,11 +110,11 @@ func (c *CmdSSHActions) CleanupRemote() error {
 			Result:   consoleprint.ResultFailure,
 		})
 		c.m.Lock()
-		//cancel out so we can skip if it's called again
+		// cancel out so we can skip if it's called again
 		c.pidHosts[host] = ""
 		c.m.Unlock()
 	}
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 	var criticalErrors []string
 	coordinators, err := c.GetCoordinators()
 	if err != nil {
@@ -125,9 +125,9 @@ func (c *CmdSSHActions) CleanupRemote() error {
 		for _, coordinator := range coordinators {
 			c.m.Lock()
 			if v, ok := c.pidHosts[coordinator]; ok {
-				wg.Add(1)
+				waitGroup.Add(1)
 				go func(host, pid string) {
-					defer wg.Done()
+					defer waitGroup.Done()
 					kill(host, pid)
 				}(coordinator, v)
 			} else {
@@ -146,9 +146,9 @@ func (c *CmdSSHActions) CleanupRemote() error {
 		for _, executor := range executors {
 			c.m.Lock()
 			if v, ok := c.pidHosts[executor]; ok {
-				wg.Add(1)
+				waitGroup.Add(1)
 				go func(host, pid string) {
-					defer wg.Done()
+					defer waitGroup.Done()
 					kill(host, pid)
 				}(executor, v)
 			} else {
@@ -157,7 +157,7 @@ func (c *CmdSSHActions) CleanupRemote() error {
 			c.m.Unlock()
 		}
 	}
-	wg.Wait()
+	waitGroup.Wait()
 	if len(criticalErrors) > 0 {
 		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
 	}
@@ -230,7 +230,7 @@ func (c *CmdSSHActions) addSSHUser(arguments []string) []string {
 }
 
 func CleanOut(out string) string {
-	//we expect there it be a warning with ssh that we will clean here
+	// we expect there it be a warning with ssh that we will clean here
 	// Create a scanner to split the output into lines
 	scanner := bufio.NewScanner(strings.NewReader(out))
 

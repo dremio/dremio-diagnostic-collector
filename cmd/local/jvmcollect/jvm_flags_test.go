@@ -45,11 +45,11 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 	}()
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
+	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
@@ -67,7 +67,7 @@ dremio-pid: %v
 		cmd.Process.Pid,
 	)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()
@@ -78,7 +78,7 @@ dremio-pid: %v
 	}
 	// make the dir..this simulates existing work that happens inside of local.go
 	nodeInfoDir := filepath.Join(c.OutputDir(), "node-info", nodeName)
-	if err := os.MkdirAll(nodeInfoDir, 0700); err != nil {
+	if err := os.MkdirAll(nodeInfoDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 

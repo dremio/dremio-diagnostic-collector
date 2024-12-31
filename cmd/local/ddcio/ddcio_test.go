@@ -77,7 +77,7 @@ func TestCopyDir(t *testing.T) {
 
 	// Create a subdirectory within the source directory
 	subDir := filepath.Join(srcDir, "subdir")
-	err = os.Mkdir(subDir, 0755)
+	err = os.Mkdir(subDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}

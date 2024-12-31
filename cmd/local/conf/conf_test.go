@@ -107,7 +107,7 @@ collect-cluster-id-timeout-seconds: 12
 	}
 	cfgContent = strings.ReplaceAll(cfgContent, "\\", "\\\\")
 	// Write the sample configuration to a file.
-	err = os.WriteFile(cfgFilePath, []byte(cfgContent), 0600)
+	err = os.WriteFile(cfgFilePath, []byte(cfgContent), 0o600)
 	if err != nil {
 		log.Fatalf("unable to create conf file with error %v", err)
 	}
@@ -138,7 +138,7 @@ dremio-endpoint: eu.dremio.cloud
 `)
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	//should parse the configuration correctly
+	// should parse the configuration correctly
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -168,21 +168,21 @@ dremio-endpoint: eu.dremio.cloud
 func TestConfCanUseTarballOutputDirWithAllowedFiles(t *testing.T) {
 	// allowed files are ddc, ddc.log, ddc.yaml
 	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	logDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(logDir, "server.log"), []byte("my log"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(logDir, "server.log"), []byte("my log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	confDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(confDir, "dremio.conf"), []byte("my log"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(confDir, "dremio.conf"), []byte("my log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	yamlText := fmt.Sprintf("tarball-out-dir: %v\ndremio-log-dir: %v\ndremio-conf-dir: %v\n", outDir, logDir, confDir)
@@ -191,7 +191,7 @@ func TestConfCanUseTarballOutputDirWithAllowedFiles(t *testing.T) {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
 	cfgFilePath := filepath.Join(tmpDir, "ddc.yaml")
-	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0600); err != nil {
+	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()
@@ -202,19 +202,20 @@ func TestConfCanUseTarballOutputDirWithAllowedFiles(t *testing.T) {
 		t.Errorf("should not have error: %v", err)
 	}
 }
+
 func TestConfCannotUseTarballOutputDirWithFiles(t *testing.T) {
-	//allowed files are ddc, ddc.log, ddc.yaml
+	// allowed files are ddc, ddc.log, ddc.yaml
 	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.yaml"), []byte("test: 1"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc"), []byte("myfile"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "ddc.log"), []byte("my log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(outDir, "server.log"), []byte("my log"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "server.log"), []byte("my log"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	yamlText := fmt.Sprintf("tarball-out-dir: %v\ndremio-log-dir: %v\n", outDir, outDir)
@@ -223,7 +224,7 @@ func TestConfCannotUseTarballOutputDirWithFiles(t *testing.T) {
 		log.Fatalf("unable to create dir with error %v", err)
 	}
 	cfgFilePath := filepath.Join(tmpDir, "ddc.yaml")
-	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0600); err != nil {
+	if err := os.WriteFile(cfgFilePath, []byte(yamlText), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(cfgFilePath)
@@ -245,7 +246,7 @@ is-dremio-cloud: true
 dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: dremio.cloud
 `)
-	//should parse the configuration correctly
+	// should parse the configuration correctly
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
@@ -274,9 +275,10 @@ dremio-endpoint: dremio.cloud
 	}
 	afterEachConfTest()
 }
+
 func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	genericConfSetup("")
-	//should parse the configuration correctly
+	// should parse the configuration correctly
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
@@ -442,7 +444,7 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
 	testLog := filepath.Join(t.TempDir(), "ddc.log")
 	simplelog.InitLoggerWithFile(testLog)
-	//should log redacted when token is present
+	// should log redacted when token is present
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
@@ -482,7 +484,6 @@ func TestURLsuffix(t *testing.T) {
 	if expected != actual {
 		t.Errorf("\nexpected: %v\nactual: %v\n'", expected, actual)
 	}
-
 }
 
 func TestClusterStatsDirectory(t *testing.T) {

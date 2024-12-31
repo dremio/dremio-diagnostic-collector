@@ -26,8 +26,10 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
-const jdk8GCLoggingFLag = "-Xloggc:"
-const jdk9UnifiedGCLoggingFlag = "-Xlog:"
+const (
+	jdk8GCLoggingFLag        = "-Xloggc:"
+	jdk9UnifiedGCLoggingFlag = "-Xlog:"
+)
 
 // FindGCLogLocation retrieves the gc log location from ps eww <pid> output
 func FindGCLogLocation(hook shutdown.Hook, pid int) (gcLogPattern string, gcLogLoc string, err error) {
@@ -36,7 +38,7 @@ func FindGCLogLocation(hook shutdown.Hook, pid int) (gcLogPattern string, gcLogL
 	// remove the header with tail -n 1
 	err = ddcio.Shell(hook, &psEWW, fmt.Sprintf("ps eww %v | tail -n 1", pid))
 	if err != nil {
-		return "", "", fmt.Errorf("unable to find gc logs due to error '%v'", err)
+		return "", "", fmt.Errorf("unable to find gc logs: %w", err)
 	}
 
 	data := strings.TrimSpace(psEWW.String())
@@ -58,7 +60,7 @@ func FindGCLogLocation(hook shutdown.Hook, pid int) (gcLogPattern string, gcLogL
 	}
 	logRegex, logLocation, err := ParseGCLogFromFlags(startupFlags)
 	if err != nil {
-		return "", "", fmt.Errorf("unable to find gc logs due to error '%v'", err)
+		return "", "", fmt.Errorf("unable to find gc logs: %w", err)
 	}
 	if logLocation == "" {
 		simplelog.Warningf("autodetection of gc logs location failed as no %v or %v flag was found in the startup flags: '%v'", jdk8GCLoggingFLag, jdk9UnifiedGCLoggingFlag, startupFlags)
@@ -79,7 +81,7 @@ func ParseGCLogFromFlags(startupFlagsStr string) (logRegex string, gcLogLocation
 	if logDir == "" {
 		logRegex, logDir, err := ParseGCLogFromFlagsPre25(startupFlagsStr)
 		if err != nil {
-			return "", "", fmt.Errorf("uanble to parse gc flags due the following errors: '%v' and '%v'", errorFromPost25, err)
+			return "", "", fmt.Errorf("unable to parse gc flags: '%w' and '%w'", errorFromPost25, err)
 		}
 		return logRegex, logDir, nil
 	}

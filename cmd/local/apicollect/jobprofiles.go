@@ -49,7 +49,6 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (t
 	}
 
 	if len(jobhistoryjsons) == 0 {
-
 		// Attempt to read job history from queries.json, if not Dremio Cloud
 		if !c.IsDremioCloud() {
 			files, err = os.ReadDir(c.QueriesOutDir())
@@ -103,7 +102,7 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (t
 			return 0, 0, fmt.Errorf("invalid thread pool: %w", err)
 		}
 		for key := range profilesToCollect {
-			//because we are looping
+			// because we are looping
 			keyToDownload := key
 			downloadThreadPool.AddJob(threading.Job{
 				Name: keyToDownload,
@@ -117,7 +116,8 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (t
 					collected++
 					m.Unlock()
 					return nil
-				}})
+				},
+			})
 		}
 		if err = downloadThreadPool.ProcessAndWait(); err != nil {
 			simplelog.Errorf("job profile download thread pool wait error %v", err)
@@ -158,16 +158,16 @@ func DownloadJobProfile(c *conf.CollectConf, hook shutdown.Hook, jobid string) e
 	if err != nil {
 		return err
 	}
-	sb := string(body)
+	bodyString := string(body)
 	jobProfileFile := path.Clean(path.Join(c.JobProfilesOutDir(), filename))
 	file, err := os.Create(path.Clean(jobProfileFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+		return fmt.Errorf("unable to create file %s: %w", filename, err)
 	}
 	defer ddcio.EnsureClose(filepath.Clean(jobProfileFile), file.Close)
-	_, err = fmt.Fprint(file, sb)
+	_, err = fmt.Fprint(file, bodyString)
 	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+		return fmt.Errorf("unable to write file %s: %w", filename, err)
 	}
 	return nil
 }

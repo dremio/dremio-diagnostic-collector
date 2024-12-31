@@ -63,31 +63,29 @@ func RunCollectWLM(c *conf.CollectConf, hook shutdown.CancelHook) error {
 
 		// Make a GET request to the respective API endpoint
 		body, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
-
 		// Log and return if there was an error with the API request
 		if err != nil {
-			return fmt.Errorf("unable to retrieve WLM from %s due to error %v", url, err)
+			return fmt.Errorf("unable to retrieve WLM from %s: %w", url, err)
 		}
 
 		// Prepare the output directory and filename
-		sb := string(body)
+		bodyString := string(body)
 		wlmFile := filepath.Join(c.WLMOutDir(), filename)
 
 		// Create a new file in the output directory
 		file, err := os.Create(filepath.Clean(wlmFile))
 		// Log and return if there was an error with file creation
 		if err != nil {
-			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+			return fmt.Errorf("unable to create file %s: %w", filename, err)
 		}
 
 		defer ddcio.EnsureClose(filepath.Clean(wlmFile), file.Close)
 
 		// Write the API response into the newly created file
-		_, err = fmt.Fprint(file, sb)
-
+		_, err = fmt.Fprint(file, bodyString)
 		// Log and return if there was an error with writing to the file
 		if err != nil {
-			return fmt.Errorf("unable to write to file %s due to error %v", filename, err)
+			return fmt.Errorf("unable to write to file %s: %w", filename, err)
 		}
 
 		// Log a success message upon successful creation of the file

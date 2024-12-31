@@ -54,16 +54,16 @@ func (l *Collector) RunCollectDremioServerLog() error {
 	simplelog.Debug("Collecting Dremio Server logs ...")
 	var errs []error
 	if err := l.exportArchivedLogs(l.dremioLogDir, "server.log", "server", l.dremioLogsNumDays); err != nil {
-		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %v", err))
+		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %w", err))
 	}
 	simplelog.Debug("... collecting server.out")
 	src := path.Join(l.dremioLogDir, "server.out")
 	dest := path.Join(l.logsOutDir, "server.out")
 	if err := ddcio.CopyFile(path.Clean(src), path.Clean(dest)); err != nil {
-		errs = append(errs, fmt.Errorf("unable to copy %v to %v due to error %v", src, dest, err))
+		errs = append(errs, fmt.Errorf("unable to copy %v to %v: %w", src, dest, err))
 	}
 	if len(errs) > 1 {
-		return fmt.Errorf("several errors while copying dremio server logs: %v", errors.Join(errs...))
+		return fmt.Errorf("several errors while copying dremio server logs: %w", errors.Join(errs...))
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
@@ -91,13 +91,13 @@ func (l *Collector) RunCollectGcLogs() error {
 		simplelog.Debugf("found file %v in gc log folder: '%v'", file.Name(), l.gcLogsDir)
 		matched, err := filepath.Match(l.dremioGCFilePattern, file.Name())
 		if err != nil {
-			errs = append(errs, fmt.Errorf("error matching file pattern %v with error '%v'", l.dremioGCFilePattern, err))
+			errs = append(errs, fmt.Errorf("error matching file pattern %v with error '%w'", l.dremioGCFilePattern, err))
 		}
 		if matched {
 			srcPath := filepath.Join(l.gcLogsDir, file.Name())
 			f, err := os.Stat(srcPath)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("while getting file info for %v there was an error: %v", srcPath, err))
+				errs = append(errs, fmt.Errorf("while getting file info for %v there was an error: %w", srcPath, err))
 				continue
 			}
 			if f.ModTime().Before(logAgeLimit) {
@@ -115,7 +115,7 @@ func (l *Collector) RunCollectGcLogs() error {
 		}
 	}
 	if len(errs) > 1 {
-		return fmt.Errorf("several errors while copying dremio server logs: %v", errors.Join(errs...))
+		return fmt.Errorf("several errors while copying dremio server logs: %w", errors.Join(errs...))
 	} else if (len(errs)) == 1 {
 		return errs[0]
 	}
@@ -127,7 +127,7 @@ func (l *Collector) RunCollectGcLogs() error {
 func (l *Collector) RunCollectMetadataRefreshLogs() error {
 	simplelog.Debug("Collecting metadata refresh logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "metadata_refresh.log", "metadata_refresh", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to collect metadata refresh logs due to error %v", err)
+		return fmt.Errorf("unable to collect metadata refresh logs: %w", err)
 	}
 	simplelog.Debug("... collecting meta data refresh logs from Coordinator(s) COMPLETED")
 	return nil
@@ -136,7 +136,7 @@ func (l *Collector) RunCollectMetadataRefreshLogs() error {
 func (l *Collector) RunCollectReflectionLogs() error {
 	simplelog.Debug("Collecting reflection logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "reflection.log", "reflection", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to collect reflection logs due to error %v", err)
+		return fmt.Errorf("unable to collect reflection logs: %w", err)
 	}
 	simplelog.Debug("... collecting reflection logs from Coordinator(s) COMPLETED")
 
@@ -146,7 +146,7 @@ func (l *Collector) RunCollectReflectionLogs() error {
 func (l *Collector) RunCollectVacuumLogs() error {
 	simplelog.Debug("Collecting vacuum logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "vacuum.json", "vacuum", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to collect vacuum logs due to error %v", err)
+		return fmt.Errorf("unable to collect vacuum logs: %w", err)
 	}
 	simplelog.Debug("... collecting vacuum logs from Coordinator(s) COMPLETED")
 
@@ -156,7 +156,7 @@ func (l *Collector) RunCollectVacuumLogs() error {
 func (l *Collector) RunCollectDremioAccessLogs() error {
 	simplelog.Debug("Collecting access logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "access.log", "access", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to archive access.logs due to error %v", err)
+		return fmt.Errorf("unable to archive access.logs: %w", err)
 	}
 	simplelog.Debug("... collecting access logs from Coordinator(s) COMPLETED")
 
@@ -166,7 +166,7 @@ func (l *Collector) RunCollectDremioAccessLogs() error {
 func (l *Collector) RunCollectDremioAuditLogs() error {
 	simplelog.Debug("Collecting audit logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "audit.json", "audit", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to archive audit.json files due to error %v", err)
+		return fmt.Errorf("unable to archive audit.json files: %w", err)
 	}
 	simplelog.Debug("... collecting audit logs from Coordinator(s) COMPLETED")
 
@@ -176,7 +176,7 @@ func (l *Collector) RunCollectDremioAuditLogs() error {
 func (l *Collector) RunCollectAccelerationLogs() error {
 	simplelog.Debug("Collecting acceleration logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "acceleration.log", "acceleration", l.dremioLogsNumDays); err != nil {
-		return fmt.Errorf("unable to archive acceleration.logs due to error %v", err)
+		return fmt.Errorf("unable to archive acceleration.logs: %w", err)
 	}
 	simplelog.Debug("... collecting acceleration logs from Coordinator(s) COMPLETED")
 
@@ -187,7 +187,7 @@ func (l *Collector) RunCollectQueriesJSON() error {
 	simplelog.Debug("Collecting queries.json ...")
 	err := l.exportArchivedLogs(l.dremioLogDir, "queries.json", "queries", l.dremioQueriesJSONNumDays)
 	if err != nil {
-		return fmt.Errorf("failed to export archived logs: %v", err)
+		return fmt.Errorf("failed to export archived logs: %w", err)
 	}
 
 	simplelog.Debug("... collecting Queries JSON for Job Profiles COMPLETED")
@@ -204,17 +204,17 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 		outDir = l.logsOutDir
 	}
 	unzippedFileDest := path.Join(outDir, unzippedFile)
-	//we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
+	// we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
 	if err := ddcio.CopyFile(path.Clean(src), path.Clean(unzippedFileDest)); err != nil {
-		errs = append(errs, fmt.Errorf("copying of log file %v failed due to error %v", unzippedFile, err))
+		errs = append(errs, fmt.Errorf("copying of log file %v failed: %w", unzippedFile, err))
 	} else {
 		// if this is successful go ahead and gzip it
 		if err := ddcio.GzipFile(path.Clean(unzippedFileDest), path.Clean(unzippedFileDest+".gz")); err != nil {
-			errs = append(errs, fmt.Errorf("archiving of log file %v failed due to error %v", unzippedFile, err))
+			errs = append(errs, fmt.Errorf("archiving of log file %v failed: %w", unzippedFile, err))
 		} else {
-			//if we've successfully gzipped the file we can safely delete the source
+			// if we've successfully gzipped the file we can safely delete the source
 			if err := os.Remove(path.Clean(unzippedFileDest)); err != nil {
-				errs = append(errs, fmt.Errorf("cleanup of old log file %v failed due to error %v", unzippedFile, err))
+				errs = append(errs, fmt.Errorf("cleanup of old log file %v failed: %w", unzippedFile, err))
 			}
 		}
 	}
@@ -222,39 +222,39 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 	today := time.Now()
 	files, err := os.ReadDir(filepath.Join(srcLogDir, "archive"))
 	if err != nil {
-		//no archives to read go ahead and exit as there is nothing to do
-		return fmt.Errorf("unable to read archive folder due to error %v", err)
+		// no archives to read go ahead and exit as there is nothing to do
+		return fmt.Errorf("unable to read archive folder: %w", err)
 	}
 	for i := 0; i <= archiveDays; i++ {
 		processingDate := today.AddDate(0, 0, -i).Format("2006-01-02")
-		//now search files for a match
+		// now search files for a match
 		for _, f := range files {
 			if strings.HasPrefix(f.Name(), fmt.Sprintf("%v.%v", logPrefix, processingDate)) {
 				simplelog.Debugf("Copying archive file for %v:%v", processingDate, f.Name())
 				src := filepath.Join(srcLogDir, "archive", f.Name())
 				dst := filepath.Join(outDir, f.Name())
 
-				//we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
+				// we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
 				if err := ddcio.CopyFile(path.Clean(src), path.Clean(dst)); err != nil {
-					errs = append(errs, fmt.Errorf("unable to move file %v to %v due to error %v", src, dst, err))
+					errs = append(errs, fmt.Errorf("unable to move file %v to %v: %w", src, dst, err))
 					continue
 				}
 				if !strings.HasSuffix(f.Name(), ".gz") {
-					//go ahead and archive the file since it's not already
+					// go ahead and archive the file since it's not already
 					if err := ddcio.GzipFile(path.Clean(dst), path.Clean(dst+".gz")); err != nil {
-						errs = append(errs, fmt.Errorf("unable to archive file %v to %v due to error %v", src, dst, err))
+						errs = append(errs, fmt.Errorf("unable to archive file %v to %v: %w", src, dst, err))
 						continue
 					}
-					//if we've successfully gzipped the file we can safely delete the source (the continue above will guard against executing this)
+					// if we've successfully gzipped the file we can safely delete the source (the continue above will guard against executing this)
 					if err := os.Remove(path.Clean(dst)); err != nil {
-						errs = append(errs, fmt.Errorf("cleanup of old log file %v failed due to error %v", unzippedFile, err))
+						errs = append(errs, fmt.Errorf("cleanup of old log file %v failed: %w", unzippedFile, err))
 					}
 				}
 			}
 		}
 	}
 	if len(errs) > 1 {
-		return fmt.Errorf("multiple errors archiving %v", errors.Join(errs...))
+		return fmt.Errorf("multiple errors archiving: %w", errors.Join(errs...))
 	} else if len(errs) == 1 {
 		return errs[0]
 	}

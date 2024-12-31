@@ -99,7 +99,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 		t.Errorf("expected %v to equal %v", expected, output)
 	}
 
-	//It("should no op for unsupported kind", func() {
+	// It("should no op for unsupported kind", func() {
 	input = `{
 				"items": [
 					{
@@ -128,7 +128,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 
 	//})
 
-	//It("should handle invalid JSON input", func() {
+	// It("should handle invalid JSON input", func() {
 	input = `{
 				"items": "invalid"
 			}`
@@ -145,7 +145,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 func jsonCompact(s string) string {
 	buf := new(bytes.Buffer)
 	if err := json.Compact(buf, []byte(s)); err != nil {
-		simplelog.Errorf("json compact failed due to error %v", err)
+		simplelog.Errorf("json compact failed: %v", err)
 	}
 	return buf.String()
 }

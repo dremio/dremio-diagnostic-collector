@@ -47,7 +47,7 @@ func RunCollectJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
 
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
-		return fmt.Errorf("unable to run JFR due to error %v", err)
+		return fmt.Errorf("unable to run JFR: %w", err)
 	}
 	simplelog.Debugf("node: %v - jfr start output - %v", c.NodeName(), w.String())
 	secondsWaiting := c.DremioJFRTimeSeconds()
@@ -56,12 +56,12 @@ func RunCollectJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debugf("... stopping JFR %v", c.NodeName())
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v JFR.dump name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
-		return fmt.Errorf("unable to dump JFR due to error %v", err)
+		return fmt.Errorf("unable to dump JFR: %w", err)
 	}
 	simplelog.Debugf("node: %v - jfr dump output %v", c.NodeName(), w.String())
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v JFR.stop name=\"DREMIO_JFR\"", c.DremioPID())); err != nil {
-		return fmt.Errorf("unable to dump JFR due to error %v", err)
+		return fmt.Errorf("unable to dump JFR: %w", err)
 	}
 	simplelog.Debugf("node: %v - jfr stop output %v", c.NodeName(), w.String())
 

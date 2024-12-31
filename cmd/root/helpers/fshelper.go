@@ -50,7 +50,7 @@ func NewFakeFileSystem() *FakeFileSystem {
 	return &FakeFileSystem{}
 }
 
-const DirPerms fs.FileMode = 0750
+const DirPerms fs.FileMode = 0o750
 
 // Real file
 type RealFile struct {
@@ -58,16 +58,13 @@ type RealFile struct {
 }
 
 // Rea fileSystem wrapper
-type RealFileSystem struct {
-}
+type RealFileSystem struct{}
 
 // Fake File
-type FakeFile struct {
-}
+type FakeFile struct{}
 
 // Fake filesystem wrapper
-type FakeFileSystem struct {
-}
+type FakeFileSystem struct{}
 
 // Name
 func (f *RealFile) Name() string {

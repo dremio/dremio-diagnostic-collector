@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -177,7 +178,7 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 	queriesrows := []QueriesRow{}
 	file, err := os.Open(path.Clean(filename))
 	if err != nil {
-		simplelog.Errorf("can't open %v due to error %v", filename, err)
+		simplelog.Errorf("can't open %v: %v", filename, err)
 		return queriesrows, err
 	}
 	defer errCheck(file.Close)
@@ -191,7 +192,7 @@ func ReadJSONFile(filename string) ([]QueriesRow, error) {
 		line := scanner.Text()
 		row, err := parseLine(line, i)
 		if err != nil {
-			simplelog.Errorf("can't parse line %v from file %v due to error %v", line, filename, err)
+			simplelog.Errorf("can't parse line %v from file %v: %v", line, filename, err)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
@@ -204,7 +205,7 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 	queriesrows := []QueriesRow{}
 	file, err := os.Open(path.Clean(filename))
 	if err != nil {
-		simplelog.Errorf("can't open %v due to error %v", filename, err)
+		simplelog.Errorf("can't open %v: %v", filename, err)
 		return queriesrows, err
 	}
 	defer errCheck(file.Close)
@@ -212,19 +213,19 @@ func ReadHistoryJobsJSONFile(filename string) ([]QueriesRow, error) {
 	var bytedata []byte
 	bytedata, err = io.ReadAll(file)
 	if err != nil {
-		simplelog.Errorf("can't read data of %v due to error %v", filename, err)
+		simplelog.Errorf("can't read data of %v: %v", filename, err)
 		return queriesrows, err
 	}
 
 	var dat HistoryJobs
 	err = json.Unmarshal(bytedata, &dat)
 	if err != nil {
-		return queriesrows, fmt.Errorf("can't JSON unmarshall %v due to error %v", filename, err)
+		return queriesrows, fmt.Errorf("can't JSON unmarshall %v: %w", filename, err)
 	}
 	for _, line := range dat.Rows {
 		row, err := parseLineJobsJSON(line)
 		if err != nil {
-			simplelog.Errorf("can't parse line %v from file %v due to error %v", row, filename, err)
+			simplelog.Errorf("can't parse line %v from file %v: %v", row, filename, err)
 		} else {
 			queriesrows = append(queriesrows, row)
 		}
@@ -236,25 +237,25 @@ func parseLine(line string, i int) (QueriesRow, error) {
 	dat := make(map[string]interface{})
 	err := json.Unmarshal([]byte(line), &dat)
 	if err != nil {
-		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v[...] - error: %v", i, strutils.GetEndOfString(line, 50), err)
+		return *new(QueriesRow), fmt.Errorf("queries.json line #%v: %v[...] - error: %w", i, strutils.GetEndOfString(line, 50), err)
 	}
-	var row = new(QueriesRow)
+	row := new(QueriesRow)
 	if val, ok := dat["queryId"]; ok {
 		qid, ok := val.(string)
 		if ok {
 			row.QueryID = qid
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryId'")
+			return *new(QueriesRow), errors.New("incorrect type for 'queryId'")
 		}
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'queryId'")
+		return *new(QueriesRow), errors.New("missing field 'queryId'")
 	}
 	if val, ok := dat["queryType"]; ok {
 		qt, ok := val.(string)
 		if ok {
 			row.QueryType = qt
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryType'")
+			return *new(QueriesRow), errors.New("incorrect type for 'queryType'")
 		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'queryType'")
@@ -264,7 +265,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 		if ok {
 			row.QueryCost = qc
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'queryCost'")
+			return *new(QueriesRow), errors.New("incorrect type for 'queryCost'")
 		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'queryCost'")
@@ -274,7 +275,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 		if ok {
 			row.PlanningTime = pt
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'planningTime'")
+			return *new(QueriesRow), errors.New("incorrect type for 'planningTime'")
 		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'planningTime'")
@@ -284,7 +285,7 @@ func parseLine(line string, i int) (QueriesRow, error) {
 		if ok {
 			row.RunningTime = rt
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'runningTime'")
+			return *new(QueriesRow), errors.New("incorrect type for 'runningTime'")
 		}
 	} else {
 		simplelog.Warningf("queries.json is missing field 'runningTime'")
@@ -294,29 +295,29 @@ func parseLine(line string, i int) (QueriesRow, error) {
 		if ok {
 			row.Start = s
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'start'")
+			return *new(QueriesRow), errors.New("incorrect type for 'start'")
 		}
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'start'")
+		return *new(QueriesRow), errors.New("missing field 'start'")
 	}
 	if val, ok := dat["outcome"]; ok {
 		o, ok := val.(string)
 		if ok {
 			row.Outcome = o
 		} else {
-			return *new(QueriesRow), fmt.Errorf("incorrect type for 'outcome'")
+			return *new(QueriesRow), errors.New("incorrect type for 'outcome'")
 		}
 	} else {
-		return *new(QueriesRow), fmt.Errorf("missing field 'outcome'")
+		return *new(QueriesRow), errors.New("missing field 'outcome'")
 	}
 	queriesrow := *row
 	return queriesrow, err
 }
 
 func parseLineJobsJSON(line Row) (QueriesRow, error) {
-	var row = new(QueriesRow)
+	row := new(QueriesRow)
 	if line.JobID == "" {
-		return *new(QueriesRow), fmt.Errorf("no job ID found")
+		return *new(QueriesRow), errors.New("no job ID found")
 	}
 	row.QueryID = line.JobID
 	row.QueryType = line.QueryType
@@ -354,7 +355,6 @@ func GetRecentErrorJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
 }
 
 func GetSlowExecJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
-
 	totalrows := len(queriesrows)
 	sort.Slice(queriesrows, func(i, j int) bool {
 		return queriesrows[i].RunningTime > queriesrows[j].RunningTime
@@ -363,7 +363,6 @@ func GetSlowExecJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
 }
 
 func GetSlowPlanningJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
-
 	totalrows := len(queriesrows)
 	sort.Slice(queriesrows, func(i, j int) bool {
 		return queriesrows[i].PlanningTime > queriesrows[j].PlanningTime
@@ -372,7 +371,6 @@ func GetSlowPlanningJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
 }
 
 func GetHighCostJobs(queriesrows []QueriesRow, limit int) []QueriesRow {
-
 	totalrows := len(queriesrows)
 	sort.Slice(queriesrows, func(i, j int) bool {
 		return queriesrows[i].QueryCost > queriesrows[j].QueryCost
@@ -389,7 +387,6 @@ func AddRowsToSet(queriesrows []QueriesRow, profilesToCollect map[string]string)
 }
 
 func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
-
 	queriesrows := []QueriesRow{}
 	for _, queriesjson := range queriesjsons {
 		simplelog.Debugf("Attempting to open queries.json file %v", queriesjson)
@@ -399,14 +396,14 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 		if strings.HasSuffix(queriesjson, ".gz") {
 			rows, err = ReadGzFile(queriesjson)
 			if err != nil {
-				simplelog.Errorf("failed to read gunzip %v due to error %v", queriesjson, err)
+				simplelog.Errorf("failed to read gunzip %v: %v", queriesjson, err)
 				continue
 			}
 			queriesrows = append(queriesrows, rows...)
 		} else if strings.HasSuffix(queriesjson, ".json") {
 			rows, err = ReadJSONFile(queriesjson)
 			if err != nil {
-				simplelog.Errorf("failed to parse json file %v due to error %v", queriesjson, err)
+				simplelog.Errorf("failed to parse json file %v: %v", queriesjson, err)
 				continue
 			}
 			queriesrows = append(queriesrows, rows...)
@@ -420,13 +417,12 @@ func CollectQueriesJSON(queriesjsons []string) []QueriesRow {
 }
 
 func CollectJobHistoryJSON(jobhistoryjsons []string) []QueriesRow {
-
 	queriesrows := []QueriesRow{}
 	for _, jobhistoryjson := range jobhistoryjsons {
 		simplelog.Infof("Attempting to open json file %v", jobhistoryjson)
 		rows, err := ReadHistoryJobsJSONFile(jobhistoryjson)
 		if err != nil {
-			simplelog.Errorf("failed to parse json file %v due to error %v", jobhistoryjson, err)
+			simplelog.Errorf("failed to parse json file %v: %v", jobhistoryjson, err)
 			continue
 		}
 		queriesrows = append(queriesrows, rows...)

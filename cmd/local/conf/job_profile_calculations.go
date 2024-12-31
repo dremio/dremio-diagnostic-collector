@@ -22,14 +22,14 @@ func calculateDefaultJobProfileNumbers(c *CollectConf) (defaultJobProfilesNumSlo
 	// check if job profile is set
 	if c.NumberJobProfilesToCollect() > 0 {
 		if c.NumberJobProfilesToCollect() < 4 {
-			//so few that it is not worth being clever
+			// so few that it is not worth being clever
 			defaultJobProfilesNumSlowExec = c.NumberJobProfilesToCollect()
 		} else {
 			defaultJobProfilesNumSlowExec = int(float64(c.NumberJobProfilesToCollect()) * 0.4)
 			defaultJobProfilesNumRecentErrors = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
 			defaultJobProfilesNumSlowPlanning = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
 			defaultJobProfilesNumHighQueryCost = int(float64(c.NumberJobProfilesToCollect()) * 0.2)
-			//grab the remainder and drop on top of defaultJobProfilesNumSlowExec
+			// grab the remainder and drop on top of defaultJobProfilesNumSlowExec
 			totalAllocated := defaultJobProfilesNumSlowExec + defaultJobProfilesNumRecentErrors + defaultJobProfilesNumSlowPlanning + defaultJobProfilesNumHighQueryCost
 			diff := c.NumberJobProfilesToCollect() - totalAllocated
 			defaultJobProfilesNumSlowExec += diff
@@ -54,7 +54,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 	// job profile specific numbers
 	jobProfilesNumHighQueryCost = c.JobProfilesNumHighQueryCost()
 	if jobProfilesNumHighQueryCost == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculations above
+		// nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumHighQueryCost = defaultJobProfilesNumHighQueryCost
 	} else if jobProfilesNumHighQueryCost != defaultJobProfilesNumHighQueryCost {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumHighQueryCost, jobProfilesNumHighQueryCost)
@@ -62,7 +62,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 
 	jobProfilesNumSlowExec = c.JobProfilesNumSlowExec()
 	if jobProfilesNumSlowExec == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculations above
+		// nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumSlowExec = defaultJobProfilesNumSlowExec
 	} else if jobProfilesNumSlowExec != defaultJobProfilesNumSlowExec {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumSlowExec, jobProfilesNumSlowExec)
@@ -70,7 +70,7 @@ func CalculateJobProfileSettingsWithViperConfig(c *CollectConf) (numberJobProfil
 
 	jobProfilesNumRecentErrors = c.JobProfilesNumRecentErrors()
 	if jobProfilesNumRecentErrors == 0 {
-		//nothing is set, so go ahead and set a default value based on the calculations above
+		// nothing is set, so go ahead and set a default value based on the calculations above
 		jobProfilesNumRecentErrors = defaultJobProfilesNumRecentErrors
 	} else if jobProfilesNumRecentErrors != defaultJobProfilesNumRecentErrors {
 		simplelog.Warningf("%s changed to %v by configuration", KeyJobProfilesNumRecentErrors, jobProfilesNumRecentErrors)

@@ -24,9 +24,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/threading"
 )
 
-var (
-	tp *threading.ThreadPool
-)
+var tp *threading.ThreadPool
 
 var setupThreadPool = func() {
 	t, err := threading.NewThreadPool(2, 1, true, true)
@@ -48,7 +46,8 @@ func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
 
 	tp.AddJob(threading.Job{
 		Name:    "test",
-		Process: jobFunc})
+		Process: jobFunc,
+	})
 	waitErr = tp.ProcessAndWait()
 
 	//		It("should execute all jobs", func() {
@@ -56,7 +55,7 @@ func TestThreadPool_WhenWaitWithOneJob(t *testing.T) {
 		t.Errorf("did not execute all jobs")
 	}
 
-	//It("should wait successfully", func() {
+	// It("should wait successfully", func() {
 	if waitErr != nil {
 		t.Errorf("unexpected error %v", waitErr)
 	}
@@ -88,12 +87,12 @@ func TestThreadPool_When(t *testing.T) {
 	}
 	waitErr = tp.ProcessAndWait()
 
-	//It("should execute all jobs", func() {
+	// It("should execute all jobs", func() {
 	if len(executed) != 100 {
 		t.Errorf("expected 100 jobs executed but had only %v", len(executed))
 	}
 
-	//It("should wait successfully", func() {
+	// It("should wait successfully", func() {
 	if waitErr != nil {
 		t.Errorf("unexpected error %v", waitErr)
 	}
@@ -115,7 +114,7 @@ func TestThreadPool_WhenWait(t *testing.T) {
 		tp.AddJob(threading.Job{Name: fmt.Sprintf("%v", i), Process: jobFunc})
 	}
 	waitErr = tp.ProcessAndWait()
-	//It("should execute all jobs", func() {
+	// It("should execute all jobs", func() {
 	if len(executed) != 10 {
 		t.Errorf("expected 10 jobs executed but had only %v", len(executed))
 	}
@@ -151,11 +150,10 @@ func TestConcurrentThreadsCappedAtThreadPool(t *testing.T) {
 		})
 	}
 	err := tp.ProcessAndWait()
-
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	//number of threads in setupThreadPool is 2
+	// number of threads in setupThreadPool is 2
 	if maxConcurrencyObserved != 2 {
 		t.Errorf("expected %v but was %v", 2, maxConcurrencyObserved)
 	}

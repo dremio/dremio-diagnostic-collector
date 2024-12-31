@@ -25,7 +25,6 @@ func setDefault(confData map[string]interface{}, key string, value interface{}) 
 
 // SetViperDefaults wires up default values for viper when the ddc.yaml or the cli flags do not set the value
 func SetViperDefaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int, collectionMode string) {
-
 	// defaults change depending on the collection mode
 
 	if collectionMode == collects.QuickCollection {

@@ -30,21 +30,21 @@ import (
 )
 
 func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if strings.HasSuffix(r.RequestURI, ".zip") {
-			w.Header().Set("Content-Type", "application/octet-stream")
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		if strings.HasSuffix(request.RequestURI, ".zip") {
+			writer.Header().Set("Content-Type", "application/octet-stream")
 
 			// Write binary data to the response writer
 			binaryData := []byte{0x12, 0x34, 0x56, 0x78}
-			_, err := w.Write(binaryData)
+			_, err := writer.Write(binaryData)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
+				writer.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		} else {
 			response := []byte(`{"message": "Hello, World!"}`)
-			if _, err := w.Write(response); err != nil {
+			if _, err := writer.Write(response); err != nil {
 				t.Fatalf("unexpected error writing response %v", err)
 			}
 		}
@@ -53,18 +53,18 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcTest")
-	err := os.Mkdir(confDir, 0700)
+	err := os.Mkdir(confDir, 0o700)
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
 	tmpDir := t.TempDir()
 	sysTableDir := filepath.Join(tmpDir, "system-tables", "node1")
-	err = os.MkdirAll(sysTableDir, 0700)
+	err = os.MkdirAll(sysTableDir, 0o700)
 	if err != nil {
 		t.Fatalf("cant make system-tables dir %v", err)
 	}
 	queriesDir := filepath.Join(tmpDir, "queries", "node1")
-	err = os.MkdirAll(queriesDir, 0700) //"queries is from
+	err = os.MkdirAll(queriesDir, 0o700) //"queries is from
 	if err != nil {
 		t.Fatalf("cant make queries dir %v", err)
 	}
@@ -72,7 +72,7 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 {"queryId":"123456","start":100,"outcome":"COMPLETED","queryType":"METADATA_REFRESH","queryCost":9000000000,"planningTime":0,"executionPlanningTime":440,"runningTime":10}
 {"queryId":"abcdef","start":200,"outcome":"FAILED","queryType":"ODBC","queryCost":9001,"planningTime":1,"executionPlanningTime":350,"runningTime":5}
 {"queryId":"dremio","start":300,"outcome":"CANCELLED","queryType":"REST","queryCost":9002,"planningTime":2,"executionPlanningTime":340,"runningTime":1235}
-`), 0600); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("unable to write queries.json %v", err)
 	}
 
@@ -90,7 +90,7 @@ node-name: node1
 number-threads: 4
 tmp-output-dir: %v
 dremio-endpoint: %v
-`, LogDir(), ConfDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0600)
+`, LogDir(), ConfDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0o600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
@@ -118,7 +118,7 @@ dremio-endpoint: %v
 	{"job_id": "Query1", "status": "FAILED", "query_type": "REST", "submitted_epoch_millis": 1713968783248,	"planning_start_epoch_millis": 0, "execution_start_epoch_millis": 0, "final_state_epoch_millis": 1713968783250, "planner_estimated_cost": 2.8234000035E5},
 	{"job_id": "Query2", "status": "COMPLETED", "query_type": "REST", "submitted_epoch_millis": 1714033458006, "planning_start_epoch_millis": 1714033458008, "execution_start_epoch_millis": 1714033458042, "final_state_epoch_millis": 1714033458061, "planner_estimated_cost": 3.8154000035E9}
 ]}
-`), 0600); err != nil {
+`), 0o600); err != nil {
 		t.Fatalf("unable to write sys.jobs_recent.json %v", err)
 	}
 

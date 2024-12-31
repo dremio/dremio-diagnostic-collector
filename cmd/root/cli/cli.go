@@ -103,36 +103,37 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	if err := cmd.Start(); err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
-	var m sync.Mutex
-	var wg sync.WaitGroup
-	wg.Add(2)
+	var mut sync.Mutex
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
 	// Asynchronously read the output from the command line by line
 	// and pass it to the outputHandler. This runs in a goroutine
 	// so that we can also read the error output at the same time.
 	go func() {
 		for stdOutScanner.Scan() {
-			m.Lock()
+			mut.Lock()
 			outputHandler(stdOutScanner.Text())
-			m.Unlock()
+			mut.Unlock()
 		}
-		wg.Done()
+		waitGroup.Done()
 	}()
 
+	waitGroup.Add(1)
 	// Asynchronously read the error output from the command line by line
 	// and pass it to the outputHandler.
 	go func() {
 		for stdErrScanner.Scan() {
-			m.Lock()
+			mut.Lock()
 			outputHandler(stdErrScanner.Text())
-			m.Unlock()
+			mut.Unlock()
 		}
-		wg.Done()
+		waitGroup.Done()
 	}()
 
-	//wait for the wait group too so that we can finish writing the text
-	wg.Wait()
+	// wait for the wait group too so that we can finish writing the text
+	waitGroup.Wait()
 	// Wait for the command to finish apparently should be called AFTER the capturing is done.
-	//this seems counterintuitive to me but we will go with it
+	// this seems counterintuitive to me but we will go with it
 	if err := cmd.Wait(); err != nil {
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}

@@ -64,7 +64,6 @@ func TestKubectlExec(t *testing.T) {
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
-
 }
 
 func TestKubectlSearch(t *testing.T) {
@@ -85,7 +84,7 @@ func TestKubectlSearch(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	//we need to pass the namespace for later commands that may consume this
+	// we need to pass the namespace for later commands that may consume this
 	// period is handy because it is an illegal character in a kubernetes name and so
 	// can act as a separator
 	expectedPods := []string{"pod1", "pod2", "pod3"}
@@ -166,7 +165,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	if len(calls) != 2 {
 		t.Errorf("expected 2 call but got %v", len(calls))
 	}
-	//we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
+	// we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
 	expectedDestination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
 	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
@@ -202,7 +201,7 @@ func TestKubectlCtrlVersion(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err := os.Chmod(outFile, 0700); err != nil {
+		if err := os.Chmod(outFile, 0o700); err != nil {
 			return err
 		}
 		return nil

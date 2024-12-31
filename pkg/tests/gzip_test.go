@@ -22,7 +22,7 @@ import (
 )
 
 func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {
-	//should contain the expected file
+	// should contain the expected file
 	gzipFile := filepath.Join("testdata", "file1.txt.gz")
 	expectedFile := filepath.Join("testdata", "file1.txt")
 
@@ -35,7 +35,7 @@ func TestGzipMatchers_ContainsFileInGzip(t *testing.T) {
 		t.Error("expected file to be in gzip but was not")
 	}
 
-	//should not contain a different file"
+	// should not contain a different file"
 	gzipFile = filepath.Join("testdata", "file1.txt.gz")
 	expectedFile = filepath.Join("testdata", "file3.txt")
 

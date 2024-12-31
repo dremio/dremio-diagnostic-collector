@@ -37,10 +37,10 @@ func (m *MockCollector) CopyToHost(hostString string, isCoordinator bool, source
 	m.CallCounter++
 	if response[1] == nil {
 		return response[0].(string), nil
-
 	}
 	return response[0].(string), response[1].(error)
 }
+
 func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyToHostSudo"
@@ -56,6 +56,7 @@ func (m *MockCollector) CopyToHostSudo(hostString string, isCoordinator bool, _,
 	}
 	return response[0].(string), response[1].(error)
 }
+
 func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyFromHost"
@@ -68,10 +69,10 @@ func (m *MockCollector) CopyFromHost(hostString string, isCoordinator bool, sour
 	m.CallCounter++
 	if response[1] == nil {
 		return response[0].(string), nil
-
 	}
 	return response[0].(string), response[1].(error)
 }
+
 func (m *MockCollector) CopyFromHostSudo(hostString string, isCoordinator bool, _, source, destination string) (out string, err error) {
 	args := make(map[string]interface{})
 	args["call"] = "copyFromHostSudo"
@@ -96,6 +97,7 @@ func (m *MockCollector) FindHosts(searchTerm string) (podName []string, err erro
 	m.CallCounter++
 	return response[0].([]string), response[1].(error)
 }
+
 func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator bool, args ...string) (stdOut string, err error) {
 	capturedArgs := make(map[string]interface{})
 	capturedArgs["hostString"] = hostString
@@ -106,7 +108,6 @@ func (m *MockCollector) HostExecute(_ bool, hostString string, isCoordinator boo
 	m.CallCounter++
 	if response[1] == nil {
 		return response[0].(string), nil
-
 	}
 	return response[0].(string), response[1].(error)
 }
@@ -121,7 +122,6 @@ func (m *MockCollector) HostExecuteAndStream(_ bool, hostString string, _ cli.Ou
 	m.CallCounter++
 	if response[0] == nil {
 		return nil
-
 	}
 	return response[0].(error)
 }

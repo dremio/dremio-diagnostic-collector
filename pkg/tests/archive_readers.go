@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -34,7 +35,7 @@ func GzipContainsFile(t *testing.T, expectedFile, gzipArchive string) {
 	cleanedArchiveFile := filepath.Clean(gzipArchive)
 	f, err := os.Open(cleanedArchiveFile)
 	if err != nil {
-		t.Fatalf("unexpected error ungziping file %v due to error %v", cleanedExpectedFile, err)
+		t.Fatalf("unexpected error ungziping file %v: %v", cleanedExpectedFile, err)
 	}
 	defer func() {
 		err := f.Close()
@@ -42,21 +43,21 @@ func GzipContainsFile(t *testing.T, expectedFile, gzipArchive string) {
 			t.Logf("WARN unable to close gzip with error %v", err)
 		}
 	}()
-	tr, err := gzip.NewReader(f)
+	gzipReader, err := gzip.NewReader(f)
 	if err != nil {
-		t.Fatalf("unexpected error reading gzip format from file %v due to error %v", cleanedExpectedFile, err)
+		t.Fatalf("unexpected error reading gzip format from file %v: %v", cleanedExpectedFile, err)
 	}
 	defer func() {
-		err := tr.Close()
+		err := gzipReader.Close()
 		if err != nil {
-			t.Logf("WARN unable to close gzip reader with error %v", err)
+			t.Logf("WARN unable to close gzip reader: %v", err)
 		}
 	}()
 	var buf bytes.Buffer
 	for {
-		_, err := io.CopyN(&buf, tr, 1024)
+		_, err := io.CopyN(&buf, gzipReader, 1024)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			t.Fatal(err)
@@ -81,17 +82,17 @@ func ExtractGZip(t *testing.T, gzipArchive, fileName string) string {
 	cleanedArchiveFile := filepath.Clean(gzipArchive)
 	f, err := os.Open(cleanedArchiveFile)
 	if err != nil {
-		t.Fatalf("unexpected error ungziping file %v due to error %v", cleanedArchiveFile, err)
+		t.Fatalf("unexpected error ungziping file %v: %v", cleanedArchiveFile, err)
 	}
 	defer func() {
 		err := f.Close()
 		if err != nil {
-			t.Logf("WARN unable to close gzip file due to error %v", err)
+			t.Logf("WARN unable to close gzip file: %v", err)
 		}
 	}()
-	tr, err := gzip.NewReader(f)
+	gzipReader, err := gzip.NewReader(f)
 	if err != nil {
-		t.Fatalf("unexpected error reading tar.gz file %v due to error %v", cleanedArchiveFile, err)
+		t.Fatalf("unexpected error reading tar.gz file %v: %v", cleanedArchiveFile, err)
 	}
 
 	newFile, err := os.Create(fileName)
@@ -105,15 +106,15 @@ func ExtractGZip(t *testing.T, gzipArchive, fileName string) string {
 		}
 	}()
 
-	br := bufio.NewReader(tr)
+	bufioReader := bufio.NewReader(gzipReader)
 	for {
-		b, err := br.Peek(1024)
-		if err != nil && err != io.EOF {
+		b, err := bufioReader.Peek(1024)
+		if err != nil && !errors.Is(err, io.EOF) {
 			t.Fatal(err)
 		}
 
-		n, err := io.CopyN(newFile, br, int64(len(b)))
-		if err != nil && err != io.EOF {
+		n, err := io.CopyN(newFile, bufioReader, int64(len(b)))
+		if err != nil && !errors.Is(err, io.EOF) {
 			t.Fatal(err)
 		}
 		if n == 0 {
@@ -143,22 +144,22 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile, internalPath strin
 	cleanedArchiveFile := filepath.Clean(archiveFile)
 	f, err := os.Open(cleanedArchiveFile)
 	if err != nil {
-		t.Fatalf("unexpected error untaring file %v due to error %v", archiveFile, err)
+		t.Fatalf("unexpected error untaring file %v: %v", archiveFile, err)
 	}
 	defer func() {
 		err := f.Close()
 		if err != nil {
-			t.Logf("WARN unable to close tar file due to error %v", err)
+			t.Logf("WARN unable to close tar file: %v", err)
 		}
 	}()
 
-	tr := tar.NewReader(f)
+	tarReader := tar.NewReader(f)
 	var found bool
 	var buf bytes.Buffer
 	var names []string
 	var matchingFileModTime time.Time
 	for {
-		hdr, err := tr.Next()
+		hdr, err := tarReader.Next()
 		if err == io.EOF {
 			break // End of archive
 		}
@@ -175,9 +176,9 @@ func TarContainsFile(t *testing.T, expectedFile, archiveFile, internalPath strin
 		names = append(names, hdr.Name)
 
 		for {
-			_, err := io.CopyN(&buf, tr, 1024)
+			_, err := io.CopyN(&buf, tarReader, 1024)
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				t.Fatal(err)

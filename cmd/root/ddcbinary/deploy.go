@@ -37,13 +37,13 @@ func WriteOutDDC(targetDir string) (ddcFilePath string, err error) {
 		return "", err
 	}
 	outFileName := filepath.Join(targetDir, "ddc.zip")
-	if err := os.WriteFile(outFileName, data, 0600); err != nil {
-		return "", fmt.Errorf("unable to write file %v due to error %v", outFileName, err)
+	if err := os.WriteFile(outFileName, data, 0o600); err != nil {
+		return "", fmt.Errorf("unable to write file %v: %w", outFileName, err)
 	}
 	if err := Unzip(outFileName); err != nil {
-		return "", fmt.Errorf("unable to unzip file %v: '%v'", outFileName, err)
+		return "", fmt.Errorf("unable to unzip file %v: '%w'", outFileName, err)
 	}
-	//the extracted ddc file should be where the zip was, and the zip should be deleted
+	// the extracted ddc file should be where the zip was, and the zip should be deleted
 	return strings.TrimSuffix(outFileName, ".zip"), nil
 }
 
@@ -54,7 +54,7 @@ func Unzip(src string) error {
 	// Open the zip file
 	r, err := zip.OpenReader(src)
 	if err != nil {
-		return fmt.Errorf("failed to open archive: %v", err)
+		return fmt.Errorf("failed to open archive: %w", err)
 	}
 	defer func() {
 		if err := r.Close(); err != nil {
@@ -116,13 +116,13 @@ func Unzip(src string) error {
 	}
 	// release for windows
 	if err := r.Close(); err != nil {
-		return fmt.Errorf("unable to close zip reader %v", err)
+		return fmt.Errorf("unable to close zip reader %w", err)
 	}
 
 	// Delete the zip file
 	err = os.Remove(src)
 	if err != nil {
-		return fmt.Errorf("failed to remove zip file: %v", err)
+		return fmt.Errorf("failed to remove zip file: %w", err)
 	}
 
 	return nil

@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
 Write-Output "Running gofmt..."
-go fmt ./...
+gofumpt -l .
 
 Write-Output "Executing golangci-lint run"
 golangci-lint run -E exportloopref,revive,gofmt -D structcheck

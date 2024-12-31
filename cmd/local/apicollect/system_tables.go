@@ -18,6 +18,7 @@ package apicollect
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -91,13 +92,13 @@ func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.Ca
 	jobstateurl := joburl + jobid
 	err = checkJobState(ctx, c, hook, jobstateurl, headers)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve sys.%v due to error %v", systable, err)
+		return fmt.Errorf("unable to retrieve sys.%v: %w", systable, err)
 	}
 	jobresultsurl = joburl + jobid + "/results"
 	simplelog.Debugf("Retrieving job results ...")
 	err = retrieveJobResults(c, hook, jobresultsurl, headers, systable)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve job results due to error %v", err)
+		return fmt.Errorf("unable to retrieve job results: %w", err)
 	}
 	return nil
 }
@@ -117,20 +118,20 @@ func checkJobState(ctx context.Context, c *conf.CollectConf, hook shutdown.Cance
 		}
 		body, err := restclient.APIRequest(hook, jobstateurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
-			return fmt.Errorf("unable to retrieve job state from %s due to error %v", jobstateurl, err)
+			return fmt.Errorf("unable to retrieve job state from %s: %w", jobstateurl, err)
 		}
 		dat := make(map[string]interface{})
 		err = json.Unmarshal(body, &dat)
 		if err != nil {
-			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
+			return fmt.Errorf("unable to unmarshall JSON response: %w", err)
 		}
 		if val, ok := dat["jobState"]; ok {
 			jobstate, ok = val.(string)
 			if !ok {
-				return fmt.Errorf("returned field 'jobState' does not have expected type string")
+				return errors.New("returned field 'jobState' does not have expected type string")
 			}
 		} else {
-			return fmt.Errorf("returned json does not contain required field 'jobState'")
+			return errors.New("returned json does not contain required field 'jobState'")
 		}
 		simplelog.Debugf("job state: %s", jobstate)
 		if jobstate == "FAILED" || jobstate == "CANCELLED" || jobstate == "CANCELLATION_REQUESTED" || jobstate == "INVALID_STATE" {
@@ -151,14 +152,14 @@ func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresult
 		resultsurl := jobresultsurl + urlsuffix
 		body, err := restclient.APIRequest(hook, resultsurl, c.DremioPATToken(), "GET", headers)
 		if err != nil {
-			return fmt.Errorf("unable to retrieve job results from %s due to error %v", resultsurl, err)
+			return fmt.Errorf("unable to retrieve job results from %s: %w", resultsurl, err)
 		}
 
 		dat := make(map[string]interface{})
 		err = json.Unmarshal(body, &dat)
 		var rowcount float64
 		if err != nil {
-			return fmt.Errorf("unable to unmarshall JSON response - %w", err)
+			return fmt.Errorf("unable to unmarshall JSON response: %w", err)
 		}
 		if val, ok := dat["rowCount"]; ok {
 			rowcount, ok = val.(float64)
@@ -176,12 +177,12 @@ func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresult
 		simplelog.Debugf("Creating %v ...", filename)
 		file, err := os.Create(path.Clean(systemTableFile))
 		if err != nil {
-			return fmt.Errorf("unable to create file %v due to error %v", filename, err)
+			return fmt.Errorf("unable to create file %v: %w", filename, err)
 		}
 		defer ddcio.EnsureClose(filepath.Clean(systemTableFile), file.Close)
 		_, err = fmt.Fprint(file, sb)
 		if err != nil {
-			return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+			return fmt.Errorf("unable to create file %s: %w", filename, err)
 		}
 		simplelog.Debugf("SUCCESS - Created %v", filename)
 

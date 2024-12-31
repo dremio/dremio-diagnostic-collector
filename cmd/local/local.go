@@ -57,55 +57,57 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions"
 )
 
-var ddcYamlLoc, collectionMode, pid string
-var patStdIn bool
+var (
+	ddcYamlLoc, collectionMode, pid string
+	patStdIn                        bool
+)
 
 func createAllDirs(c *conf.CollectConf) error {
-	var perms fs.FileMode = 0750
+	var perms fs.FileMode = 0o750
 	if !c.IsDremioCloud() {
 		if err := os.MkdirAll(c.ConfigurationOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create configuration directory %v due to error %v", c.ConfigurationOutDir(), err)
+			return fmt.Errorf("unable to create configuration directory %v: %w", c.ConfigurationOutDir(), err)
 		}
 		if err := os.MkdirAll(c.JFROutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create jfr directory due to error %v", err)
+			return fmt.Errorf("unable to create jfr directory: %w", err)
 		}
 		if err := os.MkdirAll(c.ThreadDumpsOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create thread-dumps directory due to error %v", err)
+			return fmt.Errorf("unable to create thread-dumps directory: %w", err)
 		}
 		if err := os.MkdirAll(c.HeapDumpsOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create heap-dumps directory due to error %v", err)
+			return fmt.Errorf("unable to create heap-dumps directory: %w", err)
 		}
 		if err := os.MkdirAll(c.KubernetesOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create kubernetes directory due to error %v", err)
+			return fmt.Errorf("unable to create kubernetes directory: %w", err)
 		}
 		if err := os.MkdirAll(c.KVstoreOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create kvstore directory due to error %v", err)
+			return fmt.Errorf("unable to create kvstore directory: %w", err)
 		}
 		if err := os.MkdirAll(c.LogsOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create logs directory due to error %v", err)
+			return fmt.Errorf("unable to create logs directory: %w", err)
 		}
 		if err := os.MkdirAll(c.NodeInfoOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create node-info directory due to error %v", err)
+			return fmt.Errorf("unable to create node-info directory: %w", err)
 		}
 		if err := os.MkdirAll(c.QueriesOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create queries directory due to error %v", err)
+			return fmt.Errorf("unable to create queries directory: %w", err)
 		}
 		if err := os.MkdirAll(c.TtopOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create ttop directory due to error %v", err)
+			return fmt.Errorf("unable to create ttop directory: %w", err)
 		}
 	}
 
 	if err := os.MkdirAll(c.ClusterStatsOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create cluster-stats directory due to error %v", err)
+		return fmt.Errorf("unable to create cluster-stats directory: %w", err)
 	}
 	if err := os.MkdirAll(c.SystemTablesOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create system-tables directory due to error %v", err)
+		return fmt.Errorf("unable to create system-tables directory: %w", err)
 	}
 	if err := os.MkdirAll(c.WLMOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create wlm directory due to error %v", err)
+		return fmt.Errorf("unable to create wlm directory: %w", err)
 	}
 	if err := os.MkdirAll(c.JobProfilesOutDir(), perms); err != nil {
-		return fmt.Errorf("unable to create job-profiles directory due to error %v", err)
+		return fmt.Errorf("unable to create job-profiles directory: %w", err)
 	}
 	return nil
 }
@@ -113,11 +115,11 @@ func createAllDirs(c *conf.CollectConf) error {
 func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 	if !c.DisableFreeSpaceCheck() {
 		if err := dirs.CheckFreeSpace(c.TarballOutDir(), uint64(c.MinFreeSpaceGB())); err != nil {
-			return fmt.Errorf("%v. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
+			return fmt.Errorf("%w. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
 		}
 	}
 	if err := createAllDirs(c); err != nil {
-		return fmt.Errorf("unable to create directories due to error %w", err)
+		return fmt.Errorf("unable to create directories: %w", err)
 	}
 
 	// we can probably remove this now that we have gone to single threaded, but keeping it for the delayed execution and logging for now
@@ -341,7 +343,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
 		defer cancel() // avoid leaks
 
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return "", err
 		}
@@ -349,7 +351,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if res.StatusCode != 200 {
+		if res.StatusCode != http.StatusOK {
 			return "", fmt.Errorf("invalid response %v when trying to access %v", res.Status, url)
 		}
 		body, err := io.ReadAll(res.Body)
@@ -370,6 +372,7 @@ func findClusterID(c *conf.CollectConf) (string, error) {
 		url := tries[i]
 		clusterID, err := exec(url)
 		if err != nil {
+			// TODO clean this up, we have some structure being passed to an unstructured error message
 			results = append(results, fmt.Sprintf("{url: %v, error: %v}", url, err))
 			continue
 		}
@@ -394,7 +397,7 @@ func parseClusterIDFromBody(body string) (string, error) {
 
 	err := json.Unmarshal([]byte(cleaned), &config)
 	if err != nil {
-		return "", fmt.Errorf("unable to decode json '%v': %v", cleaned, err)
+		return "", fmt.Errorf("unable to decode json '%v': %w", cleaned, err)
 	}
 
 	// Extract the clusterID
@@ -433,7 +436,7 @@ func getClassPath(hook shutdown.CancelHook, pid int) (string, error) {
 		}
 	}
 	if scanner.Err() != nil {
-		return "", fmt.Errorf("error while scanning '%v' for version: %v", out, scanner.Err())
+		return "", fmt.Errorf("unable to find version '%v': %w", out, scanner.Err())
 	}
 	return "", fmt.Errorf("no matches for java.class.path= found in '%v'", pid)
 }
@@ -459,23 +462,23 @@ func runCollectClusterStats(c *conf.CollectConf, hook shutdown.CancelHook) error
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0600)
+	return os.WriteFile(filepath.Join(c.ClusterStatsOutDir(), "cluster-stats.json"), b, 0o600)
 }
 
 func RunTtopCollect(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debug("Running top -H to get thread information")
 	duration := c.DremioTtopTimeSeconds() / c.DremioTtopFreqSeconds()
 	if duration == 0 {
-		return fmt.Errorf("cannot have duration of 0 for ttop")
+		return errors.New("cannot have duration of 0 for ttop")
 	}
 	var w bytes.Buffer
 	err := ddcio.Shell(hook, &w, fmt.Sprintf("LINES=100 top -H -n %v -p %v -d %v -bw", duration, c.DremioPID(), c.DremioTtopFreqSeconds()))
 	if err != nil {
-		return fmt.Errorf("failed collecting top %v", err)
+		return fmt.Errorf("failed collecting top: %w", err)
 	}
 	loc := fmt.Sprintf("%v/ttop.txt", c.TtopOutDir())
-	if err := os.WriteFile(loc, w.Bytes(), 0600); err != nil {
-		return fmt.Errorf("unable to write top out %v", err)
+	if err := os.WriteFile(loc, w.Bytes(), 0o600); err != nil {
+		return fmt.Errorf("unable to write top out: %w", err)
 	}
 	simplelog.Debugf("top -H written to %v", loc)
 	return nil
@@ -486,86 +489,86 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	osInfoFile := filepath.Join(c.NodeInfoOutDir(), "os_info.txt")
 	w, err := os.Create(filepath.Clean(osInfoFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %v", filepath.Clean(osInfoFile), err)
+		return fmt.Errorf("unable to create file %v: %w", filepath.Clean(osInfoFile), err)
 	}
 
 	simplelog.Debug("/etc/*-release")
 
 	_, err = w.Write([]byte("___\n>>> cat /etc/*-release\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write release file header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write release file header for os_info.txt: %v", err)
 	}
 
 	err = ddcio.Shell(hook, w, "cat /etc/*-release")
 	if err != nil {
-		simplelog.Warningf("unable to write release files for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write release files for os_info.txt: %v", err)
 	}
 
 	_, err = w.Write([]byte("___\n>>> uname -r\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write uname header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write uname header for os_info.txt: %v", err)
 	}
 
 	err = ddcio.Shell(hook, w, "uname -r")
 	if err != nil {
-		simplelog.Warningf("unable to write uname -r for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write uname -r for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> cat /etc/issue\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write cat /etc/issue header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write cat /etc/issue header for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "cat /etc/issue")
 	if err != nil {
-		simplelog.Warningf("unable to write /etc/issue for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write /etc/issue for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> cat /proc/sys/kernel/hostname\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write hostname for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "cat /proc/sys/kernel/hostname")
 	if err != nil {
-		simplelog.Warningf("unable to write hostname for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write hostname for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> cat /proc/meminfo\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write /proc/meminfo header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write /proc/meminfo header for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "cat /proc/meminfo")
 	if err != nil {
-		simplelog.Warningf("unable to write /proc/meminfo for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write /proc/meminfo for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> lscpu\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write lscpu header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write lscpu header for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "lscpu")
 	if err != nil {
-		simplelog.Warningf("unable to write lscpu for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write lscpu for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> mount\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write mount header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write mount header for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "mount")
 	if err != nil {
-		simplelog.Warningf("unable to write mount for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write mount for os_info.txt: %v", err)
 	}
 	_, err = w.Write([]byte("___\n>>> lsblk\n"))
 	if err != nil {
-		simplelog.Warningf("unable to write lsblk header for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write lsblk header for os_info.txt: %v", err)
 	}
 	err = ddcio.Shell(hook, w, "lsblk")
 	if err != nil {
-		simplelog.Warningf("unable to write lsblk for os_info.txt due to error %v", err)
+		simplelog.Warningf("unable to write lsblk for os_info.txt: %v", err)
 	}
 	const s = `stat -fc %T /sys/fs/cgroup/`
 	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", s)))
 	if err != nil {
-		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
+		simplelog.Warningf("unable to write %s header for os_info.txt: %v", s, err)
 	}
 	err = ddcio.Shell(hook, w, s)
 	if err != nil {
-		simplelog.Warningf("unable to write %s for os_info.txt due to error %v", s, err)
+		simplelog.Warningf("unable to write %s for os_info.txt: %v", s, err)
 	}
 
 	// this only retrieves cgroupv2 files and will fail on cgroup1 and of course on prem
@@ -580,39 +583,39 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		commandToExecute := fmt.Sprintf("cat /sys/fs/cgroup/%v", cgroupFile)
 		_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", commandToExecute)))
 		if err != nil {
-			simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", commandToExecute, err)
+			simplelog.Warningf("unable to write %s header for os_info.txt: %v", commandToExecute, err)
 		}
 		err = ddcio.Shell(hook, w, commandToExecute)
 		if err != nil {
-			simplelog.Warningf("unable to write %s for os_info.txt due to error %v", commandToExecute, err)
+			simplelog.Warningf("unable to write %s for os_info.txt: %v", commandToExecute, err)
 		}
 	}
 
 	loadCommand := "cat /proc/loadavg"
 	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", loadCommand)))
 	if err != nil {
-		simplelog.Warningf("unable to write %s header for os_info.txt due to error %v", s, err)
+		simplelog.Warningf("unable to write %s header for os_info.txt: %v", s, err)
 	}
 	err = ddcio.Shell(hook, w, loadCommand)
 	if err != nil {
-		simplelog.Warningf("unable to write %s for os_info.txt due to error %v", s, err)
+		simplelog.Warningf("unable to write %s for os_info.txt: %v", s, err)
 	}
 
 	if c.DremioPID() > 0 {
 		_, err = w.Write([]byte("___\n>>> ps eww\n"))
 		if err != nil {
-			simplelog.Warningf("unable to write ps eww header for os_info.txt due to error %v", err)
+			simplelog.Warningf("unable to write ps eww header for os_info.txt: %v", err)
 		}
 		err = ddcio.Shell(hook, w, fmt.Sprintf("ps eww %v | grep dremio | awk '{$1=$2=$3=$4=\"\"; print $0}'", c.DremioPID()))
 		if err != nil {
-			simplelog.Warningf("unable to write ps eww output for os_info.txt due to error %v", err)
+			simplelog.Warningf("unable to write ps eww output for os_info.txt: %v", err)
 		}
 	}
 	if err := w.Sync(); err != nil {
-		return fmt.Errorf("unable to sync the os_info.txt file due to error: %v", err)
+		return fmt.Errorf("unable to sync the os_info.txt file: %w", err)
 	}
 	if err := w.Close(); err != nil {
-		return fmt.Errorf("unable to close the os_info.txt file due to error: %v", err)
+		return fmt.Errorf("unable to close the os_info.txt file: %w", err)
 	}
 	simplelog.Debugf("... Collecting OS Information from %v COMPLETED", c.NodeName())
 
@@ -625,20 +628,20 @@ var LocalCollectCmd = &cobra.Command{
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
 		overrides := make(map[string]string)
-		//if a cli flag was set go ahead and use those values to override the yaml configuration
+		// if a cli flag was set go ahead and use those values to override the yaml configuration
 		cobraCmd.Flags().Visit(func(flag *pflag.Flag) {
 			if flag.Name == conf.KeyDremioPatToken {
 				if flag.Value.String() == "" {
 					pat, err := masking.PromptForPAT()
 					if err != nil {
-						fmt.Printf("unable to get PAT due to: %v\n", err)
+						fmt.Printf("unable to get PAT: %v\n", err)
 						os.Exit(1)
 					}
 					overrides[flag.Name] = pat
 				} else {
 					overrides[flag.Name] = flag.Value.String()
 				}
-				//we do not want to log the token
+				// we do not want to log the token
 				simplelog.Debugf("overriding yaml with cli flag %v and value 'REDACTED'", flag.Name)
 			} else {
 				simplelog.Debugf("overriding yaml with cli flag %v and value %q", flag.Name, flag.Value.String())
@@ -687,11 +690,11 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	if pid != "" {
 		if _, err := os.Stat(pid); err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
-				return "", fmt.Errorf("unable to read pid location '%v' with error: '%w'", pid, err)
+				return "", fmt.Errorf("unable to read pid location '%v': %w", pid, err)
 			}
 			// this means nothing is present great continue
-			if err := os.WriteFile(filepath.Clean(pid), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil {
-				return "", fmt.Errorf("unable to write pid file '%v: %w", pid, err)
+			if err := os.WriteFile(filepath.Clean(pid), []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+				return "", fmt.Errorf("unable to write pid file '%v': %w", pid, err)
 			}
 			hook.AddFinalSteps(func() {
 				if err := os.Remove(pid); err != nil {
@@ -732,13 +735,13 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	logLoc := simplelog.GetLogLoc()
 	if logLoc != "" {
 		if err := ddcio.CopyFile(simplelog.GetLogLoc(), filepath.Join(c.OutputDir(), fmt.Sprintf("ddc-%v.log", c.NodeName()))); err != nil {
-			simplelog.Warningf("unable to copy log to archive due to error %v", err)
+			simplelog.Warningf("unable to copy log to archive: %v", err)
 		}
 	}
 	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
 	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
 	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
-		return "", fmt.Errorf("unable to compress archive from folder '%v exiting due to error %w", c.OutputDir(), err)
+		return "", fmt.Errorf("unable to compress archive from folder '%v': %w", c.OutputDir(), err)
 	}
 	if err := os.RemoveAll(c.OutputDir()); err != nil {
 		simplelog.Errorf("unable to remove %v: %v", c.OutputDir(), err)
@@ -755,7 +758,7 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 }
 
 func init() {
-	//wire up override flags
+	// wire up override flags
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().String("dremio-pat-token", "	", "Dremio Personal Access Token (PAT)")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")

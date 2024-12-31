@@ -52,11 +52,11 @@ func RunCollectHeapDump(c *conf.CollectConf, hook shutdown.Hook) error {
 	}, "removing heap dump files")
 	var w bytes.Buffer
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jmap -dump:format=b,file=%v %v", hprofFile, dremioPID)); err != nil {
-		return fmt.Errorf("unable to capture heap dump %v", err)
+		return fmt.Errorf("unable to capture heap dump: %w", err)
 	}
 	simplelog.Debugf("heap dump output %v", w.String())
 	if err := ddcio.GzipFile(hprofFile, hprofGzFile); err != nil {
-		return fmt.Errorf("unable to gzip heap dump file")
+		return fmt.Errorf("unable to gzip heap dump file: %w", err)
 	}
 	if err := os.Remove(path.Clean(hprofFile)); err != nil {
 		simplelog.Warningf("unable to remove old hprof file, must remove manually %v", err)
@@ -69,7 +69,7 @@ func RunCollectHeapDump(c *conf.CollectConf, hook shutdown.Hook) error {
 	}()
 	dest := filepath.Join(c.HeapDumpsOutDir(), baseName+".gz")
 	if err := os.Rename(path.Clean(hprofGzFile), path.Clean(dest)); err != nil {
-		return fmt.Errorf("unable to move heap dump to %v due to error %v", dest, err)
+		return fmt.Errorf("unable to move heap dump to %v: %w", dest, err)
 	}
 	return nil
 }

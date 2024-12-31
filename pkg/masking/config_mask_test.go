@@ -24,7 +24,7 @@ import (
 )
 
 func TestConfig_WhenRemoveSecretsFromDremioConfAndConfIsNotFound(t *testing.T) {
-	//It("should throw an error if the provided file is not a dremio.conf", func() {
+	// It("should throw an error if the provided file is not a dremio.conf", func() {
 	err := masking.RemoveSecretsFromDremioConf("testdata/myFile.txt")
 	if err == nil {
 		t.Errorf("we expected an error but there was not one")
@@ -35,7 +35,7 @@ func TestConfig_WhenRemoveSecretsFromDremioConfAndConfIsNotFound(t *testing.T) {
 }
 
 func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
-	//It("should mask secrets in the config file", func() {
+	// It("should mask secrets in the config file", func() {
 	// We'll write the dremio.conf contents to a temporary file for this test
 	conf := `
 			paths: {
@@ -71,11 +71,11 @@ func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
 	tmpfile := filepath.Join(tmpDir, "dremio.conf")
 	defer func() {
 		if err := os.RemoveAll(tmpDir); err != nil {
-			t.Logf("cannot remove test dir %v due to error %v", tmpDir, err)
+			t.Logf("cannot remove test dir %v: %v", tmpDir, err)
 		}
 	}()
 
-	err = os.WriteFile(tmpfile, []byte(conf), 0600)
+	err = os.WriteFile(tmpfile, []byte(conf), 0o600)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
@@ -90,7 +90,7 @@ func TestConfig_WhenRemoveSecretsFromDremioConf(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 
-	//should mask passwords in dremio.conf
+	// should mask passwords in dremio.conf
 	if !strings.Contains(string(cleanedConf), `keyStorePassword: "<REMOVED_POTENTIAL_SECRET>"`) {
 		t.Errorf("keystorePassword was not masked")
 	}

@@ -25,10 +25,10 @@ import (
 )
 
 func main() {
-	//initial logger before verbosity is parsed
+	// initial logger before verbosity is parsed
 	defer func() {
 		if err := simplelog.Close(); err != nil {
-			log.Printf("unable to close log due to error %v", err)
+			log.Printf("unable to close log: %v", err)
 		}
 	}()
 	if err := cmd.Execute(os.Args); err != nil {

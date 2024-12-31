@@ -23,7 +23,7 @@ func TestCalculateDefaultJobProfileSettingsWithLessThan4Jobs(t *testing.T) {
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 3,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numSlowExec, numErrors, numSlowPlan, numHighCost := calculateDefaultJobProfileNumbers(c)
 
 	if numHighCost != 0 {
@@ -45,7 +45,7 @@ func TestCalculateDefaultJobProfileSettingsWith0Jobs(t *testing.T) {
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 0,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numSlowExec, numErrors, numSlowPlan, numHighCost := calculateDefaultJobProfileNumbers(c)
 
 	if numHighCost != 0 {
@@ -67,7 +67,7 @@ func TestCalculateDefaultJobProfileSettingsWith10Jobs(t *testing.T) {
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 10,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numSlowExec, numErrors, numSlowPlan, numHighCost := calculateDefaultJobProfileNumbers(c)
 	if numHighCost != 2 {
 		t.Errorf("expected 2 but got %v", numHighCost)
@@ -88,7 +88,7 @@ func TestCalculateDefaultJobProfileSettingsWith25000Jobs(t *testing.T) {
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 25000,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numSlowExec, numErrors, numSlowPlan, numHighCost := calculateDefaultJobProfileNumbers(c)
 	if numHighCost != 5000 {
 		t.Errorf("expected 5000 but got %v", numHighCost)
@@ -103,12 +103,13 @@ func TestCalculateDefaultJobProfileSettingsWith25000Jobs(t *testing.T) {
 		t.Errorf("expected 5000 but got %v", numSlowPlan)
 	}
 }
+
 func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfigAndNoPat(t *testing.T) {
 	c := &CollectConf{
 		dremioPATToken:             "",
 		numberJobProfilesToCollect: 25000,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 0 {
 		t.Errorf("expected 0 but got %v", numberProfiles)
@@ -132,7 +133,7 @@ func TestCalculateJobProfileSettingsWith25000JobsAndEmptyViperConfig(t *testing.
 		dremioPATToken:             "abc",
 		numberJobProfilesToCollect: 25000,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 25000 {
 		t.Errorf("expected 25000 but got %v", numberProfiles)
@@ -161,7 +162,7 @@ func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverride(t *testing
 		jobProfilesNumHighQueryCost: 350,
 	}
 
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 800 {
 		t.Errorf("expected 800 but got %v", numberProfiles)
@@ -189,7 +190,7 @@ func TestCalculateJobProfileSettingsWith25000JobsAndWithViperOverrideAndNoPat(t 
 		jobProfilesNumSlowPlanning:  250,
 		jobProfilesNumHighQueryCost: 350,
 	}
-	//put them all in slow exec since we are dealing with fractions here
+	// put them all in slow exec since we are dealing with fractions here
 	numberProfiles, numHighCost, numSlowExec, numErrors, numSlowPlan := CalculateJobProfileSettingsWithViperConfig(c)
 	if numberProfiles != 0 {
 		t.Errorf("expected 0 but got %v", numberProfiles)

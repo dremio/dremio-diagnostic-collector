@@ -52,6 +52,7 @@ func GetInt(confData map[string]interface{}, key string) int {
 	}
 	return 0
 }
+
 func GetUint64(confData map[string]interface{}, key string) uint64 {
 	if v, ok := confData[key]; ok {
 		return cast.ToUint64(v)
@@ -161,7 +162,7 @@ func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 	if err != nil {
 		simplelog.Errorf("configuration directory incorrect : %v", err)
 	}
-	//searching rocksdb
+	// searching rocksdb
 	var rocksDBDir string
 	if value, ok := confValues["db"]; ok {
 		rocksDBDir = value
@@ -210,6 +211,7 @@ func LogConfData(confData map[string]string) {
 		}
 	}
 }
+
 func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
 	confData, err := ParseConfig(ddcYamlLoc, overrides)
 	if err != nil {
@@ -267,16 +269,16 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
 	c.tarballOutDir = GetString(confData, KeyTarballOutDir)
-	//validate tarball output directory is not empty, because it must be empty or we will end up archiving a lot
+	// validate tarball output directory is not empty, because it must be empty or we will end up archiving a lot
 	_, err = os.Stat(c.tarballOutDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// go ahead and make the directory if it is not present
-			if err := os.MkdirAll(c.tarballOutDir, 0700); err != nil {
-				return &CollectConf{}, fmt.Errorf("failed making tarball out dir: %v", err)
+			if err := os.MkdirAll(c.tarballOutDir, 0o700); err != nil {
+				return &CollectConf{}, fmt.Errorf("failed making tarball out dir: %w", err)
 			}
 		} else {
-			//all other errors exit
+			// all other errors exit
 			return &CollectConf{}, err
 		}
 	}
@@ -292,7 +294,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		allowedList = append(allowedList, filepath.Base(pidFile))
 	}
 	for _, e := range dirEntries {
-		if slices.Contains[[]string](allowedList, e.Name()) {
+		if slices.Contains(allowedList, e.Name()) {
 			continue
 		}
 		entryCount++
@@ -376,7 +378,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectJFR = GetBool(confData, KeyCollectJFR) && dremioPIDIsValid
 	c.collectJStack = GetBool(confData, KeyCollectJStack) && dremioPIDIsValid
 
-	//we do not want to validate configuration of logs for dremio cloud
+	// we do not want to validate configuration of logs for dremio cloud
 	if !c.isDremioCloud {
 		var detectedConfig DremioConfig
 		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs
@@ -427,7 +429,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			simplelog.Info(msg)
 			fmt.Println(msg)
 			if err := dirs.CheckDirectory(c.dremioLogDir, containsValidLog); err != nil {
-				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', update ddc.yaml and fix it: %v", c.dremioLogDir, err)
+				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', update ddc.yaml and fix it: %w", c.dremioLogDir, err)
 			}
 
 		}
@@ -459,7 +461,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 					return errors.New("configuration directory is empty")
 				}
 			}); err != nil {
-				return &CollectConf{}, fmt.Errorf("invalid dremio conf dir '%v', update ddc.yaml and fix it: %v", c.dremioConfDir, err)
+				return &CollectConf{}, fmt.Errorf("invalid dremio conf dir '%v', update ddc.yaml and fix it: %w", c.dremioConfDir, err)
 			}
 		}
 		// now try and configure rocksdb
@@ -538,9 +540,9 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
 		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
 		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
-		//validate rest api configuration
+		// validate rest api configuration
 		if err := ValidateAPICredentials(c, hook); err != nil {
-			return &CollectConf{}, fmt.Errorf("CRITICAL ERROR invalid Dremio API configuration: (url: %v, user: %v) %v", c.dremioEndpoint, c.dremioUsername, err)
+			return &CollectConf{}, fmt.Errorf("CRITICAL ERROR invalid Dremio API configuration: (url: %v, user: %v) %w", c.dremioEndpoint, c.dremioUsername, err)
 		}
 	}
 
@@ -548,7 +550,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	// this is just logging logic and not actually useful for anything but reporting
 	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()
 	if err != nil {
-		simplelog.Warningf("unable to determine if node is AWSE or not due to error %v", err)
+		simplelog.Warningf("unable to determine if node is AWSE or not: %v", err)
 	}
 	if IsAWSEfromLogDirs {
 		isCoord, logPath, err := autodetect.IsAWSECoordinator()
@@ -651,7 +653,6 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 	dremioLogDir, err := extractValue(ps, dremioLogDirKey)
 	if err != nil {
 		simplelog.Warningf("key not found: %v", dremioLogDirKey)
-
 	}
 	if dremioLogDir == "" {
 		dremioLogDir, err = extractValue(ps, dremioLogDirKeyBackup)
@@ -816,6 +817,7 @@ func (c *CollectConf) KubernetesOutDir() string { return filepath.Join(c.outputD
 func (c *CollectConf) KVstoreOutDir() string {
 	return filepath.Join(c.outputDir, "kvstore", c.nodeName)
 }
+
 func (c *CollectConf) SystemTablesOutDir() string {
 	return filepath.Join(c.outputDir, "system-tables", c.nodeName)
 }
@@ -837,9 +839,11 @@ func (c *CollectConf) LogsOutDir() string { return filepath.Join(c.outputDir, "l
 func (c *CollectConf) NodeInfoOutDir() string {
 	return filepath.Join(c.outputDir, "node-info", c.nodeName)
 }
+
 func (c *CollectConf) QueriesOutDir() string {
 	return filepath.Join(c.outputDir, "queries", c.nodeName)
 }
+
 func (c *CollectConf) ThreadDumpsOutDir() string {
 	return filepath.Join(c.outputDir, "jfr", "thread-dumps", c.nodeName)
 }

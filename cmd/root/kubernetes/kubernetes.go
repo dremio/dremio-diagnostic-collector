@@ -135,6 +135,7 @@ func (c *KubeCtlAPIActions) SetHostPid(host, pidFile string) {
 	defer c.m.Unlock()
 	c.pidHosts[host] = pidFile
 }
+
 func (c *KubeCtlAPIActions) CleanupRemote() error {
 	kill := func(host string, pidFile string) {
 		if pidFile == "" {
@@ -225,7 +226,7 @@ func (c *KubeCtlAPIActions) CleanupRemote() error {
 			Result:   consoleprint.ResultFailure,
 		})
 		c.m.Lock()
-		//cancel out so we can skip if it's called again
+		// cancel out so we can skip if it's called again
 		c.pidHosts[host] = ""
 		c.m.Unlock()
 	}
@@ -297,7 +298,7 @@ func (c *KubeCtlAPIActions) HostExecuteAndStream(mask bool, hostString string, o
 	logArgs(mask, args)
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
-		return fmt.Errorf("failed looking for pod %v: %v", hostString, err)
+		return fmt.Errorf("failed looking for pod %v: %w", hostString, err)
 	}
 	req := c.client.CoreV1().RESTClient().Post().Resource("pods").Name(hostString).
 		Namespace(c.namespace).SubResource("exec")
@@ -442,7 +443,7 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
-		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
+		return "", fmt.Errorf("failed looking for pod %v: %w", hostString, err)
 	}
 	simplelog.Infof("transferring from %v:%v to %v", hostString, source, destination)
 	executor := func(writer *io.PipeWriter, cmdArr []string) {
@@ -493,7 +494,7 @@ func (c *KubeCtlAPIActions) CopyFromHost(hostString string, source, destination 
 	simplelog.Infof("untarring file '%v' from stdout", destination)
 	// has to be filepath or else we get weird outcomes
 	if err := archive.ExtractTarStream(reader, filepath.Dir(destination), path.Dir(source)); err != nil {
-		return "", fmt.Errorf("unable to copy %v", err)
+		return "", fmt.Errorf("unable to copy %w", err)
 	}
 	simplelog.Infof("file %v untarred fully and transfer is now complete", destination)
 	return "", nil
@@ -533,7 +534,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	go func(src string) {
 		defer writer.Close()
 		defer wg.Done()
-		//use filepath here or else we will get surprises
+		// use filepath here or else we will get surprises
 		srcDir := filepath.Dir(src)
 		simplelog.Debugf("k8s API transfer archiving %v to transfer file %v to make it visible on host %v", srcDir, src, hostString)
 		if err := archive.TarGzDirFilteredStream(srcDir, writer, func(s string) bool {
@@ -542,11 +543,11 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 			simplelog.Errorf("unable to archive %v", err)
 		}
 	}(source)
-	//use path here since it's always going to a linux destination
+	// use path here since it's always going to a linux destination
 	destDir := path.Dir(destination)
 	containerName, err := c.getPrimaryContainer(hostString)
 	if err != nil {
-		return "", fmt.Errorf("failed looking for pod %v: %v", hostString, err)
+		return "", fmt.Errorf("failed looking for pod %v: %w", hostString, err)
 	}
 	simplelog.Debugf("k8s API transfer unarchive %v to send file %v to make it visible on host %v", destDir, destination, hostString)
 	cmdArr := []string{"sh", "-c", fmt.Sprintf("tar -xzmf - -C %v", destDir)}
@@ -568,7 +569,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 
 	exec, err := remotecommand.NewSPDYExecutor(c.config, "POST", req.URL())
 	if err != nil {
-		return "", fmt.Errorf("spdy failed: %v", err)
+		return "", fmt.Errorf("spdy failed: %w", err)
 	}
 	var errBuff bytes.Buffer
 	var outBuff bytes.Buffer
@@ -584,7 +585,7 @@ func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination st
 	})
 	if err != nil {
 		// we are chosing not ot wait here, the theory being that depending on how the error occurred we could see a deadlock
-		return "", fmt.Errorf("failed streaming %v - %v", err, errBuff.String()+outBuff.String())
+		return "", fmt.Errorf("failed streaming %w - %v", err, errBuff.String()+outBuff.String())
 	}
 	wg.Wait()
 	return errBuff.String() + outBuff.String(), nil

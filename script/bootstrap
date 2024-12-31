@@ -35,3 +35,11 @@ if ! type "gosec" > /dev/null; then
     go install github.com/securego/gosec/v2/cmd/gosec@v2.21.4
 fi
 
+echo "Checking if gofumpt is installed…"
+date "+%H:%M:%S"
+
+if ! type "gofumpt" > /dev/null; then
+    echo "gofumpt not found installing.."
+    date "+%H:%M:%S"
+    go install mvdan.cc/gofumpt@latest
+fi

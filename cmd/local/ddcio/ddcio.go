@@ -59,15 +59,15 @@ func CopyDir(src, dst string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
-	si, err := os.Stat(src)
+	fileInfo, err := os.Stat(src)
 	if err != nil {
 		return err
 	}
-	if !si.IsDir() {
+	if !fileInfo.IsDir() {
 		return fmt.Errorf("source is not a directory: %s", src)
 	}
 
-	err = os.MkdirAll(dst, si.Mode())
+	err = os.MkdirAll(dst, fileInfo.Mode())
 	if err != nil {
 		return err
 	}
@@ -99,11 +99,11 @@ func CopyFile(srcPath, dstPath string) error {
 	// Open the source file
 	srcFile, err := os.Open(path.Clean(srcPath))
 	if err != nil {
-		return fmt.Errorf("unable to copy file %v due to error %w", path.Clean(srcPath), err)
+		return fmt.Errorf("unable to copy file %v: %w", path.Clean(srcPath), err)
 	}
 	defer func() {
 		if err := srcFile.Close(); err != nil {
-			simplelog.Warningf("unable to close %v due to error %v", path.Clean(srcPath), err)
+			simplelog.Warningf("unable to close %v :%v", path.Clean(srcPath), err)
 		}
 	}()
 
@@ -114,7 +114,7 @@ func CopyFile(srcPath, dstPath string) error {
 	}
 	defer func() {
 		if err := dstFile.Close(); err != nil {
-			simplelog.Errorf("unable to close file %v due to error %v", path.Clean(dstPath), err)
+			simplelog.Errorf("unable to close file %v: %v", path.Clean(dstPath), err)
 		}
 	}()
 
@@ -147,7 +147,7 @@ func GetFilesInDir(dir string) ([]os.DirEntry, error) {
 
 // Shell executes a shell command with shell expansion and appends its output to the provided io.Writer.
 func Shell(hook shutdown.CancelHook, writer io.Writer, commandLine string) error {
-	//this is a hack before we can do a longer term improvement of separating local-collect
+	// this is a hack before we can do a longer term improvement of separating local-collect
 	// and the ddc command into different clis
 	shell := "bash"
 	fileArg := "-c"
@@ -168,6 +168,6 @@ func Shell(hook shutdown.CancelHook, writer io.Writer, commandLine string) error
 // EnsureClose logs a failure when the close does not succeed this should not be used with "just in case closes" and should indeed signal an error
 func EnsureClose(fileName string, f func() error) {
 	if err := f(); err != nil {
-		simplelog.Errorf("unable to finish writing file %v due to error %v", fileName, err)
+		simplelog.Errorf("unable to finish writing file %v: %v", fileName, err)
 	}
 }

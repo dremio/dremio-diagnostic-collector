@@ -51,29 +51,33 @@ import (
 )
 
 // var scaleoutCoordinatorContainer string
-var coordinatorStr string
-var executorsStr string
-var labelSelector string
-var sshKeyLoc string
-var sshUser string
-var transferDir string
-var ddcYamlLoc string
+var (
+	coordinatorStr string
+	executorsStr   string
+	labelSelector  string
+	sshKeyLoc      string
+	sshUser        string
+	transferDir    string
+	ddcYamlLoc     string
+)
 
 var outputLoc string
 
-var sudoUser string
-var namespace string
-var k8sContext string
-var disableFreeSpaceCheck bool
-var disableKubeCtl bool
-var minFreeSpaceGB uint64
-var disablePrompt bool
-var detectNamespace bool
-var collectionMode string
-var cliAuthToken string
-var pid string
-var transferThreads int
-var manualPATPrompt bool
+var (
+	sudoUser              string
+	namespace             string
+	k8sContext            string
+	disableFreeSpaceCheck bool
+	disableKubeCtl        bool
+	minFreeSpaceGB        uint64
+	disablePrompt         bool
+	detectNamespace       bool
+	collectionMode        string
+	cliAuthToken          string
+	pid                   string
+	transferThreads       int
+	manualPATPrompt       bool
+)
 
 // var isEmbeddedK8s bool
 // var isEmbeddedSSH bool
@@ -104,7 +108,6 @@ for kubernetes deployments:
 	ddc --namespace mynamespace	--collect health-check
 `,
 	Run: func(_ *cobra.Command, _ []string) {
-
 	},
 }
 
@@ -131,6 +134,7 @@ func startTicker() (stop func()) {
 		close(quit)
 	}
 }
+
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool, hook shutdown.Hook) error {
 	patSet := collectionArgs.DremioPAT != ""
 	consoleprint.UpdateRuntime(
@@ -149,11 +153,11 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
 	if err != nil {
-		return fmt.Errorf("error when getting directory for copy strategy: %v", err)
+		return fmt.Errorf("error when getting directory for copy strategy: %w", err)
 	}
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
 	hook.AddFinalSteps(cs.Close, "running cleanup on copy strategy")
-	var clusterCollect = func() {}
+	clusterCollect := func() {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
 		simplelog.Info("using fallback based collection")
@@ -219,7 +223,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			fmt.Println("")
 			helpErr := RootCmd.Help()
 			if helpErr != nil {
-				return fmt.Errorf("unable to print help %w", helpErr)
+				return fmt.Errorf("unable to print help: %w", helpErr)
 			}
 			return fmt.Errorf("invalid command flag detected: %w", err)
 		}
@@ -267,7 +271,7 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
-	if err == nil && foundCmd.Use == RootCmd.Use && foundCmd.Flags().Parse(args[1:]) != pflag.ErrHelp {
+	if err == nil && foundCmd.Use == RootCmd.Use && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
@@ -285,11 +289,11 @@ func Execute(args []string) error {
 		if pid != "" {
 			if _, err := os.Stat(pid); err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("unable to read pid location '%v' with error: '%v'", pid, err)
+					return fmt.Errorf("unable to read pid location '%v': %w", pid, err)
 				}
 				// this means nothing is present great continue
-				if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0600); err != nil {
-					return fmt.Errorf("unable to write pid file '%v: %v", pid, err)
+				if err := os.WriteFile(filepath.Clean(pid), []byte(""), 0o600); err != nil {
+					return fmt.Errorf("unable to write pid file '%v': %w", pid, err)
 				}
 				hook.AddFinalSteps(func() {
 					if err := os.Remove(pid); err != nil {
@@ -312,7 +316,7 @@ func Execute(args []string) error {
 			}
 			_, transport, err := prompt.Run()
 			if err != nil {
-				return fmt.Errorf("prompt failed %v", err)
+				return fmt.Errorf("prompt failed %w", err)
 			}
 			if transport == "ssh" {
 				// ssh user
@@ -382,7 +386,7 @@ func Execute(args []string) error {
 				}
 				_, namespace, err = prompt.Run()
 				if err != nil {
-					return fmt.Errorf("prompt failed %v", err)
+					return fmt.Errorf("prompt failed: %w", err)
 				}
 			}
 			prompt = promptui.Select{
@@ -391,14 +395,14 @@ func Execute(args []string) error {
 			}
 			_, collectionMode, err = prompt.Run()
 			if err != nil {
-				return fmt.Errorf("prompt failed %v", err)
+				return fmt.Errorf("prompt failed: %w", err)
 			}
 		}
 
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
-				return fmt.Errorf("unexpected error getting ssh directory '%v'. This is a critical error and should result in a bug report", err)
+				return fmt.Errorf("Unable to get the ssh directory. This is a critical error and should result in a bug report: %w", err)
 			}
 			sshKeyLoc = sshDefault
 		}
@@ -407,7 +411,7 @@ func Execute(args []string) error {
 		simplelog.Infof("cli command: %v", strings.Join(args, " "))
 		confData, err := ValidateAndReadYaml(ddcYamlLoc, collectionMode)
 		if err != nil {
-			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %v", ddcYamlLoc, err)
+			return fmt.Errorf("CRITICAL ERROR: unable to parse %v: %w", ddcYamlLoc, err)
 		}
 		if !disableFreeSpaceCheck {
 			abs, err := filepath.Abs(outputLoc)
@@ -416,7 +420,7 @@ func Execute(args []string) error {
 			}
 			outputFolder := filepath.Dir(abs)
 			if err := dirs.CheckFreeSpace(outputFolder, minFreeSpaceGB); err != nil {
-				return fmt.Errorf("%v, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
+				return fmt.Errorf("%w, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
 			}
 		}
 
@@ -443,7 +447,7 @@ func Execute(args []string) error {
 		if manualPATPrompt || (collectionMode == collects.HealthCheckCollection && dremioPAT == "") {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
-				return fmt.Errorf("unable to get PAT due to: %v", err)
+				return fmt.Errorf("unable to get PAT: %w", err)
 			}
 			dremioPAT = pat
 		}
@@ -615,7 +619,7 @@ func init() {
 	execLocDir := filepath.Dir(execLoc)
 	RootCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
 
-	//init
+	// init
 	RootCmd.AddCommand(local.LocalCollectCmd)
 	RootCmd.AddCommand(version.VersionCmd)
 	RootCmd.AddCommand(awselogs.AWSELogsCmd)

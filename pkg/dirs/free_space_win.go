@@ -24,7 +24,6 @@ import (
 )
 
 func GetFreeSpaceOnFileSystem(folder string) (uint64, error) {
-
 	var freeBytesAvailable uint64
 	var totalNumberOfBytes uint64
 	var totalNumberOfFreeBytes uint64

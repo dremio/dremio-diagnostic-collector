@@ -23,7 +23,7 @@ import (
 )
 
 // CaptureOutput captures standard output for a function f and returns the output string
-func CaptureOutput(f func()) (string, error) {
+func CaptureOutput(run func()) (string, error) {
 	// Keep the original stdout and stderr.
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
@@ -32,28 +32,28 @@ func CaptureOutput(f func()) (string, error) {
 		os.Stderr = oldStderr
 	}()
 
-	r, w, err := os.Pipe()
+	reader, writer, err := os.Pipe()
 	if err != nil {
 		return "", err
 	}
 
-	os.Stdout = w
-	os.Stderr = w
+	os.Stdout = writer
+	os.Stderr = writer
 
 	outC := make(chan string)
 
 	go func() {
 		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, r); err != nil {
+		if _, err := io.Copy(&buf, reader); err != nil {
 			panic(err)
 		}
 		outC <- buf.String()
 	}()
 
-	f()
+	run()
 
-	if err := w.Close(); err != nil {
-		return "", fmt.Errorf("unable to capture output due to error %v", err)
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("unable to capture output: %w", err)
 	}
 
 	out := <-outC

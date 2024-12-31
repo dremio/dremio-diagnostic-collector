@@ -21,7 +21,7 @@ import (
 )
 
 func TestParseGCLogFromFlags_WhenJVMFlagsAreGiven(t *testing.T) {
-	//Should parse the GC log location correctly"
+	// Should parse the GC log location correctly"
 
 	processFlags := `    519 ?        Ssl  192:04 /usr/lib/jvm/bellsoft-java8-amd64/bin/java -Djava.util.logging.config.class=org.slf4j.bridge.SLF4JBridgeHandler -Djava.library.path=/opt/dremio/lib -XX:+PrintGCDetails -XX:+PrintGCDateStamps -Xloggc:/opt/dremio/log/server.gc -Ddremio.log.path=/opt/dremio/log -Ddremio.plugins.path=/opt/dremio/plugins -Xmx4096m -XX:MaxDirectMemorySize=8192m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/dremio/log -Dio.netty.maxDirectMemory=0 -Dio.netty.tryReflectionSetAccessible=true -DMAPR_IMPALA_RA_THROTTLE -DMAPR_MAX_RA_STREAMS=400 -XX:+UseG1GC -Ddremio.log.path=/opt/dremio/log/ -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles=5 -XX:GCLogFileSize=4000k -XX:+UseGCLogFileRotation -Xloggc:/opt/dremio/log/gc.log -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -XX:+PrintClassHistogramBeforeFullGC -XX:+PrintClassHistogramAfterFullGC -cp /opt/dremio/conf:/opt/dremio/jars/*:/opt/dremio/jars/ext/*:/opt/dremio/jars/3rdparty/*:/usr/lib/jvm/bellsoft-java8-amd64/lib/tools.jar com.dremio.dac.daemon.DremioDaemon`
 	gcRegex, gcLogLocation, err := autodetect.ParseGCLogFromFlags(processFlags)

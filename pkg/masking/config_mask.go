@@ -107,7 +107,7 @@ func RemoveSecretsFromDremioConf(configFile string) error {
 		// If there is an issue opening the file, an error is returned.
 		file, err := os.Open(path.Clean(configFile))
 		if err != nil {
-			return fmt.Errorf("unable to open file %v with error %v", configFile, err)
+			return fmt.Errorf("unable to open file %v: %w", configFile, err)
 		}
 		scanner := bufio.NewScanner(file)
 
@@ -125,13 +125,13 @@ func RemoveSecretsFromDremioConf(configFile string) error {
 
 		// Close the file and check for any errors. If there is an issue closing the file, an error is returned.
 		if err := file.Close(); err != nil {
-			return fmt.Errorf("unable to close file %v due to error %v", configFile, err)
+			return fmt.Errorf("unable to close file %v: %w", configFile, err)
 		}
 
 		// Write the contents of cleansedData back into the file.
 		// If there is an issue writing to the file, an error is returned.
-		if err := os.WriteFile(configFile, []byte(strings.Join(cleansedData, "\n")), 0600); err != nil {
-			return fmt.Errorf("unable to write new file %v due to error %v", configFile, err)
+		if err := os.WriteFile(configFile, []byte(strings.Join(cleansedData, "\n")), 0o600); err != nil {
+			return fmt.Errorf("unable to write new file %v: %w", configFile, err)
 		}
 	} else {
 		// If the configFile does not end with "dremio.conf", an error is returned.

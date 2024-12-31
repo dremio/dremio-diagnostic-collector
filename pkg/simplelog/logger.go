@@ -37,9 +37,11 @@ const (
 
 const msgMax = 1000
 
-var logger *Logger
-var ddcLogFilePath string
-var ddcLogMut = &sync.Mutex{}
+var (
+	logger         *Logger
+	ddcLogFilePath string
+	ddcLogMut      = &sync.Mutex{}
+)
 
 func setDDCLog(filePath string) {
 	ddcLogFilePath = filePath
@@ -68,7 +70,7 @@ func init() {
 }
 
 func InitLogger() {
-	//default location
+	// default location
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
 	f := createLog("", true)
@@ -96,7 +98,6 @@ func LogStartMessage() {
 	var logLine string
 	if GetLogLoc() != "" {
 		logLine = fmt.Sprintf("### logging to file: %v ###", GetLogLoc())
-
 	} else {
 		logLine = "### unable to write ddc.log using STDOUT ###"
 	}
@@ -116,7 +117,6 @@ func LogEndMessage() {
 	var logLine string
 	if GetLogLoc() != "" {
 		logLine = fmt.Sprintf("### for any troubleshooting consult log: %v ###", GetLogLoc())
-
 	} else {
 		logLine = "### no log written ###"
 	}
@@ -125,26 +125,26 @@ func LogEndMessage() {
 }
 
 func createLog(fileName string, truncate bool) *os.File {
-	var f *os.File
+	var file *os.File
 	var logLocation string
 	var err error
 	if fileName != "" {
 		logLocation = fileName
 		if truncate {
-			f, err = os.OpenFile(filepath.Clean(fileName), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
+			file, err = os.OpenFile(filepath.Clean(fileName), os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o600)
 		} else {
-			f, err = os.OpenFile(filepath.Clean(fileName), os.O_WRONLY|os.O_APPEND, 0600)
+			file, err = os.OpenFile(filepath.Clean(fileName), os.O_WRONLY|os.O_APPEND, 0o600)
 		}
 	} else {
-		logLocation, f, err = getDefaultLogLoc()
+		logLocation, file, err = getDefaultLogLoc()
 	}
 	if err != nil {
 		fallbackPath := filepath.Clean(filepath.Join(os.TempDir(), "ddc.log"))
 		var fallbackLog *os.File
 		if truncate {
-			fallbackLog, err = os.OpenFile(fallbackPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
+			fallbackLog, err = os.OpenFile(fallbackPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o600)
 		} else {
-			fallbackLog, err = os.OpenFile(fallbackPath, os.O_WRONLY|os.O_APPEND, 0600)
+			fallbackLog, err = os.OpenFile(fallbackPath, os.O_WRONLY|os.O_APPEND, 0o600)
 		}
 		if err != nil {
 			fmt.Println("falling back to standard out")
@@ -155,22 +155,22 @@ func createLog(fileName string, truncate bool) *os.File {
 		return fallbackLog
 	}
 	setDDCLog(logLocation)
-	return f
+	return file
 }
 
 func getDefaultLogLoc() (string, *os.File, error) {
 	ddcLoc, err := os.Executable()
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to to find ddc cannot copy it to hosts due to error '%v'", err)
+		return "", nil, fmt.Errorf("unable to to find ddc cannot copy it to hosts: %w", err)
 	}
 	ddcLogPath, err := filepath.Abs(path.Join(path.Dir(ddcLoc), "ddc.log"))
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to get absolute path of ddc log %v", err)
+		return "", nil, fmt.Errorf("unable to get absolute path of ddc log: %w", err)
 	}
 	// abs has already cleaned this path so no need to ignore it again
-	f, err := os.OpenFile(ddcLogPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600) // #nosec G304
+	f, err := os.OpenFile(ddcLogPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o600) // #nosec G304
 	if err != nil {
-		return "", nil, fmt.Errorf("unable to open ddc log %v", err)
+		return "", nil, fmt.Errorf("unable to open ddc log %w", err)
 	}
 	return ddcLogPath, f, nil
 }
@@ -179,7 +179,7 @@ func GetLogLoc() string {
 	if ddcLogFilePath != "" {
 		full, err := filepath.Abs(ddcLogFilePath)
 		if err != nil {
-			logger.Debugf("unable to get full path for %v due to error %v", ddcLogFilePath, err)
+			logger.Debugf("unable to get full path for %v: %v", ddcLogFilePath, err)
 			return ddcLogFilePath
 		}
 		return full
@@ -199,7 +199,7 @@ func CopyLog(dest string) error {
 		return err
 	}
 	// ok we copy the file out
-	err = os.WriteFile(dest, logRead, 0600)
+	err = os.WriteFile(dest, logRead, 0o600)
 	if err != nil {
 		return err
 	}
@@ -222,8 +222,8 @@ func Close() error {
 	return nil
 }
 
-func newLogger(f io.Writer, cleanup func()) *Logger {
-	if f == nil {
+func newLogger(writer io.Writer, cleanup func()) *Logger {
+	if writer == nil {
 		return &Logger{
 			debugLogger:   log.New(io.Discard, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
 			infoLogger:    log.New(io.Discard, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),
@@ -233,11 +233,11 @@ func newLogger(f io.Writer, cleanup func()) *Logger {
 		}
 	}
 	return &Logger{
-		debugLogger:   log.New(f, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
-		infoLogger:    log.New(f, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),
-		warningLogger: log.New(f, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile),
-		errorLogger:   log.New(f, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
-		hostLog:       log.New(f, "", 0),
+		debugLogger:   log.New(writer, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
+		infoLogger:    log.New(writer, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),
+		warningLogger: log.New(writer, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile),
+		errorLogger:   log.New(writer, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
+		hostLog:       log.New(writer, "", 0),
 		cleanup:       cleanup,
 	}
 }
@@ -349,6 +349,6 @@ func HostLog(host, line string) {
 
 func handleLogError(err error, attemptedMsg, level string) {
 	if err != nil {
-		log.Printf("critical error logging to level %v with message '%v' and therefore there is no log output due to error '%v'", level, attemptedMsg, err)
+		log.Printf("critical error logging to level %v with message '%v' and therefore there is no log output: %v", level, attemptedMsg, err)
 	}
 }

@@ -40,7 +40,7 @@ func NewThreadPool(numberThreads int, loggingFrequency int, output bool, outputP
 		return &ThreadPool{}, errors.New("invalid number of threads at 0")
 	}
 
-	//by default support 4 million jobs
+	// by default support 4 million jobs
 	jobs := make(chan Job, 4000000)
 	return &ThreadPool{
 		numberThreads:    numberThreads,
@@ -126,11 +126,11 @@ func (t *ThreadPool) ProcessAndWait() error {
 		return fmt.Errorf("thread pool wait called with no pending jobs this is unexpected")
 	}
 	t.mut.Unlock()
-	//start processing jobs
+	// start processing jobs
 	for i := 0; i < t.numberThreads; i++ {
 		go t.worker()
 	}
-	//then wait for them
+	// then wait for them
 	t.wg.Wait()
 	close(t.jobs)
 	t.mut.Lock()

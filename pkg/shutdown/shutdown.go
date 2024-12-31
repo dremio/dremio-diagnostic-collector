@@ -124,7 +124,7 @@ func (h *hookImpl) Interrupt() {
 		simplelog.Debugf("shutdown task: %v", j.name)
 		j.p()
 	}
-	//blank
+	// blank
 	h.cleanups = []cleanupTask{}
 	for _, j := range h.finalSteps {
 		counter++
@@ -132,7 +132,7 @@ func (h *hookImpl) Interrupt() {
 		simplelog.Debugf("shutdown task final stage: %v", j.name)
 		j.p()
 	}
-	//blank
+	// blank
 	h.finalSteps = []cleanupTask{}
 	consoleprint.UpdateResult(fmt.Sprintf("COMPLETE AT %v", time.Now().Format(time.RFC1123)))
 	h.stopUIThread()
@@ -157,7 +157,7 @@ func (h *hookImpl) Cleanup() {
 		simplelog.Debugf("shutdown task: %v", j.name)
 		j.p()
 	}
-	//blank
+	// blank
 	h.cleanups = []cleanupTask{}
 	for _, j := range h.finalSteps {
 		counter++
@@ -165,7 +165,7 @@ func (h *hookImpl) Cleanup() {
 		simplelog.Debugf("shutdown task final stage: %v", j.name)
 		j.p()
 	}
-	//blank
+	// blank
 	h.finalSteps = []cleanupTask{}
 	consoleprint.UpdateResult(fmt.Sprintf("COMPLETE AT %v", time.Now().Format(time.RFC1123)))
 	time.Sleep(2 * time.Second) // pause 2 seconds to allow the UI to update

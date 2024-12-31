@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// package kube contains the kuberneters integration tests
 package kube
 
 import (
@@ -51,8 +52,10 @@ type JobAPIResponse struct {
 	ID string `json:"id"`
 }
 
-var setupIsRun = false
-var outputDir string
+var (
+	setupIsRun = false
+	outputDir  string
+)
 
 func cleanupOutput() {
 	mustRemove := true
@@ -84,7 +87,7 @@ func cleanupOutput() {
 }
 
 func writeConf(patToken, dremioEndpoint, tmpOutputDir string) string {
-	if err := os.MkdirAll(tmpOutputDir, 0700); err != nil {
+	if err := os.MkdirAll(tmpOutputDir, 0o700); err != nil {
 		log.Fatalf("unable to write conf to dir %v: %v", tmpOutputDir, err)
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
@@ -136,8 +139,10 @@ func getFreePort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-var namespace string
-var dremioPATToken string
+var (
+	namespace      string
+	dremioPATToken string
+)
 
 func TestMain(m *testing.M) {
 	isIntegration := os.Getenv("SKIP_INTEGRATION_SETUP")
@@ -165,7 +170,7 @@ func TestMain(m *testing.M) {
 			if len(tokens) > 0 {
 				existingNS := tokens[0]
 				if strings.HasPrefix(existingNS, "ddc-test-") {
-					//delete it
+					// delete it
 					log.Printf("found an existing namespace %v deleting it", existingNS)
 					cmdApply = exec.Command("kubectl", "delete", "namespace", existingNS)
 					cmdApply.Stderr = os.Stderr
@@ -206,8 +211,8 @@ func TestMain(m *testing.M) {
 
 		fmt.Println("waiting on Dremio master!")
 		cmdWait := exec.Command("kubectl", "-n", namespace, "wait", "pod", "dremio-master-0", "--for=condition=Ready", "--timeout=180s")
-		//cmdWait.Stderr = os.Stderr
-		//cmdWait.Stdout = os.Stdout
+		// cmdWait.Stderr = os.Stderr
+		// cmdWait.Stdout = os.Stdout
 		err = cmdWait.Run()
 		if err != nil {
 			log.Printf("Error during kubectl wait: '%v'", err)
@@ -219,7 +224,7 @@ func TestMain(m *testing.M) {
 
 		fmt.Println("Dremio master is now ready!")
 
-		//kubectl portforward
+		// kubectl portforward
 
 		// Let the system choose a free port.
 		dremioTestPort, err := getFreePort()
@@ -231,7 +236,7 @@ func TestMain(m *testing.M) {
 		// Start the port forwarding.
 		cmd := exec.Command("kubectl", "port-forward", "dremio-master-0", fmt.Sprintf("%v:9047", dremioTestPort), "-n", namespace)
 		if err := cmd.Start(); err != nil {
-			log.Printf("Failed to start port-forward command due to error: %v", err)
+			log.Printf("Failed to start port-forward command: %v", err)
 			return 1
 		}
 		log.Printf("port-forward to port %v successful", dremioTestPort)
@@ -243,7 +248,7 @@ func TestMain(m *testing.M) {
 			}
 		}()
 
-		//give port forward time to work
+		// give port forward time to work
 		time.Sleep(5 * time.Second)
 
 		dremioEndpoint := fmt.Sprintf("http://localhost:%v", dremioTestPort)
@@ -325,10 +330,10 @@ func TestMain(m *testing.M) {
 		httpReq.Header.Add("Authorization", "_dremio"+dremioPATToken)
 		res, err = http.DefaultClient.Do(httpReq)
 		if err != nil {
-			log.Printf("unable to create data source due to error %v", err)
+			log.Printf("unable to create data source: %v", err)
 			return 1
 		}
-		if res.StatusCode != 200 {
+		if res.StatusCode != http.StatusOK {
 			log.Printf("expected status code 200 but instead got %v while trying to create source", res.StatusCode)
 			return 1
 		}
@@ -340,18 +345,18 @@ func TestMain(m *testing.M) {
 		}
 		defer func() {
 			if err := os.RemoveAll(tmpDirForConf); err != nil {
-				log.Printf("unable to clean up dir %v due to error %v", tmpDirForConf, err)
+				log.Printf("unable to clean up dir %v: %v", tmpDirForConf, err)
 			}
 		}()
 		yamlLocation := writeConf(dremioPATToken, dremioEndpoint, tmpDirForConf)
 		yamlDir := filepath.Dir(yamlLocation)
 		// no op on the configuration check because it is not valid for
-		//c, _ = conf.ReadConf(make(map[string]string), yamlLocation)
+		// c, _ = conf.ReadConf(make(map[string]string), yamlLocation)
 
 		log.Printf("the directory for yaml was %v", yamlDir)
 		entries, err := os.ReadDir(yamlDir)
 		if err != nil {
-			log.Printf("unable to read the yaml dir %v due to error %v", yamlDir, err)
+			log.Printf("unable to read the yaml dir %v: %v", yamlDir, err)
 			return 1
 		}
 		for _, e := range entries {
@@ -402,8 +407,8 @@ func TestRemoteCollectOnK8s(t *testing.T) {
 	tmpOutputDir := "/opt/dremio/data/ddc-tmp-out"
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
@@ -412,8 +417,8 @@ tmp-output-dir: %v
 collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, tmpOutputDir)), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+`, tmpOutputDir)), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
 
@@ -424,14 +429,14 @@ dremio-jfr-time-seconds: 10
 	}
 	log.Printf("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 
 	t.Logf("now we are reading the %v dir", testOut)
@@ -454,7 +459,7 @@ dremio-jfr-time-seconds: 10
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	//check k8s files
+	// check k8s files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
@@ -499,7 +504,8 @@ dremio-jfr-time-seconds: 10
 		"dremio-executor-0-chown-data-directory.txt",
 		"dremio-executor-0-chown-cloudcache-directory.txt",
 		"dremio-master-0-chown-data-directory.txt",
-		"dremio-master-0-start-only-one-dremio-master.txt"}
+		"dremio-master-0-start-only-one-dremio-master.txt",
+	}
 	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
 	entries, err = os.ReadDir(dir)
 	if err != nil {
@@ -602,8 +608,8 @@ func TestRemoteCollectOnK8sUsingTheK8sGoAPI(t *testing.T) {
 	tmpOutputDir := "/opt/dremio/data/ddc-tmp-out"
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
@@ -612,8 +618,8 @@ tmp-output-dir: %v
 collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, tmpOutputDir)), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+`, tmpOutputDir)), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
 
@@ -624,14 +630,14 @@ dremio-jfr-time-seconds: 10
 	}
 	log.Printf("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 
 	t.Logf("now we are reading the %v dir", testOut)
@@ -654,7 +660,7 @@ dremio-jfr-time-seconds: 10
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	//check k8s files
+	// check k8s files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
@@ -699,7 +705,8 @@ dremio-jfr-time-seconds: 10
 		"dremio-executor-0-chown-data-directory.txt",
 		"dremio-executor-0-chown-cloudcache-directory.txt",
 		"dremio-master-0-chown-data-directory.txt",
-		"dremio-master-0-start-only-one-dremio-master.txt"}
+		"dremio-master-0-start-only-one-dremio-master.txt",
+	}
 	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
 	entries, err = os.ReadDir(dir)
 	if err != nil {
@@ -802,8 +809,8 @@ func TestRemoteCollectOnK8sWithPAT(t *testing.T) {
 	tmpOutputDir := "/opt/dremio/data/ddc-tmp-out"
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
 	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0700); err != nil {
-		t.Fatalf("cannot make yaml dir %v due to error: %v", localYamlFileDir, err)
+	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
+		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
 	}
 	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
 	if err := os.WriteFile(localYamlFile, []byte(fmt.Sprintf(`
@@ -813,15 +820,15 @@ tmp-output-dir: %v
 collect-jstack: true
 dremio-jstack-time-seconds: 10
 dremio-jfr-time-seconds: 10
-`, tmpOutputDir)), 0600); err != nil {
-		t.Fatalf("not able to write yaml %v at due to %v", localYamlFile, err)
+`, tmpOutputDir)), 0o600); err != nil {
+		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 	outputDir = tmpOutputDir
 
-	//set original stdin since we are going to overwrite it for now
+	// set original stdin since we are going to overwrite it for now
 	org := os.Stdin
 	defer func() {
-		//reset std in
+		// reset std in
 		os.Stdin = org
 	}()
 	tmpfile, err := os.CreateTemp("", "stdinmock")
@@ -858,14 +865,14 @@ dremio-jfr-time-seconds: 10
 	}
 	log.Printf("remote collect complete now verifying the results")
 	testOut := filepath.Join(t.TempDir(), "ddcout")
-	err = os.Mkdir(testOut, 0700)
+	err = os.Mkdir(testOut, 0o700)
 	if err != nil {
 		t.Fatalf("could not make test out dir %v", err)
 	}
 	log.Printf("now in the test we are extracting tarball %v to %v", tgzFile, testOut)
 
 	if err := archive.ExtractTarGz(tgzFile, testOut); err != nil {
-		t.Fatalf("could not extract tgz %v to dir %v due to error %v", tgzFile, testOut, err)
+		t.Fatalf("could not extract tgz %v to dir %v: %v", tgzFile, testOut, err)
 	}
 
 	t.Logf("now we are reading the %v dir", testOut)
@@ -888,7 +895,7 @@ dremio-jfr-time-seconds: 10
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	//check k8s files
+	// check k8s files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "cronjob.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "daemonset.json"))
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kubernetes", "deployments.json"))
@@ -933,7 +940,8 @@ dremio-jfr-time-seconds: 10
 		"dremio-executor-0-chown-data-directory.txt",
 		"dremio-executor-0-chown-cloudcache-directory.txt",
 		"dremio-master-0-chown-data-directory.txt",
-		"dremio-master-0-start-only-one-dremio-master.txt"}
+		"dremio-master-0-start-only-one-dremio-master.txt",
+	}
 	dir := filepath.Join(hcDir, "kubernetes", "container-logs")
 	entries, err = os.ReadDir(dir)
 	if err != nil {
@@ -1026,17 +1034,17 @@ dremio-jfr-time-seconds: 10
 		tests.AssertFileHasExpectedLines(t, []string{">>> mount", ">>> lsblk"}, filepath.Join(hcDir, "node-info", host, "os_info.txt"))
 	}
 
-	//kvstore report
+	// kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", "dremio-master-0", "kvstore-report.zip"))
 
-	//ttop files
+	// ttop files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", "dremio-master-0", "ttop.txt"))
 	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", host, "ttop.txt"))
 	}
 
-	//jfr files
+	// jfr files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", "dremio-master-0.jfr"))
 	for i := 0; i < replicas; i++ {
 		hostFile := fmt.Sprintf("dremio-executor-%v.jfr", i)
@@ -1045,39 +1053,39 @@ dremio-jfr-time-seconds: 10
 
 	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
-		//thread dump files
+		// thread dump files
 		entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", host))
 		if err != nil {
-			t.Fatalf("cannot read thread dumps dir for the %v due to: %v", host, err)
+			t.Fatalf("cannot read thread dumps dir for the %v: %v", host, err)
 		}
 		if len(entries) < 9 {
-			//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
+			// giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 			t.Errorf("should be at least 9 jstack entries for %v but there was %v", host, len(entries))
 		}
 	}
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "jfr", "thread-dumps", "dremio-master-0"))
 	if err != nil {
-		t.Fatalf("cannot read thread dumps dir for the dremio-master-0 due to: %v", err)
+		t.Fatalf("cannot read thread dumps dir for the dremio-master-0: %v", err)
 	}
 
 	if len(entries) < 9 {
-		//giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
+		// giving some wiggle room on timing so allowing a tolerance of 9 entries instead of the required 10
 		t.Errorf("should be at least 9 jstack entries for dremio-master-0 but there was %v", len(entries))
 	}
 
 	// System tables
 	var systemTables []string
 	for _, e := range conf.SystemTableList() {
-		//we skip the known ones we don't care about when using oss for testing
+		// we skip the known ones we don't care about when using oss for testing
 		if e == "roles" || e == "membership" || e == "privileges" || e == "tables" {
 			continue
 		}
 		if e == "options" {
-			//we double up for options since it's big
+			// we double up for options since it's big
 			systemTables = append(systemTables, "sys.options_offset_500_limit_500")
 		}
-		//we do the trim because sys.\"tables\" becomes sys.tables on the filesystem
+		// we do the trim because sys.\"tables\" becomes sys.tables on the filesystem
 		fullFileName := fmt.Sprintf("sys.%v_offset_0_limit_500.json", e)
 		systemTables = append(systemTables, strings.ReplaceAll(fullFileName, "\\\"", ""))
 	}
@@ -1086,7 +1094,7 @@ dremio-jfr-time-seconds: 10
 	coordinator := "dremio-master-0"
 	entries, err = os.ReadDir(filepath.Join(hcDir, "system-tables", coordinator))
 	if err != nil {
-		t.Fatalf("cannot read system-tables dir for the "+coordinator+" due to: %v", err)
+		t.Fatalf("cannot read system-tables dir for the %v: %v", coordinator, err)
 	}
 	actualEntriesCount := len(entries)
 	if actualEntriesCount == 0 {
@@ -1104,11 +1112,11 @@ dremio-jfr-time-seconds: 10
 		t.Errorf("we had the following entries missing:\n\n%v\n\nextra entries on filesystem:\n\n%v\n", strings.Join(uniqueToSystemTables, "\n"), strings.Join(uniqueOnFileSystem, "\n"))
 	}
 
-	//validate job downloads
+	// validate job downloads
 
 	entries, err = os.ReadDir(filepath.Join(hcDir, "job-profiles", "dremio-master-0"))
 	if err != nil {
-		t.Fatalf("cannot read job profiles dir for the dremio-master-0 due to: %v", err)
+		t.Fatalf("cannot read job profiles dir for the dremio-master-0: %v", err)
 	}
 
 	// so there is some vagueness and luck with how many job profiles we download, so we are going to see if there are at least 10 of them and call that good enough
@@ -1124,19 +1132,19 @@ func submitSQLQuery(query, dremioEndpoint, dremioPat string) (string, error) {
 	}`, query)
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/api/v3/sql/", dremioEndpoint), bytes.NewBuffer([]byte(sql)))
 	if err != nil {
-		return "", fmt.Errorf("unable to run sql %v", err)
+		return "", fmt.Errorf("unable to run sql %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Authorization", "_dremio"+dremioPat)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("unable to run sql %v due to error  %v", query, err)
+		return "", fmt.Errorf("unable to run sql %v: %w", query, err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode > 299 {
 		text, err := io.ReadAll(res.Body)
 		if err != nil {
-			return "", fmt.Errorf("fatal attempt to make job api call %v and unable to read body for debugging", err)
+			return "", fmt.Errorf("fatal attempt to make job api call, unable to read body for debugging: %w", err)
 		}
 		log.Printf("body was %s", string(text))
 		return "", fmt.Errorf("expected status code greater than 299 but instead got %v while trying to run sql %v ", res.StatusCode, query)
@@ -1146,17 +1154,17 @@ func submitSQLQuery(query, dremioEndpoint, dremioPat string) (string, error) {
 	if err != nil {
 		text, err := io.ReadAll(res.Body)
 		if err != nil {
-			return "", fmt.Errorf("fatal attempt to decode body from dremio job api call %v and unable to read body for debugging", err)
+			return "", fmt.Errorf("fatal attempt to decode body from dremio job api call, unable to read body for debugging: %w", err)
 		}
 		log.Printf("body was %s", string(text))
-		return "", fmt.Errorf("fatal attempt to decode body from dremio job api %v", err)
+		return "", fmt.Errorf("fatal attempt to decode body from dremio job api: %w", err)
 	}
 	return jobResponse.ID, nil
 }
 
 func TestValidateBadCollectFlag(t *testing.T) {
 	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0o600); err != nil {
 		t.Fatalf("unable to write ddc yaml: %v", err)
 	}
 	args := []string{"ddc", "-n", namespace, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}

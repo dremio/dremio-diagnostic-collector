@@ -31,14 +31,14 @@ import (
 
 func TestCollectsConfFilesWithNoSecrets(t *testing.T) {
 	confDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(confDir)
 	nodeName := "node1"
 	confDestination := filepath.Join(confDir, "configuration", nodeName)
 
-	if err := os.MkdirAll(confDestination, 0700); err != nil {
+	if err := os.MkdirAll(confDestination, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	testDataPath, err := filepath.Abs("testdata")
@@ -54,7 +54,7 @@ node-name: %v
 `, filepath.Join("testdata", "logs"),
 		strings.ReplaceAll(confDir, "\\", "\\\\"),
 		strings.ReplaceAll(testDataPath, "\\", "\\\\"),
-		nodeName)), 0600); err != nil {
+		nodeName)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()
@@ -109,23 +109,23 @@ node-name: %v
 }
 
 func DiffText(expected, actual string) (string, error) {
-	e, err := os.ReadFile(expected)
+	expectedBytes, err := os.ReadFile(expected)
 	if err != nil {
-		return "", fmt.Errorf("unable to read expected file: %v", err)
+		return "", fmt.Errorf("unable to read expected file: %w", err)
 	}
 
-	a, err := os.ReadFile(actual)
+	actualBytes, err := os.ReadFile(actual)
 	if err != nil {
-		return "", fmt.Errorf("unable to read actual file: %v", err)
+		return "", fmt.Errorf("unable to read actual file: %w", err)
 	}
-	diffResult := diff.Diff(expected, e, actual, a)
+	diffResult := diff.Diff(expected, expectedBytes, actual, actualBytes)
 
 	return string(diffResult), nil
 }
 
 func TestCollectsConfFilesAndRedactDremioConf(t *testing.T) {
 	confDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
@@ -133,7 +133,7 @@ func TestCollectsConfFilesAndRedactDremioConf(t *testing.T) {
 	nodeName := "node1"
 	confDestination := filepath.Join(confDir, "configuration", nodeName)
 
-	if err := os.MkdirAll(confDestination, 0700); err != nil {
+	if err := os.MkdirAll(confDestination, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	testDataPath, err := filepath.Abs(filepath.Join("testdata", "secret-dremio"))
@@ -150,7 +150,7 @@ node-name: %v
 		filepath.Join("testdata", "logs"),
 		strings.ReplaceAll(confDir, "\\", "\\\\"),
 		strings.ReplaceAll(testDataPath, "\\", "\\\\"),
-		nodeName)), 0600); err != nil {
+		nodeName)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()

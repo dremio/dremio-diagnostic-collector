@@ -35,18 +35,18 @@ func RunCollectKvReport(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	headers := map[string]string{"Accept": "application/octet-stream"}
 	body, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
 	if err != nil {
-		return fmt.Errorf("unable to retrieve KV store report from %s due to error %v", url, err)
+		return fmt.Errorf("unable to retrieve KV store report from %s: %w", url, err)
 	}
 	sb := string(body)
 	kvStoreReportFile := path.Join(c.KVstoreOutDir(), filename)
 	file, err := os.Create(path.Clean(kvStoreReportFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+		return fmt.Errorf("unable to create file %s: %w", filename, err)
 	}
 	defer ddcio.EnsureClose(filepath.Clean(kvStoreReportFile), file.Close)
 	_, err = fmt.Fprint(file, sb)
 	if err != nil {
-		return fmt.Errorf("unable to create file %s due to error %v", filename, err)
+		return fmt.Errorf("unable to create file %s: %w", filename, err)
 	}
 	simplelog.Debugf("SUCCESS - Created %v", filename)
 	return nil

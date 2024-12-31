@@ -26,7 +26,6 @@ func TestCaptureOutput(t *testing.T) {
 	out, err := CaptureOutput(func() {
 		fmt.Println("Hello, world!")
 	})
-
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

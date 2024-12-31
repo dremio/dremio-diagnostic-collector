@@ -38,6 +38,7 @@ func NewFallback(hook shutdown.CancelHook) *Fallback {
 func (c *Fallback) SetHostPid(_, _ string) {
 	// not needed as normal cancellation will work
 }
+
 func (c *Fallback) CleanupRemote() error {
 	return nil
 }

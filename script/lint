@@ -6,10 +6,10 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-go fmt ./...
+gofumpt -l .
 
 echo "executing golangci-lint run"
-golangci-lint run -E revive,gofmt,govet,errcheck,gosec 
+golangci-lint run --sort-results -E revive,gofmt,govet,errcheck,gosec,gofumpt,wastedassign,usestdlibvars,errorlint
 
 echo "executing license-header-checker"
 license-header-checker license_header.txt . go

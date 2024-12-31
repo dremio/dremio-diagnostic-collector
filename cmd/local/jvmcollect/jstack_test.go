@@ -38,7 +38,7 @@ func TestJStackCapture(t *testing.T) {
 	}
 
 	defer func() {
-		//in windows we may need a bit more time to kill the process
+		// in windows we may need a bit more time to kill the process
 		if runtime.GOOS == "windows" {
 			time.Sleep(1 * time.Second)
 		}
@@ -50,11 +50,11 @@ func TestJStackCapture(t *testing.T) {
 	}()
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
+	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
@@ -72,7 +72,7 @@ dremio-jstack-freq-seconds: 1
 		cmd.Process.Pid,
 	)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()
@@ -82,7 +82,7 @@ dremio-jstack-freq-seconds: 1
 		t.Fatal(err)
 	}
 	threadDumpsOutDir := filepath.Join(c.OutputDir(), "jfr", "thread-dumps", nodeName)
-	if err := os.MkdirAll(threadDumpsOutDir, 0700); err != nil {
+	if err := os.MkdirAll(threadDumpsOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	now := time.Now()

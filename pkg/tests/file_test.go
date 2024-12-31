@@ -21,7 +21,7 @@ import (
 )
 
 func TestMatchFile(t *testing.T) {
-	//should match files with the same content
+	// should match files with the same content
 	file1 := "testdata/file1.txt"
 	file2 := "testdata/file2.txt"
 	expectedFile := "testdata/expected.txt"
@@ -35,7 +35,7 @@ func TestMatchFile(t *testing.T) {
 		t.Errorf("expected %v to equal %v", file2, expectedFile)
 	}
 
-	//should not match files with different content"
+	// should not match files with different content"
 	file3 := "testdata/file3.txt"
 
 	// Expect file3 to match the expected file
@@ -43,8 +43,9 @@ func TestMatchFile(t *testing.T) {
 		t.Errorf("expected %v to equal %v", file3, expectedFile)
 	}
 }
+
 func TestFileContents(t *testing.T) {
-	//should match files with the same content
+	// should match files with the same content
 	testFile := "testdata/test_os_info.txt"
 	expectedText := []string{">>> mount", ">>> lsblk"}
 

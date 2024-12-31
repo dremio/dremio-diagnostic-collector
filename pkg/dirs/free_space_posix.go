@@ -27,7 +27,7 @@ func GetFreeSpaceOnFileSystem(folder string) (uint64, error) {
 	var stat unix.Statfs_t
 	err := unix.Statfs(folder, &stat)
 	if err != nil {
-		return 0, fmt.Errorf("unable to check for free space on folder %v: %v", folder, err)
+		return 0, fmt.Errorf("unable to check for free space on folder %v: %w", folder, err)
 	}
 	// Available blocks * size per block = available space in bytes
 	return stat.Bavail * uint64(stat.Bsize), nil // #nosec G115

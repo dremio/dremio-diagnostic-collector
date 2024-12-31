@@ -81,10 +81,10 @@ func (c *Stats) UpdateNodeState(node string, secondsElapsed int, status string) 
 		c.nodeCaptureStats[node].Update(node, secondsElapsed, status)
 	} else {
 		c.nodeCaptureStats[node] = &NodeCaptureStats{
-
 			node:           node,
 			secondsElapsed: secondsElapsed,
-			status:         status}
+			status:         status,
+		}
 	}
 }
 

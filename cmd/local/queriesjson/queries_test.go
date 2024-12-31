@@ -31,7 +31,7 @@ func TestGetSlowExecJobs_empty(t *testing.T) {
 }
 
 func TestGetSlowExecJobs_small(t *testing.T) {
-	var row1 = new(QueriesRow)
+	row1 := new(QueriesRow)
 	row1.QueryID = "Row1"
 	row1.QueryType = "REST"
 	row1.QueryCost = 500
@@ -40,7 +40,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row1.Start = 11111
 	row1.Outcome = "FAILED"
 
-	var row2 = new(QueriesRow)
+	row2 := new(QueriesRow)
 	row2.QueryID = "Row2"
 	row2.QueryType = "ODBC"
 	row2.QueryCost = 10
@@ -49,7 +49,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row2.Start = 22222
 	row2.Outcome = "FAILED"
 
-	var row3 = new(QueriesRow)
+	row3 := new(QueriesRow)
 	row3.QueryID = "Row3"
 	row3.QueryType = "META"
 	row3.QueryCost = 1000
@@ -58,7 +58,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row3.Start = 33333
 	row3.Outcome = "CANCELLED"
 
-	var row4 = new(QueriesRow)
+	row4 := new(QueriesRow)
 	row4.QueryID = "Row4"
 	row4.QueryType = "REFLECTION"
 	row4.QueryCost = 10
@@ -67,7 +67,7 @@ func TestGetSlowExecJobs_small(t *testing.T) {
 	row4.Start = 44444
 	row4.Outcome = "FINISHED"
 
-	var row5 = new(QueriesRow)
+	row5 := new(QueriesRow)
 	row5.QueryID = "Row5"
 	row5.QueryType = "UI"
 	row5.QueryCost = 99
@@ -201,7 +201,7 @@ func TestParseLine_ValidJson(t *testing.T) {
 	if err != nil {
 		t.Errorf("There should not be an error here")
 	}
-	var expected = new(QueriesRow)
+	expected := new(QueriesRow)
 	expected.QueryID = "1b9b9629-8289-b46c-c765-455d24da7800"
 	expected.QueryType = "METADATA_REFRESH"
 	expected.QueryCost = 5.1003501e7

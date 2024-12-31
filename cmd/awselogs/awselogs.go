@@ -28,28 +28,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var EFSLogDir string
-var OutDir string
-var OutFile string
-var AWSELogsCmd = &cobra.Command{
-	Use:   "awselogs",
-	Short: "Log only collect of AWSE from the coordinator node",
-	Long:  `Log only collect of AWSE from the coordinator node`,
-	Run: func(_ *cobra.Command, _ []string) {
-		simplelog.LogStartMessage()
-		defer simplelog.LogEndMessage()
-		if err := Execute(EFSLogDir, OutDir, OutFile); err != nil {
-			simplelog.Errorf("exiting %v", err)
-			os.Exit(1)
-		}
-	},
-}
+var (
+	EFSLogDir   string
+	OutDir      string
+	OutFile     string
+	AWSELogsCmd = &cobra.Command{
+		Use:   "awselogs",
+		Short: "Log only collect of AWSE from the coordinator node",
+		Long:  `Log only collect of AWSE from the coordinator node`,
+		Run: func(_ *cobra.Command, _ []string) {
+			simplelog.LogStartMessage()
+			defer simplelog.LogEndMessage()
+			if err := Execute(EFSLogDir, OutDir, OutFile); err != nil {
+				simplelog.Errorf("exiting %v", err)
+				os.Exit(1)
+			}
+		},
+	}
+)
 
 func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
-
 	efsLogDir, err := filepath.Abs(efsLogDir)
 	if err != nil {
-		return fmt.Errorf("cannot get abs for dir %v due to error %w", efsLogDir, err)
+		return fmt.Errorf("cannot get abs for dir %v: %w", efsLogDir, err)
 	}
 	fmt.Println("EFS dir: " + efsLogDir)
 
@@ -59,18 +60,18 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	}
 	outDir, err := filepath.Abs(tarballOutDir)
 	if err != nil {
-		return fmt.Errorf("cannot get abs for dir %v due to error %w", tarballOutDir, err)
+		return fmt.Errorf("cannot get abs for dir %v: %w", tarballOutDir, err)
 	}
-	if err := os.MkdirAll(outDir, 0700); err != nil {
+	if err := os.MkdirAll(outDir, 0o700); err != nil {
 		return fmt.Errorf("unable to create dir %w", err)
 	}
 	outFile, err = filepath.Abs(outFile)
 	if err != nil {
-		return fmt.Errorf("cannot get abs for dir %v due to error %w", outFile, err)
+		return fmt.Errorf("cannot get abs for dir %v: %w", outFile, err)
 	}
 	defer func() {
 		if err := os.RemoveAll(outDir); err != nil {
-			simplelog.Warningf("unable to cleanup folder %v due to error: %v", outDir, err)
+			simplelog.Warningf("unable to cleanup folder %v: %v", outDir, err)
 		}
 	}()
 
@@ -95,7 +96,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, coordinatorNode)
 
 	if _, err := local.Execute([]string{}, overrides); err != nil {
-		return fmt.Errorf("unable to collect entry %v due to error %w", coordinatorNode, err)
+		return fmt.Errorf("unable to collect entry %v: %w", coordinatorNode, err)
 	}
 	fileName := fmt.Sprintf("%v.tar.gz", filepath.Join(overrides[conf.KeyTarballOutDir], coordinatorNode))
 	destFileName := fmt.Sprintf("%v.tar.gz", coordinatorNode)
@@ -123,7 +124,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 		overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 
 		if _, err := local.Execute([]string{}, overrides); err != nil {
-			return fmt.Errorf("unable to collect entry %v due to error %w", entry.Name(), err)
+			return fmt.Errorf("unable to collect entry %v: %w", entry.Name(), err)
 		}
 		fileName := fmt.Sprintf("%v.tar.gz", filepath.Join(overrides[conf.KeyTarballOutDir], entry.Name()))
 		destFileName := fmt.Sprintf("%v.tar.gz", entry.Name())
@@ -133,7 +134,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	}
 	outDirEntries, err := os.ReadDir(outDir)
 	if err != nil {
-		return fmt.Errorf("unable to read dir %v due to %w", outDir, err)
+		return fmt.Errorf("unable to read dir %v: %w", outDir, err)
 	}
 	simplelog.Infof("%v entries in %v", len(outDirEntries), outDir)
 	if len(outDirEntries) == 0 {
@@ -143,11 +144,11 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 		if strings.HasSuffix(e.Name(), ".tar.gz") {
 			tgzLoc := filepath.Join(outDir, e.Name())
 			if err := archive.ExtractTarGz(tgzLoc, outDir); err != nil {
-				simplelog.Errorf("unable to extract tarball %v due to error %v", tgzLoc, err)
+				simplelog.Errorf("unable to extract tarball %v: %v", tgzLoc, err)
 				continue
 			}
 			if err := os.Remove(tgzLoc); err != nil {
-				simplelog.Errorf("unable to remove tgz %v due to error: %v", tgzLoc, err)
+				simplelog.Errorf("unable to remove tgz %v: %v", tgzLoc, err)
 				continue
 			}
 		}

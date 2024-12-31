@@ -39,7 +39,7 @@ func TestLogger(t *testing.T) {
 		{LevelDebug, "DEBUG: ", "INFO: ", "WARN: ", "ERROR: "},
 	}
 
-	for _, tt := range tests {
+	for _, test := range tests {
 		buf := new(bytes.Buffer)
 		temp, err := os.CreateTemp(t.TempDir(), "logs")
 		if err != nil {
@@ -58,18 +58,18 @@ func TestLogger(t *testing.T) {
 
 		output := buf.String()
 
-		if !strings.Contains(output, tt.debugMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, tt.debugMessage)
+		if !strings.Contains(output, test.debugMessage) {
+			t.Errorf("expected %v to contain %v but did not", output, test.debugMessage)
 		}
 
-		if !strings.Contains(output, tt.infoMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, tt.infoMessage)
+		if !strings.Contains(output, test.infoMessage) {
+			t.Errorf("expected %v to contain %v but did not", output, test.infoMessage)
 		}
-		if !strings.Contains(output, tt.warnMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, tt.warnMessage)
+		if !strings.Contains(output, test.warnMessage) {
+			t.Errorf("expected %v to contain %v but did not", output, test.warnMessage)
 		}
-		if !strings.Contains(output, tt.errMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, tt.errMessage)
+		if !strings.Contains(output, test.errMessage) {
+			t.Errorf("expected %v to contain %v but did not", output, test.errMessage)
 		}
 	}
 }

@@ -40,7 +40,7 @@ func TestHeapDumpCapture(t *testing.T) {
 	}
 
 	defer func() {
-		//in windows we may need a bit more time to kill the process
+		// in windows we may need a bit more time to kill the process
 		if runtime.GOOS == "windows" {
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -52,15 +52,15 @@ func TestHeapDumpCapture(t *testing.T) {
 	}()
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
+	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	heapDumpOutDir := filepath.Join(tmpOutDir, "heap-dumps")
-	if err := os.Mkdir(heapDumpOutDir, 0700); err != nil {
+	if err := os.Mkdir(heapDumpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
@@ -77,7 +77,7 @@ dremio-pid: %v
 		cmd.Process.Pid,
 	)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()

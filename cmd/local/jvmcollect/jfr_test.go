@@ -49,7 +49,7 @@ func TestJFRCapture(t *testing.T) {
 	}()
 
 	defer func() {
-		//in windows we may need a bit more time to kill the process
+		// in windows we may need a bit more time to kill the process
 		if runtime.GOOS == "windows" {
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -61,11 +61,11 @@ func TestJFRCapture(t *testing.T) {
 	}()
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(tmpOutDir, 0700); err != nil {
+	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +85,7 @@ dremio-jfr-time-seconds: 2
 		cmd.Process.Pid,
 	)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()
@@ -96,9 +96,9 @@ dremio-jfr-time-seconds: 2
 		t.Fatal(err)
 	}
 
-	//create the directory before hand as what happens when we run local-collect
+	// create the directory before hand as what happens when we run local-collect
 	jfrOutDir := filepath.Join(c.OutputDir(), "jfr")
-	if err := os.MkdirAll(jfrOutDir, 0700); err != nil {
+	if err := os.MkdirAll(jfrOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
@@ -141,12 +141,12 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 		t.Fatalf("cmd.Start() failed with %s\n", err)
 	}
 	jfrCaptureDir := filepath.Join(t.TempDir(), "ddcout")
-	if err := os.Mkdir(jfrCaptureDir, 0700); err != nil {
+	if err := os.Mkdir(jfrCaptureDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
 	jfrOutDir := filepath.Join(jfrCaptureDir, "jfr")
-	if err := os.Mkdir(jfrOutDir, 0700); err != nil {
+	if err := os.Mkdir(jfrOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
@@ -159,7 +159,7 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 		t.Fatalf("cmd2.Wait() failed with %s\n", err)
 	}
 	defer func() {
-		//in windows we may need a bit more time to kill the process
+		// in windows we may need a bit more time to kill the process
 		if runtime.GOOS == "windows" {
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -168,11 +168,10 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 		} else {
 			t.Log("Process killed successfully.")
 		}
-
 	}()
 	overrides := make(map[string]string)
 	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0700); err != nil {
+	if err := os.Mkdir(confDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tmpOutDir := t.TempDir()
@@ -192,7 +191,7 @@ dremio-jfr-time-seconds: 2
 		cmd.Process.Pid,
 	)
 	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	hook := shutdown.NewHook()

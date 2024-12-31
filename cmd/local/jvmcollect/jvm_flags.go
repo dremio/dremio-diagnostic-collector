@@ -35,7 +35,7 @@ func RunCollectJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	jvmSettingsFile := filepath.Join(c.NodeInfoOutDir(), "jvm_settings.txt")
 	jvmSettingsFileWriter, err := os.Create(filepath.Clean(jvmSettingsFile))
 	if err != nil {
-		return fmt.Errorf("unable to create file %v due to error %w", filepath.Clean(jvmSettingsFile), err)
+		return fmt.Errorf("unable to create file %v: %w", filepath.Clean(jvmSettingsFile), err)
 	}
 	defer func() {
 		if err := jvmSettingsFileWriter.Close(); err != nil {
@@ -43,13 +43,13 @@ func RunCollectJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		}
 	}()
 	if _, err := jvmSettingsFileWriter.WriteString(txt); err != nil {
-		return fmt.Errorf("unable to write to file %v due to error: %w", filepath.Clean(jvmSettingsFile), err)
+		return fmt.Errorf("unable to write to file %v: %w", filepath.Clean(jvmSettingsFile), err)
 	}
 	if err := jvmSettingsFileWriter.Sync(); err != nil {
-		return fmt.Errorf("unable to sync the jvm_settings.txt file due to error: %w", err)
+		return fmt.Errorf("unable to sync the jvm_settings.txt file: %w", err)
 	}
 	if err := jvmSettingsFileWriter.Close(); err != nil {
-		return fmt.Errorf("unable to close the jvm_settings.txt file due to error: %w", err)
+		return fmt.Errorf("unable to close the jvm_settings.txt file: %w", err)
 	}
 	return nil
 }

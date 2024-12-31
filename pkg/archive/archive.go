@@ -17,6 +17,7 @@ package archive
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -96,8 +97,8 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 		if err != nil {
 			return err
 		}
-		//don't try and archive the tarball itself
-		//if filePath == dest {
+		// don't try and archive the tarball itself
+		// if filePath == dest {
 		//		return nil
 		//	}
 
@@ -125,7 +126,7 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 			return err
 		}
 
-		if !fileInfo.Mode().IsRegular() { //nothing more to do for non-regular
+		if !fileInfo.Mode().IsRegular() { // nothing more to do for non-regular
 			return nil
 		}
 
@@ -141,7 +142,7 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 				}
 			}()
 			if _, err := io.Copy(tarWriter, file); err != nil {
-				return fmt.Errorf("unable to copy file %v to tar due to error %w", filePath, err)
+				return fmt.Errorf("unable to copy file %v to tar: %w", filePath, err)
 			}
 			// if err := file.Close(); err != nil {
 			// 	return fmt.Errorf("failed closing file %v: %v", filePath, err)
@@ -189,7 +190,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 	for {
 		header, err := tarReader.Next()
 		switch {
-		case err == io.EOF:
+		case errors.Is(err, io.EOF):
 			simplelog.Infof("extraction complete %v: %v bytes", dest, totalCopied)
 			return nil
 		case err != nil:
@@ -197,7 +198,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 		case header == nil:
 			continue
 		}
-		var headerName = header.Name
+		headerName := header.Name
 		if pathToStrip != "" {
 			simplelog.Infof("stripping %v with %v", headerName, pathToStrip)
 			headerName = strings.TrimPrefix("/"+headerName, pathToStrip)
@@ -210,7 +211,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(path.Clean(target), 0750); err != nil {
+				if err := os.MkdirAll(path.Clean(target), 0o750); err != nil {
 					return err
 				}
 			}
@@ -220,7 +221,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 			}
 			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
-				simplelog.Errorf("skipping file %v due to error %v", file, err)
+				simplelog.Errorf("skipping file %v: %v", file, err)
 				// any error here should fail
 				return err
 			}
@@ -229,7 +230,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 			for {
 				copied, err := io.CopyN(file, tarReader, 1024)
 				if err != nil {
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						break
 					}
 					// should error here if we error on copy

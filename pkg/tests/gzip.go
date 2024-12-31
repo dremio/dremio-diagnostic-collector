@@ -31,23 +31,23 @@ func ContainThisFileInTheGzip(expectedFilePath string, actual interface{}) (succ
 
 	gzipFile, err := os.Open(filepath.Clean(actualFilePath))
 	if err != nil {
-		return false, fmt.Errorf("failed to open gzip file: %v", err)
+		return false, fmt.Errorf("failed to open gzip file: %w", err)
 	}
 	defer gzipFile.Close()
 
 	gzipReader, err := gzip.NewReader(gzipFile)
 	if err != nil {
-		return false, fmt.Errorf("failed to create gzip reader: %v", err)
+		return false, fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 
 	actualFileBytes, err := io.ReadAll(gzipReader)
 	if err != nil {
-		return false, fmt.Errorf("failed to read file from gzip archive: %v", err)
+		return false, fmt.Errorf("failed to read file from gzip archive: %w", err)
 	}
 
 	expectedFileBytes, err := os.ReadFile(filepath.Clean(expectedFilePath))
 	if err != nil {
-		return false, fmt.Errorf("failed to read expected file: %v", err)
+		return false, fmt.Errorf("failed to read expected file: %w", err)
 	}
 
 	return bytes.Equal(actualFileBytes, expectedFileBytes), nil

@@ -75,5 +75,4 @@ func TestClusterCopyJSON(t *testing.T) {
 	if expStr != actStr {
 		t.Errorf("\nERROR: \nexpected:\t%q\nactual:\t\t%q\n", expStr, actStr)
 	}
-
 }

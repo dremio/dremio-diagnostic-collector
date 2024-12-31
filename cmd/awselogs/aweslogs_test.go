@@ -27,7 +27,7 @@ import (
 func TestAWSELogs(t *testing.T) {
 	efsDir := filepath.Join("testdata", "logs")
 	tmpDir := filepath.Join(t.TempDir(), "ddc-out")
-	if err := os.Mkdir(tmpDir, 0700); err != nil {
+	if err := os.Mkdir(tmpDir, 0o700); err != nil {
 		t.Fatal(errors.Unwrap(err))
 	}
 
@@ -47,7 +47,7 @@ dremio-log-dir: /path/to/dremio/logs
 node-name: node1
 dremio-conf-dir: /path/to/dremio/conf
 min-free-space-gb: 5
-`), 0600); err != nil {
+`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	outDir := t.TempDir()

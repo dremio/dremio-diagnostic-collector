@@ -30,23 +30,23 @@ func RunCollectDremioConfig(c *conf.CollectConf, _ shutdown.CancelHook) error {
 	dremioConfDest := filepath.Join(c.ConfigurationOutDir(), "dremio.conf")
 	err := ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "dremio.conf"), dremioConfDest)
 	if err != nil {
-		simplelog.Warningf("unable to copy dremio.conf due to error %v", err)
+		simplelog.Warningf("unable to copy dremio.conf: %v", err)
 	}
 	simplelog.Debugf("masking passwords in dremio.conf")
 	if err := masking.RemoveSecretsFromDremioConf(dremioConfDest); err != nil {
-		simplelog.Warningf("UNABLE TO MASK SECRETS in dremio.conf due to error %v", err)
+		simplelog.Warningf("UNABLE TO MASK SECRETS in dremio.conf: %v", err)
 	}
 	err = ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "dremio-env"), filepath.Join(c.ConfigurationOutDir(), "dremio-env"))
 	if err != nil {
-		simplelog.Warningf("unable to copy dremio-env due to error %v", err)
+		simplelog.Warningf("unable to copy dremio-env: %v", err)
 	}
 	err = ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "logback.xml"), filepath.Join(c.ConfigurationOutDir(), "logback.xml"))
 	if err != nil {
-		simplelog.Warningf("unable to copy logback.xml due to error %v", err)
+		simplelog.Warningf("unable to copy logback.xml: %v", err)
 	}
 	err = ddcio.CopyFile(filepath.Join(c.DremioConfDir(), "logback-access.xml"), filepath.Join(c.ConfigurationOutDir(), "logback-access.xml"))
 	if err != nil {
-		simplelog.Warningf("unable to copy logback-access.xml due to error %v", err)
+		simplelog.Warningf("unable to copy logback-access.xml: %v", err)
 	}
 	simplelog.Debugf("... Collecting Configuration Information from %v COMPLETED", c.NodeName())
 

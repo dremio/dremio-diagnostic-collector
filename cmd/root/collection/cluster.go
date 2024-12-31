@@ -56,7 +56,7 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 		}
 		text, err := masking.RemoveSecretsFromK8sJSON(out)
 		if err != nil {
-			simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text due to error '%v'", resource, namespace, err)
+			simplelog.Errorf("unable to mask secrets for %v in namespace %v returning am empty text: %v", resource, namespace, err)
 			continue
 		}
 
@@ -575,5 +575,4 @@ func clusterExecuteBytes(hook shutdown.CancelHook, namespace string, c *k8sapi.C
 	}
 
 	return b, nil
-
 }

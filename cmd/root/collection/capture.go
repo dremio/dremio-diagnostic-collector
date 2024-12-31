@@ -34,7 +34,7 @@ type FindErr struct {
 }
 
 func (fe FindErr) Error() string {
-	return fmt.Sprintf("find failed due to error %v:", fe.Cmd)
+	return fmt.Sprintf("find failed: %v:", fe.Cmd)
 }
 
 func matchToConst(jobText string) string {
@@ -112,7 +112,7 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 	return
 }
 
-//valid status list
+// valid status list
 
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
 // are first logged and then returned at the end with the reason for the failure.
@@ -132,7 +132,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 	pathToDDCYAML := path.Join(c.TransferDir, "ddc.yaml")
 	dremioPAT := c.DremioPAT
 	versionMatch := false
-	//if versions don't match go ahead and install a copy in the ddc tmp directory
+	// if versions don't match go ahead and install a copy in the ddc tmp directory
 	if !versionMatch {
 		nodeState = consoleprint.NodeState{
 			Node:     host,
@@ -143,7 +143,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 
-		//remotely make TransferDir
+		// remotely make TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "mkdir", "-p", c.TransferDir); err != nil {
 			nodeState = consoleprint.NodeState{
 				Node:       host,
@@ -154,7 +154,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-			return fmt.Errorf("host %v unable to make dir %v due to error '%v' with output '%v'", host, c.TransferDir, err, out)
+			return fmt.Errorf("host %v unable to make dir %v: '%w' - '%v'", host, c.TransferDir, err, out)
 		}
 
 		nodeState = consoleprint.NodeState{
@@ -165,7 +165,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-		//copy file to TransferDir assume there is
+		// copy file to TransferDir assume there is
 		if out, err := c.Collector.CopyToHost(c.Host, localDDCPath, pathToDDC); err != nil {
 			nodeState = consoleprint.NodeState{
 				Node:       host,
@@ -177,20 +177,20 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-			return fmt.Errorf("unable to copy local ddc %v to remote path due to error: '%v' with output '%v'", localDDCPath, err, out)
-			//this is a critical error so it is safe to exit
+			return fmt.Errorf("unable to copy local ddc %v to remote path: '%w' - '%v'", localDDCPath, err, out)
+			// this is a critical error so it is safe to exit
 		}
 		simplelog.Infof("successfully copied ddc to host %v at %v", host, pathToDDC)
 		defer func() {
 			// clear out when done
 			if out, err := c.Collector.HostExecute(false, c.Host, "rm", pathToDDC); err != nil {
-				simplelog.Warningf("on host %v unable to remove ddc due to error '%v' with output '%v'", host, err, out)
+				simplelog.Warningf("on host %v unable to remove ddc: '%v' - '%v'", host, err, out)
 			}
 		}()
 		defer func() {
 			// clear out w&hen done
 			if out, err := c.Collector.HostExecute(false, c.Host, "rm", pathToDDC+".log"); err != nil {
-				simplelog.Warningf("on host %v unable to remove ddc.log due to error '%v' with output '%v'", host, err, out)
+				simplelog.Warningf("on host %v unable to remove ddc.log: '%v' - '%v'", host, err, out)
 			}
 		}()
 		nodeState = consoleprint.NodeState{
@@ -201,7 +201,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-		//make  exec TransferDir
+		// make  exec TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "chmod", "+x", pathToDDC); err != nil {
 			nodeState = consoleprint.NodeState{
 				Node:       host,
@@ -213,7 +213,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-			return fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture due to error '%v' with output '%v'", host, pathToDDC, err, out)
+			return fmt.Errorf("host %v unable to make ddc exec %v and cannot proceed with capture: '%w' - '%v'", host, pathToDDC, err, out)
 		}
 	}
 	nodeState = consoleprint.NodeState{
@@ -224,7 +224,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-	//always update the configuration
+	// always update the configuration
 	if out, err := c.Collector.CopyToHost(c.Host, localDDCYamlPath, pathToDDCYAML); err != nil {
 		nodeState := consoleprint.NodeState{
 			Node:       host,
@@ -236,14 +236,14 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-		return fmt.Errorf("unable to copy local ddc yaml '%v' to remote path due to error: '%v' with output '%v'", localDDCYamlPath, err, out)
-		//this is a critical step and will not work without it so exit
+		return fmt.Errorf("unable to copy local ddc yaml '%v' to remote path: '%w' - '%v'", localDDCYamlPath, err, out)
+		// this is a critical step and will not work without it so exit
 	}
 	simplelog.Infof("successfully copied ddc.yaml to host %v at %v", host, pathToDDCYAML)
 	defer func() {
 		// clear out when done
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", pathToDDCYAML); err != nil {
-			simplelog.Warningf("on host %v unable to do initial cleanup capture due to error '%v' with output '%v'", host, err, out)
+			simplelog.Warningf("on host %v unable to do initial cleanup capture: '%v' - '%v'", host, err, out)
 		}
 	}()
 
@@ -256,7 +256,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 
-	//execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
+	// execute local-collect with a tarball-out-dir flag it must match our transfer-dir flag
 	var mask bool // to mask PAT token in logs
 	pidFile := path.Join(c.TransferDir, "ddc.pid")
 	c.Collector.SetHostPid(c.Host, pidFile)
@@ -265,10 +265,10 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableFreeSpaceCheck))
 	}
 	if skipRESTCollect {
-		//if skipRESTCollect is set blank the pat
+		// if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableRESTAPI))
 	} else if dremioPAT != "" {
-		//if the dremio PAT is set, set the pat-stdin value so we can pass it in via that mechanism
+		// if the dremio PAT is set, set the pat-stdin value so we can pass it in via that mechanism
 		localCollectArgs = append(localCollectArgs, "--pat-stdin")
 		mask = true
 	} else {
@@ -329,7 +329,7 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
-		return fmt.Errorf("on host %v capture failed due to error '%v' output was %v", host, err, strings.Join(allHostLog, "\n"))
+		return fmt.Errorf("on host %v capture failed: '%w' - %v", host, err, strings.Join(allHostLog, "\n"))
 	}
 
 	simplelog.Debugf("on host %v capture successful", host)
@@ -357,12 +357,12 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-		return 0, c.Host, fmt.Errorf("on host %v detect real hostname so I cannot copy back the capture due to error %v", c.Host, err)
+		return 0, c.Host, fmt.Errorf("on host %v cannot detect real hostname so unable to proceed with capture: %w", c.Host, err)
 	}
 
-	//copy tar.gz back
+	// copy tar.gz back
 	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
-	//IMPORTANT we must use path.join and not filepath.join or everything will break
+	// IMPORTANT we must use path.join and not filepath.join or everything will break
 	tarGZ := path.Join(c.TransferDir, tgzFileName)
 
 	outDir := path.Dir(outputLoc)
@@ -379,7 +379,7 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 	tarballCleanup := func() {
 		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
-			simplelog.Warningf("on host %v unable to cleanup remote capture due to error '%v' with output '%v'", c.Host, err, out)
+			simplelog.Warningf("on host %v unable to cleanup remote capture: '%v' - '%v'", c.Host, err, out)
 		} else {
 			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
 		}
@@ -397,7 +397,7 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v due to error %v with output %v", tarGZ, c.Host, outDir, err, out)
+		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v: '%w' - '%v'", tarGZ, c.Host, outDir, err, out)
 	}
 	// cleanup tarball ASAP
 	tarballCleanup()
@@ -412,10 +412,10 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	}, fmt.Sprintf("removing local tarball if present %v", tarGZ))
 
 	fileInfo, err := c.DDCfs.Stat(destFile)
-	//we assume a file size of zero if we are not able to retrieve the file size for some reason
+	// we assume a file size of zero if we are not able to retrieve the file size for some reason
 	size := int64(0)
 	if err != nil {
-		simplelog.Warningf("cannot get file size for file %v due to error %v. Storing size as 0", destFile, err)
+		simplelog.Warningf("cannot get file size for file %v: %v", destFile, err)
 	} else {
 		size = fileInfo.Size()
 	}

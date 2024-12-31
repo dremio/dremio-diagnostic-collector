@@ -39,7 +39,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions"
 )
 
-var DirPerms fs.FileMode = 0750
+var DirPerms fs.FileMode = 0o750
 
 type CopyStrategy interface {
 	CreatePath(fileType, source, nodeType string) (path string, err error)
@@ -152,7 +152,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	transferThreads := collectionArgs.TransferThreads
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
-	err = os.Mkdir(tmpInstallDir, 0700)
+	err = os.Mkdir(tmpInstallDir, 0o700)
 	if err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	}, "cleaning temp install dir")
 	ddcFilePath, err := ddcbinary.WriteOutDDC(tmpInstallDir)
 	if err != nil {
-		return fmt.Errorf("making ddc binary failed: '%v'", err)
+		return fmt.Errorf("making ddc binary failed: %w", err)
 	}
 
 	coordinators, err := c.GetCoordinators()
@@ -186,7 +186,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	clusterWg.Add(1)
 	go func() {
 		defer clusterWg.Done()
-		//now safe to collect cluster level information
+		// now safe to collect cluster level information
 		clusterCollection()
 	}()
 	var tarballs []string
@@ -233,7 +233,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 				DremioPAT:      dremioPAT,
 				CollectionMode: collectionMode,
 			}
-			//we want to be able to capture the job profiles of all the nodes
+			// we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
 			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
@@ -277,7 +277,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 				TransferDir:    transferDir,
 				CollectionMode: collectionMode,
 			}
-			//always skip executor calls
+			// always skip executor calls
 			skipRESTCalls := true
 			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
@@ -333,23 +333,23 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
-		for _, t := range tarballs {
-			simplelog.Debugf("extracting %v to %v", t, s.GetTmpDir())
-			if err := archive.ExtractTarGz(t, s.GetTmpDir()); err != nil {
-				simplelog.Errorf("unable to extract tarball %v due to error %v", t, err)
+		for _, tarball := range tarballs {
+			simplelog.Debugf("extracting %v to %v", tarball, s.GetTmpDir())
+			if err := archive.ExtractTarGz(tarball, s.GetTmpDir()); err != nil {
+				simplelog.Errorf("unable to extract tarball %v: %v", tarball, err)
 			}
-			simplelog.Debugf("extracted %v", t)
+			simplelog.Debugf("extracted %v", tarball)
 			// run a delete immediately as this takes up substantial space
-			if err := os.Remove(t); err != nil {
-				simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)
+			if err := os.Remove(tarball); err != nil {
+				simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
 			}
 			hook.AddFinalSteps(func() {
 				// run it again on cleanup just to be sure it's removed in case we got a ctrl+c
-				if err := os.Remove(t); err != nil {
-					simplelog.Errorf("unable to delete tarball %v due to error %v", t, err)
+				if err := os.Remove(tarball); err != nil {
+					simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
 				}
-			}, fmt.Sprintf("removing local tarball %v", t))
-			simplelog.Debugf("removed %v", t)
+			}, fmt.Sprintf("removing local tarball %v", tarball))
+			simplelog.Debugf("removed %v", tarball)
 		}
 	}
 
@@ -372,14 +372,14 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 
 	// converts the collection info to a string
 	// ready to write out to a file
-	o, err := collectionInfo.String()
+	outString, err := collectionInfo.String()
 	if err != nil {
 		return err
 	}
 
 	// archives the collected files
 	// creates the summary file too
-	err = s.ArchiveDiag(o, outputLoc)
+	err = s.ArchiveDiag(outString, outputLoc)
 	if err != nil {
 		return err
 	}

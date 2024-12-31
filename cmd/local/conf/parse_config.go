@@ -27,22 +27,21 @@ func ParseConfig(ddcYamlLoc string, overrides map[string]string) (map[string]int
 	data := make(map[string]interface{})
 	absPath, err := filepath.Abs(ddcYamlLoc)
 	if err != nil {
-		return data, fmt.Errorf("can't absolute path for %v due to error %w", ddcYamlLoc, err)
+		return data, fmt.Errorf("can't absolute path for %v: %w", ddcYamlLoc, err)
 	}
 	confFile, err := os.ReadFile(filepath.Clean(absPath))
 	if err != nil {
-		return data, fmt.Errorf("conf %v not readable due to error %w", ddcYamlLoc, err)
+		return data, fmt.Errorf("conf %v not readable: %w", ddcYamlLoc, err)
 	}
 
 	err = yaml.Unmarshal(confFile, &data)
-
 	if err != nil {
 		return data, fmt.Errorf("unable to parse yaml: %w", err)
 	}
 
 	simplelog.Infof("conf %v parsed successfully", absPath)
 	for k, v := range overrides {
-		//this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
+		// this really only applies for running over ssh so why am I doing it here? because we end up doing some crazy stuff as a result!
 		if v == "\"\"" {
 			data[k] = ""
 		} else {

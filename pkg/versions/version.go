@@ -16,8 +16,10 @@ package versions
 
 import "fmt"
 
-var Version string
-var GitSha string
+var (
+	Version string
+	GitSha  string
+)
 
 func GetCLIVersion() string {
 	return fmt.Sprintf("ddc %v-%v\n", Version, GitSha)

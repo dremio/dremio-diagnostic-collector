@@ -52,7 +52,7 @@ type SummaryInfoWriterError struct {
 }
 
 func (w SummaryInfoWriterError) Error() string {
-	return fmt.Sprintf("This is a bug, unable to write summary %#v due to error %v", w.SummaryInfo, w.Err)
+	return fmt.Sprintf("This is a bug, unable to write summary %#v: %v", w.SummaryInfo, w.Err)
 }
 
 func (summary SummaryInfo) String() (string, error) {

@@ -31,9 +31,8 @@ import (
 )
 
 func writeConfWithYamlText(tmpOutputDir, yamlTextMinusTmpOutputDir string) string {
-
 	cleaned := filepath.Clean(tmpOutputDir)
-	if err := os.MkdirAll(cleaned, 0700); err != nil {
+	if err := os.MkdirAll(cleaned, 0o700); err != nil {
 		log.Fatal(err)
 	}
 	testDDCYaml := filepath.Join(tmpOutputDir, "ddc.yaml")
@@ -44,14 +43,13 @@ tmp-output-dir: %v
 %v
 `, filepath.Join("testdata", "fs", "opt", "dremio", "logs"), filepath.Join("testdata", "fs", "opt", "dremio", "conf"), strings.ReplaceAll(cleaned, "\\", "\\\\"), yamlTextMinusTmpOutputDir)
 	fmt.Printf("yaml text is\n%q\n", yamlText)
-	if err := os.WriteFile(testDDCYaml, []byte(yamlText), 0600); err != nil {
+	if err := os.WriteFile(testDDCYaml, []byte(yamlText), 0o600); err != nil {
 		log.Fatal(err)
 	}
 	return testDDCYaml
 }
 
 func writeConf(tmpOutputDir string) string {
-
 	defaultText := `
 verbose: vvvv
 node-metrics-collect-duration-seconds: 10
@@ -61,7 +59,7 @@ node-metrics-collect-duration-seconds: 10
 
 func TestCaptureSystemMetrics(t *testing.T) {
 	tmpDirForConf := t.TempDir() + string(filepath.Separator) + "ddc"
-	err := os.Mkdir(tmpDirForConf, 0700)
+	err := os.Mkdir(tmpDirForConf, 0o700)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,19 +71,19 @@ func TestCaptureSystemMetrics(t *testing.T) {
 		log.Fatalf("reading config %v", err)
 	}
 	log.Printf("NODE INFO DIR %v", c.NodeInfoOutDir())
-	if err := os.MkdirAll(c.NodeInfoOutDir(), 0700); err != nil {
-		t.Errorf("cannot make output dir due to error %v", err)
+	if err := os.MkdirAll(c.NodeInfoOutDir(), 0o700); err != nil {
+		t.Errorf("cannot make output dir: %v", err)
 	}
 	defer func() {
 		if err := os.RemoveAll(c.NodeInfoOutDir()); err != nil {
-			t.Logf("error cleaning up dir %v due to error %v", c.NodeInfoOutDir(), err)
+			t.Logf("error cleaning up dir %v: %v", c.NodeInfoOutDir(), err)
 		}
 	}()
 }
 
 func TestCreateAllDirs(t *testing.T) {
 	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
-	err := os.Mkdir(tmpDirForConf, 0700)
+	err := os.Mkdir(tmpDirForConf, 0o700)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,7 +120,7 @@ func TestCreateAllDirs(t *testing.T) {
 
 func TestCollectJVMFlags(t *testing.T) {
 	tmpDirForConf := filepath.Join(t.TempDir(), "ddc")
-	err := os.Mkdir(tmpDirForConf, 0700)
+	err := os.Mkdir(tmpDirForConf, 0o700)
 	if err != nil {
 		t.Fatalf("unable to make test dir: %v", err)
 	}
@@ -221,7 +219,7 @@ min-free-space-gb: 5
 
 func TestSkipCollect(t *testing.T) {
 	tmpDirForConf := filepath.Join(t.TempDir(), "ddcSkipCollect")
-	err := os.Mkdir(tmpDirForConf, 0700)
+	err := os.Mkdir(tmpDirForConf, 0o700)
 	if err != nil {
 		t.Fatalf("unable to make test dir: %v", err)
 	}
@@ -371,7 +369,7 @@ func TestParseClassPathVersion(t *testing.T) {
 
 func TestValidateCollectFlag(t *testing.T) {
 	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0600); err != nil {
+	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0o600); err != nil {
 		t.Fatalf("unable to write ddc yaml: %v", err)
 	}
 	args := []string{"ddc", "local-collect", "--ddc-yaml", ddcYaml, "--collect", "wrong"}

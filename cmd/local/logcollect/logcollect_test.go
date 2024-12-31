@@ -30,17 +30,19 @@ func cleanUp(dirs ...string) {
 	for _, d := range dirs {
 		log.Printf("deleting %v", d)
 		if err := ddcio.DeleteDirContents(d); err != nil {
-			log.Printf("WARN: unable to delete the contents of folder %v due to error %v", d, err)
+			log.Printf("WARN: unable to delete the contents of folder %v: %v", d, err)
 		}
 	}
 }
 
-var logCollector logcollect.Collector
-var destinationQueriesJSON string
-var startLogDir string
-var testGCLogsDir string
-var dremioLogDays int
-var dremioQueriesJSONDays int
+var (
+	logCollector           logcollect.Collector
+	destinationQueriesJSON string
+	startLogDir            string
+	testGCLogsDir          string
+	dremioLogDays          int
+	dremioQueriesJSONDays  int
+)
 
 var setupEnv = func() (destinationDir, logDir string) {
 	dremioLogDays = 2
@@ -49,7 +51,7 @@ var setupEnv = func() (destinationDir, logDir string) {
 	testGCLogsDir = filepath.Join("testdata", "gcLogDir")
 	destinationQueriesJSON = filepath.Join("testdata", "queriesOutDir")
 	var err error
-	err = os.MkdirAll(destinationQueriesJSON, 0750)
+	err = os.MkdirAll(destinationQueriesJSON, 0o750)
 	if err != nil {
 		log.Fatalf("unexpected error %v", err)
 	}
@@ -75,7 +77,7 @@ var setupEnv = func() (destinationDir, logDir string) {
 
 var AfterEachLogCollectTest = func() {
 	if err := ddcio.DeleteDirContents(destinationQueriesJSON); err != nil {
-		log.Printf("unable to delete the contents of folder %v due to error %v", destinationQueriesJSON, err)
+		log.Printf("unable to delete the contents of folder %v: %v", destinationQueriesJSON, err)
 	}
 }
 
@@ -85,15 +87,15 @@ func TestLogCollect_WhenAllServerLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
 	}
 
-	//rename archive to yesterday
+	// rename archive to yesterday
 	yesterdaysLog = "server." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".log.gz"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "server.2022-04-30.log.gz"), filepath.Join(testLogDir, "archive", yesterdaysLog)); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
@@ -130,20 +132,20 @@ func TestLogCollect_WhenServerLogHasAnUngzippedFileInTheArchive(t *testing.T) {
 	var dayBeforeYesterday string
 	var err error
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
 	}
 
-	//rename archive to yesterday
+	// rename archive to yesterday
 	yesterdaysLog = "server." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".log.gz"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "server.2022-04-30.log.gz"), filepath.Join(testLogDir, "archive", yesterdaysLog)); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
 	}
 
-	//copy server.log to day before yesterday
+	// copy server.log to day before yesterday
 	dayBeforeYesterday = "server." + time.Now().AddDate(0, 0, -2).Format("2006-01-02") + ".log"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "server.log"), filepath.Join(testLogDir, "archive", dayBeforeYesterday)); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
@@ -156,26 +158,26 @@ func TestLogCollect_WhenServerLogHasAnUngzippedFileInTheArchive(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should should collect the server.log as a gzip", func() {
+	// It("should should collect the server.log as a gzip", func() {
 	actual := filepath.Join(destinationDir, "server.log.gz")
 	expected := filepath.Join(testLogDir, "server.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file to contain %v but it did not", expected, actual)
 	}
-	//It("should collect server.out", func() {
+	// It("should collect server.out", func() {
 	actual = filepath.Join(destinationDir, "server.out")
 	expected = filepath.Join(testLogDir, "server.out")
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
 
-	//It("should find the gzipped file and copy it as is", func() {
+	// It("should find the gzipped file and copy it as is", func() {
 	actual = filepath.Join(destinationDir, yesterdaysLog)
 	expected = filepath.Join(testLogDir, "archive", yesterdaysLog)
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
-	//It("should find the ungzipped file and archive it", func() {
+	// It("should find the ungzipped file and archive it", func() {
 	actual = filepath.Join(destinationDir, dayBeforeYesterday+".gz")
 	expected = filepath.Join(testLogDir, "archive", dayBeforeYesterday)
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -189,12 +191,12 @@ func TestLogCollect_WhenServerOutIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
 	}
-	//rename archive to yesterday
+	// rename archive to yesterday
 	yesterdaysLog = "server." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".log.gz"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "server.2022-04-30.log.gz"), filepath.Join(testLogDir, "archive", yesterdaysLog)); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
@@ -213,7 +215,7 @@ func TestLogCollect_WhenServerOutIsMissing(t *testing.T) {
 		t.Error("expected an error but there was none")
 	}
 
-	//It("should collect all logs with age", func() {
+	// It("should collect all logs with age", func() {
 	actual := filepath.Join(destinationDir, "server.log.gz")
 	expected := filepath.Join(testLogDir, "server.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -225,7 +227,7 @@ func TestLogCollect_WhenServerOutIsMissing(t *testing.T) {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
 
-	//It("should ignore logs older than num days", func() {
+	// It("should ignore logs older than num days", func() {
 	_, err = os.Stat(filepath.Join(destinationDir, "server.2022-04-30.log.gz"))
 	if !os.IsNotExist(err) && err == nil {
 		t.Error("should not copy the file but did")
@@ -238,7 +240,7 @@ func TestLogCollect_WhenServerLogIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -261,7 +263,7 @@ func TestLogCollect_WhenServerLogIsMissing(t *testing.T) {
 		t.Error("expected an error but there was none")
 	}
 
-	//It("should collect all logs still present", func() {
+	// It("should collect all logs still present", func() {
 	actual := filepath.Join(destinationDir, "server.out")
 	expected := filepath.Join(testLogDir, "server.out")
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
@@ -272,14 +274,14 @@ func TestLogCollect_WhenServerLogIsMissing(t *testing.T) {
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
-
 }
+
 func TestLogCollect_WhenServerLogArchivesAreMissing(t *testing.T) {
 	var err error
 	var destinationDir string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -296,7 +298,7 @@ func TestLogCollect_WhenServerLogArchivesAreMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect all logs still present", func() {
+	// It("should collect all logs still present", func() {
 	actual := filepath.Join(destinationDir, "server.log.gz")
 	expected := filepath.Join(testLogDir, "server.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -307,7 +309,6 @@ func TestLogCollect_WhenServerLogArchivesAreMissing(t *testing.T) {
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
-
 }
 
 func TestLogCollect_WhenAllReflectionLogsArePresent(t *testing.T) {
@@ -316,7 +317,7 @@ func TestLogCollect_WhenAllReflectionLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -334,7 +335,7 @@ func TestLogCollect_WhenAllReflectionLogsArePresent(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	actual := filepath.Join(destinationDir, "reflection.log.gz")
 	expected := filepath.Join(testLogDir, "reflection.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -346,18 +347,19 @@ func TestLogCollect_WhenAllReflectionLogsArePresent(t *testing.T) {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
 
-	//it should not collect logs older than num log days
+	// it should not collect logs older than num log days
 	_, err = os.Stat(filepath.Join(destinationDir, "reflection.2022-04-30.log.gz"))
 	if !os.IsNotExist(err) && err == nil {
 		t.Error("should not copy the file but did")
 	}
 }
+
 func TestLogCollect_WhenReflectionLogArchivesAreMissing(t *testing.T) {
 	var err error
 	var destinationDir string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -373,7 +375,7 @@ func TestLogCollect_WhenReflectionLogArchivesAreMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect reflection.log", func() {
+	// It("should collect reflection.log", func() {
 	actual := filepath.Join(destinationDir, "reflection.log.gz")
 	expected := filepath.Join(testLogDir, "reflection.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -387,7 +389,7 @@ func TestLogCollect_WhenReflectionLogIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -410,7 +412,7 @@ func TestLogCollect_WhenReflectionLogIsMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect archives", func() {
+	// It("should collect archives", func() {
 	actual := filepath.Join(destinationDir, yesterdaysLog)
 	expected := filepath.Join(testLogDir, "archive", yesterdaysLog)
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
@@ -424,7 +426,7 @@ func TestLogCollect_WhenAllAccelerationLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -441,7 +443,7 @@ func TestLogCollect_WhenAllAccelerationLogsArePresent(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	actual := filepath.Join(destinationDir, "acceleration.log.gz")
 	expected := filepath.Join(testLogDir, "acceleration.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -453,18 +455,19 @@ func TestLogCollect_WhenAllAccelerationLogsArePresent(t *testing.T) {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
 
-	//It("should ignore logs older than num days", func() {
+	// It("should ignore logs older than num days", func() {
 	_, err = os.Stat(filepath.Join(destinationDir, "acceleration.2022-04-30.log.gz"))
 	if !os.IsNotExist(err) && err == nil {
 		t.Error("should not copy the file but did")
 	}
 }
+
 func TestLogCollect_WhenAccelerationLogArchivesAreMissing(t *testing.T) {
 	var err error
 	var destinationDir string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -480,7 +483,7 @@ func TestLogCollect_WhenAccelerationLogArchivesAreMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect acceleration log as a gzip", func() {
+	// It("should collect acceleration log as a gzip", func() {
 	actual := filepath.Join(destinationDir, "acceleration.log.gz")
 	expected := filepath.Join(testLogDir, "acceleration.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -494,7 +497,7 @@ func TestLogCollect_WhenAccelerationLogIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -517,7 +520,7 @@ func TestLogCollect_WhenAccelerationLogIsMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect archives", func() {
+	// It("should collect archives", func() {
 	actual := filepath.Join(destinationDir, yesterdaysLog)
 	expected := filepath.Join(testLogDir, "archive", yesterdaysLog)
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
@@ -531,7 +534,7 @@ func TestLogCollect_WhenAllAcessLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -548,7 +551,7 @@ func TestLogCollect_WhenAllAcessLogsArePresent(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	actual := filepath.Join(destinationDir, "access.log.gz")
 	expected := filepath.Join(testLogDir, "access.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -560,18 +563,19 @@ func TestLogCollect_WhenAllAcessLogsArePresent(t *testing.T) {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
 
-	//It("should ignore logs older than num days", func() {
+	// It("should ignore logs older than num days", func() {
 	_, err = os.Stat(filepath.Join(destinationDir, "access.2022-04-30.log.gz"))
 	if !os.IsNotExist(err) && err == nil {
 		t.Error("should not copy the file but did")
 	}
 }
+
 func TestLogCollect_WhenAccessLogArchiveAreMissing(t *testing.T) {
 	var err error
 	var destinationDir string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -587,7 +591,7 @@ func TestLogCollect_WhenAccessLogArchiveAreMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect access log as a gzip", func() {
+	// It("should collect access log as a gzip", func() {
 	actual := filepath.Join(destinationDir, "access.log.gz")
 	expected := filepath.Join(testLogDir, "access.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -601,7 +605,7 @@ func TestLogCollect_WhenAaccessLogIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -624,7 +628,7 @@ func TestLogCollect_WhenAaccessLogIsMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect archives", func() {
+	// It("should collect archives", func() {
 	actual := filepath.Join(destinationDir, yesterdaysLog)
 	expected := filepath.Join(testLogDir, "archive", yesterdaysLog)
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
@@ -638,7 +642,7 @@ func TestLogCollect_WhenAllMetadataRefreshLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -655,7 +659,7 @@ func TestLogCollect_WhenAllMetadataRefreshLogsArePresent(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	actual := filepath.Join(destinationDir, "metadata_refresh.log.gz")
 	expected := filepath.Join(testLogDir, "metadata_refresh.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -666,7 +670,7 @@ func TestLogCollect_WhenAllMetadataRefreshLogsArePresent(t *testing.T) {
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
-	//It("should ignore logs older than num days", func() {
+	// It("should ignore logs older than num days", func() {
 	_, err = os.Stat(filepath.Join(destinationDir, "metadata_refresh.2022-04-30.log.gz"))
 	if !os.IsNotExist(err) {
 		t.Errorf("expected to not find old log file copied but it was")
@@ -678,7 +682,7 @@ func TestLogCollect_WhenMetadataRefreshLogArchivesAreMissing(t *testing.T) {
 	var destinationDir string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -694,7 +698,7 @@ func TestLogCollect_WhenMetadataRefreshLogArchivesAreMissing(t *testing.T) {
 	defer cleanUp(destinationDir, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect access log as a gzip", func() {
+	// It("should collect access log as a gzip", func() {
 	actual := filepath.Join(destinationDir, "metadata_refresh.log.gz")
 	expected := filepath.Join(testLogDir, "metadata_refresh.log")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -708,7 +712,7 @@ func TestLogCollect_WhenMetadataRefreshLogIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	destinationDir, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -744,7 +748,7 @@ func TestLogCollect_WhenAllQueriesJsonLogsArePresent(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	_, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -763,7 +767,7 @@ func TestLogCollect_WhenAllQueriesJsonLogsArePresent(t *testing.T) {
 	defer AfterEachLogCollectTest()
 	tests.Tree(destinationQueriesJSON)
 
-	//It("should collect all logs", func() {
+	// It("should collect all logs", func() {
 	actual := filepath.Join(destinationQueriesJSON, "queries.json.gz")
 	expected := filepath.Join(testLogDir, "queries.json")
 	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
@@ -774,7 +778,7 @@ func TestLogCollect_WhenAllQueriesJsonLogsArePresent(t *testing.T) {
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
 		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
 	}
-	//It("should ignore logs older than num days", func() {
+	// It("should ignore logs older than num days", func() {
 	_, err = os.Stat(filepath.Join(destinationQueriesJSON, "queries.2022-04-30.json.gz"))
 	if !os.IsNotExist(err) {
 		t.Errorf("expected to not find old log file copied but it was")
@@ -785,7 +789,7 @@ func TestLogCollect_WhenQueriesJsonArchivesAreMissing(t *testing.T) {
 	var err error
 	var testLogDir string
 	_, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -801,7 +805,7 @@ func TestLogCollect_WhenQueriesJsonArchivesAreMissing(t *testing.T) {
 	defer cleanUp(destinationQueriesJSON, testLogDir)
 	defer AfterEachLogCollectTest()
 
-	//It("should collect access log as a gzip", func() {
+	// It("should collect access log as a gzip", func() {
 	tests.Tree(destinationQueriesJSON)
 	actual := filepath.Join(destinationQueriesJSON, "queries.json.gz")
 	expected := filepath.Join(testLogDir, "queries.json")
@@ -815,7 +819,7 @@ func TestLogCollect_WhenQueriesJsonIsMissing(t *testing.T) {
 	var yesterdaysLog string
 	var testLogDir string
 	_, testLogDir = setupEnv()
-	//setup logs
+	// setup logs
 	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
 		t.Logf("test should fail as we had an error setting up the test directory: %v", err)
 		t.Errorf("unexpected error %v", err)
@@ -839,7 +843,7 @@ func TestLogCollect_WhenQueriesJsonIsMissing(t *testing.T) {
 	defer AfterEachLogCollectTest()
 	tests.Tree(destinationQueriesJSON)
 
-	//It("should collect queriesJSON archives", func() {
+	// It("should collect queriesJSON archives", func() {
 	actual := filepath.Join(destinationQueriesJSON, yesterdaysLog)
 	expected := filepath.Join(testLogDir, "archive", yesterdaysLog)
 	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
@@ -897,14 +901,14 @@ func TestLogCollect_WhenGCLogsArePresentAndSomeHaveModTimeMoreThanLogDays(t *tes
 
 func TestLogCollect_WhenGCLogsArePresentAndThereAreMoreThanOne(t *testing.T) {
 	var destinationDir string
-	//It("should collect all gc logs as gzips", func() {
+	// It("should collect all gc logs as gzips", func() {
 	tests.Tree(destinationDir)
 	tests.Tree(testGCLogsDir)
 	gclogs := []string{"gc.0.log", "gc.1.log", "gc.2.log", "gc.3.log", "gc.4.log.current"}
 	for _, gclog := range gclogs {
 		t.Run("Test GCLog "+gclog, func(t *testing.T) {
 			destinationDir, _ = setupEnv()
-			//update mod time of each
+			// update mod time of each
 			expected := filepath.Join(testGCLogsDir, gclog)
 			currentTime := time.Now()
 			// Change both the access time and the modification time to current time

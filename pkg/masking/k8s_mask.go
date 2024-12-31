@@ -31,8 +31,8 @@ var secretK8sKeywords = []string{
 
 func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
 	var containers []interface{}
-	kindRaw, ok := k8sItem["kind"]
-	if !ok {
+	kindRaw, valid := k8sItem["kind"]
+	if !valid {
 		return containers, fmt.Errorf("unable to read kind %#v", k8sItem)
 	}
 	kind := strings.ToLower(kindRaw.(string))
@@ -49,8 +49,8 @@ func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
 		return containers, nil
 	}
 
-	specRaw, ok := k8sItem["spec"]
-	if !ok {
+	specRaw, valid := k8sItem["spec"]
+	if !valid {
 		return containers, fmt.Errorf("unable to read spec")
 	}
 	spec := specRaw.(map[string]interface{})
@@ -72,15 +72,15 @@ func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
 
 func maskDictSecrets(containers []interface{}) {
 	for _, container := range containers {
-		envVarsRaw, ok := container.(map[string]interface{})["env"]
-		if !ok {
+		envVarsRaw, valid := container.(map[string]interface{})["env"]
+		if !valid {
 			return
 		}
 		envVars := envVarsRaw.([]interface{})
 		for _, envVar := range envVars {
-			nameRaw, ok := envVar.(map[string]interface{})["name"]
-			if !ok {
-				//skipping
+			nameRaw, valid := envVar.(map[string]interface{})["name"]
+			if !valid {
+				// skipping
 				continue
 			}
 			name := strings.ToLower(nameRaw.(string))
@@ -101,16 +101,16 @@ func checkK8sStringForSecret(s string) bool {
 }
 
 func maskLastAppliedConfig(k8sObject map[string]interface{}) {
-	metadata, ok := k8sObject["metadata"]
-	if !ok {
+	metadata, valid := k8sObject["metadata"]
+	if !valid {
 		return
 	}
-	annotationsRaw, ok := metadata.(map[string]interface{})["annotations"]
-	if !ok {
+	annotationsRaw, valid := metadata.(map[string]interface{})["annotations"]
+	if !valid {
 		return
 	}
 	annotations := annotationsRaw.(map[string]interface{})
-	if _, ok := annotations["kubectl.kubernetes.io/last-applied-configuration"]; ok {
+	if _, valid := annotations["kubectl.kubernetes.io/last-applied-configuration"]; valid {
 		annotations["kubectl.kubernetes.io/last-applied-configuration"] = "REMOVED_POTENTIAL_SECRET"
 	}
 }
@@ -121,16 +121,16 @@ func RemoveSecretsFromK8sJSON(k8sJSON []byte) (string, error) {
 	if err := json.Unmarshal(k8sJSON, &dataDict); err != nil {
 		return "", err
 	}
-	itemsRaw, ok := dataDict["items"]
-	if !ok {
+	itemsRaw, valid := dataDict["items"]
+	if !valid {
 		return "", fmt.Errorf("items key not found or not a slice: %#v", dataDict)
 	}
 	if itemsRaw == nil {
 		simplelog.Infof("no items to mask skipping masking")
 		return string(k8sJSON), nil
 	}
-	items, ok := itemsRaw.([]interface{})
-	if !ok {
+	items, valid := itemsRaw.([]interface{})
+	if !valid {
 		return "", fmt.Errorf("items must be an array but was '%T'", itemsRaw)
 	}
 

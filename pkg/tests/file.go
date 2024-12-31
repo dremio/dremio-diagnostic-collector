@@ -23,7 +23,6 @@ import (
 )
 
 func MatchFile(expectedFile, actualFile string) (success bool, err error) {
-
 	expectedLines, err := readLines(expectedFile)
 	if err != nil {
 		return false, err
@@ -33,7 +32,7 @@ func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	//remove cross platform line endings to make the tests work on windows and linux
+	// remove cross platform line endings to make the tests work on windows and linux
 	expectedText := normalizeText(expectedLines)
 	actualText := normalizeText(actualLines)
 
@@ -41,7 +40,6 @@ func MatchFile(expectedFile, actualFile string) (success bool, err error) {
 }
 
 func MatchLines(t *testing.T, expectedLines []string, actualFile string) (bool, error) {
-
 	type MatchLines struct {
 		word    string
 		matched bool
@@ -56,24 +54,24 @@ func MatchLines(t *testing.T, expectedLines []string, actualFile string) (bool, 
 	}
 
 	// We take each expected line and check for matches
-	mi := 0
+	matchIndex := 0
 	for _, expectedLine := range expectedLines {
 		matchLine.word = expectedLine
 		matchLine.matched = false
 		matchLines = append(matchLines, matchLine)
 		for _, actualLine := range actualLines {
 			if strings.Contains(actualLine, expectedLine) {
-				matchLines[mi].word = expectedLine
-				matchLines[mi].matched = true
+				matchLines[matchIndex].word = expectedLine
+				matchLines[matchIndex].matched = true
 			}
 		}
-		mi++
+		matchIndex++
 	}
 	// We have to see at least one match on each expected line
 	// if not then the whole check fails
-	for _, m := range matchLines {
-		if !m.matched {
-			t.Errorf("Did not find a match for %v in file %v", m.word, actualFile)
+	for _, matchLine := range matchLines {
+		if !matchLine.matched {
+			t.Errorf("Did not find a match for %v in file %v", matchLine.word, actualFile)
 			return false, nil
 		}
 		success++
