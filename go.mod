@@ -9,8 +9,8 @@ require github.com/spf13/cobra v1.8.1 // direct
 require (
 	github.com/google/uuid v1.6.0
 	github.com/manifoldco/promptui v0.9.0
-	github.com/rogpeppe/go-internal v1.12.0
-	github.com/spf13/cast v1.7.0
+	github.com/rogpeppe/go-internal v1.13.1
+	github.com/spf13/cast v1.7.1
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/sys v0.28.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -46,12 +46,12 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.32.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.24.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	google.golang.org/protobuf v1.36.0 // indirect
+	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
@@ -61,3 +61,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace golang.org/x/net => golang.org/x/net v0.33.0

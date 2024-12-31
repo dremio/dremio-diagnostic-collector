@@ -9,10 +9,12 @@
 ### Changed
 
 * no longer have specific zookeeper directory for container logs
+* made error messages more consistent
 
 ### Removed
 
 * removed zookeeper specific code for log capture
+* removed `kubernetes/dremio-master` folder
 
 ## [3.2.8] - 2024-12-18
 
