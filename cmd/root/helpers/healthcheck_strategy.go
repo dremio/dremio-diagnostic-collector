@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
@@ -97,16 +96,8 @@ func (s *CopyStrategyHC) CreatePath(fileType, source, nodeType string) (path str
 
 	// We only tag a suffix of '-C' / '-E' for ssh nodes, the K8s pods are desriptive enough to determine the coordinator / executor
 	// also add exceptions for general k8s directories
-	var isK8s bool
-	if strings.Contains(source, "dremio-master") ||
-		strings.Contains(source, "dremio-executor") ||
-		strings.Contains(source, "dremio-coordinator") ||
-		strings.Contains(source, "container-logs") ||
-		strings.Contains(source, "nodes") ||
-		strings.Contains(source, "pods") {
-		isK8s = true
-	}
-	if !isK8s { // SSH node types
+	if fileType != "kubernetes" {
+		// ssh nodes types
 		if nodeType == "coordinator" {
 			path = filepath.Join(tmpDir, baseDir, fileType, source+"-C")
 		} else {
