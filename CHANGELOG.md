@@ -5,6 +5,8 @@
 ### Added
 
 * capture container logs of all pods in namespace
+* cpu architecture detection for each host
+* The cpu architecture specific ddc local-collect binary is sent to the node
 
 ### Fixed
 

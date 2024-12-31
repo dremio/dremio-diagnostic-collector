@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/ddcbinary"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
@@ -116,7 +117,7 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 
 // Capture collects diagnostics, conf files and log files from the target hosts. Failures are permissive and
 // are first logged and then returned at the end with the reason for the failure.
-func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB uint64) error {
+func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.DDCBinaryInfo, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB uint64) error {
 	host := c.Host
 	nodeState := consoleprint.NodeState{
 		Node:     host,
@@ -165,6 +166,16 @@ func StartCapture(c HostCaptureConfiguration, localDDCPath, localDDCYamlPath str
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
+		cpuArch, err := c.Collector.HostExecute(false, c.Host, "uname", "-m")
+		if err != nil {
+			return fmt.Errorf("unable to read cpu architecture of %v: %w", c.Host, err)
+		}
+		var localDDCPath string
+		if cpuArch == "aarch64" {
+			localDDCPath = ddcBinaryInfo.ArmBinaryLocation
+		} else {
+			localDDCPath = ddcBinaryInfo.IntelBinaryLocation
+		}
 		// copy file to TransferDir assume there is
 		if out, err := c.Collector.CopyToHost(c.Host, localDDCPath, pathToDDC); err != nil {
 			nodeState = consoleprint.NodeState{

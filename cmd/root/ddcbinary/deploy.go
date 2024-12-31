@@ -27,16 +27,25 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
-//go:embed output/ddc.zip
+//go:embed output/*.zip
 var binaryData embed.FS
 
-func WriteOutDDC(targetDir string) (ddcFilePath string, err error) {
-	data, err := binaryData.ReadFile("output/ddc.zip")
+// DDCBinaryInfo provides location of ddc binaries
+type DDCBinaryInfo struct {
+	IntelBinaryLocation string // location to find DDC x86_64 binary
+	ArmBinaryLocation   string // location to find DDC aarch64 binary
+}
+
+func writeBinary(arch, targetDir string) (string, error) {
+	data, err := binaryData.ReadFile(fmt.Sprintf("output/ddc-%v.zip", arch))
 	if err != nil {
-		// Handle error
 		return "", err
 	}
-	outFileName := filepath.Join(targetDir, "ddc.zip")
+	outFileDir := filepath.Join(targetDir, arch)
+	if err := os.MkdirAll(outFileDir, 0o700); err != nil {
+		return "", err
+	}
+	outFileName := filepath.Join(outFileDir, "ddc.zip")
 	if err := os.WriteFile(outFileName, data, 0o600); err != nil {
 		return "", fmt.Errorf("unable to write file %v: %w", outFileName, err)
 	}
@@ -45,6 +54,21 @@ func WriteOutDDC(targetDir string) (ddcFilePath string, err error) {
 	}
 	// the extracted ddc file should be where the zip was, and the zip should be deleted
 	return strings.TrimSuffix(outFileName, ".zip"), nil
+}
+
+func WriteOutDDC(targetDir string) (DDCBinaryInfo, error) {
+	intelBinary, err := writeBinary("amd64", targetDir)
+	if err != nil {
+		return DDCBinaryInfo{}, err
+	}
+	arm64Binary, err := writeBinary("arm64", targetDir)
+	if err != nil {
+		return DDCBinaryInfo{}, err
+	}
+	return DDCBinaryInfo{
+		IntelBinaryLocation: intelBinary,
+		ArmBinaryLocation:   arm64Binary,
+	}, nil
 }
 
 // Unzip a file to a target directory.
