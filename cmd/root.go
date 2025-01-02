@@ -601,20 +601,20 @@ func init() {
 	RootCmd.Flags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 
 	// shared flags
-	RootCmd.PersistentFlags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
-	RootCmd.PersistentFlags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
-	RootCmd.PersistentFlags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
-	RootCmd.PersistentFlags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
-	RootCmd.PersistentFlags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
-	RootCmd.PersistentFlags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
-	RootCmd.PersistentFlags().StringVar(&pid, "pid", "", "write a pid")
-	if err := RootCmd.PersistentFlags().MarkHidden("pid"); err != nil {
+	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
+	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
+	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
+	RootCmd.Flags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
+	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
+	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
+	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
 	var defaultMaxFreeSpace uint64 = 40
-	RootCmd.PersistentFlags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
+	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 
