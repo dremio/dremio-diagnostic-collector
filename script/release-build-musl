@@ -69,7 +69,7 @@ fi
 echo "Building embedded binary for linux-amd64…"
 date "+%H:%M:%S"
 
-CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
+CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-amd64.zip
 rm ./bin/ddc
@@ -77,19 +77,19 @@ rm ./bin/ddc
 echo "Building embedded binary for linux-arm64…"
 date "+%H:%M:%S"
 
-CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
+CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
 zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
 rm ./bin/ddc
 
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
-GCO_ENABLED=1 CC=x86_64-linux-musl-cc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+CC=x86_64-linux-musl-cc GCO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
-GCO_ENABLED=1 CC=aarch64-linux-musl-cc GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+CC=aarch64-linux-musl-cc GCO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
 
 echo "Building darwin-os-x-amd64…"
