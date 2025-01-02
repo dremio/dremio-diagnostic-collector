@@ -60,10 +60,7 @@ var (
 	ddcYamlLoc     string
 )
 
-var (
-	outputLoc       string
-	legacyOutputDir string
-)
+var outputLoc string
 
 var (
 	sudoUser              string
@@ -151,17 +148,8 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		0,
 	)
 	consoleprint.UpdateCollectionMode(collectionArgs.CollectionMode)
-	var outputDir string
-	var err error
-	if legacyOutputDir != "" {
-		// this should only be set when the local collect command is used
-		hostname, err := os.Hostname()
-		if err != nil {
-			return fmt.Errorf("unable to get hostname: %w", err)
-		}
-		outputLoc = filepath.Join(legacyOutputDir, fmt.Sprintf("%v.tar.gz", hostname))
-	}
-	outputDir, err = filepath.Abs(filepath.Dir(outputLoc))
+
+	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
 	if err != nil {
@@ -173,6 +161,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	clusterCollect := func() {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
+
 		simplelog.Info("using fallback based collection")
 		collectorStrategy = fallback.NewFallback(hook)
 		consoleprint.UpdateRuntime(
@@ -631,7 +620,7 @@ func init() {
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
 	var defaultMaxFreeSpace uint64 = 40
 	RootCmd.PersistentFlags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
-	RootCmd.PersistentFlags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
+	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 
 	execLoc, err := os.Executable()
@@ -644,8 +633,7 @@ func init() {
 
 	// local collect only flags
 	// command to keep consistency with the old local-collect command
-	localCollectCmd.Flags().StringVar(&legacyOutputDir, "tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
-
+	localCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	// init
 	RootCmd.AddCommand(localCollectCmd)
 	RootCmd.AddCommand(version.VersionCmd)
@@ -657,7 +645,6 @@ var localCollectCmd = &cobra.Command{
 	Short: "Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(_ *cobra.Command, _ []string) {
-		fallBackToLocal()
 	},
 }
 

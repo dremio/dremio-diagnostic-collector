@@ -379,6 +379,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 
 	// archives the collected files
 	// creates the summary file too
+	simplelog.Debugf("archiving collected files to %v", outputLoc)
 	err = s.ArchiveDiag(outString, outputLoc)
 	if err != nil {
 		return err
