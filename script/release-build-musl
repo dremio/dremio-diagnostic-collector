@@ -46,14 +46,12 @@ date "+%H:%M:%S"
 
 if ! type "x86_64-linux-musl-cc" > /dev/null; then
     echo "x86_64-linux-musl-cc not found installing…"
+    rm -fr ./musl-build
     git clone https://github.com/richfelker/musl-cross-make.git ./musl-build
     cd ./musl-build
-    TARGET=x86_64-linux-musl
-    make
-    make install
-    TARGET=aarch64-linux-musl
-    make
-    make install
+    CORES=$(getconf _NPROCESSORS_ONLN)
+    TARGET=x86_64-linux-musl make -j$CORES install
+    TARGET=aarch64-linux-musl make -j$CORES install
     cd ..
 
     MUSL_BIN="$(PWD)/musl-build/output/bin/"
@@ -77,30 +75,31 @@ zip ./bin/ddc.zip ./bin/ddc
 mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
 rm ./bin/ddc
 
-
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
 GCO_ENABLED=1 CC=x86_64-linux-musl-cc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
-
-
 GCO_ENABLED=1 CC=aarch64-linux-musl-cc GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building darwin-os-x-amd64…"
 date "+%H:%M:%S"
-
 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 zip ./bin/ddc-mac-intel.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building darwin-os-x-arm64…"
 date "+%H:%M:%S"
 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building windows-amd64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
 zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building windows-arm64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
