@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/awselogs"
+	local "github.com/dremio/dremio-diagnostic-collector/v3/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/fallback"
@@ -161,7 +162,6 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	clusterCollect := func() {}
 	var collectorStrategy collection.Collector
 	if fallbackEnabled {
-
 		simplelog.Info("using fallback based collection")
 		collectorStrategy = fallback.NewFallback(hook)
 		consoleprint.UpdateRuntime(
@@ -272,13 +272,8 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
-	// for local collect enablefallback
-	isLocalCollect := foundCmd.Use == localCollectCmd.Use
-	if isLocalCollect {
-		fallBackToLocal()
-	}
 	// default cmd if no cmd is given
-	if err == nil && (foundCmd.Use == RootCmd.Use || isLocalCollect) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
+	if err == nil && (foundCmd.Use == RootCmd.Use) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
@@ -631,21 +626,10 @@ func init() {
 	execLocDir := filepath.Dir(execLoc)
 	RootCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
 
-	// local collect only flags
-	// command to keep consistency with the old local-collect command
-	localCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	// init
-	RootCmd.AddCommand(localCollectCmd)
+	RootCmd.AddCommand(local.LocalCollectCmd)
 	RootCmd.AddCommand(version.VersionCmd)
 	RootCmd.AddCommand(awselogs.AWSELogsCmd)
-}
-
-var localCollectCmd = &cobra.Command{
-	Use:   "local-collect",
-	Short: "Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
-	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
-	Run: func(_ *cobra.Command, _ []string) {
-	},
 }
 
 func validateSSHParameters(sshArgs ssh.Args) error {
