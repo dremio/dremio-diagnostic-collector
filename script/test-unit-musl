@@ -11,4 +11,11 @@ cd "$(dirname "$0")/.."
 ./script/clean
 ./script/build-musl
 export SKIP_INTEGRATION_SETUP=true
- CGO_ENABLED=1 CC=musl-gcc go test --ldflags '-linkmode external -extldflags "-static"' -race -short -coverpkg=./... -coverprofile=covprofile ./...
+
+
+arch=$(uname -m)
+if test "$arch" = "x86_64"; then
+    CC=x86_64-linux-musl-cc CGO_ENABLED=1 go test --ldflags '-linkmode external -extldflags "-static"' -race -short -coverpkg=./... -coverprofile=covprofile ./...
+else
+    CC=aarch64-linux-musl-cc CGO_ENABLED=1 go test --ldflags '-linkmode external -extldflags "-static"' -race -short -coverpkg=./... -coverprofile=covprofile ./...
+fi
