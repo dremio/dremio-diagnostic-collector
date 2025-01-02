@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/awselogs"
-	local "github.com/dremio/dremio-diagnostic-collector/v3/cmd/local"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/fallback"
@@ -62,6 +61,7 @@ var (
 )
 
 var outputLoc string
+var legacyOutputDir string
 
 var (
 	sudoUser              string
@@ -149,12 +149,23 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		0,
 	)
 	consoleprint.UpdateCollectionMode(collectionArgs.CollectionMode)
-	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
+	var outputDir string
+	var err error
+	if legacyOutputDir != "" {
+		// this should only be set when the local collect command is used
+		hostname, err := os.Hostname()
+		if err != nil {
+			return fmt.Errorf("unable to get hostname: %w", err)
+		}
+		outputLoc = filepath.Join(legacyOutputDir, fmt.Sprintf("%v.tar.gz", hostname))
+	}
+	outputDir, err = filepath.Abs(filepath.Dir(outputLoc))
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
 	if err != nil {
 		return fmt.Errorf("error when getting directory for copy strategy: %w", err)
 	}
+
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
 	hook.AddFinalSteps(cs.Close, "running cleanup on copy strategy")
 	clusterCollect := func() {}
@@ -270,8 +281,13 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
+	// for local collect enablefallback
+	isLocalCollect := foundCmd.Use == localCollectCmd.Use
+	if isLocalCollect {
+		fallBackToLocal()
+	}
 	// default cmd if no cmd is given
-	if err == nil && foundCmd.Use == RootCmd.Use && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
+	if err == nil && (foundCmd.Use == RootCmd.Use || isLocalCollect) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
@@ -307,7 +323,7 @@ func Execute(args []string) error {
 			}
 		}
 
-		skipPromptUI := disablePrompt || detectNamespace || (namespace != "") || sshUser != ""
+		skipPromptUI := enableFallback || disablePrompt || detectNamespace || (namespace != "") || sshUser != ""
 		if !skipPromptUI {
 			// fire configuration prompt
 			prompt := promptui.Select{
@@ -402,7 +418,7 @@ func Execute(args []string) error {
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
-				return fmt.Errorf("Unable to get the ssh directory. This is a critical error and should result in a bug report: %w", err)
+				return fmt.Errorf("unable to get the ssh directory. This is a critical error and should result in a bug report: %w", err)
 			}
 			sshKeyLoc = sshDefault
 		}
@@ -452,37 +468,41 @@ func Execute(args []string) error {
 			dremioPAT = pat
 		}
 		patSet := dremioPAT != ""
-		var enableFallback bool
 		if detectNamespace {
-			enableFallback := func(err error) {
-				enableFallback = true
-				// falling back to local collect
-				msg := fmt.Sprintf("unable to detect namespace (%v) falling back to local-collect", err)
-				consoleprint.WarningPrint(msg)
-				simplelog.Error(msg)
-			}
 			validateK8s := func(namespace string) {
 				rightsTester, err := kubernetes.NewK8sAPI(kubernetes.KubeArgs{Namespace: namespace}, hook)
 				if err != nil {
-					enableFallback(err)
+					msg := fmt.Sprintf("unable to unable to initialize connection to kubernetes falling back to local-collect: %v", err)
+					consoleprint.WarningPrint(msg)
+					simplelog.Error(msg)
+					fallBackToLocal()
 					return
 				}
 				testCoordinators, err := rightsTester.GetCoordinators()
 				if err != nil {
-					enableFallback(err)
+					msg := fmt.Sprintf("not sufficient rights to collect the coordinator diagnostic information via the Kubernetes API falling back to local-collect: %v", err)
+					consoleprint.WarningPrint(msg)
+					simplelog.Error(msg)
+					fallBackToLocal()
 					return
 				}
 				for _, c := range testCoordinators {
 					_, err := rightsTester.HostExecute(false, c, "ls")
 					if err != nil {
-						enableFallback(err)
+						msg := fmt.Sprintf("not sufficient rights to collect the executor diagnostic information via the Kubernetes API falling back to local-collect: %v", err)
+						consoleprint.WarningPrint(msg)
+						simplelog.Error(msg)
+						fallBackToLocal()
 						return
 					}
 				}
 			}
 			b, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 			if err != nil {
-				enableFallback(err)
+				msg := fmt.Sprintf("did not find the namespace so falling back to local-collect: %v", err)
+				consoleprint.WarningPrint(msg)
+				simplelog.Error(msg)
+				fallBackToLocal()
 			} else {
 				namespace = string(b)
 				validateK8s(namespace)
@@ -595,22 +615,23 @@ func init() {
 	RootCmd.Flags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 
 	// shared flags
-	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
-	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
-	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
-	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
-	RootCmd.Flags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
-	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
-	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
-	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
+	RootCmd.PersistentFlags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	RootCmd.PersistentFlags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
+	RootCmd.PersistentFlags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
+	RootCmd.PersistentFlags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
+	RootCmd.PersistentFlags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
+	RootCmd.PersistentFlags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
+	RootCmd.PersistentFlags().StringVar(&pid, "pid", "", "write a pid")
+	if err := RootCmd.PersistentFlags().MarkHidden("pid"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
 	var defaultMaxFreeSpace uint64 = 40
-	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
-	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
+	RootCmd.PersistentFlags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
+	RootCmd.PersistentFlags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
+
 	execLoc, err := os.Executable()
 	if err != nil {
 		fmt.Printf("unable to find ddc, critical error %v", err)
@@ -619,10 +640,23 @@ func init() {
 	execLocDir := filepath.Dir(execLoc)
 	RootCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
 
+	// local collect only flags
+	// command to keep consistency with the old local-collect command
+	localCollectCmd.Flags().StringVar(&legacyOutputDir, "tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
+
 	// init
-	RootCmd.AddCommand(local.LocalCollectCmd)
+	RootCmd.AddCommand(localCollectCmd)
 	RootCmd.AddCommand(version.VersionCmd)
 	RootCmd.AddCommand(awselogs.AWSELogsCmd)
+}
+
+var localCollectCmd = &cobra.Command{
+	Use:   "local-collect",
+	Short: "Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
+	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
+	Run: func(_ *cobra.Command, args []string) {
+		fallBackToLocal()
+	},
 }
 
 func validateSSHParameters(sshArgs ssh.Args) error {
@@ -634,3 +668,9 @@ func validateSSHParameters(sshArgs ssh.Args) error {
 	}
 	return nil
 }
+
+func fallBackToLocal() {
+	enableFallback = true
+}
+
+var enableFallback bool

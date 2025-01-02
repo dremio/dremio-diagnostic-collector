@@ -624,7 +624,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 
 var LocalCollectCmd = &cobra.Command{
 	Use:   "local-collect",
-	Short: "retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
+	Short: "Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
 	Run: func(cobraCmd *cobra.Command, args []string) {
 		overrides := make(map[string]string)
@@ -761,7 +761,7 @@ func init() {
 	// wire up override flags
 	LocalCollectCmd.Flags().CountP("verbose", "v", "Logging verbosity")
 	LocalCollectCmd.Flags().String("dremio-pat-token", "	", "Dremio Personal Access Token (PAT)")
-	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final diag.tgz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
+	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
 	LocalCollectCmd.Flags().Int(conf.KeyMinFreeSpaceGB, 40, "min free space needed in GB for the process to run")
 	if err := LocalCollectCmd.Flags().MarkHidden(conf.KeyMinFreeSpaceGB); err != nil {
