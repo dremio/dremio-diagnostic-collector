@@ -61,7 +61,7 @@ if ! type "x86_64-linux-musl-cc" > /dev/null; then
     TARGET=aarch64-linux-musl make -j$JOBS install
     cd ..
 
-    MUSL_BIN="$(PWD)/musl-build/output/bin/"
+    MUSL_BIN="$(pwd)/musl-build/output/bin/"
     PATH=$PATH:$MUSL_BIN;
 fi
 

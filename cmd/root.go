@@ -60,8 +60,10 @@ var (
 	ddcYamlLoc     string
 )
 
-var outputLoc string
-var legacyOutputDir string
+var (
+	outputLoc       string
+	legacyOutputDir string
+)
 
 var (
 	sudoUser              string
@@ -654,7 +656,7 @@ var localCollectCmd = &cobra.Command{
 	Use:   "local-collect",
 	Short: "Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support",
 	Long:  `Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support. This subcommand needs to be run with enough permissions to read the /proc filesystem, the dremio logs and configuration files`,
-	Run: func(_ *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fallBackToLocal()
 	},
 }

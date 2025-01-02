@@ -79,7 +79,7 @@ func TestUnzipWithNonZipFile(t *testing.T) {
 	}
 	f.Close()
 
-	if err := Unzip(f.Name()); err == nil {
+	if err := UnzipAndRemoveZip(f.Name()); err == nil {
 		t.Errorf("expected an error but got nil")
 	}
 
@@ -92,7 +92,7 @@ func TestUnzipWithTooManyFilesInZip(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error reading testdata %v", err)
 	}
-	if err := Unzip(filepath.Join("testdata", "test-too-many-files.zip")); err == nil {
+	if err := UnzipAndRemoveZip(filepath.Join("testdata", "test-too-many-files.zip")); err == nil {
 		t.Errorf("expected an error but got nil")
 	}
 	entriesAfter, err := os.ReadDir("testdata")
