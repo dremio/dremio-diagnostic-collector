@@ -44,8 +44,8 @@ fi
 if ! type "x86_64-linux-musl-cc" > /dev/null; then
     echo "x86_64-linux-musl-cc not found installing…"
     rm -fr ./musl-build
-    git clone https://github.com/richfelker/musl-cross-make.git ./musl-build
-    cd ./musl-build
+    git clone https://github.com/richfelker/musl-cross-make.git $HOME/musl-build
+    cd $HOME/musl-build
     CORES=$(getconf _NPROCESSORS_ONLN)
     MIN_CORES=4
     JOBS=$(( $CORES < $MIN_CORES ? $CORES : $MIN_CORES ))
@@ -56,8 +56,8 @@ if ! type "x86_64-linux-musl-cc" > /dev/null; then
     TARGET=x86_64-linux-musl make -j$JOBS install
     TARGET=aarch64-linux-musl make -j$JOBS 
     TARGET=aarch64-linux-musl make -j$JOBS install
-    cd ..
-    MUSL_BIN="$(PWD)/musl-build/output/bin/"
+    cd "$(dirname "$0")/.."
+    MUSL_BIN="$HOME/musl-build/output/bin/"
     PATH=$PATH:$MUSL_BIN;
 fi
 
