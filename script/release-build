@@ -52,7 +52,17 @@ GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/ma
 cp ./default-ddc.yaml ./bin/ddc.yaml
 zip ./bin/ddc.zip ./bin/ddc
 rm ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
+mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-amd64.zip
+
+echo "Building embedded binary for linux-arm64…"
+date "+%H:%M:%S"
+touch ./cmd/root/ddcbinary/output/ddc.zip
+GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
+cp ./default-ddc.yaml ./bin/ddc.yaml
+zip ./bin/ddc.zip ./bin/ddc
+rm ./bin/ddc
+mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
+
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
