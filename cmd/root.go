@@ -149,12 +149,14 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		0,
 	)
 	consoleprint.UpdateCollectionMode(collectionArgs.CollectionMode)
+
 	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
 	// This is where the SSH or K8s collection is determined. We create an instance of the interface based on this
 	// which then determines whether the commands are routed to the SSH or K8s commands
 	if err != nil {
 		return fmt.Errorf("error when getting directory for copy strategy: %w", err)
 	}
+
 	cs := helpers.NewHCCopyStrategy(collectionArgs.DDCfs, &helpers.RealTimeService{}, outputDir)
 	hook.AddFinalSteps(cs.Close, "running cleanup on copy strategy")
 	clusterCollect := func() {}
@@ -271,7 +273,7 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
-	if err == nil && foundCmd.Use == RootCmd.Use && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
+	if err == nil && (foundCmd.Use == RootCmd.Use) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
@@ -307,7 +309,7 @@ func Execute(args []string) error {
 			}
 		}
 
-		skipPromptUI := disablePrompt || detectNamespace || (namespace != "") || sshUser != ""
+		skipPromptUI := enableFallback || disablePrompt || detectNamespace || (namespace != "") || sshUser != ""
 		if !skipPromptUI {
 			// fire configuration prompt
 			prompt := promptui.Select{
@@ -402,7 +404,7 @@ func Execute(args []string) error {
 		if sshKeyLoc == "" {
 			sshDefault, err := sshDefault()
 			if err != nil {
-				return fmt.Errorf("Unable to get the ssh directory. This is a critical error and should result in a bug report: %w", err)
+				return fmt.Errorf("unable to get the ssh directory. This is a critical error and should result in a bug report: %w", err)
 			}
 			sshKeyLoc = sshDefault
 		}
@@ -452,37 +454,41 @@ func Execute(args []string) error {
 			dremioPAT = pat
 		}
 		patSet := dremioPAT != ""
-		var enableFallback bool
 		if detectNamespace {
-			enableFallback := func(err error) {
-				enableFallback = true
-				// falling back to local collect
-				msg := fmt.Sprintf("unable to detect namespace (%v) falling back to local-collect", err)
-				consoleprint.WarningPrint(msg)
-				simplelog.Error(msg)
-			}
 			validateK8s := func(namespace string) {
 				rightsTester, err := kubernetes.NewK8sAPI(kubernetes.KubeArgs{Namespace: namespace}, hook)
 				if err != nil {
-					enableFallback(err)
+					msg := fmt.Sprintf("unable to unable to initialize connection to kubernetes falling back to local-collect: %v", err)
+					consoleprint.WarningPrint(msg)
+					simplelog.Error(msg)
+					fallBackToLocal()
 					return
 				}
 				testCoordinators, err := rightsTester.GetCoordinators()
 				if err != nil {
-					enableFallback(err)
+					msg := fmt.Sprintf("not sufficient rights to collect the coordinator diagnostic information via the Kubernetes API falling back to local-collect: %v", err)
+					consoleprint.WarningPrint(msg)
+					simplelog.Error(msg)
+					fallBackToLocal()
 					return
 				}
 				for _, c := range testCoordinators {
 					_, err := rightsTester.HostExecute(false, c, "ls")
 					if err != nil {
-						enableFallback(err)
+						msg := fmt.Sprintf("not sufficient rights to collect the executor diagnostic information via the Kubernetes API falling back to local-collect: %v", err)
+						consoleprint.WarningPrint(msg)
+						simplelog.Error(msg)
+						fallBackToLocal()
 						return
 					}
 				}
 			}
 			b, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 			if err != nil {
-				enableFallback(err)
+				msg := fmt.Sprintf("did not find the namespace so falling back to local-collect: %v", err)
+				consoleprint.WarningPrint(msg)
+				simplelog.Error(msg)
+				fallBackToLocal()
 			} else {
 				namespace = string(b)
 				validateK8s(namespace)
@@ -611,6 +617,7 @@ func init() {
 	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
+
 	execLoc, err := os.Executable()
 	if err != nil {
 		fmt.Printf("unable to find ddc, critical error %v", err)
@@ -634,3 +641,9 @@ func validateSSHParameters(sshArgs ssh.Args) error {
 	}
 	return nil
 }
+
+func fallBackToLocal() {
+	enableFallback = true
+}
+
+var enableFallback bool

@@ -189,8 +189,8 @@ dremio-rocksdb-dir: %v
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", coordinator, "queries.json.gz"))
 
 	// check gc logs (this relies on some black magic to work, on the ci server we make sure to touch the gc logs via cron)
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", coordinator, "gc.log.0"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", executor, "gc.log.0"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", coordinator, "gc.log"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", executor, "gc.log"))
 
 	// check conf files
 

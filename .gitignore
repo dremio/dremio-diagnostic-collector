@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+musl-build/
 
 
 ddc.log

@@ -26,19 +26,33 @@ func TestWriteOutDDC(t *testing.T) {
 	defer os.RemoveAll(tempDir) // clean up
 
 	// Call the WriteOutDDC function
-	ddcFilePath, err := WriteOutDDC(tempDir)
+	ddcBinaryInfo, err := WriteOutDDC(tempDir)
 	if err != nil {
 		t.Fatalf("WriteOutDDC failed: %v", err)
 	}
 
+	intelDDCFilePath := ddcBinaryInfo.IntelBinaryLocation
+
 	// Verify that the zip file was deleted
-	zipFilePath := ddcFilePath + ".zip"
+	zipFilePath := intelDDCFilePath + ".zip"
 	if _, err := os.Stat(zipFilePath); !os.IsNotExist(err) {
 		t.Errorf("zip file was not deleted: %v", err)
 	}
 
 	// Verify that the ddc file exists and can be opened
-	if _, err := os.Stat(ddcFilePath); os.IsNotExist(err) {
+	if _, err := os.Stat(intelDDCFilePath); os.IsNotExist(err) {
+		t.Errorf("ddc file does not exist: %v", err)
+	}
+
+	armDDCFilePath := ddcBinaryInfo.ArmBinaryLocation
+	// Verify that the zip file was deleted
+	zipFilePath = armDDCFilePath + ".zip"
+	if _, err := os.Stat(zipFilePath); !os.IsNotExist(err) {
+		t.Errorf("zip file was not deleted: %v", err)
+	}
+
+	// Verify that the ddc file exists and can be opened
+	if _, err := os.Stat(armDDCFilePath); os.IsNotExist(err) {
 		t.Errorf("ddc file does not exist: %v", err)
 	}
 }
@@ -65,7 +79,7 @@ func TestUnzipWithNonZipFile(t *testing.T) {
 	}
 	f.Close()
 
-	if err := Unzip(f.Name()); err == nil {
+	if err := UnzipAndRemoveZip(f.Name()); err == nil {
 		t.Errorf("expected an error but got nil")
 	}
 
@@ -78,7 +92,7 @@ func TestUnzipWithTooManyFilesInZip(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error reading testdata %v", err)
 	}
-	if err := Unzip(filepath.Join("testdata", "test-too-many-files.zip")); err == nil {
+	if err := UnzipAndRemoveZip(filepath.Join("testdata", "test-too-many-files.zip")); err == nil {
 		t.Errorf("expected an error but got nil")
 	}
 	entriesAfter, err := os.ReadDir("testdata")

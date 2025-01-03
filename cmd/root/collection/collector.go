@@ -152,7 +152,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	transferThreads := collectionArgs.TransferThreads
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
-	err = os.Mkdir(tmpInstallDir, 0o700)
+	err = os.MkdirAll(tmpInstallDir, 0o700)
 	if err != nil {
 		return err
 	}
@@ -379,6 +379,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 
 	// archives the collected files
 	// creates the summary file too
+	simplelog.Debugf("archiving collected files to %v", outputLoc)
 	err = s.ArchiveDiag(outString, outputLoc)
 	if err != nil {
 		return err

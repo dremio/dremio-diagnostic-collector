@@ -4,6 +4,7 @@
 
 echo "Checking if zip is installed…"
 date "+%H:%M:%S"
+cd "$(dirname "$0")/.."
 
 if ! type "zip" > /dev/null; then
     echo "zip not found installing…"
@@ -44,35 +45,70 @@ echo "Cleaning bin folder…"
 date "+%H:%M:%S"
 ./script/clean
 
+if ! type "x86_64-linux-musl-cc" > /dev/null; then
+    echo "x86_64-linux-musl-cc not found installing…"
+    git clone https://github.com/richfelker/musl-cross-make.git $HOME/musl-build
+    cd $HOME/musl-build
+    CORES=$(getconf _NPROCESSORS_ONLN)
+    MIN_CORES=4
+    JOBS=$(( $CORES < $MIN_CORES ? $CORES : $MIN_CORES ))
+    echo "####################################"
+    echo "## running make with $JOBS job(s) ##" 
+    echo "####################################"
+    TARGET=x86_64-linux-musl make -j$JOBS
+    TARGET=x86_64-linux-musl make -j$JOBS install
+    TARGET=aarch64-linux-musl make -j$JOBS
+    TARGET=aarch64-linux-musl make -j$JOBS install
+    cd "$(dirname "$0")/.."
+
+    MUSL_BIN="$HOME/musl-build/output/bin/"
+    PATH=$PATH:$MUSL_BIN;
+fi
+
 
 echo "Building embedded binary for linux-amd64…"
 date "+%H:%M:%S"
-touch ./cmd/root/ddcbinary/output/ddc.zip
-GCO_ENABLED=1 CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
-cp ./default-ddc.yaml ./bin/ddc.yaml
+
+CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
 zip ./bin/ddc.zip ./bin/ddc
+mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-amd64.zip
 rm ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc.zip
+
+echo "Building embedded binary for linux-arm64…"
+date "+%H:%M:%S"
+
+CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
+zip ./bin/ddc.zip ./bin/ddc
+mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
+rm ./bin/ddc
+
+cp ./default-ddc.yaml ./bin/ddc.yaml
+
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
-GCO_ENABLED=1 CC=musl-gcc GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
-GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
+CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
 zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building darwin-os-x-amd64…"
 date "+%H:%M:%S"
 GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 zip ./bin/ddc-mac-intel.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building darwin-os-x-arm64…"
 date "+%H:%M:%S"
 GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
 zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building windows-amd64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
 zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md
+
 echo "Building windows-arm64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
