@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.1] - 2024-01-09
+
+### Fixed
+
+* -l selector was not being applied when kubectl was available
+
 ## [3.3.0] - 2024-01-03
 
 ### Added
@@ -838,6 +844,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.3.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.8...v3.3.0
 [3.2.8]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.7...v3.2.8
 [3.2.7]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.6...v3.2.7
