@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/kubernetes"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
@@ -38,13 +39,13 @@ type KubeArgs struct {
 
 // NewKubectlK8sActions is the only supported way to initialize the KubectlK8sActions struct
 // one must pass the path to kubectl
-func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string) (*CliK8sActions, error) {
+func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs) (*CliK8sActions, error) {
 	kubectl, err := exec.LookPath("kubectl")
 	if err != nil {
 		return &CliK8sActions{}, fmt.Errorf("no kubectl found: %w", err)
 	}
 	cliInstance := cli.NewCli(hook)
-
+	k8sContext := kubeArgs.K8SContext
 	if k8sContext == "" {
 		k8sContextRaw, err := cliInstance.Execute(false, kubectl, "config", "current-context")
 		if err != nil {
@@ -59,7 +60,8 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string
 	return &CliK8sActions{
 		cli:            cliInstance,
 		kubectlPath:    kubectl,
-		namespace:      namespace,
+		labelSelector:  kubeArgs.LabelSelector,
+		namespace:      kubeArgs.Namespace,
 		k8sContext:     k8sContext,
 		pidHosts:       make(map[string]string),
 		retriesEnabled: retriesEnabled,
@@ -69,6 +71,7 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, namespace, k8sContext string
 // CliK8sActions provides a way to collect and copy files using kubectl
 type CliK8sActions struct {
 	cli            cli.CmdExecutor
+	labelSelector  string
 	kubectlPath    string
 	namespace      string
 	k8sContext     string
@@ -205,7 +208,7 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", "role=dremio-cluster-pod", "-o", "name")
+	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", c.labelSelector, "-o", "name")
 	if err != nil {
 		return []string{}, err
 	}
