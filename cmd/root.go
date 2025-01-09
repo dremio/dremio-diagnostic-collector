@@ -183,7 +183,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			return err
 		}
 		if !disableKubeCtl {
-			potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs.Namespace, kubeArgs.K8SContext)
+			potentialStrategy, err := kubectl.NewKubectlK8sActions(hook, kubeArgs)
 			if err != nil {
 				simplelog.Warningf("kubectl not available failling back to kubeapi: %v", err)
 			} else {

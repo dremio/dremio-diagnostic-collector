@@ -75,10 +75,11 @@ func TestKubectlSearch(t *testing.T) {
 		StoredErrors:   []error{nil, nil, nil, nil},
 	}
 	k := CliK8sActions{
-		cli:         cli,
-		kubectlPath: "kubectl",
-		namespace:   namespace,
-		k8sContext:  k8sContext,
+		cli:           cli,
+		labelSelector: "role=dremio-pods",
+		kubectlPath:   "kubectl",
+		namespace:     namespace,
+		k8sContext:    k8sContext,
 	}
 	podNames, err := k.GetCoordinators()
 	if err != nil {
@@ -95,7 +96,7 @@ func TestKubectlSearch(t *testing.T) {
 	if len(calls) != 4 {
 		t.Errorf("expected 4 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "--context", k8sContext, "-l", "role=dremio-cluster-pod", "-o", "name"}
+	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "--context", k8sContext, "-l", "role=dremio-pods", "-o", "name"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
@@ -148,6 +149,7 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	}
 	k := CliK8sActions{
 		cli:            cli,
+		labelSelector:  "role=abc",
 		kubectlPath:    "kubectl",
 		namespace:      namespace,
 		k8sContext:     k8sContext,
