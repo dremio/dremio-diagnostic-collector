@@ -47,8 +47,10 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	}
 	if collectionMode == collects.HealthCheckCollection {
 		setDefault(confData, KeyNumberJobProfiles, 25000)
+		setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 1440) // 24 minutes for health check system tables collection since they're very important for health check analysis.
 	} else {
 		setDefault(confData, KeyNumberJobProfiles, 20)
+		setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 120) // 2 minutes for system tables collection. This is a good balance between collection speed and completeness.
 	}
 
 	// set default config
@@ -97,6 +99,5 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyRestHTTPTimeout, 30)
 	setDefault(confData, KeyDisableFreeSpaceCheck, false)
 	setDefault(confData, KeyMinFreeSpaceGB, 40)
-	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 60)
 	setDefault(confData, KeyCollectClusterIDTimeoutSeconds, 60)
 }

@@ -84,7 +84,7 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
 		{conf.KeyAllowInsecureSSL, true},
-		{conf.KeyCollectSystemTablesTimeoutSeconds, 60},
+		{conf.KeyCollectSystemTablesTimeoutSeconds, 1440},
 		{conf.KeyCollectClusterIDTimeoutSeconds, 60},
 	}
 
