@@ -132,6 +132,7 @@ type CollectConf struct {
 	nodeName                          string
 	restHTTPTimeout                   int
 	minFreeSpaceCheckGB               uint64
+	noLogDir                          bool
 
 	// variables
 	systemtables            []string
@@ -322,6 +323,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
+	c.noLogDir = GetBool(confData, KeyNoLogDir)
 	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
@@ -382,7 +384,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	if !c.isDremioCloud {
 		var detectedConfig DremioConfig
 		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs
-		if capturesATypeOfLog {
+		// because so few people would change the ddc.yaml to skip log capture when they didn't want it we have added this flag
+		if capturesATypeOfLog && !c.noLogDir {
 			// enable some autodetected directories
 			if dremioPIDIsValid {
 				var err error
@@ -429,7 +432,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			simplelog.Info(msg)
 			fmt.Println(msg)
 			if err := dirs.CheckDirectory(c.dremioLogDir, containsValidLog); err != nil {
-				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', update ddc.yaml and fix it: %w", c.dremioLogDir, err)
+				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', set dremio-log-dir in ddc.yaml or if you want to skip log dir collection run --no-log-dir: %w", c.dremioLogDir, err)
 			}
 
 		}

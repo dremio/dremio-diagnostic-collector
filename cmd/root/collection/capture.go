@@ -275,6 +275,9 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 	if disableFreeSpaceCheck {
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableFreeSpaceCheck))
 	}
+	if c.NoLogDir {
+		localCollectArgs = append(localCollectArgs, "--no-log-dir")
+	}
 	if skipRESTCollect {
 		// if skipRESTCollect is set blank the pat
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableRESTAPI))

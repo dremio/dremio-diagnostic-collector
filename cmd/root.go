@@ -77,6 +77,7 @@ var (
 	pid                   string
 	transferThreads       int
 	manualPATPrompt       bool
+	noLogDir              bool
 )
 
 // var isEmbeddedK8s bool
@@ -539,6 +540,7 @@ func Execute(args []string) error {
 			MinFreeSpaceGB:        minFreeSpaceGB,
 			CollectionMode:        collectionMode,
 			TransferThreads:       transferThreads,
+			NoLogDir:              noLogDir,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc:      sshKeyLoc,
@@ -606,6 +608,7 @@ func init() {
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
 	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
 	RootCmd.Flags().BoolVarP(&manualPATPrompt, "pat-prompt", "t", false, "prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report")
+	RootCmd.Flags().BoolVar(&noLogDir, conf.KeyNoLogDir, false, "when enabled then the process will not fail if the log directory is invalid. This is useful if one just wants to collect kubernetes log output and diagnostics information")
 	RootCmd.Flags().BoolVar(&detectNamespace, "detect-namespace", false, "detect namespace feature to pass the namespace automatically")
 	RootCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := RootCmd.Flags().MarkHidden("pid"); err != nil {
