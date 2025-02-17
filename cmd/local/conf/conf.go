@@ -179,7 +179,6 @@ func SystemTableList() []string {
 		"copy_errors_history",
 		"fragments",
 		"jobs",
-		"jobs_recent",
 		"materializations",
 		"membership",
 		"memory",
@@ -200,6 +199,7 @@ func SystemTableList() []string {
 		"cache.datasets",
 		"cache.mount_points",
 		"cache.storage_plugins",
+		"jobs_recent",
 	}
 }
 

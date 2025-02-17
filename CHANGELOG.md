@@ -11,6 +11,7 @@
 
 * increased default timeout for system table collect for health check to 1440 seconds
 * increased default timeout for system table collect for light, standard and standard+jstack to 120 seconds
+* jobs_recent sys table is collected last
 
 ## [3.3.1] - 2024-01-09
 
