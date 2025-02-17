@@ -763,6 +763,7 @@ func init() {
 	LocalCollectCmd.Flags().String("dremio-pat-token", "	", "Dremio Personal Access Token (PAT)")
 	LocalCollectCmd.Flags().String("tarball-out-dir", "/tmp/ddc", "directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command")
 	LocalCollectCmd.Flags().Bool(conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --tarball-out-dir")
+	LocalCollectCmd.Flags().Bool(conf.KeyNoLogDir, false, "when enabled then the process will not fail if the log directory is invalid. This is useful if one just wants to collect kubernetes log output and diagnostics information")
 	LocalCollectCmd.Flags().Int(conf.KeyMinFreeSpaceGB, 40, "min free space needed in GB for the process to run")
 	if err := LocalCollectCmd.Flags().MarkHidden(conf.KeyMinFreeSpaceGB); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)

@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.3.2] - 2024-02-18
+
+### Added
+
+* added new --no-log-dir flag to make it easier to skip the log directory check
+* updated the log directory check failure to provide potential next steps
+
+### Changed
+
+* increased default timeout for system table collect for health check to 1440 seconds
+* increased default timeout for system table collect for light, standard and standard+jstack to 120 seconds
+
 ## [3.3.1] - 2024-01-09
 
 ### Fixed
@@ -844,6 +856,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.8...v3.3.0
 [3.2.8]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.2.7...v3.2.8

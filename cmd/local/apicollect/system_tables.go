@@ -42,8 +42,9 @@ func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook)
 	} else {
 		systables = c.SystemtablesDremioCloud()
 	}
+	timeoutDuration := time.Duration(c.CollectSystemTablesTimeoutSeconds()) * time.Second
 	// wrap context with a timeout
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.CollectSystemTablesTimeoutSeconds())*time.Second)
+	ctx, cancel := context.WithTimeoutCause(context.Background(), timeoutDuration, fmt.Errorf("unable to complete collection of sys tables in %v, raise %v in the ddc.yaml", timeoutDuration, conf.KeyCollectSystemTablesTimeoutSeconds))
 	defer cancel() // avoid leaks
 	for _, systable := range systables {
 		// check to see if context is cancelled

@@ -73,6 +73,7 @@ type Args struct {
 	MinFreeSpaceGB        uint64
 	CollectionMode        string
 	TransferThreads       int
+	NoLogDir              bool
 }
 
 type HostCaptureConfiguration struct {
@@ -84,6 +85,7 @@ type HostCaptureConfiguration struct {
 	DremioPAT      string
 	TransferDir    string
 	CollectionMode string
+	NoLogDir       bool
 }
 
 func FilterCoordinators(coordinators []string) []string {
@@ -150,6 +152,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	minFreeSpaceGB := collectionArgs.MinFreeSpaceGB
 	collectionMode := collectionArgs.CollectionMode
 	transferThreads := collectionArgs.TransferThreads
+	noLogDir := collectionArgs.NoLogDir
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
 	err = os.MkdirAll(tmpInstallDir, 0o700)
@@ -232,6 +235,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 				TransferDir:    transferDir,
 				DremioPAT:      dremioPAT,
 				CollectionMode: collectionMode,
+				NoLogDir:       noLogDir,
 			}
 			// we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
@@ -276,6 +280,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 				DDCfs:          ddcfs,
 				TransferDir:    transferDir,
 				CollectionMode: collectionMode,
+				NoLogDir:       noLogDir,
 			}
 			// always skip executor calls
 			skipRESTCalls := true
