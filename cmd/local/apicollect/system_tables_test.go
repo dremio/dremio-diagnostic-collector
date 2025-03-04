@@ -17,12 +17,6 @@ package apicollect
 
 import (
 	"testing"
-
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-)
-
-var (
-	testConf *conf.CollectConf
 )
 
 func TestSysTableNameWithNoEscapableCharacters(t *testing.T) {
@@ -63,11 +57,4 @@ func TestSysTableNameWithAllEscapableCharacters(t *testing.T) {
 	if name != expected {
 		t.Errorf("expected %v but was %v", expected, name)
 	}
-}
-
-func TestSysTableSkip(t *testing.T) {
-	var c conf.CollectConf
-	table := c.SkipSysTables()
-	t.Logf("table: %v", table)
-
 }
