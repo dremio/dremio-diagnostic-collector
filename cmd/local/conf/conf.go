@@ -46,6 +46,14 @@ func GetString(confData map[string]interface{}, key string) string {
 	return ""
 }
 
+func GetStringArray(confData map[string]interface{}, key string) []string {
+	var e []string // empty array to fulfill return for noentry
+	if v, ok := confData[key]; ok {
+		return strings.Split(cast.ToString(v), ",")
+	}
+	return e
+}
+
 func GetInt(confData map[string]interface{}, key string) int {
 	if v, ok := confData[key]; ok {
 		return cast.ToInt(v)
@@ -123,6 +131,7 @@ type CollectConf struct {
 	collectSystemTablesExport         bool
 	collectSystemTablesTimeoutSeconds int
 	systemTablesRowLimit              int
+	skipSysTables                     []string
 	collectClusterIDTimeoutSeconds    int
 	collectOSConfig                   bool
 	collectDiskUsage                  bool
@@ -541,6 +550,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		c.collectWLM = GetBool(confData, KeyCollectWLM)
 		c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport)
 		c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
+		c.skipSysTables = GetStringArray(confData, KeySkipSysTables)
 		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
 		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 		// validate rest api configuration
@@ -761,6 +771,10 @@ func (c *CollectConf) CollectKVStoreReport() bool {
 
 func (c *CollectConf) Systemtables() []string {
 	return c.systemtables
+}
+
+func (c *CollectConf) SkipSysTables() []string {
+	return c.skipSysTables
 }
 
 func (c *CollectConf) SystemtablesDremioCloud() []string {

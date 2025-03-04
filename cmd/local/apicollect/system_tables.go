@@ -51,12 +51,25 @@ func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook)
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		err := downloadSysTable(ctx, c, hook, systable)
-		if err != nil {
-			simplelog.Errorf("%v", err) // Print instead of Error
+		if checkSkipSysTable(systable, c) {
+			simplelog.Warningf("Skipping system table %v", systable)
+		} else {
+			err := downloadSysTable(ctx, c, hook, systable)
+			if err != nil {
+				simplelog.Errorf("%v", err) // Print instead of Error
+			}
 		}
 	}
 	return nil
+}
+
+func checkSkipSysTable(systable string, c *conf.CollectConf) bool {
+	for _, skipTable := range c.SkipSysTables() {
+		if skipTable == systable {
+			return true
+		}
+	}
+	return false
 }
 
 func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.CancelHook, systable string) error {
