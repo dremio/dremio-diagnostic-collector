@@ -17,6 +17,7 @@
 package conf_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
@@ -87,12 +88,14 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		{conf.KeyCollectSystemTablesTimeoutSeconds, 1440},
 		{conf.KeyCollectClusterIDTimeoutSeconds, 60},
 		{conf.KeyNoLogDir, false},
+		{conf.KeySysTables, conf.SystemTableList()},
+		{conf.KeySysTablesCloud, conf.SystemTableListCloud()},
 	}
 
 	for _, check := range checks {
-		actual := confData[check.key]
-		if actual != check.expected {
-			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, actual, check.expected)
+		actual := fmt.Sprint(confData[check.key])
+		if actual != fmt.Sprint(check.expected) {
+			t.Errorf("Unexpected value for '%s'. \nGot:\n %v\nExpected:\n %v", check.key, actual, check.expected)
 		}
 	}
 }
@@ -151,8 +154,8 @@ func TestSetViperDefaultsQuickCollect(t *testing.T) {
 	}
 
 	for _, check := range checks {
-		actual := confData[check.key]
-		if actual != check.expected {
+		actual := fmt.Sprint(confData[check.key])
+		if actual != fmt.Sprint(check.expected) {
 			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, actual, check.expected)
 		}
 	}
@@ -212,8 +215,8 @@ func TestSetViperDefaults(t *testing.T) {
 	}
 
 	for _, check := range checks {
-		actual := confData[check.key]
-		if actual != check.expected {
+		actual := fmt.Sprint(confData[check.key])
+		if actual != fmt.Sprint(check.expected) {
 			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, actual, check.expected)
 		}
 	}
