@@ -77,5 +77,6 @@ const (
 	KeyCollectionMode                    = "collect"
 	KeyCollectClusterIDTimeoutSeconds    = "collect-cluster-id-timeout-seconds"
 	KeyCollectSystemTablesTimeoutSeconds = "collect-system-tables-timeout-seconds"
-	KeySkipSysTables                     = "skip-system-table"
+	KeySysTables                         = "system-tables"
+	KeySysTablesCloud                    = "system-tables-cloud"
 )

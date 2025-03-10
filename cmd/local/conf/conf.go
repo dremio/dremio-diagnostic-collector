@@ -49,7 +49,7 @@ func GetString(confData map[string]interface{}, key string) string {
 func GetStringArray(confData map[string]interface{}, key string) []string {
 	var e []string // empty array to fulfill return for noentry
 	if v, ok := confData[key]; ok {
-		return strings.Split(cast.ToString(v), ",")
+		return cast.ToStringSlice(v)
 	}
 	return e
 }
@@ -131,7 +131,6 @@ type CollectConf struct {
 	collectSystemTablesExport         bool
 	collectSystemTablesTimeoutSeconds int
 	systemTablesRowLimit              int
-	skipSysTables                     []string
 	collectClusterIDTimeoutSeconds    int
 	collectOSConfig                   bool
 	collectDiskUsage                  bool
@@ -144,7 +143,7 @@ type CollectConf struct {
 	noLogDir                          bool
 
 	// variables
-	systemtables            []string
+	systemTables            []string
 	systemtablesdremiocloud []string
 	dremioPID               int
 }
@@ -212,6 +211,26 @@ func SystemTableList() []string {
 	}
 }
 
+func SystemTableListCloud() []string {
+	return []string{
+		"organization.clouds",
+		"organization.privileges",
+		"organization.projects",
+		"organization.roles",
+		"organization.usage",
+		"project.engines",
+		"project.jobs",
+		"project.materializations",
+		"project.privileges",
+		"project.reflection_dependencies",
+		"project.reflections",
+		"project.\\\"tables\\\"",
+		"project.views",
+		// "project.history.events",
+		"project.history.jobs",
+	}
+}
+
 func LogConfData(confData map[string]string) {
 	for k, v := range confData {
 		if k == KeyDremioPatToken && v != "" {
@@ -237,25 +256,6 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)
 	c := &CollectConf{}
-	c.systemtables = SystemTableList()
-	c.systemtablesdremiocloud = []string{
-		"organization.clouds",
-		"organization.privileges",
-		"organization.projects",
-		"organization.roles",
-		"organization.usage",
-		"project.engines",
-		"project.jobs",
-		"project.materializations",
-		"project.privileges",
-		"project.reflection_dependencies",
-		"project.reflections",
-		"project.\\\"tables\\\"",
-		"project.views",
-		// "project.history.events",
-		"project.history.jobs",
-	}
-
 	for k, v := range confData {
 		if k == KeyDremioPatToken && v != "" {
 			simplelog.Debugf("conf key '%v':'REDACTED'", k)
@@ -550,7 +550,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		c.collectWLM = GetBool(confData, KeyCollectWLM)
 		c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport)
 		c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
-		c.skipSysTables = GetStringArray(confData, KeySkipSysTables)
+		c.systemTables = GetStringArray(confData, KeySysTables)
+		c.systemtablesdremiocloud = GetStringArray(confData, KeySysTablesCloud)
 		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
 		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
 		// validate rest api configuration
@@ -770,11 +771,7 @@ func (c *CollectConf) CollectKVStoreReport() bool {
 }
 
 func (c *CollectConf) Systemtables() []string {
-	return c.systemtables
-}
-
-func (c *CollectConf) SkipSysTables() []string {
-	return c.skipSysTables
+	return c.systemTables
 }
 
 func (c *CollectConf) SystemtablesDremioCloud() []string {
