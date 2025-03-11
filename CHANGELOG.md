@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.3.3] - 2024-03-11
+
+### Added
+
+* added new parameters in ddc.yaml `system-tables` and `system-tables-cloud` to specify which system tables a user wishes to collect. The defaults remain the same as before.
+
 ## [3.3.2] - 2024-02-18
 
 ### Added
