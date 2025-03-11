@@ -49,8 +49,8 @@ func GetNumberOfJobProfilesCollected(c *conf.CollectConf, hook shutdown.Hook) (t
 	}
 
 	if len(jobhistoryjsons) == 0 {
-		// Attempt to read job history from queries.json, if not Dremio Cloud
-		if !c.IsDremioCloud() {
+		// Attempt to read job history from queries.json, if not Dremio Cloud or REST collect
+		if !c.IsRESTCollect() {
 			files, err = os.ReadDir(c.QueriesOutDir())
 			if err != nil {
 				return 0, 0, err

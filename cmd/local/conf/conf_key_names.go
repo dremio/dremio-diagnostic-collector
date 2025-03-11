@@ -63,6 +63,7 @@ const (
 	KeyDremioGCLogsDir                   = "dremio-gclogs-dir"
 	KeyNodeName                          = "node-name"
 	KeyAcceptCollectionConsent           = "accept-collection-consent"
+	KeyIsRESTCollect                     = "is-rest-collect"
 	KeyIsDremioCloud                     = "is-dremio-cloud"
 	KeyDremioCloudProjectID              = "dremio-cloud-project-id"
 	KeyAllowInsecureSSL                  = "allow-insecure-ssl"

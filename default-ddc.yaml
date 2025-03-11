@@ -94,6 +94,7 @@
 # dremio-ttop-time-seconds: 60
 # dremio-ttop-freq-seconds: 1
 # node-name: "" //dynamically set normally
+# is-rest-collect: false
 # is-dremio-cloud: false
 # dremio-cloud-project-id: ""
 # allow-insecure-ssl: true
