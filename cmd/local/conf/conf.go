@@ -99,6 +99,7 @@ type CollectConf struct {
 	collectAuditLogs           bool
 	collectJVMFlags            bool
 	captureHeapDump            bool
+	isRESTCollect              bool
 	isDremioCloud              bool
 	dremioCloudProjectID       string
 	dremioCloudAppEndpoint     string
@@ -270,6 +271,12 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	// simplelog.InitLogger(verbose)
 	// we use dremio cloud option here to know if we should validate the log and conf dirs or not
 	c.isDremioCloud = GetBool(confData, KeyIsDremioCloud)
+	if c.isDremioCloud {
+		// Dremio Cloud is a type of REST API collect, so this is flipped to true
+		c.isRESTCollect = true
+	} else {
+		c.isRESTCollect = GetBool(confData, KeyIsRESTCollect)
+	}
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
 	c.dremioCloudProjectID = GetString(confData, KeyDremioCloudProjectID)
 	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
@@ -390,7 +397,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectJStack = GetBool(confData, KeyCollectJStack) && dremioPIDIsValid
 
 	// we do not want to validate configuration of logs for dremio cloud
-	if !c.isDremioCloud {
+	if !c.isRESTCollect {
 		var detectedConfig DremioConfig
 		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs
 		// because so few people would change the ddc.yaml to skip log capture when they didn't want it we have added this flag
@@ -868,6 +875,10 @@ func (c *CollectConf) DremioEndpoint() string {
 
 func (c *CollectConf) DremioPATToken() string {
 	return c.dremioPATToken
+}
+
+func (c *CollectConf) IsRESTCollect() bool {
+	return c.isRESTCollect
 }
 
 func (c *CollectConf) IsDremioCloud() bool {

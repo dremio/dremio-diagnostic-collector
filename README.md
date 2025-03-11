@@ -87,6 +87,16 @@ Log-only collection from a Dremio AWSE coordinator is possible via the following
 ./ddc awselogs
 ```
 
+### REST-API-only collection (works for all Dremio Software variants)
+To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
+```yaml
+is-rest-collect: true
+dremio-endpoint: "<DREMIO_ENDPOINT>"
+dremio-pat-token: "<DREMIO_PAT>"
+tarball-out-dir: /full/path/to/local/dir  # Specify local target directory
+```
+and run `./ddc local-collect` from your local machine
+
 ### Dremio Cloud
 To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
 ```yaml
@@ -94,7 +104,7 @@ is-dremio-cloud: true
 dremio-endpoint: "[eu.]dremio.cloud"    # Specify whether EU Dremio Cloud or not
 dremio-cloud-project-id: "<PROJECT_ID>"
 dremio-pat-token: "<DREMIO_PAT>"
-tmp-output-dir: /full/path/to/dir       # Specify local target directory
+tarball-out-dir: /full/path/to/dir      # Specify local target directory
 ```
 and run `./ddc local-collect` from your local machine
 

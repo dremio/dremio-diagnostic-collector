@@ -90,6 +90,8 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		{conf.KeyNoLogDir, false},
 		{conf.KeySysTables, conf.SystemTableList()},
 		{conf.KeySysTablesCloud, conf.SystemTableListCloud()},
+		{conf.KeyIsRESTCollect, false},
+		{conf.KeyIsDremioCloud, false},
 	}
 
 	for _, check := range checks {
@@ -151,6 +153,8 @@ func TestSetViperDefaultsQuickCollect(t *testing.T) {
 		{conf.KeyAcceptCollectionConsent, true},
 		{conf.KeyAllowInsecureSSL, true},
 		{conf.KeyNoLogDir, false},
+		{conf.KeyIsRESTCollect, false},
+		{conf.KeyIsDremioCloud, false},
 	}
 
 	for _, check := range checks {
@@ -212,6 +216,8 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyAcceptCollectionConsent, true},
 		{conf.KeyAllowInsecureSSL, true},
 		{conf.KeyNoLogDir, false},
+		{conf.KeyIsRESTCollect, false},
+		{conf.KeyIsDremioCloud, false},
 	}
 
 	for _, check := range checks {

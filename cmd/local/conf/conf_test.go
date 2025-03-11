@@ -132,6 +132,7 @@ var afterEachConfTest = func() {
 
 func TestConfReadingWithEUDremioCloud(t *testing.T) {
 	genericConfSetup(`
+is-rest-collect: false
 is-dremio-cloud: true
 dremio-cloud-project-id: "224653935291683895642623390599291234"
 dremio-endpoint: eu.dremio.cloud
@@ -147,6 +148,9 @@ dremio-endpoint: eu.dremio.cloud
 		t.Error("invalid conf")
 	}
 
+	if cfg.IsRESTCollect() != true {
+		t.Error("expected is-rest-collect to be flipped to true")
+	}
 	if cfg.IsDremioCloud() != true {
 		t.Error("expected is-dremio-cloud to be true")
 	}
@@ -257,6 +261,9 @@ dremio-endpoint: dremio.cloud
 		t.Error("invalid conf")
 	}
 
+	if cfg.IsRESTCollect() != true {
+		t.Error("expected is-rest-collect to be flipped to true")
+	}
 	if cfg.IsDremioCloud() != true {
 		t.Error("expected is-dremio-cloud to be true")
 	}
@@ -386,6 +393,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("expected timeout of 12 seconds for cluster id collection")
 	}
 
+	if cfg.IsRESTCollect() != false {
+		t.Error("expected is-rest-collect to be false")
+	}
 	afterEachConfTest()
 }
 

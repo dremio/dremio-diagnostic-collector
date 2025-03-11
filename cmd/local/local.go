@@ -64,7 +64,7 @@ var (
 
 func createAllDirs(c *conf.CollectConf) error {
 	var perms fs.FileMode = 0o750
-	if !c.IsDremioCloud() {
+	if !c.IsRESTCollect() {
 		if err := os.MkdirAll(c.ConfigurationOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create configuration directory %v: %w", c.ConfigurationOutDir(), err)
 		}
@@ -80,9 +80,6 @@ func createAllDirs(c *conf.CollectConf) error {
 		if err := os.MkdirAll(c.KubernetesOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create kubernetes directory: %w", err)
 		}
-		if err := os.MkdirAll(c.KVstoreOutDir(), perms); err != nil {
-			return fmt.Errorf("unable to create kvstore directory: %w", err)
-		}
 		if err := os.MkdirAll(c.LogsOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create logs directory: %w", err)
 		}
@@ -94,6 +91,11 @@ func createAllDirs(c *conf.CollectConf) error {
 		}
 		if err := os.MkdirAll(c.TtopOutDir(), perms); err != nil {
 			return fmt.Errorf("unable to create ttop directory: %w", err)
+		}
+	}
+	if !c.IsDremioCloud() {
+		if err := os.MkdirAll(c.KVstoreOutDir(), perms); err != nil {
+			return fmt.Errorf("unable to create kvstore directory: %w", err)
 		}
 	}
 
@@ -163,7 +165,9 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 		} else {
 			t.AddJob(wrapConfigJob("KV STORE COLLECTION", apicollect.RunCollectKvReport))
 		}
+	}
 
+	if !c.IsRESTCollect() {
 		if !c.CollectDiskUsage() {
 			simplelog.Info("Skipping disk usage collection")
 		} else {
