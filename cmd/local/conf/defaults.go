@@ -14,7 +14,9 @@
 
 package conf
 
-import "github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+import (
+	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+)
 
 func setDefault(confData map[string]interface{}, key string, value interface{}) {
 	// if key is not present go ahead and set it
@@ -101,4 +103,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyNoLogDir, false)
 	setDefault(confData, KeyMinFreeSpaceGB, 40)
 	setDefault(confData, KeyCollectClusterIDTimeoutSeconds, 60)
+	setDefault(confData, KeySysTables, SystemTableList())
+	setDefault(confData, KeySysTablesCloud, SystemTableListCloud())
 }

@@ -15,7 +15,9 @@
 // apicollect provides all the methods that collect via the API, this is a substantial part of the activities of DDC so it gets it's own package
 package apicollect
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestSysTableNameWithNoEscapableCharacters(t *testing.T) {
 	urlsuffix := ""
