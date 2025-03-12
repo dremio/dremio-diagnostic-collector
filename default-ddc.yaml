@@ -69,7 +69,6 @@
 #  - "cache.datasets"
 #  - "cache.mount_points"
 #  - "cache.storage_plugins"
-#  - "jobs_recent"
 # system-tables-cloud: 	
 #  - "organization.clouds"
 #  - "organization.privileges"
@@ -95,6 +94,7 @@
 # dremio-ttop-freq-seconds: 1
 # node-name: "" //dynamically set normally
 # is-rest-collect: false
+# rest-collect-daily-jobs-limit: 100000
 # is-dremio-cloud: false
 # dremio-cloud-project-id: ""
 # allow-insecure-ssl: true

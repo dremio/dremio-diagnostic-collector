@@ -728,7 +728,9 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 			simplelog.Errorf("unable to cleanup %v: %v", c.TarballOutDir(), err)
 		}
 	}
-	fmt.Println("looking for logs in: " + c.DremioLogDir())
+	if !c.IsRESTCollect() {
+		fmt.Println("looking for logs in: " + c.DremioLogDir())
+	}
 
 	// Run application
 	simplelog.Info("Starting collection...")

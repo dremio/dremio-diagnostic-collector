@@ -96,6 +96,7 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyNodeName, hostName)
 	setDefault(confData, KeyAcceptCollectionConsent, true)
 	setDefault(confData, KeyIsRESTCollect, false)
+	setDefault(confData, KeyRESTCollectDailyJobsLimit, 100000)
 	setDefault(confData, KeyIsDremioCloud, false)
 	setDefault(confData, KeyDremioCloudProjectID, "")
 	setDefault(confData, KeyAllowInsecureSSL, true)

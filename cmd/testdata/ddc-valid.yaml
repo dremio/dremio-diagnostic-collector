@@ -50,6 +50,7 @@ dremio-pat-token: "my-pat" # when set will attempt to collect Workload Manager, 
 # dremio-ttop-freq-seconds: 1
 # node-name: "" //dynamically set normally
 # is-rest-collect: false
+# rest-collect-daily-jobs-limit: 100000
 # is-dremio-cloud: false
 # dremio-cloud-project-id: ""
 # allow-insecure-ssl: true

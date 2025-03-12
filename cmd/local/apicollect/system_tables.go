@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,11 +36,33 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
+type Stat struct {
+	Date             string `json:"date"`
+	JobCount         int    `json:"jobCount"`
+	UniqueUsersCount int    `json:"uniqueUsersCount"`
+}
+
+type ClusterUsage struct {
+	Edition string `json:"edition"`
+	Stats   []Stat `json:"stats"`
+}
+
 func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	simplelog.Debugf("Collecting results from Export System Tables...")
 	var systables []string
 	if !c.IsDremioCloud() {
 		systables = c.Systemtables()
+		// sys.jobs_recent only to be collected in REST-only mode
+		if c.IsRESTCollect() {
+			// sys.jobs_recent only to be collected for small to medium sized clusters
+			err := validateClusterUsage(c)
+			if err != nil {
+				simplelog.Warningf("Skipping sys.jobs_recent: %v", err)
+			} else {
+				simplelog.Debugf("Adding sys.jobs_recent to collection")
+				systables = append(systables, "jobs_recent")
+			}
+		}
 	} else {
 		systables = c.SystemtablesDremioCloud()
 	}
@@ -59,6 +83,69 @@ func RunCollectDremioSystemTables(c *conf.CollectConf, hook shutdown.CancelHook)
 	return nil
 }
 
+func validateClusterUsage(c *conf.CollectConf) (err error) {
+	clusterusagefile := "cluster_usage.json"
+	// Check if cluster usage is within limits, as sys.jobs_recent table performance can suffer on high volume clusters
+	var files []fs.DirEntry
+	files, err = os.ReadDir(c.WLMOutDir())
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		if strings.Contains(file.Name(), clusterusagefile) {
+			filename := path.Join(c.WLMOutDir(), file.Name())
+			data, err := openJSON(filename)
+			if err != nil {
+				return err
+			}
+			averageDailyJobCount, err := calculateJobCount(data)
+			if err != nil {
+				return err
+			}
+			if averageDailyJobCount > c.RestCollectDailyJobsLimit() {
+				return fmt.Errorf("average daily job count %v above allowed limit of %v", averageDailyJobCount, c.RestCollectDailyJobsLimit())
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("unable to find %v in wlm dir", clusterusagefile)
+}
+
+func openJSON(filename string) ([]byte, error) {
+	var bytedata []byte
+	data, err := os.Open(path.Clean(filename))
+	if err != nil {
+		simplelog.Errorf("can't open %v: %v", filename, err)
+		return bytedata, err
+	}
+	defer errCheck(data.Close)
+
+	bytedata, err = io.ReadAll(data)
+	if err != nil {
+		simplelog.Errorf("can't read data of %v: %v", filename, err)
+		return bytedata, err
+	}
+	return bytedata, nil
+}
+
+func calculateJobCount(data []byte) (int, error) {
+	var stats ClusterUsage
+	err := json.Unmarshal(data, &stats)
+	if err != nil {
+		return -1, err
+	}
+
+	sum := 0
+	daycount := 1 // Avoid divide by zero
+	for _, stat := range stats.Stats {
+		sum += stat.JobCount
+		daycount += 1
+	}
+	averageDailyJobCount := sum / daycount
+
+	return averageDailyJobCount, nil
+}
+
 func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.CancelHook, systable string) error {
 	tablerowlimit := strconv.Itoa(c.SystemTablesRowLimit())
 
@@ -75,7 +162,12 @@ func downloadSysTable(ctx context.Context, c *conf.CollectConf, hook shutdown.Ca
 	sql := "SELECT * FROM sys." + systable
 	// job history is limited by the number of days, all other sys tables are limited by the number of rows
 	if strings.Contains(systable, "project.history.jobs") || strings.Contains(systable, "jobs_recent") {
-		daylimit := strconv.Itoa(c.DremioQueriesJSONNumDays())
+		maxdaylimit := 7
+		if c.DremioQueriesJSONNumDays() < maxdaylimit {
+			maxdaylimit = c.DremioQueriesJSONNumDays()
+		}
+		daylimit := strconv.Itoa(maxdaylimit)
+
 		sql += " WHERE submitted_ts > DATE_SUB(CAST(NOW() AS DATE), CAST(" + daylimit + " AS INTERVAL DAY))"
 		sql += " ORDER BY submitted_ts DESC"
 		simplelog.Debugf("Collecting sys.%v (Limit: Last %v days)", systable, daylimit)
@@ -208,4 +300,11 @@ func getSystemTableName(systable, urlsuffix string) string {
 	// go ahead and remove & because it will look weird by itself in the file name
 	filename = strings.Replace(filename, "&", "_", -1)
 	return strings.Replace(filename, "\\\"", "", -1)
+}
+
+func errCheck(f func() error) {
+	err := f()
+	if err != nil {
+		simplelog.Errorf("received error: %v", err)
+	}
 }
