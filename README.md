@@ -24,14 +24,69 @@ Download the [latest release binary](https://github.com/dremio/dremio-diagnostic
 ddc
 ```
 #### select transport
-![step 1: transport](select.png)
-#### select namespace for k8s
-![step 2: namespace](namespaces.png)
-#### select collection type
-![step 3: collection](collection.png)
-#### enjoy progress
-![step 4: progress](progress.png)
+```bash
+ ? select transport for file transfers: 
+  ▸ kubernetes
+    ssh
+```
 
+#### select namespace for k8s
+```bash
+✔ kubernetes
+Use the arrow keys to navigate: ↓ ↑ → ← 
+? The following k8s namespaces have dremio clusters. Select the one you want to collect from: 
+  ▸ default
+    ns1
+```
+
+#### select collection type
+```bash
+✔ kubernetes
+✔ default
+Use the arrow keys to navigate: ↓ ↑ → ← 
+? Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), standard+jstack (standard w jstack), health-check (needs PAT): 
+  ▸ light
+    standard
+    standard+jstack
+    health-check
+```
+#### enjoy progress
+```bash
+=================================
+== Dremio Diagnostic Collector ==
+=================================
+Wed, 12 Mar 2025 14:20:54 CET
+
+Version              : ddc v3.3.1-d5a0c02
+Yaml                 : /opt/homebrew/Cellar/ddc/3.3.1/libexec/ddc.yaml
+Log File             : /opt/homebrew/Cellar/ddc/3.3.1/libexec/ddc.log
+Collection Type      : Kubectl - context used: default
+Collections Enabled  : disk-usage,dremio-configuration,gc-logs,jfr,jvm-flags,meta-refresh-log,os-config,queries-json,reflection-log,server-logs,ttop,vacuum-log
+Collections Disabled : acceleration-log,access-log,audit-log,job-profiles,jstack,kvstore-report,system-tables-export,wlm
+Collection Mode      : STANDARD
+Collection Args      : namespace: 'default', label selector: 'role=dremio-cluster-pod'
+Dremio PAT Set       : No (disables Job Profiles, WLM, KV Store and System Table Reports use --collect health-check if you want these)
+Autodetect Enabled   : Yes
+
+-- status --
+Transfers Complete   : 0/1
+Collect Duration     : elapsed 17 seconds
+Tarball              : 
+Result               : 
+
+-- Warnings --
+
+
+
+Kubernetes:
+-----------
+Last file collected   : pod dremio-master-0 logs
+files collected       : 23
+
+Nodes:
+------
+1. node dremio-master-0 - elapsed 8 secs - status COPY DDC TO HOST 
+```
 
 ### Scripting - Dremio on Kubernetes
 
