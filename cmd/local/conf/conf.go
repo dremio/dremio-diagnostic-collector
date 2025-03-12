@@ -100,6 +100,7 @@ type CollectConf struct {
 	collectJVMFlags            bool
 	captureHeapDump            bool
 	isRESTCollect              bool
+	restCollectDailyJobsLimit  int
 	isDremioCloud              bool
 	dremioCloudProjectID       string
 	dremioCloudAppEndpoint     string
@@ -208,7 +209,7 @@ func SystemTableList() []string {
 		"cache.datasets",
 		"cache.mount_points",
 		"cache.storage_plugins",
-		"jobs_recent",
+		// "jobs_recent", // Only collected for REST-only collections
 	}
 }
 
@@ -277,6 +278,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	} else {
 		c.isRESTCollect = GetBool(confData, KeyIsRESTCollect)
 	}
+	c.restCollectDailyJobsLimit = GetInt(confData, KeyRESTCollectDailyJobsLimit)
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
 	c.dremioCloudProjectID = GetString(confData, KeyDremioCloudProjectID)
 	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
@@ -879,6 +881,10 @@ func (c *CollectConf) DremioPATToken() string {
 
 func (c *CollectConf) IsRESTCollect() bool {
 	return c.isRESTCollect
+}
+
+func (c *CollectConf) RestCollectDailyJobsLimit() int {
+	return c.restCollectDailyJobsLimit
 }
 
 func (c *CollectConf) IsDremioCloud() bool {

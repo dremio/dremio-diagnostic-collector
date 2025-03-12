@@ -91,6 +91,7 @@ Log-only collection from a Dremio AWSE coordinator is possible via the following
 To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
 ```yaml
 is-rest-collect: true
+rest-collect-daily-jobs-limit: 100000 # Optional; Used to prevent reading from large sys.jobs_recent table
 dremio-endpoint: "<DREMIO_ENDPOINT>"
 dremio-pat-token: "<DREMIO_PAT>"
 tarball-out-dir: /full/path/to/local/dir  # Specify local target directory
