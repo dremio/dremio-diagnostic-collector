@@ -44,6 +44,10 @@ func RunCollectWLM(c *conf.CollectConf, hook shutdown.CancelHook) error {
 			{"/api/v3/wlm/queue", "queues.json"},
 			{"/api/v3/wlm/rule", "rules.json"},
 			{"/apiv2/provision/clusters", "awse_engines.json"},
+			{"/apiv2/stats/jobsandusers", "cluster_usage.json"},
+			// {"/api/v3/cluster/stats", "cluster_stats.json"},
+			// {"/api/v3/cluster/jobstats", "cluster_jobstats.json"},
+			// {"/api/v3/stats/user", "cluster_userstats.json"},
 		}
 	} else {
 		apiobjects = [][]string{

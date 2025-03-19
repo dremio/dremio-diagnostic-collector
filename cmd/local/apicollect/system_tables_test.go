@@ -58,3 +58,39 @@ func TestSysTableNameWithAllEscapableCharacters(t *testing.T) {
 		t.Errorf("expected %v but was %v", expected, name)
 	}
 }
+
+func TestClusterUsageData(t *testing.T) {
+	filename := "../../testdata/queries/cluster_usage.json"
+	data, _ := openJSON(filename)
+	averageDailyJobCount, _ := calculateJobCount(data)
+	expected := 4580 / (7 + 1) // == 654
+	if averageDailyJobCount != expected {
+		t.Errorf("expected %v but was %v", expected, averageDailyJobCount)
+	}
+}
+
+func TestNoFile(t *testing.T) {
+	filename := "../../testdata/this_file_does_not_exist"
+	_, err := openJSON(filename)
+	if err == nil {
+		t.Errorf("expected file not found error")
+	}
+}
+
+func TestWrongJSON(t *testing.T) {
+	filename := "../../testdata/queries/bad_sys.jobs_recent.json"
+	data, err := openJSON(filename)
+	_, err = calculateJobCount(data)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+}
+
+func TestInvalidJSON(t *testing.T) {
+	filename := "../../testdata/queries/bad_queries.json"
+	data, err := openJSON(filename)
+	_, err = calculateJobCount(data)
+	if err == nil {
+		t.Errorf("expected error, due to invalid json structure")
+	}
+}

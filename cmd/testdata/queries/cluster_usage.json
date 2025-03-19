@@ -1,0 +1,44 @@
+{
+    "edition": "dremio-ee-25.2.4-202503051912590919-11cc9e3f",
+    "stats": [
+        {
+            "date": "2025-03-06",
+            "jobCount": 3642,
+            "uniqueUsersCount": 7
+        },
+        {
+            "date": "2025-03-07",
+            "jobCount": 187,
+            "uniqueUsersCount": 4
+        },
+        {
+            "date": "2025-03-08",
+            "jobCount": 53,
+            "uniqueUsersCount": 1
+        },
+        {
+            "date": "2025-03-09",
+            "jobCount": 26,
+            "uniqueUsersCount": 1
+        },
+        {
+            "date": "2025-03-10",
+            "jobCount": 422,
+            "uniqueUsersCount": 5
+        },
+        {
+            "date": "2025-03-11",
+            "jobCount": 241,
+            "uniqueUsersCount": 3
+        },
+        {
+            "date": "2025-03-12",
+            "jobCount": 9,
+            "uniqueUsersCount": 1
+        }
+    ],
+    "jobStats": [],
+    "userStatsByDate": [],
+    "userStatsByWeek": [],
+    "userStatsByMonth": []
+}
