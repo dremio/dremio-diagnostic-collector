@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.3.4] - UNKNOWN
+
+### Added
+
+* added REST-API-only `local-collect` mode for Dremio Software installations (`"is-rest-collect": true`)
+* for REST-API-only mode, added guardrail for collecting sys.jobs_recent based on cluster usage via `"rest-collect-daily-jobs-limit"`
+
+### Changed
+
+* jobs_recent sys table is not collected as part of default ddc config
+* limited sys.jobs_recent collection to 7 days maximum
+
 ## [3.3.3] - 2024-03-11
 
 ### Added
