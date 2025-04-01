@@ -83,6 +83,7 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyCollectReflectionLog, true)
 	setDefault(confData, KeyCollectVacuumLog, true)
 	setDefault(confData, KeyCollectGCLogs, true)
+	setDefault(confData, KeyCollectHSErrFiles, true)
 	setDefault(confData, KeyCollectSystemTablesExport, true)
 	setDefault(confData, KeySystemTablesRowLimit, 100000)
 	setDefault(confData, KeyCollectWLM, true)

@@ -124,6 +124,45 @@ func (l *Collector) RunCollectGcLogs() error {
 	return nil
 }
 
+func (l *Collector) RunCollectHSErrFiles() error {
+	// TODO: Make DDC auto-detect hs_err file directory and pattern from -XX:ErrorFile=./hs_err_pid<pid>.log
+	var hsErrFileDir = l.dremioLogDir
+	var hsErrFilePattern = "hs_err*"
+
+	simplelog.Debugf("Collecting hs_err files from %v using pattern %s ...", hsErrFileDir, hsErrFilePattern)
+	files, err := os.ReadDir(path.Clean(hsErrFileDir))
+	if err != nil {
+		return fmt.Errorf("error reading directory: %w", err)
+	}
+
+	var errs []error
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		matched, err := filepath.Match(hsErrFilePattern, file.Name())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error matching file pattern %v with error '%w'", hsErrFilePattern, err))
+		}
+		if matched {
+			srcPath := filepath.Join(hsErrFileDir, file.Name())
+			destPath := filepath.Join(l.logsOutDir, file.Name())
+			if err := ddcio.CopyFile(path.Clean(srcPath), path.Clean(destPath)); err != nil {
+				errs = append(errs, fmt.Errorf("error copying file %s: %w", file.Name(), err))
+				continue
+			}
+		}
+	}
+	if len(errs) > 1 {
+		return fmt.Errorf("several errors while copying hs err logs: %w", errors.Join(errs...))
+	} else if (len(errs)) == 1 {
+		return errs[0]
+	}
+	simplelog.Debug("... collecting hs_err files COMPLETED")
+
+	return nil
+}
+
 func (l *Collector) RunCollectMetadataRefreshLogs() error {
 	simplelog.Debug("Collecting metadata refresh logs from Coordinator(s) ...")
 	if err := l.exportArchivedLogs(l.dremioLogDir, "metadata_refresh.log", "metadata_refresh", l.dremioLogsNumDays); err != nil {

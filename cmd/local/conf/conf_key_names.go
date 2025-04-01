@@ -48,6 +48,7 @@ const (
 	KeyCollectReflectionLog              = "collect-reflection-log"
 	KeyCollectVacuumLog                  = "collect-vacuum-log"
 	KeyCollectGCLogs                     = "collect-gc-logs"
+	KeyCollectHSErrFiles                 = "collect-hs-err-files"
 	KeyCollectJFR                        = "collect-jfr"
 	KeyCollectJStack                     = "collect-jstack"
 	KeyCollectTtop                       = "collect-ttop"

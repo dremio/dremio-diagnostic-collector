@@ -37,6 +37,7 @@
 # collect-meta-refresh-log: true
 # collect-reflection-log: true
 # collect-gc-logs: true
+# collect-hs-err-files: true
 # collect-jfr: true
 # collect-jstack: false
 # collect-ttop: true

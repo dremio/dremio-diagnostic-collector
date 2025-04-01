@@ -90,6 +90,7 @@ collect-meta-refresh-log: true
 collect-reflection-log: true
 collect-vacuum-log: true
 collect-gc-logs: true
+collect-hs-err-files: true
 collect-jfr: true
 dremio-jfr-time-seconds: 60
 collect-jstack: true

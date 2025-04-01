@@ -258,6 +258,7 @@ collect-server-logs: false
 collect-meta-refresh-log: false
 collect-reflection-log: false
 collect-gc-logs: false
+collect-hs-err-files: false
 collect-jfr: false
 collect-jstack: false
 collect-ttop: false

@@ -36,6 +36,7 @@ dremio-pat-token: "my-pat" # when set will attempt to collect Workload Manager, 
 # collect-meta-refresh-log: true
 # collect-reflection-log: true
 # collect-gc-logs: true
+# collect-hs-err-files: true
 # collect-jfr: true
 # collect-jstack: true
 # collect-ttop: true
