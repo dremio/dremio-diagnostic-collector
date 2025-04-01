@@ -137,6 +137,7 @@ type CollectConf struct {
 	collectOSConfig                   bool
 	collectDiskUsage                  bool
 	collectGCLogs                     bool
+	collectHSErrFiles                 bool
 	collectTtop                       bool
 	collectWLM                        bool
 	nodeName                          string
@@ -338,6 +339,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectReflectionLogs = GetBool(confData, KeyCollectReflectionLog)
 	c.collectVacuumLogs = GetBool(confData, KeyCollectVacuumLog)
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
+	c.collectHSErrFiles = GetBool(confData, KeyCollectHSErrFiles)
 	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
@@ -753,6 +755,10 @@ func (c *CollectConf) CollectWLM() bool {
 
 func (c *CollectConf) CollectGCLogs() bool {
 	return c.collectGCLogs
+}
+
+func (c *CollectConf) CollectHSErrFiles() bool {
+	return c.collectHSErrFiles
 }
 
 func (c *CollectConf) CollectOSConfig() bool {

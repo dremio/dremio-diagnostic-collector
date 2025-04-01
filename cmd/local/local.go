@@ -228,6 +228,15 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 			})
 		}
 
+		if !c.CollectHSErrFiles() {
+			simplelog.Debug("Skipping hs_err file collection")
+		} else {
+			t.AddJob(threading.Job{
+				Name:    "HS ERR FILE COLLECTION",
+				Process: logCollector.RunCollectHSErrFiles,
+			})
+		}
+
 		if !c.CollectMetaRefreshLogs() {
 			simplelog.Debug("Skipping metadata refresh log collection")
 		} else {
