@@ -8,6 +8,9 @@
 * for REST-API-only mode, added guardrail for collecting sys.jobs_recent based on cluster usage via `"rest-collect-daily-jobs-limit"`
 * added `collect-hs-err-files` setting to collect any hs_err files from the log directory
 
+### Fixed
+* fixed an issue where the log directory was not being detected correctly if `queries.json` was the only log type being collected
+
 ### Changed
 
 * jobs_recent sys table is not collected as part of default ddc config

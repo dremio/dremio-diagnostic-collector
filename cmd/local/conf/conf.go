@@ -403,7 +403,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	// we do not want to validate configuration of logs for dremio cloud
 	if !c.isRESTCollect {
 		var detectedConfig DremioConfig
-		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs
+		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs || c.collectQueriesJSON
 		// because so few people would change the ddc.yaml to skip log capture when they didn't want it we have added this flag
 		if capturesATypeOfLog && !c.noLogDir {
 			// enable some autodetected directories
