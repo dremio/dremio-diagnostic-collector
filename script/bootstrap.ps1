@@ -38,12 +38,3 @@ if (-not (Get-Command "gosec" -ErrorAction SilentlyContinue)) {
     go install github.com/securego/gosec/v2/cmd/gosec@v2.19.0
 }
 
-
-Write-Output "Checking if gofumpt is installed..."
-Get-Date -Format "HH:mm:ss"
-
-if (-not (Get-Command "gofumpt" -ErrorAction SilentlyContinue)) {
-    Write-Output "gofumpt not found, installing..."
-    Get-Date -Format "HH:mm:ss"
-    go install mvdan.cc/gofumpt@latest
-}

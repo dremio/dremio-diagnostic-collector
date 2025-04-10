@@ -80,6 +80,9 @@ func TestNoFile(t *testing.T) {
 func TestWrongJSON(t *testing.T) {
 	filename := "../../testdata/queries/bad_sys.jobs_recent.json"
 	data, err := openJSON(filename)
+	if err != nil {
+		t.Errorf("unexpected error in opening the json %v", err)
+	}
 	_, err = calculateJobCount(data)
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
@@ -89,6 +92,9 @@ func TestWrongJSON(t *testing.T) {
 func TestInvalidJSON(t *testing.T) {
 	filename := "../../testdata/queries/bad_queries.json"
 	data, err := openJSON(filename)
+	if err != nil {
+		t.Errorf("unexpected error in opening the json %v", err)
+	}
 	_, err = calculateJobCount(data)
 	if err == nil {
 		t.Errorf("expected error, due to invalid json structure")

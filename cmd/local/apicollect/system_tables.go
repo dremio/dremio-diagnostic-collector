@@ -139,7 +139,7 @@ func calculateJobCount(data []byte) (int, error) {
 	daycount := 1 // Avoid divide by zero
 	for _, stat := range stats.Stats {
 		sum += stat.JobCount
-		daycount += 1
+		daycount++
 	}
 	averageDailyJobCount := sum / daycount
 
