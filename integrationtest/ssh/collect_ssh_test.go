@@ -37,8 +37,6 @@ import (
 type SSHTestConf struct {
 	SudoUser         string `json:"sudo_user"`
 	User             string `json:"user"`
-	Public           string `json:"public"`
-	Private          string `json:"private"`
 	Executor         string `json:"executor"`
 	Coordinator      string `json:"coordinator"`
 	DremioLogDir     string `json:"dremio-log-dir"`
@@ -235,16 +233,7 @@ dremio-rocksdb-dir: %v
 		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
-	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
-		t.Fatalf("unable to write ssh private key: %v", err)
-	}
-	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
-		t.Fatalf("unable to write ssh public key: %v", err)
-	}
-
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard+jstack", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard+jstack", "--min-free-space-gb", "5"}
 	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -369,15 +358,6 @@ dremio-jfr-time-seconds: 10
 		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
-	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
-		t.Fatalf("unable to write ssh private key: %v", err)
-	}
-	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
-		t.Fatalf("unable to write ssh public key: %v", err)
-	}
-
 	// set original stdin since we are going to overwrite it for now
 	org := os.Stdin
 	defer func() {
@@ -412,7 +392,7 @@ dremio-jfr-time-seconds: 10
 	}
 	os.Stdin = tmpfile
 
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb", "5"}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -625,15 +605,12 @@ func TestValidateBadCollectFlag(t *testing.T) {
 	if err := json.Unmarshal(b, &sshConf); err != nil {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
-	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
-		t.Fatalf("unable to write ssh private key: %v", err)
-	}
+
 	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
 	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0o600); err != nil {
 		t.Fatalf("unable to write ddc yaml: %v", err)
 	}
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}
+	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}
 	err = cmd.Execute(args)
 	if err == nil {
 		t.Error("collect should fail")
