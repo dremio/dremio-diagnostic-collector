@@ -648,8 +648,8 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 4 
-            memory: 16384Mi
+            cpu: "2" 
+            memory: 8192Mi
         volumeMounts:
         - name: dremio-config
           mountPath: /opt/dremio/conf
@@ -884,8 +884,8 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: 4 
-            memory: 16384Mi
+            cpu: "2"
+            memory: 8192Mi
         volumeMounts:
         - name: dremio-master-volume
           mountPath: /opt/dremio/data
@@ -1061,7 +1061,7 @@ spec:
         image: "zookeeper:3.8.0"
         resources:
           requests:
-            cpu: 0.5
+            cpu: "0.5"
             memory: 1024Mi
         ports:
         - containerPort: 2181
