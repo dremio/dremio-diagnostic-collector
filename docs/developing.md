@@ -14,8 +14,6 @@
 {   
     "sudo_user": "dremio",
     "user": "myuser", 
-    "public": "ssh-ed25519 publickey", 
-    "private":"-----BEGIN OPENSSH PRIVATE KEY-----\nprivatekey\n-----END OPENSSH PRIVATE KEY-----\n",
     "coordinator": "coordinator-ip",
     "executor": "executor1",
     "dremio-log-dir": "/opt/dremio/log",

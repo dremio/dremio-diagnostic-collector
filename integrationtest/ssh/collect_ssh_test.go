@@ -84,8 +84,6 @@ you must make one with the following format:
 {
     "sudo_user": "dremio",
     "user": "myuser", 
-    "public": "ssh-ed25519 publickey", 
-    "private":"-----BEGIN OPENSSH PRIVATE KEY-----\nprivatekey\n-----END OPENSSH PRIVATE KEY-----\n",
     "coordinator": "coordinator-ip",
     "executor": "executor1",
     "dremio-log-dir": "/opt/dremio/log",
@@ -128,16 +126,7 @@ dremio-rocksdb-dir: %v
 		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
 	}
 
-	privateKey := filepath.Join(t.TempDir(), "ssh_key")
-	if err := os.WriteFile(privateKey, []byte(sshConf.Private), 0o600); err != nil {
-		t.Fatalf("unable to write ssh private key: %v", err)
-	}
-	publicKey := filepath.Join(t.TempDir(), "ssh_key.pub")
-	if err := os.WriteFile(publicKey, []byte(sshConf.Public), 0o600); err != nil {
-		t.Fatalf("unable to write ssh public key: %v", err)
-	}
-
-	args := []string{"ddc", "-s", privateKey, "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", "5"}
 	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -173,11 +162,11 @@ dremio-rocksdb-dir: %v
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	coordinator, err := getHostName(sshConf.Coordinator, privateKey, sshConf)
+	coordinator, err := getHostName(sshConf.Coordinator, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	executor, err := getHostName(sshConf.Executor, privateKey, sshConf)
+	executor, err := getHostName(sshConf.Executor, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,11 +280,11 @@ dremio-rocksdb-dir: %v
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	coordinator, err := getHostName(sshConf.Coordinator, privateKey, sshConf)
+	coordinator, err := getHostName(sshConf.Coordinator, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	executor, err := getHostName(sshConf.Executor, privateKey, sshConf)
+	executor, err := getHostName(sshConf.Executor, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,11 +448,11 @@ dremio-jfr-time-seconds: 10
 	}
 	tests.AssertFileHasContent(t, filepath.Join(testOut, "summary.json"))
 
-	coordinator, err := getHostName(sshConf.Coordinator, privateKey, sshConf)
+	coordinator, err := getHostName(sshConf.Coordinator, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	executor, err := getHostName(sshConf.Executor, privateKey, sshConf)
+	executor, err := getHostName(sshConf.Executor, sshConf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -598,10 +587,10 @@ dremio-jfr-time-seconds: 10
 	}
 }
 
-func getHostName(ip string, sshKey string, sshConf SSHTestConf) (string, error) {
+func getHostName(ip string, sshConf SSHTestConf) (string, error) {
 	var stdOut bytes.Buffer
 	var stdErr bytes.Buffer
-	c := exec.Command("ssh", "-i", sshKey, fmt.Sprintf("%v@%v", sshConf.User, ip), "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "hostname")
+	c := exec.Command("ssh", fmt.Sprintf("%v@%v", sshConf.User, ip), "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "hostname")
 	c.Stdout = &stdOut
 	c.Stderr = &stdErr
 	if err := c.Start(); err != nil {
