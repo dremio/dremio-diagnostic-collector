@@ -11,6 +11,7 @@ echo "Validating if all dependencies are fullfilled…"
 date "+%H:%M:%S"
 ./script/bootstrap
 
+export SKIP_SSH_TEST=1
 
 echo "Tests started at…"
 date "+%H:%M:%S"

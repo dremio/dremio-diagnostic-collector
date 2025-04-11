@@ -435,7 +435,7 @@ func Execute(args []string) error {
 			}
 			if fi.Size() > 0 {
 				simplelog.Info("accepting PAT from standard in")
-				var inputReader io.Reader = RootCmd.InOrStdin()
+				inputReader := RootCmd.InOrStdin()
 				b, err := io.ReadAll(inputReader)
 				if err != nil {
 					return err

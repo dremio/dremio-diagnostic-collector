@@ -1,8 +1,24 @@
-linters-settings:
-  gosec:
-    excludes:
-    # Run everything except for rule G204
-    # will look into sanitizing pod name input as a security measure but this is too 
-    # general of a rule and we are shelling at for the time being intentionally in this tooling
-      - G204
-
+version: "2"
+linters:
+  settings:
+    gosec:
+      excludes:
+        - G204
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
