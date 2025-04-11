@@ -507,7 +507,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 
 	simplelog.Debug("/etc/*-release")
 
-	_, err = w.Write([]byte("___\n>>> cat /etc/*-release\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> cat /etc/*-release\n")
 	if err != nil {
 		simplelog.Warningf("unable to write release file header for os_info.txt: %v", err)
 	}
@@ -517,7 +517,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		simplelog.Warningf("unable to write release files for os_info.txt: %v", err)
 	}
 
-	_, err = w.Write([]byte("___\n>>> uname -r\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> uname -r\n")
 	if err != nil {
 		simplelog.Warningf("unable to write uname header for os_info.txt: %v", err)
 	}
@@ -526,7 +526,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write uname -r for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> cat /etc/issue\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> cat /etc/issue\n")
 	if err != nil {
 		simplelog.Warningf("unable to write cat /etc/issue header for os_info.txt: %v", err)
 	}
@@ -534,7 +534,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write /etc/issue for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> cat /proc/sys/kernel/hostname\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> cat /proc/sys/kernel/hostname\n")
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt: %v", err)
 	}
@@ -542,7 +542,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write hostname for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> cat /proc/meminfo\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> cat /proc/meminfo\n")
 	if err != nil {
 		simplelog.Warningf("unable to write /proc/meminfo header for os_info.txt: %v", err)
 	}
@@ -550,7 +550,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write /proc/meminfo for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> lscpu\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> lscpu\n")
 	if err != nil {
 		simplelog.Warningf("unable to write lscpu header for os_info.txt: %v", err)
 	}
@@ -558,7 +558,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write lscpu for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> mount\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> mount\n")
 	if err != nil {
 		simplelog.Warningf("unable to write mount header for os_info.txt: %v", err)
 	}
@@ -566,7 +566,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	if err != nil {
 		simplelog.Warningf("unable to write mount for os_info.txt: %v", err)
 	}
-	_, err = w.Write([]byte("___\n>>> lsblk\n"))
+	_, err = fmt.Fprintf(w, "___\n>>> lsblk\n")
 	if err != nil {
 		simplelog.Warningf("unable to write lsblk header for os_info.txt: %v", err)
 	}
@@ -575,7 +575,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 		simplelog.Warningf("unable to write lsblk for os_info.txt: %v", err)
 	}
 	const s = `stat -fc %T /sys/fs/cgroup/`
-	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", s)))
+	_, err = fmt.Fprintf(w, "___\n>>> %v\n", s)
 	if err != nil {
 		simplelog.Warningf("unable to write %s header for os_info.txt: %v", s, err)
 	}
@@ -594,7 +594,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	}
 	for _, cgroupFile := range cgroupFiles {
 		commandToExecute := fmt.Sprintf("cat /sys/fs/cgroup/%v", cgroupFile)
-		_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", commandToExecute)))
+		_, err = fmt.Fprintf(w, "___\n>>> %v\n", commandToExecute)
 		if err != nil {
 			simplelog.Warningf("unable to write %s header for os_info.txt: %v", commandToExecute, err)
 		}
@@ -605,7 +605,7 @@ func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	}
 
 	loadCommand := "cat /proc/loadavg"
-	_, err = w.Write([]byte(fmt.Sprintf("___\n>>> %v\n", loadCommand)))
+	_, err = fmt.Fprintf(w, "___\n>>> %v\n", loadCommand)
 	if err != nil {
 		simplelog.Warningf("unable to write %s header for os_info.txt: %v", s, err)
 	}
@@ -662,7 +662,7 @@ var LocalCollectCmd = &cobra.Command{
 			}
 		})
 		if patStdIn {
-			var inputReader io.Reader = cobraCmd.InOrStdin()
+			inputReader := cobraCmd.InOrStdin()
 			b, err := io.ReadAll(inputReader)
 			if err != nil {
 				fmt.Printf("\nCRITICAL ERROR: %v\n", err)

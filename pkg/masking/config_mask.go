@@ -69,7 +69,7 @@ func maskConfigSecret(line string) string {
 	if len(matches) > 1 {
 		secret := matches[1]
 		// Replace the secret with the masking text
-		line = strings.Replace(line, secret, "\"<REMOVED_POTENTIAL_SECRET>\"", -1)
+		line = strings.ReplaceAll(line, secret, "\"<REMOVED_POTENTIAL_SECRET>\"")
 	}
 	return line
 }
@@ -84,14 +84,14 @@ func MaskPAT(line string) string {
 	if len(matches) >= 1 {
 		secret := matches[0]
 		// Replace the secret with the masking text
-		line = strings.Replace(line, secret, "\"<REMOVED_PAT_TOKEN>\"", -1)
+		line = strings.ReplaceAll(line, secret, "\"<REMOVED_PAT_TOKEN>\"")
 	}
 	matches2 := re2.FindStringSubmatch(line)
 	// If there is more than one match, the secret will be the second element in the slice (at index 1)
 	if len(matches2) >= 1 {
 		secret := matches2[0]
 		// Replace the secret with the masking text
-		line = strings.Replace(line, secret, "\"<REMOVED_PAT_TOKEN>\"", -1)
+		line = strings.ReplaceAll(line, secret, "\"<REMOVED_PAT_TOKEN>\"")
 	}
 	return line
 }
