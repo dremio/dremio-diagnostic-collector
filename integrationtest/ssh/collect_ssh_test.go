@@ -103,6 +103,9 @@ func TestSSHBasedRemoteCollect(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
 	}
+	if os.Getenv("SKIP_SSH_TEST") == "1" {
+		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
+	}
 	defer consoleprint.Clear()
 	var sshConf SSHTestConf
 	b := GetJSON(t)
@@ -211,6 +214,9 @@ dremio-rocksdb-dir: %v
 func TestSSHBasedRemoteCollectPlusJstack(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
+	}
+	if os.Getenv("SKIP_SSH_TEST") == "1" {
+		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
 	}
 	defer consoleprint.Clear()
 	var sshConf SSHTestConf
@@ -328,6 +334,9 @@ dremio-rocksdb-dir: %v
 func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
+	}
+	if os.Getenv("SKIP_SSH_TEST") == "1" {
+		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
 	}
 	defer consoleprint.Clear()
 	var sshConf SSHTestConf
@@ -598,6 +607,9 @@ func getHostName(ip string, sshConf SSHTestConf) (string, error) {
 func TestValidateBadCollectFlag(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping testing in short mode")
+	}
+	if os.Getenv("SKIP_SSH_TEST") == "1" {
+		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
 	}
 	b := GetJSON(t)
 	var err error

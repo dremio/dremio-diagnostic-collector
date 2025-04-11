@@ -17,7 +17,6 @@ package ssh
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 
@@ -25,9 +24,6 @@ import (
 )
 
 func TestSSHExec(t *testing.T) {
-	if os.Getenv("SKIP_SSH_TEST") == "1" {
-		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
-	}
 	hostName := "pod"
 	cli := &tests.MockCli{
 		StoredResponse: []string{"success"},
@@ -58,9 +54,6 @@ func TestSSHExec(t *testing.T) {
 }
 
 func TestSCP(t *testing.T) {
-	if os.Getenv("SKIP_SSH_TEST") == "1" {
-		t.Skip("Skipping SSH tests because SKIP_SSH_TEST=1")
-	}
 	hostName := "pod"
 	source := "/podroot/test.log"
 	destination := "/mydir/test.log"
