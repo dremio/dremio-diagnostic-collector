@@ -7,6 +7,7 @@
 * added REST-API-only `local-collect` mode for Dremio Software installations (`"is-rest-collect": true`)
 * for REST-API-only mode, added guardrail for collecting sys.jobs_recent based on cluster usage via `"rest-collect-daily-jobs-limit"`
 * added `collect-hs-err-files` setting to collect any hs_err files from the log directory
+* added support to include collection for `server.json` log files
 
 ### Fixed
 
