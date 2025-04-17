@@ -357,7 +357,7 @@ data:
           </appender>
   
           <appender name="json" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>${dremio.log.path}/json/server.json</file>
+            <file>${dremio.log.path}/server.json</file>
             <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
               <fileNamePattern>${dremio.log.path}/json/archive/server.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
               <maxHistory>30</maxHistory>
