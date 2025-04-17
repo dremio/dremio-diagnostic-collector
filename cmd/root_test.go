@@ -191,3 +191,77 @@ func TestValidateDDCYamlMaskPAT(t *testing.T) {
 		t.Errorf("expected redacted pat: '%v'", string(b))
 	}
 }
+
+func TestGetFreeSpace(t *testing.T) {
+	tests := []struct {
+		name              string
+		minFreeSpaceGB    uint64
+		collectionMode    string
+		expectedFreeSpace uint64
+	}{
+		{
+			name:              "With minFreeSpaceGB set for QuickCollection",
+			minFreeSpaceGB:    10,
+			collectionMode:    collects.QuickCollection,
+			expectedFreeSpace: 10,
+		},
+		{
+			name:              "With minFreeSpaceGB zero for QuickCollection",
+			minFreeSpaceGB:    0,
+			collectionMode:    collects.QuickCollection,
+			expectedFreeSpace: 5,
+		},
+		{
+			name:              "With minFreeSpaceGB set for StandardCollection",
+			minFreeSpaceGB:    30,
+			collectionMode:    collects.StandardCollection,
+			expectedFreeSpace: 30,
+		},
+		{
+			name:              "With minFreeSpaceGB zero for StandardCollection",
+			minFreeSpaceGB:    0,
+			collectionMode:    collects.StandardCollection,
+			expectedFreeSpace: 25,
+		},
+		{
+			name:              "With minFreeSpaceGB set for StandardPlusJSTACKCollection",
+			minFreeSpaceGB:    35,
+			collectionMode:    collects.StandardPlusJSTACKCollection,
+			expectedFreeSpace: 35,
+		},
+		{
+			name:              "With minFreeSpaceGB zero for StandardPlusJSTACKCollection",
+			minFreeSpaceGB:    0,
+			collectionMode:    collects.StandardPlusJSTACKCollection,
+			expectedFreeSpace: 25,
+		},
+		{
+			name:              "With minFreeSpaceGB set for HealthCheckCollection",
+			minFreeSpaceGB:    50,
+			collectionMode:    collects.HealthCheckCollection,
+			expectedFreeSpace: 50,
+		},
+		{
+			name:              "With minFreeSpaceGB zero for HealthCheckCollection",
+			minFreeSpaceGB:    0,
+			collectionMode:    collects.HealthCheckCollection,
+			expectedFreeSpace: 40,
+		},
+		{
+			name:              "With unknown collection type",
+			minFreeSpaceGB:    0,
+			collectionMode:    "unknown",
+			expectedFreeSpace: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := getFreeSpace(tt.minFreeSpaceGB, tt.collectionMode)
+			if result != tt.expectedFreeSpace {
+				t.Errorf("getFreeSpace(%d, %q) = %d; want %d",
+					tt.minFreeSpaceGB, tt.collectionMode, result, tt.expectedFreeSpace)
+			}
+		})
+	}
+}

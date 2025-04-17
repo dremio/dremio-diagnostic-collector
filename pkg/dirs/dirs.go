@@ -74,3 +74,14 @@ func CheckFreeSpace(folder string, minGB uint64) error {
 	}
 	return nil
 }
+
+// FormatFreeSpaceError formats an error message for free space issues based on the collection mode.
+// It provides a more specific error message suggesting to try a lighter collection mode if appropriate.
+func FormatFreeSpaceError(nonDefaultFreeSpace bool, err error, collectionMode, fallbackMode string) error {
+	if collectionMode == fallbackMode || nonDefaultFreeSpace {
+		// If already using the lightest mode, just return the original error
+		return fmt.Errorf("%w", err)
+	}
+	// Suggest trying a lighter collection mode
+	return fmt.Errorf("%w for %v mode, try %v mode instead", err, collectionMode, fallbackMode)
+}
