@@ -9,7 +9,12 @@
 * added `collect-hs-err-files` setting to collect any hs_err files from the log directory
 
 ### Fixed
+
 * fixed an issue where the log directory was not being detected correctly if `queries.json` was the only log type being collected
+* Updated go to 1.24.2 due to several security vulnerabilities.
+* updated gosec and golangci-lint versions to be compatible with this version of Go.
+* updated golang.org/x/net to v0.39.0 due to security fixes. 
+* updated k8s.io/api to v0.32.3 due to the upgrade of golang.org/x/net.
 
 ### Changed
 
