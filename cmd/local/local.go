@@ -117,7 +117,7 @@ func createAllDirs(c *conf.CollectConf) error {
 func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 	if !c.DisableFreeSpaceCheck() {
 		if err := dirs.CheckFreeSpace(c.TarballOutDir(), uint64(c.MinFreeSpaceGB())); err != nil {
-			return fmt.Errorf("%w. Use a larger directory by using ddc --transfer-dir or if using ddc local-collect --tarball-out-dir", err)
+			return fmt.Errorf("%w", err)
 		}
 	}
 	if err := createAllDirs(c); err != nil {

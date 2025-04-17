@@ -11,13 +11,14 @@
 ### Fixed
 
 * fixed an issue where the log directory was not being detected correctly if `queries.json` was the only log type being collected
-* updated go to 1.24.2 due to several security vulnerabilities.
-* updated gosec and golangci-lint versions to be compatible with this version of go.
-* updated golang.org/x/net to v0.39.0 due to security fixes.
-* updated k8s.io/api to v0.32.3 due to the upgrade of golang.org/x/net.
+* updated go to 1.24.2 due to several security vulnerabilities
+* updated gosec and golangci-lint versions to be compatible with this version of go
+* updated golang.org/x/net to v0.39.0 due to security fixes
+* updated k8s.io/api to v0.32.3 due to the upgrade of golang.org/x/net
 
 ### Changed
 
+* free space required is now dependent on collection mode, 5GB for light, 25 GB for standard and standard+jstack, 40 GB for health checks
 * jobs_recent sys table is not collected as part of default ddc config
 * limited sys.jobs_recent collection to 7 days maximum
 

@@ -422,8 +422,9 @@ func Execute(args []string) error {
 				return err
 			}
 			outputFolder := filepath.Dir(abs)
-			if err := dirs.CheckFreeSpace(outputFolder, minFreeSpaceGB); err != nil {
-				return fmt.Errorf("%w, therefore use --output-file to output the tarball to somewhere with more space or --%v to disable this check", err, conf.KeyDisableFreeSpaceCheck)
+			nonDefaultFreeSpace := minFreeSpaceGB > 0
+			if err := dirs.CheckFreeSpace(outputFolder, getFreeSpace(minFreeSpaceGB, collectionMode)); err != nil {
+				return dirs.FormatFreeSpaceError(nonDefaultFreeSpace, err, collectionMode, collects.QuickCollection)
 			}
 		}
 
@@ -616,8 +617,7 @@ func init() {
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
-	var defaultMaxFreeSpace uint64 = 40
-	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", defaultMaxFreeSpace, "min free space needed in GB for the process to run")
+	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", 0, "min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 
@@ -650,3 +650,19 @@ func fallBackToLocal() {
 }
 
 var enableFallback bool
+
+func getFreeSpace(b uint64, m string) uint64 {
+	if b == 0 {
+		switch m {
+		case collects.QuickCollection:
+			b = 5
+		case collects.StandardCollection:
+			b = 25
+		case collects.StandardPlusJSTACKCollection:
+			b = 25
+		case collects.HealthCheckCollection:
+			b = 40
+		}
+	}
+	return b
+}
