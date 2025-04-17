@@ -87,7 +87,7 @@ func TestRunCollectWLM(t *testing.T) {
 		case "/apiv2/provision/clusters":
 			fmt.Fprint(writer, `{"rule": "awse data"}`)
 		case "/apiv2/stats/jobsandusers":
-			fmt.Fprint(writer, `{"jobs": "user data"}`)
+			fmt.Fprint(writer, `{"rule": "jobs and users data"}`)
 		default:
 			http.Error(writer, "Not Found", http.StatusNotFound)
 		}

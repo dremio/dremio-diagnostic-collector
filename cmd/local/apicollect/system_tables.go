@@ -139,7 +139,7 @@ func calculateJobCount(data []byte) (int, error) {
 	daycount := 1 // Avoid divide by zero
 	for _, stat := range stats.Stats {
 		sum += stat.JobCount
-		daycount += 1
+		daycount++
 	}
 	averageDailyJobCount := sum / daycount
 
@@ -294,12 +294,12 @@ func retrieveJobResults(c *conf.CollectConf, hook shutdown.CancelHook, jobresult
 func getSystemTableName(systable, urlsuffix string) string {
 	filename := strings.Join([]string{"sys.", systable, urlsuffix, ".json"}, "")
 	// the ? will not work on windows
-	filename = strings.Replace(filename, "?", "_", -1)
+	filename = strings.ReplaceAll(filename, "?", "_")
 	// the = will not work on windows
-	filename = strings.Replace(filename, "=", "_", -1)
+	filename = strings.ReplaceAll(filename, "=", "_")
 	// go ahead and remove & because it will look weird by itself in the file name
-	filename = strings.Replace(filename, "&", "_", -1)
-	return strings.Replace(filename, "\\\"", "", -1)
+	filename = strings.ReplaceAll(filename, "&", "_")
+	return strings.ReplaceAll(filename, "\\\"", "")
 }
 
 func errCheck(f func() error) {

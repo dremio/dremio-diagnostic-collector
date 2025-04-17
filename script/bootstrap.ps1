@@ -6,11 +6,6 @@ $ErrorActionPreference = "Stop"
 # Change working directory to script's grandparents directory
 Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definition)).Parent.FullName
 
-Write-Output "putting jar from ttop into lib dir.."
-Get-Date -Format "HH:mm:ss"
-mkdir -Force .\cmd\local\jvmcollect\lib
-Invoke-WebRequest https://github.com/rsvihladremio/jvm-tools/releases/download/0.22-SNAPSHOT/sjk-0.22-SNAPSHOT.jar  -OutFile .\cmd\local\jvmcollect\lib\sjk.jar 
-
 Write-Output "Checking if license-header-checker is installed..."
 Get-Date -Format "HH:mm:ss"
 
@@ -26,7 +21,7 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "golangci-lint" -ErrorAction SilentlyContinue)) {
     Write-Output "golangci-lint not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.0.2
 }
 
 Write-Output "Checking if gosec is installed..."
@@ -35,15 +30,6 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "gosec" -ErrorAction SilentlyContinue)) {
     Write-Output "gosec not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/securego/gosec/v2/cmd/gosec@v2.19.0
+    go install github.com/securego/gosec/v2/cmd/gosec@v2.22.3
 }
 
-
-Write-Output "Checking if gofumpt is installed..."
-Get-Date -Format "HH:mm:ss"
-
-if (-not (Get-Command "gofumpt" -ErrorAction SilentlyContinue)) {
-    Write-Output "gofumpt not found, installing..."
-    Get-Date -Format "HH:mm:ss"
-    go install mvdan.cc/gofumpt@latest
-}
