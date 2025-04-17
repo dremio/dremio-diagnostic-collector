@@ -53,8 +53,13 @@ func NewLogCollector(dremioLogDir, logsOutDir, gcLogsDir, dremioGCFilePattern, q
 func (l *Collector) RunCollectDremioServerLog() error {
 	simplelog.Debug("Collecting Dremio Server logs ...")
 	var errs []error
+	// server.log logs
 	if err := l.exportArchivedLogs(l.dremioLogDir, "server.log", "server", l.dremioLogsNumDays); err != nil {
 		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %w", err))
+	}
+	// server.json logs
+	if err := l.exportArchivedLogs(l.dremioLogDir, "server.json", "server", l.dremioLogsNumDays); err != nil {
+		errs = append(errs, fmt.Errorf("trying to archive server json logs we got error: %w", err))
 	}
 	simplelog.Debug("... collecting server.out")
 	src := path.Join(l.dremioLogDir, "server.out")

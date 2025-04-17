@@ -559,6 +559,12 @@ dremio-jfr-time-seconds: 10
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.log.gz"))
 	}
+	// check server.json logs
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.json.gz"))
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.json.gz"))
+	}
 	// check queries.json
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
 	// check conf files
@@ -759,6 +765,12 @@ dremio-jfr-time-seconds: 10
 	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.log.gz"))
+	}
+	// check server.json logs
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.json.gz"))
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.json.gz"))
 	}
 	// check queries.json
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
@@ -994,6 +1006,12 @@ dremio-jfr-time-seconds: 10
 	for i := 0; i < replicas; i++ {
 		host := fmt.Sprintf("dremio-executor-%v", i)
 		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.log.gz"))
+	}
+	// check server.json logs
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", "dremio-master-0", "server.json.gz"))
+	for i := 0; i < replicas; i++ {
+		host := fmt.Sprintf("dremio-executor-%v", i)
+		tests.AssertFileHasContent(t, filepath.Join(hcDir, "logs", host, "server.json.gz"))
 	}
 	// check queries.json
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "queries", "dremio-master-0", "queries.json.gz"))
