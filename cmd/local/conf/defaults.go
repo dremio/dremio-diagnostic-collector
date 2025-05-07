@@ -34,13 +34,11 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 		setDefault(confData, KeyCollectTtop, false)
 		setDefault(confData, KeyDremioLogsNumDays, 2)
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 2)
-		setDefault(confData, KeyNumberThreads, 1)
 	} else {
 		setDefault(confData, KeyCollectJFR, true)
 		setDefault(confData, KeyCollectTtop, true)
 		setDefault(confData, KeyDremioLogsNumDays, 7)
 		setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
-		setDefault(confData, KeyNumberThreads, 2)
 	}
 	if collectionMode == collects.StandardPlusJSTACKCollection {
 		setDefault(confData, KeyCollectJStack, true)
@@ -48,7 +46,7 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 		setDefault(confData, KeyCollectJStack, false)
 	}
 	if collectionMode == collects.HealthCheckCollection {
-		setDefault(confData, KeyNumberJobProfiles, 25000)
+		setDefault(confData, KeyNumberJobProfiles, 10000)
 		setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 1440) // 24 minutes for health check system tables collection since they're very important for health check analysis.
 	} else {
 		setDefault(confData, KeyNumberJobProfiles, 20)
@@ -107,4 +105,5 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyCollectClusterIDTimeoutSeconds, 60)
 	setDefault(confData, KeySysTables, SystemTableList())
 	setDefault(confData, KeySysTablesCloud, SystemTableListCloud())
+	setDefault(confData, KeyNumberThreads, 1)
 }
