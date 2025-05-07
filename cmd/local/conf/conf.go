@@ -16,7 +16,6 @@
 package conf
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -166,22 +165,17 @@ func ValidateAPICredentials(c *CollectConf, hook shutdown.Hook) error {
 
 func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 	dremioConfFile := filepath.Join(dremioConfDir, "dremio.conf")
-	content, err := os.ReadFile(filepath.Clean(dremioConfFile))
-	if err != nil {
-		simplelog.Errorf("configuration directory incorrect : %v", err)
+
+	// Use the HOCON parser
+	hoconConfig, err := ParseDremioConf(dremioConfFile, dremioHome)
+	if err == nil {
+		return hoconConfig.GetRocksDBPath(dremioHome)
 	}
-	confValues, err := parseAndResolveConfig(string(content), dremioHome)
-	if err != nil {
-		simplelog.Errorf("configuration directory incorrect : %v", err)
-	}
-	// searching rocksdb
-	var rocksDBDir string
-	if value, ok := confValues["db"]; ok {
-		rocksDBDir = value
-	} else {
-		rocksDBDir = filepath.Join(dremioHome, "data", "db")
-	}
-	return rocksDBDir
+
+	// If parsing fails, use the default path
+	simplelog.Warningf("Failed to parse dremio.conf with HOCON parser: %v", err)
+	simplelog.Infof("Using default RocksDB path")
+	return filepath.Join(dremioHome, "data", "db")
 }
 
 func SystemTableList() []string {
@@ -589,52 +583,6 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		}
 	}
 	return c, nil
-}
-
-// parseAndResolveConfig parses the dremio.conf content and resolves placeholders based on the provided DREMIO_HOME.
-func parseAndResolveConfig(confContent, dremioHome string) (map[string]string, error) {
-	scanner := bufio.NewScanner(strings.NewReader(confContent))
-	config := make(map[string]string)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Replace DREMIO_HOME placeholder
-
-		line = strings.ReplaceAll(line, "${DREMIO_HOME}", dremioHome)
-		trimmedLine := strings.TrimSpace(line)
-
-		// Skip empty lines and comments
-		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
-			continue
-		}
-
-		parts := strings.SplitN(trimmedLine, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.Trim(parts[1], " ,\"'")
-
-		// Store in map
-		config[key] = value
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	local := ""
-	for key, value := range config {
-		if strings.Contains("local", key) || strings.Contains("path.local", key) {
-			local = value
-			break
-		}
-	}
-	for key, value := range config {
-		config[key] = strings.ReplaceAll(value, "${paths.local}", local)
-	}
-
-	return config, nil
 }
 
 // DremioConfig represents the configuration details for Dremio.
