@@ -324,7 +324,6 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 			allHostLog = append(allHostLog, line)
 		}
 		if strings.Contains(line, "AUTODETECTION DISABLED") {
-			consoleprint.UpdateNodeAutodetectDisabled(host, true)
 			simplelog.HostLog(host, "autodetection disabled")
 		}
 		simplelog.HostLog(host, line)

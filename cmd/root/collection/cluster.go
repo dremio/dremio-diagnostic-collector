@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/helpers"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
@@ -64,7 +63,6 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 			simplelog.Errorf("trying to write file %v, error was %v", filename, err)
 			continue
 		}
-		consoleprint.UpdateK8sFiles(cmd)
 	}
 	return nil
 }
@@ -103,7 +101,6 @@ func saveLogsFromPod(podObj corev1.Pod, hook shutdown.CancelHook, cs CopyStrateg
 		// save current logs
 		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podName, false)
 	}
-	consoleprint.UpdateK8sFiles(fmt.Sprintf("pod %v logs", podName))
 }
 
 func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, container, namespace string, client *k8sapi.Clientset, path string, pod string, previous bool) {

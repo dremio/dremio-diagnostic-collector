@@ -102,7 +102,6 @@ func CanRetryTransfers(kubectlPath string) (bool, error) {
 			return true, nil
 		}
 		msg := fmt.Sprintf("kubectl version %v no retries available, consider upgrading", results.ClientVersion.GitVersion)
-		consoleprint.AddWarningToConsole(msg)
 		simplelog.Warning(msg)
 		return false, nil
 	}

@@ -99,11 +99,8 @@ func GetClientset(k8sContext string) (*kubernetes.Clientset, *rest.Config, error
 				return nil, nil, err
 			}
 			simplelog.Infof("current kubernetes context is detected as %v", startConfig.CurrentContext)
-			consoleprint.UpdateK8SContext(startConfig.CurrentContext)
 		} else {
 			simplelog.Infof("using kubernetes context of %v", k8sContext)
-			consoleprint.UpdateK8SContext(k8sContext)
-
 		}
 		config, err = clientConfig.ClientConfig()
 		if err != nil {

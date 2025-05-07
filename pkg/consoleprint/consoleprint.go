@@ -19,13 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
 )
 
 // NodeCaptureStats represents stats for a node capture.
@@ -37,39 +36,18 @@ type NodeCaptureStats struct {
 
 // CollectionStats represents stats for a collection.
 type CollectionStats struct {
-	collectionMode       string                       // shows the collectionMode used that sets defaults: light, standard, or healthcheck
-	collectionArgs       string                       // collectionArgs arguments passed to ddc, useful for debugging
-	ddcVersion           string                       // ddcVersion used during the collection
-	logFile              string                       // logFile location of the ddc.log file
-	ddcYaml              string                       // ddcYaml location of the ddc.yaml file
-	TransfersComplete    int                          // TransfersComplete shows the number of tarball transfers completed
-	totalTransfers       int                          // totalTransfers shows the number of transfers of tarballs attempted
-	collectionType       string                       // collectionType shows the type of transfer used to collect tarballs: kubectl, ssh, or kubernetes api
-	k8sContext           string                       // k8sContexst is the kubernetes context used during capture, this is to help debug when the incorrect context was used
-	tarball              string                       // tarball is the location of the final tarball
-	nodeCaptureStats     map[string]*NodeCaptureStats // nodeCaptureStats is the map of nodes and their basic collection stats such as startTime, endTime and status
-	nodeDetectDisabled   map[string]bool              // nodeDetectDisabled shows the nodes where node configuration detection failed and the only the ddc.yaml or defaults are used for finding logs and configuration
-	result               string                       // result is the current result of the collection process
-	k8sFilesCollected    []string                     // k8sFileCollected is the list of files collected during the kubernetes file collection step
-	lastK8sFileCollected string                       // lastK8sFileCollected collected during the kubernetes configuration file and log collection
-	enabled              []string                     // enabled shows all the collection steps enabled usually via defaults, ddc.yaml or preconditions being present
-	disabled             []string                     // disabled shows all the collection steps disabled via ddc.yaml or missing preconditions
-	patSet               bool                         // patSet indicates if the pat is set or not
-	startTime            int64                        // startTime in epoch seconds for the collection
-	endTime              int64                        // endTime in epoch seconds for the collection
-	warnings             []string                     // warnings encountered during the collection
-	mu                   sync.RWMutex                 // mu is the mutex to protect access to various fields (nodeCaptureStats, warnings, lastK8sFileCollected, etc)
-}
-
-// GetCollectionType generates a friendly message useful for indicating
-// what mechanism is used to transfer tarballs
-func (c *CollectionStats) GetCollectionType() string {
-	if c.k8sContext == "" {
-		// if no k8s context is used then just pass the collection type
-		return c.collectionType
-	}
-	// include the kubernetes contexts for debugging
-	return fmt.Sprintf("%v - context used: %v", c.collectionType, c.k8sContext)
+	collectionMode    string                       // shows the collectionMode used that sets defaults: light, standard, or healthcheck
+	collectionArgs    string                       // collectionArgs arguments passed to ddc, useful for debugging
+	ddcVersion        string                       // ddcVersion used during the collection
+	logFile           string                       // logFile location of the ddc.log file
+	TransfersComplete int                          // TransfersComplete shows the number of tarball transfers completed
+	totalTransfers    int                          // totalTransfers shows the number of transfers of tarballs attempted
+	tarball           string                       // tarball is the location of the final tarball
+	nodeCaptureStats  map[string]*NodeCaptureStats // nodeCaptureStats is the map of nodes and their basic collection stats such as startTime, endTime and status
+	result            string                       // result is the current result of the collection process
+	startTime         int64                        // startTime in epoch seconds for the collection
+	endTime           int64                        // endTime in epoch seconds for the collection
+	mu                sync.RWMutex                 // mu is the mutex to protect access to various fields (nodeCaptureStats, warnings, lastK8sFileCollected, etc)
 }
 
 var statusOut bool
@@ -126,33 +104,24 @@ func ErrorPrint(msg string) {
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
-func UpdateRuntime(ddcVersion, logFile, ddcYaml, collectionType string, enabled []string, disabled []string, patSet bool, transfersComplete, totalTransfers int) {
+func UpdateRuntime(ddcVersion string, logFile string, transfersComplete, totalTransfers int) {
 	c.mu.Lock()
 	c.ddcVersion = ddcVersion
 	c.logFile = logFile
-	c.ddcYaml = ddcYaml
 	c.TransfersComplete = transfersComplete
 	c.totalTransfers = totalTransfers
-	c.collectionType = collectionType
-	sort.Strings(enabled)
-	c.enabled = enabled
-	sort.Strings(disabled)
-	c.disabled = disabled
-	c.patSet = patSet
 	c.mu.Unlock()
-}
-
-func UpdateK8sFiles(fileName string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.k8sFilesCollected = append(c.k8sFilesCollected, fileName)
-	c.lastK8sFileCollected = fileName
 }
 
 func UpdateTarballDir(tarballDir string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.tarball = tarballDir
+
+	// If the result already contains "COMPLETE", append the tarball information to it
+	if c.result != "" && strings.Contains(c.result, "COMPLETE") && !strings.Contains(c.result, tarballDir) {
+		c.result = fmt.Sprintf("%v\nTarball: %v", c.result, tarballDir)
+	}
 }
 
 // StatusUpdate struct for json communication
@@ -192,22 +161,6 @@ func UpdateCollectionMode(collectionMode string) {
 	c.collectionMode = collectionMode
 }
 
-func UpdateK8SContext(k8sContext string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.k8sContext = k8sContext
-}
-
-// AddWarningToConsole adds a trimed string to the list of warnings
-// lines after the first line are also trimmed
-func AddWarningToConsole(warning string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	tokens := strings.Split(warning, "\n")
-	trimmed := tokens[0]
-	c.warnings = append(c.warnings, strutils.TruncateString(trimmed, 120))
-}
-
 // c is the singleton that is the global collection
 // stats that stores all the status updates used by
 // the collection process.
@@ -219,9 +172,8 @@ func init() {
 
 func initialize() {
 	c = &CollectionStats{
-		nodeCaptureStats:   make(map[string]*NodeCaptureStats),
-		nodeDetectDisabled: make(map[string]bool),
-		startTime:          time.Now().Unix(),
+		nodeCaptureStats: make(map[string]*NodeCaptureStats),
+		startTime:        time.Now().Unix(),
 	}
 	if strings.HasSuffix(os.Args[0], ".test") {
 		clearCode = "CLEAR SCREEN"
@@ -234,13 +186,6 @@ func Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	initialize()
-}
-
-// Update updates the CollectionStats fields in a thread-safe manner.
-func UpdateNodeAutodetectDisabled(node string, enabled bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.nodeDetectDisabled[node] = enabled
 }
 
 type NodeState struct {
@@ -329,7 +274,9 @@ func UpdateNodeState(nodeState NodeState) {
 			// we only want to count it the first time, so we check to see if
 			// the endTime has been set or not, if it has, then we do nothing.
 			if c.nodeCaptureStats[node].endTime == 0 {
-				c.TransfersComplete++
+				if nodeState.Result != ResultFailure {
+					c.TransfersComplete++
+				}
 				c.nodeCaptureStats[node].endTime = time.Now().Unix()
 			}
 		}
@@ -364,16 +311,6 @@ func PrintState() {
 	}
 	sort.Strings(keys)
 	var nodes strings.Builder
-	// once we have started collection of kubernetes files we should start updating the ui
-	// with the stats from this collection. This at once shows people when these files are successfully
-	// collected such as when ddc has the rights to do so. We don't want to surprise people, it
-	// should be obvious as possible what we are collecting.
-	if c.lastK8sFileCollected != "" {
-		nodes.WriteString("Kubernetes:\n-----------\n")
-		nodes.WriteString(fmt.Sprintf("Last file collected   : %v\n", c.lastK8sFileCollected))
-		nodes.WriteString(fmt.Sprintf("files collected       : %v\n", len(c.k8sFilesCollected)))
-		nodes.WriteString("\n")
-	}
 	// if there are any node capture status write the header
 	if len(c.nodeCaptureStats) > 0 {
 		nodes.WriteString("Nodes:\n------\n")
@@ -382,46 +319,71 @@ func PrintState() {
 	// iterate through the keys using the sorted array
 	for i, key := range keys {
 		node := c.nodeCaptureStats[key]
-		var secondsElapsed int
-		if node.endTime > 0 {
-			// if not finished output duration. TODO considering saving this on write.
-			secondsElapsed = int(node.endTime) - int(node.startTime)
-		} else {
-			// if not finished calculated time elasped.
-			secondsElapsed = int(time.Now().Unix()) - int(node.startTime)
-		}
 		status := node.status
-		if _, ok := c.nodeDetectDisabled[key]; ok {
-			status = fmt.Sprintf("(NO PID) %v", status)
+
+		// Only show duration for completed nodes
+		if node.endTime > 0 {
+			secondsElapsed := int(node.endTime) - int(node.startTime)
+			// Format with duration at the end
+			nodes.WriteString(fmt.Sprintf("%v. node %v - %v (%v seconds)\n", i+1, key, status, secondsElapsed))
+		} else {
+			nodes.WriteString(fmt.Sprintf("%v. node %v - %v\n", i+1, key, status))
 		}
-		nodes.WriteString(fmt.Sprintf("%v. node %v - elapsed %v secs - status %v \n", i+1, key, secondsElapsed, status))
 	}
-	var patMessage string
-	if c.patSet {
-		patMessage = "Yes"
-	} else {
-		patMessage = "No (disables Job Profiles, WLM, KV Store and System Table Reports use --collect health-check if you want these)"
-	}
-	autodetectEnabled := "Yes"
-	if len(c.nodeDetectDisabled) > 0 {
-		autodetectEnabled = fmt.Sprintf("Disabled on %v/%v nodes files may be missing try again with the --sudo-user flag", len(c.nodeDetectDisabled), len(c.nodeCaptureStats))
-	}
-	// write out duration elapsed to provide a sense of time passing in the UI
-	durationElapsed := time.Now().Unix() - c.startTime
 	// set the default version of Unknown
 	ddcVersion := "Unknown Version"
 	if c.ddcVersion != "" {
 		// since we have a version overwrite the default
 		ddcVersion = c.ddcVersion
 	}
-	var warningsBuilder strings.Builder
-	// write out all the warnings as a numbered list
-	for i, w := range c.warnings {
-		_, err := warningsBuilder.WriteString(fmt.Sprintf("%v. %v\n", i+1, w))
-		if err != nil {
-			fmt.Printf("unable to write string %v: (%v)", w, err)
+
+	// Set default result to show start time if not set
+	resultText := c.result
+	if resultText == "" {
+		startTime := time.Unix(c.startTime, 0)
+		resultText = fmt.Sprintf("STARTED AT %v", startTime.Format(time.RFC1123))
+	}
+
+	// Append tarball to result if it's available and not already included
+	if c.tarball != "" && !strings.Contains(resultText, c.tarball) {
+		// Only append tarball to result if the collection is complete
+		// This is determined by checking if the result contains "COMPLETE"
+		if strings.HasPrefix(resultText, "COMPLETE AT") {
+			resultText = fmt.Sprintf("%v - Tarball: %v", resultText, c.tarball)
 		}
 	}
+
+	// Find failed nodes
+	var failedNodes []string
+	for nodeName, nodeStats := range c.nodeCaptureStats {
+		if strings.Contains(nodeStats.status, ResultFailure) {
+			failedNodes = append(failedNodes, nodeName)
+		}
+	}
+
+	// Sort by node name
+	sort.Strings(failedNodes)
+
+	// Create failed nodes string and grep command for OSX/Linux users
+	var failedNodesStr string
+	var grepCommandsStr strings.Builder
+
+	if len(failedNodes) > 0 {
+		// Just show node names for failed nodes
+		failedNodesStr = strings.Join(failedNodes, ", ")
+
+		// Add grep commands for OSX/Linux users
+		if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+			grepCommandsStr.WriteString("\nFor detailed logs on failed nodes, run:\n")
+			for _, nodeName := range failedNodes {
+				grepCommandsStr.WriteString(fmt.Sprintf("grep \"HOST: %v\" %v | grep -v NodeState\n",
+					nodeName, c.logFile))
+			}
+		}
+	} else {
+		failedNodesStr = "None"
+	}
+
 	_, err := fmt.Printf(
 		`=================================
 == Dremio Diagnostic Collector ==
@@ -429,29 +391,18 @@ func PrintState() {
 %v
 
 Version              : %v
-Yaml                 : %v
 Log File             : %v
-Collection Type      : %v
-Collections Enabled  : %v
-Collections Disabled : %v
 Collection Mode      : %v
-Collection Args      : %v
-Dremio PAT Set       : %v
-Autodetect Enabled   : %v
 
 -- status --
 Transfers Complete   : %v/%v
-Collect Duration     : elapsed %v seconds
-Tarball              : %v
 Result               : %v
-
--- Warnings --
-%v
+Failed Nodes         : %v
 
 
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.ddcYaml, c.logFile, c.GetCollectionType(), strings.Join(c.enabled, ","), strings.Join(c.disabled, ","), strings.ToUpper(c.collectionMode), c.collectionArgs, patMessage, autodetectEnabled, c.TransfersComplete, total,
-		durationElapsed, c.tarball, c.result, warningsBuilder.String(), nodes.String())
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.logFile, strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
+		resultText, failedNodesStr, nodes.String())
 	if err != nil {
 		fmt.Printf("unable to write output: (%v)\n", err)
 	}

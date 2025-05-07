@@ -8,6 +8,14 @@
 * Only run REST API collection on master coordinators
 * Modified PAT validation to only require PAT for health-check mode on master coordinators
 * Enhanced master coordinator detection to check both JVM arguments and dremio.conf (JVM arguments take precedence)
+* Simplified the TUI by removing most status indicators like 'Autodetect Enabled', 'Collections Enabled', 'Collections Disabled', 'Yaml', 'Collection Args', 'Dremio PAT Set', 'Collect Duration', and 'Collection Type'
+* Removed the Kubernetes section from the TUI display
+* Removed the warnings section from the TUI display
+* For failed nodes in the TUI, show only the node name
+* Simplified the TUI by removing elapsed time from node strings
+* For the TUI, show each node's collection duration at the end of the line when that node completes
+* Update the result field in the TUI to default to 'STARTED AT [formatted date/time]' showing when the collection started
+* Removed tarball as a separate field and append it to the result field instead
 
 ### Removed
 
