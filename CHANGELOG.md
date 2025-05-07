@@ -5,6 +5,7 @@
 ### Changed
 
 * Replaced simple dremio.conf parser with proper HOCON parser implementation
+* Only run REST API collection on master coordinators
 
 ### Removed
 

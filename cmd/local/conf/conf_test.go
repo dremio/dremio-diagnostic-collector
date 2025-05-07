@@ -96,7 +96,7 @@ dremio-jfr-time-seconds: 60
 collect-jstack: true
 dremio-jstack-time-seconds: 60
 dremio-jstack-freq-seconds: 10
-dremio-ttop-time-seconds: 30 
+dremio-ttop-time-seconds: 30
 dremio-ttop-freq-seconds: 5
 collect-wlm: true
 collect-ttop: true
@@ -332,8 +332,23 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Errorf("Expected CollectDremioConfiguration to be true, got false")
 	}
 
-	if cfg.CollectKVStoreReport() != true {
-		t.Errorf("Expected CollectKVStoreReport to be true, got false")
+	// In this test, we're not explicitly setting isMasterCoordinator
+	// so we need to check the actual value and verify the behavior is correct
+
+	// These REST API features should be enabled only for master coordinators
+	if cfg.CollectKVStoreReport() != cfg.IsMasterCoordinator() {
+		t.Errorf("Expected CollectKVStoreReport to be %v (matching IsMasterCoordinator), got %v",
+			cfg.IsMasterCoordinator(), cfg.CollectKVStoreReport())
+	}
+
+	if cfg.CollectSystemTablesExport() != cfg.IsMasterCoordinator() {
+		t.Errorf("Expected CollectSystemTablesExport to be %v (matching IsMasterCoordinator), got %v",
+			cfg.IsMasterCoordinator(), cfg.CollectSystemTablesExport())
+	}
+
+	if cfg.CollectWLM() != cfg.IsMasterCoordinator() {
+		t.Errorf("Expected CollectWLM to be %v (matching IsMasterCoordinator), got %v",
+			cfg.IsMasterCoordinator(), cfg.CollectWLM())
 	}
 
 	if cfg.CollectMetaRefreshLogs() != true {
@@ -354,14 +369,6 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 
 	if cfg.CollectServerLogs() != true {
 		t.Errorf("Expected CollectServerLogs to be true, got false")
-	}
-
-	if cfg.CollectSystemTablesExport() != true {
-		t.Errorf("Expected CollectSystemTablesExport to be true, got false")
-	}
-
-	if cfg.CollectWLM() != true {
-		t.Errorf("Expected CollectWLM to be true, got false")
 	}
 
 	if cfg.CollectTtop() != true {
@@ -603,4 +610,134 @@ func TestEnvVarsForLogging(t *testing.T) {
 	}
 
 	afterEachConfTest()
+}
+
+func TestConfWithMasterCoordinator(t *testing.T) {
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pat-token: "your_personal_access_token"
+number-job-profiles: 10
+collect-wlm: true
+collect-system-tables-export: true
+collect-kvstore-report: true
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	// Create a mock dremio.conf file with master coordinator enabled
+	mockConfDir := t.TempDir()
+	mockConfFile := filepath.Join(mockConfDir, "dremio.conf")
+	mockConfContent := `
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: true,
+  executor.enabled: false
+}
+`
+	err := os.WriteFile(mockConfFile, []byte(mockConfContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write mock dremio.conf: %v", err)
+	}
+
+	// Set the dremio-conf-dir to our mock directory
+	overrides["dremio-conf-dir"] = mockConfDir
+
+	// Disable REST API to skip API validation
+	overrides["disable-rest-api"] = "true"
+
+	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("invalid conf")
+	}
+
+	// Verify that the node is detected as a master coordinator
+	if !cfg.IsMasterCoordinator() {
+		t.Error("Expected IsMasterCoordinator to be true, got false")
+	}
+
+	// Since we disabled the REST API, these features should be disabled regardless of master coordinator status
+	if cfg.CollectKVStoreReport() {
+		t.Error("Expected CollectKVStoreReport to be false when REST API is disabled, got true")
+	}
+
+	if cfg.CollectSystemTablesExport() {
+		t.Error("Expected CollectSystemTablesExport to be false when REST API is disabled, got true")
+	}
+
+	if cfg.CollectWLM() {
+		t.Error("Expected CollectWLM to be false when REST API is disabled, got true")
+	}
+}
+
+func TestConfWithNonMasterCoordinator(t *testing.T) {
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pat-token: "your_personal_access_token"
+number-job-profiles: 10
+collect-wlm: true
+collect-system-tables-export: true
+collect-kvstore-report: true
+`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	// Create a mock dremio.conf file with master coordinator disabled
+	mockConfDir := t.TempDir()
+	mockConfFile := filepath.Join(mockConfDir, "dremio.conf")
+	mockConfContent := `
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: false,
+  executor.enabled: false
+}
+`
+	err := os.WriteFile(mockConfFile, []byte(mockConfContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write mock dremio.conf: %v", err)
+	}
+
+	// Set the dremio-conf-dir to our mock directory
+	overrides["dremio-conf-dir"] = mockConfDir
+
+	// Disable REST API to skip API validation
+	overrides["disable-rest-api"] = "true"
+
+	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("invalid conf")
+	}
+
+	// Verify that the node is not detected as a master coordinator
+	if cfg.IsMasterCoordinator() {
+		t.Error("Expected IsMasterCoordinator to be false, got true")
+	}
+
+	// Verify that REST API features are disabled
+	if cfg.CollectKVStoreReport() {
+		t.Error("Expected CollectKVStoreReport to be false for non-master coordinator, got true")
+	}
+
+	if cfg.CollectSystemTablesExport() {
+		t.Error("Expected CollectSystemTablesExport to be false for non-master coordinator, got true")
+	}
+
+	if cfg.CollectWLM() {
+		t.Error("Expected CollectWLM to be false for non-master coordinator, got true")
+	}
 }

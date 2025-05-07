@@ -143,6 +143,7 @@ type CollectConf struct {
 	restHTTPTimeout                   int
 	minFreeSpaceCheckGB               uint64
 	noLogDir                          bool
+	isMasterCoordinator               bool
 
 	// variables
 	systemTables            []string
@@ -510,6 +511,20 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			simplelog.Warningf("only applies to coordinators - invalid rocksdb dir '%v', update ddc.yaml and fix it: %v", c.dremioConfDir, err)
 		}
 
+		// Check if this node is a master coordinator using the HOCON parser
+		dremioConfFile := filepath.Join(c.dremioConfDir, "dremio.conf")
+		hoconConfig, err := ParseDremioConf(dremioConfFile, detectedConfig.Home)
+		if err == nil {
+			c.isMasterCoordinator = hoconConfig.IsCoordinatorMaster()
+			if c.isMasterCoordinator {
+				simplelog.Infof("Detected node as a master coordinator")
+			} else {
+				simplelog.Infof("Node is not a master coordinator")
+			}
+		} else {
+			simplelog.Warningf("Failed to detect if node is a master coordinator: %v", err)
+		}
+
 	}
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
@@ -533,9 +548,13 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
 	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
 	// collect rest apis
-	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
+	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == "" || !c.isMasterCoordinator
 	if disableRESTAPI {
-		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+		if !c.isMasterCoordinator && !c.disableRESTAPI && c.dremioPATToken != "" {
+			simplelog.Infof("Disabling REST API collection because this node is not a master coordinator")
+		} else {
+			simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set or REST API is disabled")
+		}
 		c.numberJobProfilesToCollect = 0
 		c.jobProfilesNumHighQueryCost = 0
 		c.jobProfilesNumSlowExec = 0
@@ -955,4 +974,9 @@ func (c *CollectConf) CollectSystemTablesTimeoutSeconds() int {
 
 func (c *CollectConf) CollectClusterIDTimeoutSeconds() int {
 	return c.collectClusterIDTimeoutSeconds
+}
+
+// IsMasterCoordinator returns whether this node is a master coordinator
+func (c *CollectConf) IsMasterCoordinator() bool {
+	return c.isMasterCoordinator
 }

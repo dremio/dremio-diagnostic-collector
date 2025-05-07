@@ -57,6 +57,26 @@ func TestGetNumberOfJobProfilesCollectedWIthServerUp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing conf dir %v", err)
 	}
+
+	// Create a mock dremio.conf file with master coordinator enabled
+	dremioConfDir := filepath.Join(confDir, "dremio-conf")
+	err = os.MkdirAll(dremioConfDir, 0o700)
+	if err != nil {
+		t.Fatalf("unable to create dremio conf dir: %v", err)
+	}
+
+	// Create a dremio.conf file that indicates this is a master coordinator
+	err = os.WriteFile(filepath.Join(dremioConfDir, "dremio.conf"), []byte(`
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: true,
+  executor.enabled: false
+}
+`), 0o600)
+	if err != nil {
+		t.Fatalf("unable to create dremio.conf: %v", err)
+	}
+
 	tmpDir := t.TempDir()
 	sysTableDir := filepath.Join(tmpDir, "system-tables", "node1")
 	err = os.MkdirAll(sysTableDir, 0o700)
@@ -90,7 +110,7 @@ node-name: node1
 number-threads: 4
 tmp-output-dir: %v
 dremio-endpoint: %v
-`, LogDir(), ConfDir(), strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0o600)
+`, LogDir(), dremioConfDir, strings.ReplaceAll(tmpDir, "\\", "\\\\"), server.URL)), 0o600)
 	if err != nil {
 		t.Fatalf("missing conf file %v", err)
 	}
