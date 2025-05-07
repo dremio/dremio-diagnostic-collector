@@ -120,10 +120,11 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB uint64) error {
 	host := c.Host
 	nodeState := consoleprint.NodeState{
-		Node:     host,
-		Status:   consoleprint.Starting,
-		StatusUX: "STARTING",
-		Result:   consoleprint.ResultPending,
+		Node:          host,
+		Status:        consoleprint.Starting,
+		StatusUX:      "STARTING",
+		Result:        consoleprint.ResultPending,
+		IsCoordinator: c.IsCoordinator,
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))

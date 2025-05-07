@@ -32,6 +32,7 @@ type NodeCaptureStats struct {
 	endTime         int64
 	status          string
 	endProcessError string
+	isCoordinator   bool
 }
 
 // CollectionStats represents stats for a collection.
@@ -195,6 +196,7 @@ type NodeState struct {
 	Result          string `json:"result"`
 	EndProcess      bool   `json:"end_process"`
 	EndProcessError string `json:"-"` // Use json:"-" to exclude from JSON output
+	IsCoordinator   bool   `json:"-"` // Use json:"-" to exclude from JSON output
 }
 
 const (
@@ -277,8 +279,9 @@ func UpdateNodeState(nodeState NodeState) {
 		// if the node is not present we initialize it and can
 		// safely set the start time.
 		c.nodeCaptureStats[node] = &NodeCaptureStats{
-			startTime: time.Now().Unix(),
-			status:    status,
+			startTime:     time.Now().Unix(),
+			status:        status,
+			isCoordinator: nodeState.IsCoordinator,
 		}
 	}
 }
@@ -295,32 +298,38 @@ func PrintState() {
 	// clear the screen
 	fmt.Print(clearCode)
 	total := c.totalTransfers
-	// put the keys in a stable order so the UI update is consistent
+	// put the coordinatorKeys in a stable order so the UI update is consistent
 	// and doesn't jump around. TODO move this to happening on write
 	// since this function is called much more frequently
-	var keys []string
+
+	var executorKeys []string
+	var coordinatorKeys []string
 	for k := range c.nodeCaptureStats {
-		keys = append(keys, k)
+		node := c.nodeCaptureStats[k]
+		if node.isCoordinator {
+			coordinatorKeys = append(coordinatorKeys, k)
+		} else {
+			executorKeys = append(executorKeys, k)
+		}
 	}
-	sort.Strings(keys)
+	sort.Strings(coordinatorKeys)
 	var nodes strings.Builder
 	// if there are any node capture status write the header
 	if len(c.nodeCaptureStats) > 0 {
-		nodes.WriteString("Nodes:\n------\n")
+		nodes.WriteString("Coordinator Detail:\n-------------------\n")
 	}
 
 	// iterate through the keys using the sorted array
-	for i, key := range keys {
+	for i, key := range coordinatorKeys {
 		node := c.nodeCaptureStats[key]
 		status := node.status
-
 		// Only show duration for completed nodes
 		if node.endTime > 0 {
 			secondsElapsed := int(node.endTime) - int(node.startTime)
 			// Format with duration at the end
-			nodes.WriteString(fmt.Sprintf("%v. node %v - %v (%v seconds)\n", i+1, key, status, secondsElapsed))
+			nodes.WriteString(fmt.Sprintf("%v. %v - %v (%v seconds)\n", i+1, key, status, secondsElapsed))
 		} else {
-			nodes.WriteString(fmt.Sprintf("%v. node %v - %v\n", i+1, key, status))
+			nodes.WriteString(fmt.Sprintf("%v. %v - %v\n", i+1, key, status))
 		}
 	}
 	// set the default version of Unknown
@@ -386,17 +395,18 @@ func PrintState() {
 =================================
 %v
 
-Version              : %v
-Collection Mode      : %v
+Version                        : %v
+Collection Mode                : %v
 
 -- status --
-Transfers Complete   : %v/%v
-Result               : %v
-Failed Nodes         : %v
+Transfers Complete             : %v/%v
+Result                         : %v
+Nodes (Coordinators/Executors) : %v/%v
+Failed Nodes                   : %v
 
 %v
 `, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
-		resultText, failedNodesStr, nodes.String())
+		resultText, len(coordinatorKeys), len(executorKeys), failedNodesStr, nodes.String())
 	if err != nil {
 		fmt.Printf("unable to write output: (%v)\n", err)
 	}
