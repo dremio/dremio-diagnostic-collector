@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,9 +28,10 @@ import (
 
 // NodeCaptureStats represents stats for a node capture.
 type NodeCaptureStats struct {
-	startTime int64
-	endTime   int64
-	status    string
+	startTime       int64
+	endTime         int64
+	status          string
+	endProcessError string
 }
 
 // CollectionStats represents stats for a collection.
@@ -189,12 +189,12 @@ func Clear() {
 }
 
 type NodeState struct {
-	Status     string `json:"status"`
-	StatusUX   string `json:"status_ux"`
-	Node       string `json:"node"`
-	Message    string `json:"message"`
-	Result     string `json:"result"`
-	EndProcess bool   `json:"end_process"`
+	Status          string `json:"status"`
+	StatusUX        string `json:"status_ux"`
+	Node            string `json:"node"`
+	Result          string `json:"result"`
+	EndProcess      bool   `json:"end_process"`
+	EndProcessError string `json:"-"` // Use json:"-" to exclude from JSON output
 }
 
 const (
@@ -252,23 +252,15 @@ func UpdateNodeState(nodeState NodeState) {
 	node := nodeState.Node
 	status := nodeState.StatusUX
 	result := nodeState.Result
-	message := nodeState.Message
 	if _, ok := c.nodeCaptureStats[node]; ok {
-		var statusText string
-		if message != "" {
-			// add the message if present
-			statusText = fmt.Sprintf("(%v) %v", status, message)
-		} else {
-			// if there is no message just the status
-			statusText = status
-		}
 		// failures should include a clear failure output in the status text
 		if result == ResultFailure {
-			statusText = ResultFailure + " - " + statusText
+
+			status = status + " - " + ResultFailure
 		}
 		// set the status message on the node directly so we can display it when the
 		// display is updated
-		c.nodeCaptureStats[node].status = statusText
+		c.nodeCaptureStats[node].status = status
 		if nodeState.EndProcess {
 			// set the end time and then increment the transfers complete counter
 			// we only want to count it the first time, so we check to see if
@@ -277,6 +269,7 @@ func UpdateNodeState(nodeState NodeState) {
 				if nodeState.Result != ResultFailure {
 					c.TransfersComplete++
 				}
+				c.nodeCaptureStats[node].endProcessError = nodeState.EndProcessError
 				c.nodeCaptureStats[node].endTime = time.Now().Unix()
 			}
 		}
@@ -364,22 +357,25 @@ func PrintState() {
 	// Sort by node name
 	sort.Strings(failedNodes)
 
-	// Create failed nodes string and grep command for OSX/Linux users
 	var failedNodesStr string
-	var grepCommandsStr strings.Builder
-
+	errorLogs := strings.Builder{}
+	for _, node := range failedNodes {
+		if c.nodeCaptureStats[node] == nil {
+			continue
+		}
+		if c.nodeCaptureStats[node] == nil {
+			continue
+		}
+		if c.nodeCaptureStats[node].endProcessError == "" {
+			continue
+		}
+		errorLogs.WriteString(fmt.Sprintf("Node: %v\n", node))
+		errorLogs.WriteString(fmt.Sprintf("Error: %v\n", c.nodeCaptureStats[node].endProcessError))
+	}
 	if len(failedNodes) > 0 {
 		// Just show node names for failed nodes
 		failedNodesStr = strings.Join(failedNodes, ", ")
-
-		// Add grep commands for OSX/Linux users
-		if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-			grepCommandsStr.WriteString("\nFor detailed logs on failed nodes, run:\n")
-			for _, nodeName := range failedNodes {
-				grepCommandsStr.WriteString(fmt.Sprintf("grep \"HOST: %v\" %v | grep -v NodeState\n",
-					nodeName, c.logFile))
-			}
-		}
+		failedNodesStr = fmt.Sprintf("%v\n\nLogs of Failed Nodes:\n---------------------\n%v", failedNodesStr, errorLogs.String())
 	} else {
 		failedNodesStr = "None"
 	}
@@ -391,7 +387,6 @@ func PrintState() {
 %v
 
 Version              : %v
-Log File             : %v
 Collection Mode      : %v
 
 -- status --
@@ -399,9 +394,8 @@ Transfers Complete   : %v/%v
 Result               : %v
 Failed Nodes         : %v
 
-
 %v
-`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), c.logFile, strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
+`, time.Now().Format(time.RFC1123), strings.TrimSpace(ddcVersion), strings.ToUpper(c.collectionMode), c.TransfersComplete, total,
 		resultText, failedNodesStr, nodes.String())
 	if err != nil {
 		fmt.Printf("unable to write output: (%v)\n", err)

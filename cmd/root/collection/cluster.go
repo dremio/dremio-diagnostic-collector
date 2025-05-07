@@ -130,7 +130,7 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 		case context.DeadlineExceeded:
 			simplelog.Errorf("%v", context.Cause(ctx))
 		default:
-			simplelog.Errorf("unable to copy log into string for pod: %v container: %v with error: %v", pod, container, err)
+			simplelog.Warningf("unable to copy log into string for pod: %v container: %v with error: %v", pod, container, err)
 			return
 		}
 	}
