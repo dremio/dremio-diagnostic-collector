@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.4.0] - UNRELEASED
+
+### Changed
+
+* Replaced simple dremio.conf parser with proper HOCON parser implementation
+
+### Removed
+
+* Removed old simple parser
+
 ## [3.3.4] - 2025-04-17
 
 ### Added
@@ -90,9 +100,9 @@
 
 ## [3.2.7] - 2024-10-09
 
-### Added 
+### Added
 
-* added collection of the vacuum log 
+* added collection of the vacuum log
 * retry client id with ssl if http fails
 * have a special build for local-collect only, this shrinks binary size quite a bit
 
@@ -114,7 +124,7 @@
 
 ## [3.2.4] - 2024-09-09
 
-### Added 
+### Added
 
 * added support for using older kubectl clients since the kubectl cp interface is stable, by checking client version we can safely check if retries are supported and only add them if the are
 
@@ -122,7 +132,7 @@
 
 ### Added
 
-* --context or -x flag to provide support for passing the kubernetes context into ddc, this works for both the 
+* --context or -x flag to provide support for passing the kubernetes context into ddc, this works for both the
 kubeAPI as well as the the kubectl based collection
 * the current context is detected if none is supplied
 * added the context used to the logs
@@ -158,7 +168,7 @@ kubeAPI as well as the the kubectl based collection
 
 ### Removed
 
-* removed --dremio-pat-token this flag was hidden but still in use in some cases, this was intended to be removed awhile ago use the --pat-prompt instead 
+* removed --dremio-pat-token this flag was hidden but still in use in some cases, this was intended to be removed awhile ago use the --pat-prompt instead
 
 ### Fixed
 
@@ -211,7 +221,7 @@ kubeAPI as well as the the kubectl based collection
 
 ### Fixed
 
-* security fixes 
+* security fixes
 * upgrade k8s client to 0.30.1
 * semantic version correction for go modules
 
@@ -229,7 +239,7 @@ kubeAPI as well as the the kubectl based collection
 
 ### Changed
 
-* removed ttop and replaced it with `LINES=100 top -H -n <iterations> -p <pid> -d <interval> -bw` 
+* removed ttop and replaced it with `LINES=100 top -H -n <iterations> -p <pid> -d <interval> -bw`
 * will try and use `kubectl` for file transfers and command execution if present, but for cluster discovery and the k8s rights check the api is still used, use the `-d` flag to disable this behavior and just use the Kubernetes api directly.
 * unhide most of the hidden flags so that people can use the more advanced features if they want
 * in k8s pod tarball transfer now increases with node count (coordinators will have more queries.json size) the base is still 30 minutes but we add a minute for every 3 pods
@@ -321,7 +331,7 @@ someone has added the PAT which is always available
 
 ### Added
 
-* retry logic for copy from 
+* retry logic for copy from
 * high hard-coded timeouts for copy from and copy to pod, if someone really wants this to be configurable we accept PRs
 
 ## [2.3.0-beta2] - 2024-03-20
@@ -346,7 +356,7 @@ someone has added the PAT which is always available
 
 ### Fixed
 
-* never closed the reader for kubernetes.CopyToHost 
+* never closed the reader for kubernetes.CopyToHost
 * no longer waiting on result of stream copy if it fails in kubernetes.CopyToHost should enhance stability in some networks
 
 ## [2.2.1-beta1] - 2024-03-13
@@ -404,7 +414,7 @@ someone has added the PAT which is always available
 
 * validation for the --collect mode.
 
-## [2.0.0] - 2024-02-13 
+## [2.0.0] - 2024-02-13
 
 ### Fixed
 
@@ -419,12 +429,12 @@ someone has added the PAT which is always available
 
 ### Added
 * ddc interactive prompt when no options are passed to the command that takes you through a menu driven selection
-* Added --collect with the available values of light, standard, health-check default is quick. 
+* Added --collect with the available values of light, standard, health-check default is quick.
   * `--collect light` has no jfr, jstack, ttop and only 2 days of logs and queries.json
   * `--collect standard` is the old default (jfr, ttop, jstack, 28 days of queries.json and 7 days of logs)
   * `--collect healthcheck` is full + fires the pat prompt which adds job profile collection
 
-### Changed 
+### Changed
 
 * k8s collection now no longer takes -c and -e flags, and only a full cluster capture is supported with k8s
 
@@ -465,7 +475,7 @@ someone has added the PAT which is always available
 * will fail ddc if we use a --tarball-out-dir or a --transfer-dir that has any entries besides: ddc, ddc.log, ddc.yaml or nodeName.tar.gz
 
 ### Fixed
-* fixed not actually allowing the DREMIO_LOG_DIR to be used 
+* fixed not actually allowing the DREMIO_LOG_DIR to be used
 
 ## [0.8.3] - 2023-12-21
 
@@ -485,7 +495,7 @@ someone has added the PAT which is always available
 * add `mount` and `lsblk` outputs into `node-info.txt` file for each node
 
 ### Fixed
-* fixed jcmd command syntax when getting dremio version from process info 
+* fixed jcmd command syntax when getting dremio version from process info
 
 ## [0.8.0] - 2023-12-01
 
@@ -520,7 +530,7 @@ someone has added the PAT which is always available
 
 * now copy, archive, and delete copy instead of archive in place log files #130
 * unexpected use of tmp path #123
-* clean rest API URL by adding check for trailing slash #127 
+* clean rest API URL by adding check for trailing slash #127
 
 ## [0.7.2] - 2023-10-06
 
@@ -532,7 +542,7 @@ someone has added the PAT which is always available
 
 ### Changed
 
-* Changed K8s container log collection to be multi-threaded 
+* Changed K8s container log collection to be multi-threaded
 
 ## [0.7.1] - 2023-09-01
 
@@ -550,7 +560,7 @@ someone has added the PAT which is always available
 
 * end to end testing around ssh collection
 
-### Fixed 
+### Fixed
 
 * fixed ttop collection on premise
 * NOTICE file is now present which includes dependencies authors and their copyrights
@@ -606,7 +616,7 @@ someone has added the PAT which is always available
 ### Added
 
 * added "ttop" reporting for local-collect which allows reporting on the threads in java by cpu usage and gc allocation rate
-* now have dremio-cloud support 
+* now have dremio-cloud support
 
 ### Fixed
 
@@ -786,7 +796,7 @@ someone has added the PAT which is always available
 
 ### Added
 
-- Local capture command that can run locally on a node. 
+- Local capture command that can run locally on a node.
 - Added configuration file support ddc-capture.yaml in local folder (also supports json, toml, hcl, env, and props file formats). The configuration options are the same name as the flags. Run ddc local-capture --help for more information.
 
 ### Changed
@@ -886,6 +896,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.4...v3.4.0
 [3.3.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.3...v3.3.4
 [3.3.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.2...v3.3.3
 [3.3.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.1...v3.3.2
