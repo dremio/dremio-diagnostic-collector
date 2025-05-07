@@ -786,7 +786,6 @@ func init() {
 	}
 	LocalCollectCmd.Flags().Bool("allow-insecure-ssl", false, "When true allow insecure ssl certs when doing API calls")
 	LocalCollectCmd.Flags().BoolVar(&patStdIn, "pat-stdin", false, "allows one to pipe the pat to standard in")
-	LocalCollectCmd.Flags().Bool("disable-rest-api", false, "disable all REST API calls, this will disable job profile, WLM, and KVM reports")
 	LocalCollectCmd.Flags().StringVar(&pid, "pid", "", "write a pid")
 	if err := LocalCollectCmd.Flags().MarkHidden("pid"); err != nil {
 		fmt.Printf("unable to mark flag hidden critical error %v", err)

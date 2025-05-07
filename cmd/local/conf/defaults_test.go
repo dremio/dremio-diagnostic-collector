@@ -41,7 +41,6 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		{conf.KeyDisableRESTAPI, false},
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
 		{conf.KeyCollectAuditLog, false},
@@ -109,7 +108,6 @@ func TestSetViperDefaultsQuickCollect(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		{conf.KeyDisableRESTAPI, false},
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
 		{conf.KeyCollectAuditLog, false},
@@ -173,7 +171,6 @@ func TestSetViperDefaults(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		{conf.KeyDisableRESTAPI, false},
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
 		{conf.KeyCollectAuditLog, false},

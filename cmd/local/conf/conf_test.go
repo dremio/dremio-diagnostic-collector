@@ -58,7 +58,6 @@ var genericConfSetup = func(cfgContent string) {
 		// Create a sample configuration file.
 		cfgContent = fmt.Sprintf(`
 accept-collection-consent: true
-disable-rest-api: false
 collect-acceleration-log: true
 collect-access-log: true
 collect-audit-log: true
@@ -301,10 +300,6 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Error("invalid conf")
 	}
 
-	if cfg.DisableRESTAPI() != false {
-		t.Errorf("Expected DisableRESTAPI to be true, got false")
-	}
-
 	if cfg.CollectAccelerationLogs() != true {
 		t.Errorf("Expected CollectAccelerationLogs to be true, got false")
 	}
@@ -405,57 +400,6 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 		t.Error("expected is-rest-collect to be false")
 	}
 	afterEachConfTest()
-}
-
-func TestConfReadWithDisabledRestAPIResultsInDisabledWLMJobProfileAndKVReport(t *testing.T) {
-	yaml := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-disable-rest-api: true
-number-threads: 4
-dremio-endpoint: "http://localhost:9047"
-dremio-username: "admin"
-dremio-pat-token: "your_personal_access_token"
-number-job-profiles: 10
-collect-wlm: true
-collect-system-tables-export: true
-collect-kvstore-report: true
-`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"))
-	genericConfSetup(yaml)
-	defer afterEachConfTest()
-	hook := shutdown.NewHook()
-	defer hook.Cleanup()
-	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-	if cfg == nil {
-		t.Fatal("invalid conf")
-	}
-	if cfg.CollectSystemTablesExport() == true {
-		t.Error("expected collect system tables export to be false")
-	}
-	if cfg.CollectWLM() == true {
-		t.Error("expected collect wlm to be false")
-	}
-	if cfg.CollectKVStoreReport() == true {
-		t.Error("expected collect wlm to be false")
-	}
-	if cfg.NumberJobProfilesToCollect() != 0 {
-		t.Errorf("expected number job profiles was %v but expected 0", cfg.NumberJobProfilesToCollect())
-	}
-	if cfg.JobProfilesNumHighQueryCost() != 0 {
-		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumHighQueryCost())
-	}
-	if cfg.JobProfilesNumRecentErrors() != 0 {
-		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumRecentErrors())
-	}
-	if cfg.JobProfilesNumSlowExec() != 0 {
-		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumSlowExec())
-	}
-	if cfg.JobProfilesNumSlowPlanning() != 0 {
-		t.Errorf("expected number high query cost job profiles was %v but expected 0", cfg.JobProfilesNumSlowPlanning())
-	}
 }
 
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
@@ -647,8 +591,15 @@ services: {
 	// Set the dremio-conf-dir to our mock directory
 	overrides["dremio-conf-dir"] = mockConfDir
 
-	// Disable REST API to skip API validation
-	overrides["disable-rest-api"] = "true"
+	// Set up a mock server to handle API validation
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `{"success": true}`)
+	}))
+	defer ts.Close()
+
+	// Update the endpoint to use our mock server
+	overrides["dremio-endpoint"] = ts.URL
 
 	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {
@@ -663,17 +614,17 @@ services: {
 		t.Error("Expected IsMasterCoordinator to be true, got false")
 	}
 
-	// Since we disabled the REST API, these features should be disabled regardless of master coordinator status
-	if cfg.CollectKVStoreReport() {
-		t.Error("Expected CollectKVStoreReport to be false when REST API is disabled, got true")
+	// These features should be enabled for master coordinators with a PAT token
+	if !cfg.CollectKVStoreReport() {
+		t.Error("Expected CollectKVStoreReport to be true for master coordinator, got false")
 	}
 
-	if cfg.CollectSystemTablesExport() {
-		t.Error("Expected CollectSystemTablesExport to be false when REST API is disabled, got true")
+	if !cfg.CollectSystemTablesExport() {
+		t.Error("Expected CollectSystemTablesExport to be true for master coordinator, got false")
 	}
 
-	if cfg.CollectWLM() {
-		t.Error("Expected CollectWLM to be false when REST API is disabled, got true")
+	if !cfg.CollectWLM() {
+		t.Error("Expected CollectWLM to be true for master coordinator, got false")
 	}
 }
 
@@ -712,8 +663,15 @@ services: {
 	// Set the dremio-conf-dir to our mock directory
 	overrides["dremio-conf-dir"] = mockConfDir
 
-	// Disable REST API to skip API validation
-	overrides["disable-rest-api"] = "true"
+	// Set up a mock server to handle API validation
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `{"success": true}`)
+	}))
+	defer ts.Close()
+
+	// Update the endpoint to use our mock server
+	overrides["dremio-endpoint"] = ts.URL
 
 	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
 	if err != nil {

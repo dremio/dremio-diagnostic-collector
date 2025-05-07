@@ -77,7 +77,6 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 
 	coordinatorNode := "coordinator"
 	overrides := make(map[string]string)
-	overrides[conf.KeyDisableRESTAPI] = "true"
 	overrides[conf.KeyCollectDiskUsage] = "false"
 	overrides[conf.KeyCollectJFR] = "false"
 	overrides[conf.KeyCollectJStack] = "false"
@@ -105,7 +104,6 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	}
 	for _, entry := range entries {
 		overrides := make(map[string]string)
-		overrides[conf.KeyDisableRESTAPI] = "true"
 		overrides[conf.KeyCollectDiskUsage] = "false"
 		overrides[conf.KeyCollectJFR] = "false"
 		overrides[conf.KeyCollectJStack] = "false"

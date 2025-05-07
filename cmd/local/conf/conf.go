@@ -83,7 +83,6 @@ type CollectConf struct {
 	// flags that are configurable by env or configuration
 	disableFreeSpaceCheck      bool
 	numberThreads              int
-	disableRESTAPI             bool
 	gcLogsDir                  string
 	dremioLogDir               string
 	dremioConfDir              string
@@ -339,10 +338,9 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
 	c.noLogDir = GetBool(confData, KeyNoLogDir)
-	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
-	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && !c.disableRESTAPI {
+	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection {
 		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one")
 	}
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
@@ -548,12 +546,12 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
 	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
 	// collect rest apis
-	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == "" || !c.isMasterCoordinator
+	disableRESTAPI := c.dremioPATToken == "" || !c.isMasterCoordinator
 	if disableRESTAPI {
-		if !c.isMasterCoordinator && !c.disableRESTAPI && c.dremioPATToken != "" {
+		if !c.isMasterCoordinator && c.dremioPATToken != "" {
 			simplelog.Infof("Disabling REST API collection because this node is not a master coordinator")
 		} else {
-			simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set or REST API is disabled")
+			simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
 		}
 		c.numberJobProfilesToCollect = 0
 		c.jobProfilesNumHighQueryCost = 0
@@ -690,10 +688,6 @@ func extractValue(input string, key string) (string, error) {
 
 func getOutputDir(now time.Time) string {
 	return now.Format("20060102-150405")
-}
-
-func (c CollectConf) DisableRESTAPI() bool {
-	return c.disableRESTAPI
 }
 
 func (c CollectConf) DisableFreeSpaceCheck() bool {

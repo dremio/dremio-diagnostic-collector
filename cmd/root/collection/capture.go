@@ -278,10 +278,7 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 	if c.NoLogDir {
 		localCollectArgs = append(localCollectArgs, "--no-log-dir")
 	}
-	if skipRESTCollect {
-		// if skipRESTCollect is set blank the pat
-		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableRESTAPI))
-	} else if dremioPAT != "" {
+	if dremioPAT != "" {
 		// if the dremio PAT is set, set the pat-stdin value so we can pass it in via that mechanism
 		localCollectArgs = append(localCollectArgs, "--pat-stdin")
 		mask = true
