@@ -700,6 +700,82 @@ services: {
 	}
 }
 
+func TestMasterCoordinatorDetectionFromJVMArgs(t *testing.T) {
+	// Test that we can detect a master coordinator from JVM arguments
+	// even if dremio.conf says otherwise
+
+	// Setup common test environment
+	logDir := filepath.Join("testdata", "logs")
+	confDir := filepath.Join("testdata", "conf")
+
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pat-token: "your_personal_access_token"
+dremio-pid: 12345
+`, logDir, confDir)
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	// Create a mock dremio.conf file with master coordinator disabled
+	mockConfDir := t.TempDir()
+	mockConfFile := filepath.Join(mockConfDir, "dremio.conf")
+	mockConfContent := `
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: false,
+  executor.enabled: false
+}
+`
+	err := os.WriteFile(mockConfFile, []byte(mockConfContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write mock dremio.conf: %v", err)
+	}
+
+	// Set the dremio-conf-dir to our mock directory
+	overrides["dremio-conf-dir"] = mockConfDir
+
+	// Set up a mock server to handle API validation
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `{"success": true}`)
+	}))
+	defer ts.Close()
+
+	// Update the endpoint to use our mock server
+	overrides["dremio-endpoint"] = ts.URL
+
+	// Mock the process output to include the master coordinator flag
+	// We'll do this by creating a mock implementation of the ReadPSEnv function
+	originalReadPSEnv := conf.DefaultReadPSEnv
+	defer func() {
+		conf.DefaultReadPSEnv = originalReadPSEnv
+	}()
+
+	conf.DefaultReadPSEnv = func(hook shutdown.CancelHook, dremioPID int) (string, error) {
+		return `DREMIO_HOME=/opt/dremio DREMIO_CONF_DIR=/etc/dremio DREMIO_LOG_DIR=/var/log/dremio -Dservices.coordinator.master.enabled=true`, nil
+	}
+
+	// Now test that we detect the node as a master coordinator from JVM args
+	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("invalid conf")
+	}
+
+	// Should be detected as a master coordinator from JVM args
+	// even though dremio.conf says it's not
+	if !cfg.IsMasterCoordinator() {
+		t.Error("Expected IsMasterCoordinator to be true (from JVM args), got false")
+	}
+}
+
 func TestHealthCheckModeWithoutPAT(t *testing.T) {
 	// Test cases:
 	// 1. Non-master coordinator without PAT in health-check mode - should succeed
@@ -782,7 +858,7 @@ services: {
 	overrides["dremio-conf-dir"] = mockConfDir2
 
 	// Case 2: Master coordinator without PAT in health-check mode - should fail
-	cfg, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.HealthCheckCollection)
+	_, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.HealthCheckCollection)
 	if err == nil {
 		t.Error("Case 2: Expected error for master coordinator without PAT in health-check mode, got success")
 	} else if !strings.Contains(err.Error(), "INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one for master coordinators") {

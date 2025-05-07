@@ -7,6 +7,7 @@
 * Replaced simple dremio.conf parser with proper HOCON parser implementation
 * Only run REST API collection on master coordinators
 * Modified PAT validation to only require PAT for health-check mode on master coordinators
+* Enhanced master coordinator detection to check both JVM arguments and dremio.conf (JVM arguments take precedence)
 
 ### Removed
 
