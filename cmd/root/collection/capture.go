@@ -120,10 +120,11 @@ func extractJobProgressText(line string) (status string, statusUX string, messag
 func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo, localDDCYamlPath string, skipRESTCollect bool, disableFreeSpaceCheck bool, minFreeSpaceGB uint64) error {
 	host := c.Host
 	nodeState := consoleprint.NodeState{
-		Node:     host,
-		Status:   consoleprint.Starting,
-		StatusUX: "STARTING",
-		Result:   consoleprint.ResultPending,
+		Node:          host,
+		Status:        consoleprint.Starting,
+		StatusUX:      "STARTING",
+		Result:        consoleprint.ResultPending,
+		IsCoordinator: c.IsCoordinator,
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -147,11 +148,11 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 		// remotely make TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "mkdir", "-p", c.TransferDir); err != nil {
 			nodeState = consoleprint.NodeState{
-				Node:       host,
-				Status:     consoleprint.CreatingRemoteDir,
-				Message:    fmt.Sprintf("(%v) %v", err, out),
-				Result:     consoleprint.ResultFailure,
-				EndProcess: true,
+				Node:            host,
+				Status:          consoleprint.CreatingRemoteDir,
+				Result:          consoleprint.ResultFailure,
+				EndProcess:      true,
+				EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -179,12 +180,12 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 		// copy file to TransferDir assume there is
 		if out, err := c.Collector.CopyToHost(c.Host, localDDCPath, pathToDDC); err != nil {
 			nodeState = consoleprint.NodeState{
-				Node:       host,
-				Status:     consoleprint.CopyDDCToHost,
-				StatusUX:   "COPY DDC TO HOST",
-				Result:     consoleprint.ResultFailure,
-				Message:    fmt.Sprintf("(%v) %v", err, out),
-				EndProcess: true,
+				Node:            host,
+				Status:          consoleprint.CopyDDCToHost,
+				StatusUX:        "COPY DDC TO HOST",
+				Result:          consoleprint.ResultFailure,
+				EndProcess:      true,
+				EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -215,12 +216,12 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 		// make  exec TransferDir
 		if out, err := c.Collector.HostExecute(false, c.Host, "chmod", "+x", pathToDDC); err != nil {
 			nodeState = consoleprint.NodeState{
-				Node:       host,
-				Status:     consoleprint.SettingDDCPermissions,
-				StatusUX:   "SETTING DDC PERMISSIONS",
-				Result:     consoleprint.ResultFailure,
-				Message:    fmt.Sprintf("(%v) %v", err, out),
-				EndProcess: true,
+				Node:            host,
+				Status:          consoleprint.SettingDDCPermissions,
+				StatusUX:        "SETTING DDC PERMISSIONS",
+				Result:          consoleprint.ResultFailure,
+				EndProcess:      true,
+				EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -238,12 +239,12 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 	// always update the configuration
 	if out, err := c.Collector.CopyToHost(c.Host, localDDCYamlPath, pathToDDCYAML); err != nil {
 		nodeState := consoleprint.NodeState{
-			Node:       host,
-			Status:     consoleprint.CopyDDCYaml,
-			StatusUX:   "COPY DDC YAML",
-			Result:     consoleprint.ResultFailure,
-			Message:    fmt.Sprintf("(%v) %v", err, out),
-			EndProcess: true,
+			Node:            host,
+			Status:          consoleprint.CopyDDCYaml,
+			StatusUX:        "COPY DDC YAML",
+			Result:          consoleprint.ResultFailure,
+			EndProcess:      true,
+			EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -287,6 +288,7 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 	}
 
 	var allHostLog []string
+	var lastLine string
 	err := c.Collector.HostExecuteAndStream(mask, c.Host, func(line string) {
 		if strings.HasPrefix(line, "JOB START") {
 			status, statusUX := extractJobText(line)
@@ -299,10 +301,9 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else if strings.HasPrefix(line, "JOB FAILED") {
-			status, statusUX, message := extractJobFailedText(line)
+			status, statusUX, _ := extractJobFailedText(line)
 			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
-				Message:  message,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultFailure,
@@ -310,10 +311,9 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else if strings.HasPrefix(line, "JOB PROGRESS") {
-			status, statusUX, message := extractJobProgressText(line)
+			status, statusUX, _ := extractJobProgressText(line)
 			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
-				Message:  message,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultPending,
@@ -321,22 +321,23 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else {
+			lastLine = line
 			allHostLog = append(allHostLog, line)
 		}
 		if strings.Contains(line, "AUTODETECTION DISABLED") {
-			consoleprint.UpdateNodeAutodetectDisabled(host, true)
 			simplelog.HostLog(host, "autodetection disabled")
 		}
 		simplelog.HostLog(host, line)
 	}, dremioPAT, localCollectArgs...)
 	if err != nil {
+
 		nodeState := consoleprint.NodeState{
-			Node:       c.Host,
-			Status:     consoleprint.Collecting,
-			StatusUX:   "LOCAL-COLLECT",
-			Result:     consoleprint.ResultFailure,
-			EndProcess: true,
-			Message:    strutils.GetEndOfString(strings.Join(allHostLog, " - "), 1024),
+			Node:            c.Host,
+			Status:          consoleprint.Collecting,
+			StatusUX:        "LOCAL-COLLECT",
+			Result:          consoleprint.ResultFailure,
+			EndProcess:      true,
+			EndProcessError: fmt.Sprintf("'%v' - '%v'", err, strutils.TruncateString(lastLine, 1024)),
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
@@ -359,12 +360,12 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	hostname, err := c.Collector.HostExecute(false, c.Host, "cat", "/proc/sys/kernel/hostname")
 	if err != nil {
 		nodeState := consoleprint.NodeState{
-			Node:       c.Host,
-			Status:     consoleprint.Collecting,
-			StatusUX:   "COLLECT HOSTNAME",
-			Result:     consoleprint.ResultFailure,
-			EndProcess: true,
-			Message:    err.Error(),
+			Node:            c.Host,
+			Status:          consoleprint.Collecting,
+			StatusUX:        "COLLECT HOSTNAME",
+			Result:          consoleprint.ResultFailure,
+			EndProcess:      true,
+			EndProcessError: fmt.Sprintf("'%v' - '%v'", err, hostname),
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
@@ -399,12 +400,12 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	destFile := filepath.Join(outDir, tgzFileName)
 	if out, err := c.Collector.CopyFromHost(c.Host, tarGZ, destFile); err != nil {
 		nodeState := consoleprint.NodeState{
-			Node:       c.Host,
-			Status:     consoleprint.TarballTransfer,
-			StatusUX:   "TARBALL TRANSFER",
-			Result:     consoleprint.ResultFailure,
-			EndProcess: true,
-			Message:    fmt.Sprintf("(%v) %v", err, out),
+			Node:            c.Host,
+			Status:          consoleprint.TarballTransfer,
+			StatusUX:        "TARBALL TRANSFER",
+			Result:          consoleprint.ResultFailure,
+			EndProcess:      true,
+			EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
 		}
 		consoleprint.UpdateNodeState(nodeState)
 		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))

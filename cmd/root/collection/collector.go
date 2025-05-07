@@ -119,7 +119,6 @@ func FilterExecutors(executors []string, coordinators []string) []string {
 			if c == e {
 				dupe = true
 				simplelog.Warningf("found %v in coordinator and executor list, removing from executor list", e)
-				consoleprint.AddWarningToConsole(fmt.Sprintf("%v was listed as executor and coordinator, choosing coordinator", e))
 				break
 			}
 		}
@@ -207,11 +206,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	consoleprint.UpdateRuntime(
 		versions.GetCLIVersion(),
 		simplelog.GetLogLoc(),
-		collectionArgs.DDCYamlLoc,
-		c.Name(),
-		collectionArgs.Enabled,
-		collectionArgs.Disabled,
-		dremioPAT != "",
 		0,
 		len(coordinators)+len(executors),
 	)

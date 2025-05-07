@@ -137,18 +137,6 @@ func startTicker() (stop func()) {
 }
 
 func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs kubernetes.KubeArgs, fallbackEnabled bool, hook shutdown.Hook) error {
-	patSet := collectionArgs.DremioPAT != ""
-	consoleprint.UpdateRuntime(
-		versions.GetCLIVersion(),
-		simplelog.GetLogLoc(),
-		collectionArgs.DDCYamlLoc,
-		"",
-		collectionArgs.Enabled,
-		collectionArgs.Disabled,
-		patSet,
-		0,
-		0,
-	)
 	consoleprint.UpdateCollectionMode(collectionArgs.CollectionMode)
 
 	outputDir, err := filepath.Abs(filepath.Dir(outputLoc))
@@ -168,11 +156,6 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		consoleprint.UpdateRuntime(
 			versions.GetCLIVersion(),
 			simplelog.GetLogLoc(),
-			collectionArgs.DDCYamlLoc,
-			collectorStrategy.Name(),
-			collectionArgs.Enabled,
-			collectionArgs.Disabled,
-			patSet,
 			0,
 			0,
 		)
@@ -195,11 +178,6 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		consoleprint.UpdateRuntime(
 			versions.GetCLIVersion(),
 			simplelog.GetLogLoc(),
-			collectionArgs.DDCYamlLoc,
-			collectorStrategy.Name(),
-			collectionArgs.Enabled,
-			collectionArgs.Disabled,
-			patSet,
 			0,
 			0,
 		)
