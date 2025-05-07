@@ -340,9 +340,6 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.noLogDir = GetBool(confData, KeyNoLogDir)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
-	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection {
-		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one")
-	}
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
 	c.numberJobProfilesToCollect = GetInt(confData, KeyNumberJobProfiles)
 
@@ -523,6 +520,11 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			simplelog.Warningf("Failed to detect if node is a master coordinator: %v", err)
 		}
 
+	}
+
+	// Only require PAT for health-check mode if this is a master coordinator
+	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && c.isMasterCoordinator {
+		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one for master coordinators")
 	}
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
