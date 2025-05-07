@@ -44,6 +44,25 @@ func setupConfigDir(t *testing.T, endpoint string) (confDir string) {
 	if err != nil {
 		t.Fatalf("unable to create wlm dir: %v", err)
 	}
+	// Create a mock dremio.conf file with master coordinator enabled
+	dremioConfDir := filepath.Join(confDir, "dremio-conf")
+	err = os.MkdirAll(dremioConfDir, 0o700)
+	if err != nil {
+		t.Fatalf("unable to create dremio conf dir: %v", err)
+	}
+
+	// Create a dremio.conf file that indicates this is a master coordinator
+	err = os.WriteFile(filepath.Join(dremioConfDir, "dremio.conf"), []byte(`
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: true,
+  executor.enabled: false
+}
+`), 0o600)
+	if err != nil {
+		t.Fatalf("unable to create dremio.conf: %v", err)
+	}
+
 	err = os.WriteFile(filepath.Join(confDir, "ddc.yaml"), []byte(fmt.Sprintf(`
 dremio-log-dir: %v
 dremio-conf-dir: %v
@@ -56,7 +75,7 @@ accept-collection-consent: true
 allow-insecure-ssl: true
 node-name: %v
 tmp-output-dir: %v
-`, LogDir(), ConfDir(), endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0o600)
+`, LogDir(), dremioConfDir, endpoint, nodeName, strings.ReplaceAll(outDir, "\\", "\\\\"))), 0o600)
 	if err != nil {
 		t.Fatalf("unable to create ddc.yaml: %v", err)
 	}

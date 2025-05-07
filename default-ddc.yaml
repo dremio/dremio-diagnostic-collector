@@ -1,12 +1,12 @@
 
-## if the node is offline you will need to set these to match your environment to have a collection work 
+## if the node is offline you will need to set these to match your environment to have a collection work
 # dremio-log-dir: "/var/log/dremio" # where the dremio log is located
 # dremio-conf-dir: "/opt/dremio/conf" #where the dremio conf files are located
 # dremio-rocksdb-dir: /opt/dremio/data/db # used for locating Dremio's KV Metastore
 
 ## these are optional
 # dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use for collecting Workload Manager, KV Report and Job Profiles
-# dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles 
+# dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles
 # dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
 # dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir
 # verbose: vv
@@ -23,8 +23,7 @@
 
 ## not typically recommended to change
 # dremio-pid: 0
-# dremio-pid-detection: true 
-# disable-rest-api: false
+# dremio-pid-detection: true
 # rest-http-timeout: 30
 # collect-os-config: true
 # collect-disk-usage: true
@@ -45,7 +44,7 @@
 # collect-system-tables-timeout-seconds: 120
 # collect-cluster-id-timeout-seconds: 60
 # system-tables-row-limit: 100000
-# system-tables: 
+# system-tables:
 #  - "\\\"tables\\\""
 #  - "copy_errors_history"
 #  - "fragments"
@@ -70,7 +69,7 @@
 #  - "cache.datasets"
 #  - "cache.mount_points"
 #  - "cache.storage_plugins"
-# system-tables-cloud: 	
+# system-tables-cloud:
 #  - "organization.clouds"
 #  - "organization.privileges"
 #  - "organization.projects"

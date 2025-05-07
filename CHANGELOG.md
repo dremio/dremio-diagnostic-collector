@@ -5,10 +5,14 @@
 ### Changed
 
 * Replaced simple dremio.conf parser with proper HOCON parser implementation
+* Only run REST API collection on master coordinators
+* Modified PAT validation to only require PAT for health-check mode on master coordinators
+* Enhanced master coordinator detection to check both JVM arguments and dremio.conf (JVM arguments take precedence)
 
 ### Removed
 
 * Removed old simple parser
+* Removed `disable-rest-api` flag and related code from all commands, now automatically detects if a node is a master coordinator
 
 ## [3.3.4] - 2025-04-17
 

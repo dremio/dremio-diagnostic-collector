@@ -83,7 +83,6 @@ type CollectConf struct {
 	// flags that are configurable by env or configuration
 	disableFreeSpaceCheck      bool
 	numberThreads              int
-	disableRESTAPI             bool
 	gcLogsDir                  string
 	dremioLogDir               string
 	dremioConfDir              string
@@ -143,6 +142,7 @@ type CollectConf struct {
 	restHTTPTimeout                   int
 	minFreeSpaceCheckGB               uint64
 	noLogDir                          bool
+	isMasterCoordinator               bool
 
 	// variables
 	systemTables            []string
@@ -338,12 +338,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
 	c.noLogDir = GetBool(confData, KeyNoLogDir)
-	c.disableRESTAPI = GetBool(confData, KeyDisableRESTAPI)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
-	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && !c.disableRESTAPI {
-		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one")
-	}
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
 	c.numberJobProfilesToCollect = GetInt(confData, KeyNumberJobProfiles)
 
@@ -510,6 +506,32 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			simplelog.Warningf("only applies to coordinators - invalid rocksdb dir '%v', update ddc.yaml and fix it: %v", c.dremioConfDir, err)
 		}
 
+		// Check if this node is a master coordinator
+		// First check if it's set in the JVM arguments
+		if detectedConfig.IsMasterCoordinator {
+			c.isMasterCoordinator = true
+			simplelog.Infof("Detected node as a master coordinator from JVM arguments")
+		} else {
+			// If not set in JVM arguments, check the HOCON config
+			dremioConfFile := filepath.Join(c.dremioConfDir, "dremio.conf")
+			hoconConfig, err := ParseDremioConf(dremioConfFile, detectedConfig.Home)
+			if err == nil {
+				c.isMasterCoordinator = hoconConfig.IsCoordinatorMaster()
+				if c.isMasterCoordinator {
+					simplelog.Infof("Detected node as a master coordinator from dremio.conf")
+				} else {
+					simplelog.Infof("Node is not a master coordinator (checked both JVM arguments and dremio.conf)")
+				}
+			} else {
+				simplelog.Warningf("Failed to detect if node is a master coordinator from dremio.conf: %v", err)
+			}
+		}
+
+	}
+
+	// Only require PAT for health-check mode if this is a master coordinator
+	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && c.isMasterCoordinator {
+		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one for master coordinators")
 	}
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
@@ -533,9 +555,13 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
 	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
 	// collect rest apis
-	disableRESTAPI := c.disableRESTAPI || c.dremioPATToken == ""
+	disableRESTAPI := c.dremioPATToken == "" || !c.isMasterCoordinator
 	if disableRESTAPI {
-		simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+		if !c.isMasterCoordinator && c.dremioPATToken != "" {
+			simplelog.Infof("Disabling REST API collection because this node is not a master coordinator")
+		} else {
+			simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
+		}
 		c.numberJobProfilesToCollect = 0
 		c.jobProfilesNumHighQueryCost = 0
 		c.jobProfilesNumSlowExec = 0
@@ -587,9 +613,10 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 // DremioConfig represents the configuration details for Dremio.
 type DremioConfig struct {
-	Home    string
-	LogDir  string
-	ConfDir string
+	Home                string
+	LogDir              string
+	ConfDir             string
+	IsMasterCoordinator bool
 }
 
 func GetConfiguredDremioValuesFromPID(hook shutdown.CancelHook, dremioPID int) (DremioConfig, error) {
@@ -600,7 +627,11 @@ func GetConfiguredDremioValuesFromPID(hook shutdown.CancelHook, dremioPID int) (
 	return ParsePSForConfig(psOut)
 }
 
-func ReadPSEnv(hook shutdown.CancelHook, dremioPID int) (string, error) {
+// ReadPSEnvFunc is a function type for reading process environment
+type ReadPSEnvFunc func(hook shutdown.CancelHook, dremioPID int) (string, error)
+
+// DefaultReadPSEnv is the default implementation for reading process environment
+var DefaultReadPSEnv ReadPSEnvFunc = func(hook shutdown.CancelHook, dremioPID int) (string, error) {
 	var w bytes.Buffer
 	// grep -v /etc/dremio/preview filters out the AWSE discount preview engine
 	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | grep -v /etc/dremio/preview | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
@@ -610,12 +641,18 @@ func ReadPSEnv(hook shutdown.CancelHook, dremioPID int) (string, error) {
 	return w.String(), nil
 }
 
+// ReadPSEnv reads the process environment for a given PID
+func ReadPSEnv(hook shutdown.CancelHook, dremioPID int) (string, error) {
+	return DefaultReadPSEnv(hook, dremioPID)
+}
+
 func ParsePSForConfig(ps string) (DremioConfig, error) {
 	// Define the keys to search for
 	dremioHomeKey := "DREMIO_HOME="
 	dremioLogDirKey := "-Ddremio.log.path="
 	dremioConfDirKey := "DREMIO_CONF_DIR="
 	dremioLogDirKeyBackup := "DREMIO_LOG_DIR="
+	dremioMasterCoordinatorKey := "-Dservices.coordinator.master.enabled="
 
 	// Find and extract the values
 	dremioHome, err := extractValue(ps, dremioHomeKey)
@@ -639,10 +676,20 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 		return DremioConfig{}, err
 	}
 
+	// Check if master coordinator flag is set in JVM arguments
+	isMasterCoordinator := false
+	masterCoordinatorValue, err := extractValue(ps, dremioMasterCoordinatorKey)
+	if err == nil {
+		// If we found the flag, check its value
+		isMasterCoordinator = strings.ToLower(masterCoordinatorValue) == "true"
+		simplelog.Infof("Found master coordinator flag in JVM arguments: %v", isMasterCoordinator)
+	}
+
 	return DremioConfig{
-		Home:    dremioHome,
-		LogDir:  dremioLogDir,
-		ConfDir: dremioConfDir,
+		Home:                dremioHome,
+		LogDir:              dremioLogDir,
+		ConfDir:             dremioConfDir,
+		IsMasterCoordinator: isMasterCoordinator,
 	}, nil
 }
 
@@ -671,10 +718,6 @@ func extractValue(input string, key string) (string, error) {
 
 func getOutputDir(now time.Time) string {
 	return now.Format("20060102-150405")
-}
-
-func (c CollectConf) DisableRESTAPI() bool {
-	return c.disableRESTAPI
 }
 
 func (c CollectConf) DisableFreeSpaceCheck() bool {
@@ -955,4 +998,9 @@ func (c *CollectConf) CollectSystemTablesTimeoutSeconds() int {
 
 func (c *CollectConf) CollectClusterIDTimeoutSeconds() int {
 	return c.collectClusterIDTimeoutSeconds
+}
+
+// IsMasterCoordinator returns whether this node is a master coordinator
+func (c *CollectConf) IsMasterCoordinator() bool {
+	return c.isMasterCoordinator
 }

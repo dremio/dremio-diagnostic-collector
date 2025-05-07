@@ -57,7 +57,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 
 	// set default config
 	setDefault(confData, KeyVerbose, "vv")
-	setDefault(confData, KeyDisableRESTAPI, false)
 	setDefault(confData, KeyCollectAccelerationLog, false)
 	setDefault(confData, KeyCollectAccessLog, false)
 	setDefault(confData, KeyCollectAuditLog, false)
