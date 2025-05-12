@@ -21,7 +21,7 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "golangci-lint" -ErrorAction SilentlyContinue)) {
     Write-Output "golangci-lint not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.0.2
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
 }
 
 Write-Output "Checking if gosec is installed..."
@@ -30,6 +30,6 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "gosec" -ErrorAction SilentlyContinue)) {
     Write-Output "gosec not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/securego/gosec/v2/cmd/gosec@v2.22.3
+    go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
 }
 
