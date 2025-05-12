@@ -112,6 +112,31 @@ for kubernetes deployments:
 	},
 }
 
+// validateUnknownFlags checks if there are any unknown flags in the arguments
+func validateUnknownFlags(args []string) error {
+	// Create a temporary flag set with all the defined flags
+	tempFlagSet := pflag.NewFlagSet("temp", pflag.ContinueOnError)
+	RootCmd.Flags().VisitAll(func(flag *pflag.Flag) {
+		tempFlagSet.AddFlag(flag)
+	})
+
+	// Parse the arguments and check for errors
+	err := tempFlagSet.Parse(args)
+	if err != nil {
+		return fmt.Errorf("invalid flag: %w", err)
+	}
+
+	// Check for any unknown flags
+	unknown := tempFlagSet.Args()
+	for _, arg := range unknown {
+		if strings.HasPrefix(arg, "-") {
+			return fmt.Errorf("unknown flag: %s", arg)
+		}
+	}
+
+	return nil
+}
+
 // startTicker starts a ticker that ticks every specified duration and returns
 // a function that can be called to stop the ticker.
 func startTicker() (stop func()) {
@@ -253,6 +278,11 @@ func Execute(args []string) error {
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && (foundCmd.Use == RootCmd.Use) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
+		// Check for unknown flags when using the root command directly
+		if err := validateUnknownFlags(args[1:]); err != nil {
+			return err
+		}
+
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)

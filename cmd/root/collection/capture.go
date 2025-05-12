@@ -311,12 +311,13 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
 		} else if strings.HasPrefix(line, "JOB PROGRESS") {
-			status, statusUX, _ := extractJobProgressText(line)
+			status, statusUX, progressMessage := extractJobProgressText(line)
 			nodeState := consoleprint.NodeState{
 				Node:     c.Host,
 				Status:   status,
 				StatusUX: statusUX,
 				Result:   consoleprint.ResultPending,
+				Progress: progressMessage,
 			}
 			consoleprint.UpdateNodeState(nodeState)
 			simplelog.HostLog(host, fmt.Sprintf("%#v", nodeState))
