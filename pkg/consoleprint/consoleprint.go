@@ -198,7 +198,7 @@ type NodeState struct {
 	EndProcess      bool   `json:"end_process"`
 	EndProcessError string `json:"-"` // Use json:"-" to exclude from JSON output
 	IsCoordinator   bool   `json:"-"` // Use json:"-" to exclude from JSON output
-	Progress        string `json:"_"` // Use json:"_" to exclude from JSON output
+	Progress        string `json:"-"` // Use json:"-" to exclude from JSON output
 }
 
 const (
