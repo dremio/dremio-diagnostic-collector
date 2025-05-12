@@ -33,6 +33,7 @@ type NodeCaptureStats struct {
 	status          string
 	endProcessError string
 	isCoordinator   bool
+	progress        string
 }
 
 // CollectionStats represents stats for a collection.
@@ -197,6 +198,7 @@ type NodeState struct {
 	EndProcess      bool   `json:"end_process"`
 	EndProcessError string `json:"-"` // Use json:"-" to exclude from JSON output
 	IsCoordinator   bool   `json:"-"` // Use json:"-" to exclude from JSON output
+	Progress        string `json:"_"` // Use json:"_" to exclude from JSON output
 }
 
 const (
@@ -255,6 +257,8 @@ func UpdateNodeState(nodeState NodeState) {
 	status := nodeState.StatusUX
 	result := nodeState.Result
 	if _, ok := c.nodeCaptureStats[node]; ok {
+		// progress for job stats this is usually not set
+		c.nodeCaptureStats[node].progress = nodeState.Progress
 		// failures should include a clear failure output in the status text
 		if result == ResultFailure {
 
@@ -323,6 +327,10 @@ func PrintState() {
 	for i, key := range coordinatorKeys {
 		node := c.nodeCaptureStats[key]
 		status := node.status
+		progress := node.progress
+		if progress != "" {
+			status = fmt.Sprintf("%v - %v", status, progress)
+		}
 		// Only show duration for completed nodes
 		if node.endTime > 0 {
 			secondsElapsed := int(node.endTime) - int(node.startTime)
