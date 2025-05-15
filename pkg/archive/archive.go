@@ -37,7 +37,7 @@ func TarDDC(srcDir, dest, baseDDC string) error {
 	summaryJSON := filepath.Join(srcDir, "summary.json")
 	ddcFolder := filepath.Join(srcDir, baseDDC)
 	simplelog.Debug("copying log to archive for diagnostics")
-	err := simplelog.CopyLog(filepath.Join(baseDDC, "ddc.log"))
+	err := simplelog.CopyLog(filepath.Join(ddcFolder, "ddc.log"))
 	if err != nil {
 		fmt.Printf("unable to copy ddc.log: \n%v", err)
 	}

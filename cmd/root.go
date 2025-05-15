@@ -283,6 +283,12 @@ func Execute(args []string) error {
 			return err
 		}
 
+		// Reinitialize logger with output directory if outputLoc is specified
+		if outputLoc != "" {
+			outputDir := filepath.Dir(outputLoc)
+			simplelog.InitLoggerWithOutputDir(outputDir)
+		}
+
 		hook := shutdown.NewHook()
 		defer hook.Cleanup()
 		c := make(chan os.Signal, 1)
