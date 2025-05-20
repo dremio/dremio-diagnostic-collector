@@ -76,7 +76,9 @@ func TestLogger(t *testing.T) {
 }
 
 func TestStartLogMessage(t *testing.T) {
-	InitLogger()
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
+	defer InitLoggerWithOutputDir(tempDir)
 	loc := GetLogLoc()
 	if loc == "" {
 		t.Error("expected log file to not be empty but it was")
@@ -93,7 +95,8 @@ func TestStartLogMessage(t *testing.T) {
 }
 
 func TestEndLogMessage(t *testing.T) {
-	InitLogger()
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
 	loc := GetLogLoc()
 	out, err := output.CaptureOutput(func() {
 		LogEndMessage()
@@ -196,7 +199,8 @@ func TestLogIsCreatedInOutputDir(t *testing.T) {
 }
 func TestLogIsNotCreatedAtBasePathWithOutputDir(t *testing.T) {
 	// First, get the default log location
-	InitLogger()
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
 	defaultLogPath := GetLogLoc()
 	if defaultLogPath == "" {
 		t.Fatal("Default log path should not be empty")
@@ -213,7 +217,6 @@ func TestLogIsNotCreatedAtBasePathWithOutputDir(t *testing.T) {
 	}
 
 	// Create a temp directory for the output
-	tempDir := t.TempDir()
 	outputDir := filepath.Join(tempDir, "custom_logs")
 
 	// Create the output directory

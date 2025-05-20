@@ -153,7 +153,8 @@ func TestEnsureClose(t *testing.T) {
 	expectedFile := "my_long_file_name.txt"
 
 	// so the simplelogger output will be captured
-	simplelog.InitLogger()
+	tempDir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(tempDir)
 	ddcio.EnsureClose(expectedFile, failedClose)
 
 	raw, err := os.ReadFile(simplelog.GetLogLoc())

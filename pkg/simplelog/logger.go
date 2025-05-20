@@ -82,18 +82,6 @@ func InitLogger() {
 	})
 }
 
-func InitLoggerWithFile(fileName string) {
-	ddcLogMut.Lock()
-	defer ddcLogMut.Unlock()
-	f := createLog(fileName, true)
-	ddcLogLoc := GetLogLoc()
-	logger = newLogger(f, func() {
-		if err := f.Close(); err != nil {
-			fmt.Printf("WARNING unable to close log file: %v\n", ddcLogLoc)
-		}
-	})
-}
-
 func InitLoggerWithOutputDir(outputDir string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
