@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -275,6 +276,13 @@ func ValidateAndReadYaml(ddcYaml, collectionMode string) (map[string]interface{}
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(args []string) error {
+	// Defer closing the logger
+	defer func() {
+		if err := simplelog.Close(); err != nil {
+			log.Printf("unable to close log: %v", err)
+		}
+	}()
+
 	foundCmd, _, err := RootCmd.Find(args[1:])
 	// default cmd if no cmd is given
 	if err == nil && (foundCmd.Use == RootCmd.Use) && !errors.Is(foundCmd.Flags().Parse(args[1:]), pflag.ErrHelp) {
@@ -283,7 +291,7 @@ func Execute(args []string) error {
 			return err
 		}
 
-		// Reinitialize logger with output directory if outputLoc is specified
+		// Initialize logger after flags have been parsed
 		if outputLoc != "" {
 			outputDir := filepath.Dir(outputLoc)
 			simplelog.InitLoggerWithOutputDir(outputDir)

@@ -97,16 +97,17 @@ func InitLoggerWithFile(fileName string) {
 func InitLoggerWithOutputDir(outputDir string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-
 	// Create log file in the specified output directory
-	logPath := filepath.Join(outputDir, "ddc.log")
-	f := createLog(logPath, true)
-	ddcLogLoc := GetLogLoc()
-	logger = newLogger(f, func() {
-		if err := f.Close(); err != nil {
-			fmt.Printf("WARNING unable to close log file: %v\n", ddcLogLoc)
-		}
-	})
+	if outputDir != "" {
+		logPath := filepath.Join(outputDir, "ddc.log")
+		f := createLog(logPath, true)
+		ddcLogLoc := GetLogLoc()
+		logger = newLogger(f, func() {
+			if err := f.Close(); err != nil {
+				fmt.Printf("WARNING unable to close log file: %v\n", ddcLogLoc)
+			}
+		})
+	}
 }
 
 func LogStartMessage() {
