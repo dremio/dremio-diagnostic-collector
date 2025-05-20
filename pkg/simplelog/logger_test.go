@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -75,7 +76,9 @@ func TestLogger(t *testing.T) {
 }
 
 func TestStartLogMessage(t *testing.T) {
-	InitLogger()
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
+	defer InitLoggerWithOutputDir(tempDir)
 	loc := GetLogLoc()
 	if loc == "" {
 		t.Error("expected log file to not be empty but it was")
@@ -92,7 +95,8 @@ func TestStartLogMessage(t *testing.T) {
 }
 
 func TestEndLogMessage(t *testing.T) {
-	InitLogger()
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
 	loc := GetLogLoc()
 	out, err := output.CaptureOutput(func() {
 		LogEndMessage()
@@ -151,5 +155,96 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	output = strings.TrimSpace(strings.Split(errbuf.String(), ": ")[2])
 	if len(output) != expected {
 		t.Errorf("expected %q to be %v but was %v", string(output), expected, len(output))
+	}
+}
+func TestLogIsCreatedInOutputDir(t *testing.T) {
+	// First, close any existing logger
+	if err := Close(); err != nil {
+		t.Logf("Error closing existing logger: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	tPath := filepath.Join(tempDir, "ddcout")
+	expected := filepath.Join(tempDir, "ddcout", "ddc.log")
+
+	// Create the directory if it doesn't exist
+	if err := os.MkdirAll(tPath, 0755); err != nil {
+		t.Fatalf("Failed to create directory: %v", err)
+	}
+
+	// Register cleanup function
+	t.Cleanup(func() {
+		if err := Close(); err != nil {
+			t.Logf("Error closing logger during cleanup: %v", err)
+		}
+	})
+
+	InitLoggerWithOutputDir(tPath)
+	actual := GetLogLoc()
+
+	// Verify log location is not empty
+	if actual == "" {
+		t.Error("expected returned log file location to not be empty but it was")
+	}
+
+	// Verify log file exists at expected location
+	if _, err := os.Stat(expected); os.IsNotExist(err) {
+		t.Fatalf("expected log file %v to exist but instead was %v", expected, actual)
+	}
+
+	// Verify the returned log location matches the expected path
+	if actual != expected {
+		t.Errorf("expected log location to be %v but got %v", expected, actual)
+	}
+}
+func TestLogIsNotCreatedAtBasePathWithOutputDir(t *testing.T) {
+	// First, get the default log location
+	tempDir := t.TempDir()
+	InitLoggerWithOutputDir(tempDir)
+	defaultLogPath := GetLogLoc()
+	if defaultLogPath == "" {
+		t.Fatal("Default log path should not be empty")
+	}
+
+	// Clean up the default logger
+	if err := Close(); err != nil {
+		t.Logf("Error closing default logger: %v", err)
+	}
+
+	// Remove the default log file if it exists
+	if err := os.Remove(defaultLogPath); err != nil && !os.IsNotExist(err) {
+		t.Logf("Error removing default log file: %v", err)
+	}
+
+	// Create a temp directory for the output
+	outputDir := filepath.Join(tempDir, "custom_logs")
+
+	// Create the output directory
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		t.Fatalf("Failed to create output directory: %v", err)
+	}
+
+	// Initialize logger with the output directory
+	InitLoggerWithOutputDir(outputDir)
+
+	// Check that the log file exists in the output directory
+	expectedLogPath := filepath.Join(outputDir, "ddc.log")
+	if _, err := os.Stat(expectedLogPath); os.IsNotExist(err) {
+		t.Errorf("Log file not created in output directory: %v", expectedLogPath)
+	}
+
+	// Check that no log file was created at the default path
+	if _, err := os.Stat(defaultLogPath); !os.IsNotExist(err) {
+		// If the file exists or there's another error, fail the test
+		if err == nil {
+			t.Errorf("Log file was incorrectly created at default path: %v", defaultLogPath)
+		} else {
+			t.Errorf("Error checking default path log: %v", err)
+		}
+	}
+
+	// Clean up
+	if err := Close(); err != nil {
+		t.Logf("Error closing logger: %v", err)
 	}
 }

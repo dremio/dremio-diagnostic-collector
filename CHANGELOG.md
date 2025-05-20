@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.4.1] - 2025-05-15 
+
+### Fixed
+
+* fixed an issue where the `ddc.log` does not get archived if the `--output-file` path is different from the current working dir
+
 ## [3.4.0] - 2025-05-12 
 
 ### Changed
@@ -902,6 +908,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.4...v3.4.0
 [3.3.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.3...v3.3.4
 [3.3.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.2...v3.3.3

@@ -168,13 +168,15 @@ func TestValidateDDCYamlNotValid(t *testing.T) {
 }
 
 func TestValidateDDCYamlMaskPAT(t *testing.T) {
-	logLoc := filepath.Join(t.TempDir(), "test-ddc.log")
-	simplelog.InitLoggerWithFile(logLoc)
+	tempDir := t.TempDir()
+	// so the simplelogger output will be captured
+	logLoc := filepath.Join(tempDir, "ddc.log")
+	simplelog.InitLoggerWithOutputDir(tempDir)
 	defer func() {
 		if err := simplelog.Close(); err != nil {
 			t.Logf("unable to close log file %v", err)
 		}
-		simplelog.InitLoggerWithFile(filepath.Join(os.TempDir(), "ddc.log"))
+		simplelog.InitLoggerWithOutputDir(os.TempDir())
 	}()
 	valid := filepath.Join("testdata", "ddc-valid.yaml")
 	_, err := ValidateAndReadYaml(valid, collects.StandardCollection)

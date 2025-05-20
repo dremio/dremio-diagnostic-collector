@@ -256,7 +256,9 @@ func TestTarDDC(t *testing.T) {
 }
 
 func TestCopyLog(t *testing.T) {
-	simplelog.InitLogger()
+	tempDir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(tempDir)
+	defer simplelog.InitLoggerWithOutputDir(tempDir)
 	simplelog.Infof("test for copy")
 	currLog := simplelog.GetLogLoc()
 	destLog := filepath.Join("testdata", "ddc.log")

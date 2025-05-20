@@ -404,8 +404,9 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 
 func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	genericConfSetup("")
-	testLog := filepath.Join(t.TempDir(), "ddc.log")
-	simplelog.InitLoggerWithFile(testLog)
+	tempDir := t.TempDir()
+	testLog := filepath.Join(tempDir, "ddc.log")
+	simplelog.InitLoggerWithOutputDir(tempDir)
 	// should log redacted when token is present
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
@@ -419,7 +420,7 @@ func TestConfReadingWhenLoggingParsingOfDdcYAML(t *testing.T) {
 	if err := simplelog.Close(); err != nil {
 		t.Fatal(err)
 	}
-	defer simplelog.InitLogger()
+	defer simplelog.InitLoggerWithOutputDir(tempDir)
 	b, err := os.ReadFile(testLog)
 	if err != nil {
 		t.Fatal(err)

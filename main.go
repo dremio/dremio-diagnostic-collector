@@ -16,21 +16,13 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd"
 	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
 )
 
 func main() {
-	// initial logger before verbosity is parsed
-	defer func() {
-		if err := simplelog.Close(); err != nil {
-			log.Printf("unable to close log: %v", err)
-		}
-	}()
 	if err := cmd.Execute(os.Args); err != nil {
 		consoleprint.ErrorPrint(err.Error())
 		os.Exit(1)
