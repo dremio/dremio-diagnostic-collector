@@ -170,7 +170,7 @@ func TestValidateDDCYamlNotValid(t *testing.T) {
 func TestValidateDDCYamlMaskPAT(t *testing.T) {
 	tempDir := t.TempDir()
 	// so the simplelogger output will be captured
-	logLoc := filepath.Join(tempDir, "test-ddc.log")
+	logLoc := filepath.Join(tempDir, "ddc.log")
 	simplelog.InitLoggerWithOutputDir(tempDir)
 	defer func() {
 		if err := simplelog.Close(); err != nil {
