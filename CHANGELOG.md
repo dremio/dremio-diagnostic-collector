@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.0] - UNRELEASED
+
+### Added
+
+* copying now happens in 256mb chunks and not all at once, with a 30 second pause between chunks. This is to help with large tarballs and reduce the stress on the network and filesystem. 
+
 ## [3.4.1] - 2025-05-15 
 
 ### Fixed
@@ -908,6 +914,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.4...v3.4.0
 [3.3.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.3...v3.3.4
