@@ -753,23 +753,31 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 			simplelog.Warningf("unable to copy log to archive: %v", err)
 		}
 	}
-	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
-	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
-	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
+	tarballPrefix := filepath.Join(c.TarballOutDir(), c.NodeName())
+	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballPrefix)
+	createdFiles, err := archive.TarGzDirWithSizeLimitMB(c.OutputDir(), tarballPrefix, 256)
+	if err != nil {
 		return "", fmt.Errorf("unable to compress archive from folder '%v': %w", c.OutputDir(), err)
 	}
 	if err := os.RemoveAll(c.OutputDir()); err != nil {
 		simplelog.Errorf("unable to remove %v: %v", c.OutputDir(), err)
 	}
 
-	simplelog.Infof("Archive %v complete", tarballName)
+	simplelog.Infof("Archive(s) %v complete", createdFiles)
 	endTime := time.Now().Unix()
-	fi, err := os.Stat(tarballName)
-	if err != nil {
-		// quickly just supplying tarball name and elapsed
-		return fmt.Sprintf("file %v - %v secs collection", tarballName, endTime-startTime), nil
+
+	// Calculate total size of all created files
+	var totalSize int64
+	for _, filename := range createdFiles {
+		if fi, err := os.Stat(filename); err == nil {
+			totalSize += fi.Size()
+		}
 	}
-	return fmt.Sprintf("file %v - %v seconds for collection - size %v bytes", tarballName, endTime-startTime, fi.Size()), nil
+
+	if len(createdFiles) == 1 {
+		return fmt.Sprintf("file %v - %v seconds for collection - size %v bytes", createdFiles[0], endTime-startTime, totalSize), nil
+	}
+	return fmt.Sprintf("files %v - %v seconds for collection - total size %v bytes", createdFiles, endTime-startTime, totalSize), nil
 }
 
 func init() {

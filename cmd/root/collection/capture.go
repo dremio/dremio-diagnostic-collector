@@ -373,10 +373,38 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 		return 0, c.Host, fmt.Errorf("on host %v cannot detect real hostname so unable to proceed with capture: %w", c.Host, err)
 	}
 
-	// copy tar.gz back
-	tgzFileName := fmt.Sprintf("%v.tar.gz", strings.TrimSpace(hostname))
-	// IMPORTANT we must use path.join and not filepath.join or everything will break
-	tarGZ := path.Join(c.TransferDir, tgzFileName)
+	// discover all tarball parts (could be single file or multiple parts)
+	hostname = strings.TrimSpace(hostname)
+
+	// Use ls -1 to ensure one file per line, with explicit directory and pattern
+	partFiles, err := c.Collector.HostExecute(false, c.Host, "ls", c.TransferDir)
+	if err != nil {
+		return 0, "", fmt.Errorf("unable to list tarball parts on host %v: %w", c.Host, err)
+	}
+
+	var tarballFiles []string
+	if strings.TrimSpace(partFiles) != "" {
+
+		lines := strings.Split(partFiles, ".tar.gz")
+		simplelog.Debugf("found %d lines from ls command: %v", len(lines), lines)
+		for _, file := range lines {
+			if !strings.HasPrefix(file, hostname) {
+				continue
+			}
+			file = fmt.Sprintf("%v.tar.gz", strings.TrimSpace(file))
+			if file != "" && strings.Contains(file, hostname) && strings.HasSuffix(file, ".tar.gz") {
+				// Convert relative filename to full path
+				fullPath := path.Join(c.TransferDir, file)
+				tarballFiles = append(tarballFiles, fullPath)
+			}
+		}
+	}
+
+	if len(tarballFiles) == 0 {
+		return 0, "", fmt.Errorf("no tarball files found for host %v (checked both %v.part*.tar.gz and %v.tar.gz)", c.Host, hostname, hostname)
+	}
+
+	simplelog.Infof("found %d tarball file(s) for host %v: %v", len(tarballFiles), c.Host, tarballFiles)
 
 	outDir := path.Dir(outputLoc)
 	if outDir == "" {
@@ -390,48 +418,70 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-	tarballCleanup := func() {
-		if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarGZ); err != nil {
-			simplelog.Warningf("on host %v unable to cleanup remote capture: '%v' - '%v'", c.Host, err, out)
+
+	// Transfer all tarball files
+	var transferredFiles []string
+	var totalSize int64
+
+	for i, tarballPath := range tarballFiles {
+		// Extract just the filename from the full path
+		tarballFileName := filepath.Base(tarballPath)
+		destFile := filepath.Join(outDir, tarballFileName)
+
+		simplelog.Infof("transferring part %d/%d: %v to %v", i+1, len(tarballFiles), tarballPath, destFile)
+
+		if out, err := c.Collector.CopyFromHost(c.Host, tarballPath, destFile); err != nil {
+			nodeState := consoleprint.NodeState{
+				Node:            c.Host,
+				Status:          consoleprint.TarballTransfer,
+				StatusUX:        "TARBALL TRANSFER",
+				Result:          consoleprint.ResultFailure,
+				EndProcess:      true,
+				EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
+			}
+			consoleprint.UpdateNodeState(nodeState)
+			simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
+			return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v: '%w' - '%v'", tarballPath, c.Host, outDir, err, out)
+		}
+
+		transferredFiles = append(transferredFiles, destFile)
+
+		// Get file size for this part
+		if fileInfo, err := c.DDCfs.Stat(destFile); err == nil {
+			totalSize += fileInfo.Size()
 		} else {
-			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
+			simplelog.Warningf("cannot get file size for file %v: %v", destFile, err)
 		}
 	}
-	hook.AddFinalSteps(tarballCleanup, fmt.Sprintf("removing tarball %v on host %v", tarGZ, c.Host))
-	destFile := filepath.Join(outDir, tgzFileName)
-	if out, err := c.Collector.CopyFromHost(c.Host, tarGZ, destFile); err != nil {
-		nodeState := consoleprint.NodeState{
-			Node:            c.Host,
-			Status:          consoleprint.TarballTransfer,
-			StatusUX:        "TARBALL TRANSFER",
-			Result:          consoleprint.ResultFailure,
-			EndProcess:      true,
-			EndProcessError: fmt.Sprintf("'%v' - '%v'", err, out),
+
+	// Cleanup all tarball files on remote host
+	tarballCleanup := func() {
+		for _, tarballPath := range tarballFiles {
+			if out, err := c.Collector.HostExecute(false, c.Host, "rm", tarballPath); err != nil {
+				simplelog.Warningf("on host %v unable to cleanup remote capture file %v: '%v' - '%v'", c.Host, tarballPath, err, out)
+			} else {
+				simplelog.Debugf("on host %v file %v has been removed", c.Host, tarballPath)
+			}
 		}
-		consoleprint.UpdateNodeState(nodeState)
-		simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-		return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v: '%w' - '%v'", tarGZ, c.Host, outDir, err, out)
 	}
-	// cleanup tarball ASAP
+	hook.AddFinalSteps(tarballCleanup, fmt.Sprintf("removing tarball files %v on host %v", tarballFiles, c.Host))
+
+	// cleanup tarballs ASAP
 	tarballCleanup()
 
+	// Add cleanup for local files
 	hook.AddFinalSteps(func() {
-		if _, err := os.Stat(outputLoc); err == nil {
-			if err := os.Remove(outputLoc); err != nil {
-				simplelog.Warningf("unable to cleanup tgz %v: %v", outputLoc, err)
+		for _, localFile := range transferredFiles {
+			if _, err := os.Stat(localFile); err == nil {
+				if err := os.Remove(localFile); err != nil {
+					simplelog.Warningf("unable to cleanup local tarball %v: %v", localFile, err)
+				} else {
+					simplelog.Debugf("local file %v has been removed", localFile)
+				}
 			}
-			simplelog.Debugf("on host %v file %v has been removed", c.Host, tarGZ)
 		}
-	}, fmt.Sprintf("removing local tarball if present %v", tarGZ))
+	}, fmt.Sprintf("removing local tarball files if present %v", transferredFiles))
 
-	fileInfo, err := c.DDCfs.Stat(destFile)
-	// we assume a file size of zero if we are not able to retrieve the file size for some reason
-	size := int64(0)
-	if err != nil {
-		simplelog.Warningf("cannot get file size for file %v: %v", destFile, err)
-	} else {
-		size = fileInfo.Size()
-	}
 	nodeState = consoleprint.NodeState{
 		Node:       c.Host,
 		Status:     consoleprint.Completed,
@@ -441,7 +491,10 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	}
 	consoleprint.UpdateNodeState(nodeState)
 	simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
-	simplelog.Infof("host %v copied %v to %v it was %v bytes", c.Host, tarGZ, destFile, size)
 
-	return size, destFile, nil
+	// Return comma-separated list of transferred files for backward compatibility
+	allTransferredFiles := strings.Join(transferredFiles, ",")
+	simplelog.Infof("host %v copied %d file(s) totaling %v bytes: %v", c.Host, len(transferredFiles), totalSize, allTransferredFiles)
+
+	return totalSize, allTransferredFiles, nil
 }
