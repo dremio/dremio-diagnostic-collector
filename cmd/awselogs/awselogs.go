@@ -93,6 +93,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 	overrides[conf.KeyNodeName] = coordinatorNode
 	overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, coordinatorNode)
 	overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, coordinatorNode)
+	overrides[conf.KeyDisableArchiveSplitting] = "true"
 
 	if _, err := local.Execute([]string{}, overrides); err != nil {
 		return fmt.Errorf("unable to collect entry %v: %w", coordinatorNode, err)
@@ -120,6 +121,7 @@ func Execute(efsLogDir string, tarballOutDir string, outFile string) error {
 		overrides[conf.KeyNodeName] = entry.Name()
 		overrides[conf.KeyDremioGCLogsDir] = filepath.Join(efsLogDir, "executor", entry.Name())
 		overrides[conf.KeyDremioLogDir] = filepath.Join(efsLogDir, "executor", entry.Name())
+		overrides[conf.KeyDisableArchiveSplitting] = "true"
 
 		if _, err := local.Execute([]string{}, overrides); err != nil {
 			return fmt.Errorf("unable to collect entry %v: %w", entry.Name(), err)

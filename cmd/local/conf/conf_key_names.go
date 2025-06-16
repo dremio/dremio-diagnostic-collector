@@ -81,4 +81,6 @@ const (
 	KeyCollectSystemTablesTimeoutSeconds = "collect-system-tables-timeout-seconds"
 	KeySysTables                         = "system-tables"
 	KeySysTablesCloud                    = "system-tables-cloud"
+	KeyArchiveSizeLimitMB                = "archive-size-limit-mb"
+	KeyDisableArchiveSplitting           = "disable-archive-splitting"
 )

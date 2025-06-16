@@ -148,6 +148,8 @@ type CollectConf struct {
 	systemTables            []string
 	systemtablesdremiocloud []string
 	dremioPID               int
+	archiveSizeLimitMB      int
+	disableArchiveSplitting bool
 }
 
 func ValidateAPICredentials(c *CollectConf, hook shutdown.Hook) error {
@@ -554,6 +556,8 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
 	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
 	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
+	c.archiveSizeLimitMB = GetInt(confData, KeyArchiveSizeLimitMB)
+	c.disableArchiveSplitting = GetBool(confData, KeyDisableArchiveSplitting)
 	// collect rest apis
 	disableRESTAPI := c.dremioPATToken == "" || !c.isMasterCoordinator
 	if disableRESTAPI {
@@ -1003,4 +1007,14 @@ func (c *CollectConf) CollectClusterIDTimeoutSeconds() int {
 // IsMasterCoordinator returns whether this node is a master coordinator
 func (c *CollectConf) IsMasterCoordinator() bool {
 	return c.isMasterCoordinator
+}
+
+// ArchiveSizeLimitMB returns the archive size limit in MB
+func (c *CollectConf) ArchiveSizeLimitMB() int {
+	return c.archiveSizeLimitMB
+}
+
+// EnableArchiveSplitting returns whether archive splitting is enabled
+func (c *CollectConf) EnableArchiveSplitting() bool {
+	return !c.disableArchiveSplitting
 }

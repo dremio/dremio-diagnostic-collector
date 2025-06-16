@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
 	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/ddcbinary"
@@ -376,7 +377,6 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 	// discover all tarball parts (could be single file or multiple parts)
 	hostname = strings.TrimSpace(hostname)
 
-	// Use ls -1 to ensure one file per line, with explicit directory and pattern
 	partFiles, err := c.Collector.HostExecute(false, c.Host, "ls", c.TransferDir)
 	if err != nil {
 		return 0, "", fmt.Errorf("unable to list tarball parts on host %v: %w", c.Host, err)
@@ -384,7 +384,7 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 
 	var tarballFiles []string
 	if strings.TrimSpace(partFiles) != "" {
-
+		// we split on .tar.gz because the response comes back with the spaces trimmed, rather than change the hostexecute method we just split on this
 		lines := strings.Split(partFiles, ".tar.gz")
 		simplelog.Debugf("found %d lines from ls command: %v", len(lines), lines)
 		for _, file := range lines {

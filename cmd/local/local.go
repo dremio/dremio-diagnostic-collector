@@ -755,7 +755,19 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	}
 	tarballPrefix := filepath.Join(c.TarballOutDir(), c.NodeName())
 	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballPrefix)
-	createdFiles, err := archive.TarGzDirWithSizeLimitMB(c.OutputDir(), tarballPrefix, 256)
+
+	var createdFiles []string
+	if c.EnableArchiveSplitting() {
+		simplelog.Debugf("Archive splitting enabled with size limit %d MB", c.ArchiveSizeLimitMB())
+		createdFiles, err = archive.TarGzDirWithSizeLimitMB(c.OutputDir(), tarballPrefix, int64(c.ArchiveSizeLimitMB()))
+	} else {
+		simplelog.Debugf("Archive splitting disabled, creating single archive")
+		archivePath := tarballPrefix + ".tar.gz"
+		err = archive.TarGzDir(c.OutputDir(), archivePath)
+		if err == nil {
+			createdFiles = []string{archivePath}
+		}
+	}
 	if err != nil {
 		return "", fmt.Errorf("unable to compress archive from folder '%v': %w", c.OutputDir(), err)
 	}
@@ -807,4 +819,6 @@ func init() {
 	execLocDir := filepath.Dir(execLoc)
 	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
 	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top, jstack or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	LocalCollectCmd.Flags().IntP(conf.KeyArchiveSizeLimitMB, "z", 256, "maximum size in MB for each archive file before splitting into multiple files")
+	LocalCollectCmd.Flags().Bool(conf.KeyDisableArchiveSplitting, false, "disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)")
 }
