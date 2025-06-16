@@ -4,7 +4,8 @@
 
 ### Added
 
-* copying now happens in 256mb chunks and not all at once, with a 30 second pause between chunks. This is to help with large tarballs and reduce the stress on the network and filesystem. 
+* copying now happens in chunks and not all at once, with a 30 second pause between chunks. This is to help with large tarballs and reduce the stress on the network and filesystem.
+* configurable archive splitting behavior with `-z, --archive-size-limit-mb` and `--disable-archive-splitting` flags
 
 ## [3.4.1] - 2025-05-15 
 
