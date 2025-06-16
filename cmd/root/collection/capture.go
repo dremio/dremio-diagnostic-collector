@@ -443,7 +443,7 @@ func TransferCapture(c HostCaptureConfiguration, hook shutdown.Hook, outputLoc s
 			simplelog.HostLog(hostname, fmt.Sprintf("%#v", nodeState))
 			return 0, destFile, fmt.Errorf("unable to copy file %v from host %v to directory %v: '%w' - '%v'", tarballPath, c.Host, outDir, err, out)
 		}
-		time.Sleep(20 * time.Second) // giving the network a break
+		time.Sleep(30 * time.Second) // giving the network a break
 		transferredFiles = append(transferredFiles, destFile)
 
 		// Get file size for this part
