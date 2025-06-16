@@ -332,23 +332,31 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 
 	if len(tarballs) > 0 {
 		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
-		for _, tarball := range tarballs {
-			simplelog.Debugf("extracting %v to %v", tarball, s.GetTmpDir())
-			if err := archive.ExtractTarGz(tarball, s.GetTmpDir()); err != nil {
-				simplelog.Errorf("unable to extract tarball %v: %v", tarball, err)
-			}
-			simplelog.Debugf("extracted %v", tarball)
-			// run a delete immediately as this takes up substantial space
-			if err := os.Remove(tarball); err != nil {
-				simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
-			}
-			hook.AddFinalSteps(func() {
-				// run it again on cleanup just to be sure it's removed in case we got a ctrl+c
+		for _, tarballEntry := range tarballs {
+			// Handle both single files and comma-separated multiple files (for split archives)
+			tarballFiles := strings.Split(tarballEntry, ",")
+			for _, tarball := range tarballFiles {
+				tarball = strings.TrimSpace(tarball)
+				if tarball == "" {
+					continue
+				}
+				simplelog.Debugf("extracting %v to %v", tarball, s.GetTmpDir())
+				if err := archive.ExtractTarGz(tarball, s.GetTmpDir()); err != nil {
+					simplelog.Errorf("unable to extract tarball %v: %v", tarball, err)
+				}
+				simplelog.Debugf("extracted %v", tarball)
+				// run a delete immediately as this takes up substantial space
 				if err := os.Remove(tarball); err != nil {
 					simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
 				}
-			}, fmt.Sprintf("removing local tarball %v", tarball))
-			simplelog.Debugf("removed %v", tarball)
+				hook.AddFinalSteps(func() {
+					// run it again on cleanup just to be sure it's removed in case we got a ctrl+c
+					if err := os.Remove(tarball); err != nil {
+						simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
+					}
+				}, fmt.Sprintf("removing local tarball %v", tarball))
+				simplelog.Debugf("removed %v", tarball)
+			}
 		}
 	}
 

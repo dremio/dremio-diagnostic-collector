@@ -92,6 +92,8 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 		{conf.KeySysTablesCloud, conf.SystemTableListCloud()},
 		{conf.KeyIsRESTCollect, false},
 		{conf.KeyIsDremioCloud, false},
+		{conf.KeyArchiveSizeLimitMB, 256},
+		{conf.KeyDisableArchiveSplitting, false},
 	}
 
 	for _, check := range checks {
@@ -155,6 +157,8 @@ func TestSetViperDefaultsQuickCollect(t *testing.T) {
 		{conf.KeyNoLogDir, false},
 		{conf.KeyIsRESTCollect, false},
 		{conf.KeyIsDremioCloud, false},
+		{conf.KeyArchiveSizeLimitMB, 256},
+		{conf.KeyDisableArchiveSplitting, false},
 	}
 
 	for _, check := range checks {
@@ -218,6 +222,8 @@ func TestSetViperDefaults(t *testing.T) {
 		{conf.KeyNoLogDir, false},
 		{conf.KeyIsRESTCollect, false},
 		{conf.KeyIsDremioCloud, false},
+		{conf.KeyArchiveSizeLimitMB, 256},
+		{conf.KeyDisableArchiveSplitting, false},
 	}
 
 	for _, check := range checks {

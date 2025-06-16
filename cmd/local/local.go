@@ -753,23 +753,43 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 			simplelog.Warningf("unable to copy log to archive: %v", err)
 		}
 	}
-	tarballName := filepath.Join(c.TarballOutDir(), c.NodeName()+".tar.gz")
-	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballName)
-	if err := archive.TarGzDir(c.OutputDir(), tarballName); err != nil {
+	tarballPrefix := filepath.Join(c.TarballOutDir(), c.NodeName())
+	simplelog.Debugf("collection complete. Archiving %v to %v...", c.OutputDir(), tarballPrefix)
+
+	var createdFiles []string
+	if c.EnableArchiveSplitting() {
+		simplelog.Debugf("Archive splitting enabled with size limit %d MB", c.ArchiveSizeLimitMB())
+		createdFiles, err = archive.TarGzDirWithSizeLimitMB(c.OutputDir(), tarballPrefix, int64(c.ArchiveSizeLimitMB()))
+	} else {
+		simplelog.Debugf("Archive splitting disabled, creating single archive")
+		archivePath := tarballPrefix + ".tar.gz"
+		err = archive.TarGzDir(c.OutputDir(), archivePath)
+		if err == nil {
+			createdFiles = []string{archivePath}
+		}
+	}
+	if err != nil {
 		return "", fmt.Errorf("unable to compress archive from folder '%v': %w", c.OutputDir(), err)
 	}
 	if err := os.RemoveAll(c.OutputDir()); err != nil {
 		simplelog.Errorf("unable to remove %v: %v", c.OutputDir(), err)
 	}
 
-	simplelog.Infof("Archive %v complete", tarballName)
+	simplelog.Infof("Archive(s) %v complete", createdFiles)
 	endTime := time.Now().Unix()
-	fi, err := os.Stat(tarballName)
-	if err != nil {
-		// quickly just supplying tarball name and elapsed
-		return fmt.Sprintf("file %v - %v secs collection", tarballName, endTime-startTime), nil
+
+	// Calculate total size of all created files
+	var totalSize int64
+	for _, filename := range createdFiles {
+		if fi, err := os.Stat(filename); err == nil {
+			totalSize += fi.Size()
+		}
 	}
-	return fmt.Sprintf("file %v - %v seconds for collection - size %v bytes", tarballName, endTime-startTime, fi.Size()), nil
+
+	if len(createdFiles) == 1 {
+		return fmt.Sprintf("file %v - %v seconds for collection - size %v bytes", createdFiles[0], endTime-startTime, totalSize), nil
+	}
+	return fmt.Sprintf("files %v - %v seconds for collection - total size %v bytes", createdFiles, endTime-startTime, totalSize), nil
 }
 
 func init() {
@@ -799,4 +819,6 @@ func init() {
 	execLocDir := filepath.Dir(execLoc)
 	LocalCollectCmd.Flags().StringVar(&ddcYamlLoc, "ddc-yaml", filepath.Join(execLocDir, "ddc.yaml"), "location of ddc.yaml that will be transferred to remote nodes for collection configuration")
 	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top, jstack or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	LocalCollectCmd.Flags().IntP(conf.KeyArchiveSizeLimitMB, "z", 256, "maximum size in MB for each archive file before splitting into multiple files")
+	LocalCollectCmd.Flags().Bool(conf.KeyDisableArchiveSplitting, false, "disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)")
 }

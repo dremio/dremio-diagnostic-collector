@@ -106,4 +106,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeySysTables, SystemTableList())
 	setDefault(confData, KeySysTablesCloud, SystemTableListCloud())
 	setDefault(confData, KeyNumberThreads, 1)
+	setDefault(confData, KeyArchiveSizeLimitMB, 256)
+	setDefault(confData, KeyDisableArchiveSplitting, false)
 }

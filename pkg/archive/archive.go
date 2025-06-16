@@ -164,6 +164,181 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 	return nil
 }
 
+// sizeTrackingWriter wraps an io.Writer and tracks the total bytes written
+type sizeTrackingWriter struct {
+	writer       io.Writer
+	bytesWritten int64
+}
+
+func (w *sizeTrackingWriter) Write(p []byte) (n int, err error) {
+	n, err = w.writer.Write(p)
+	w.bytesWritten += int64(n)
+	return n, err
+}
+
+// TarGzDirWithSizeLimit creates tar.gz archives with a maximum size limit.
+// When the limit is reached, it starts a new archive file.
+// Returns a slice of created archive filenames.
+func TarGzDirWithSizeLimit(srcDir, destPrefix string, maxSizeBytes int64) ([]string, error) {
+	return TarGzDirFilteredWithSizeLimit(srcDir, destPrefix, maxSizeBytes, func(string) bool { return true })
+}
+
+// TarGzDirWithSizeLimitMB creates tar.gz archives with a maximum size limit in megabytes.
+// When the limit is reached, it starts a new archive file.
+// Returns a slice of created archive filenames.
+func TarGzDirWithSizeLimitMB(srcDir, destPrefix string, maxSizeMB int64) ([]string, error) {
+	maxSizeBytes := maxSizeMB * 1024 * 1024
+	return TarGzDirFilteredWithSizeLimit(srcDir, destPrefix, maxSizeBytes, func(string) bool { return true })
+}
+
+// TarGzDirFilteredWithSizeLimit creates tar.gz archives with a maximum size limit and file filtering.
+// When the limit is reached, it starts a new archive file.
+// Returns a slice of created archive filenames.
+func TarGzDirFilteredWithSizeLimit(srcDir, destPrefix string, maxSizeBytes int64, filterList func(string) bool) ([]string, error) {
+	if maxSizeBytes <= 0 {
+		return nil, fmt.Errorf("maxSizeBytes must be greater than 0")
+	}
+
+	var createdFiles []string
+	partNumber := 1
+
+	// Start with the first archive
+	currentArchivePath := fmt.Sprintf("%s.part%03d.tar.gz", destPrefix, partNumber)
+	currentFile, currentWriter, currentTarWriter, sizeTracker, err := createNewArchiveWithSizeTracking(currentArchivePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create first archive: %w", err)
+	}
+	createdFiles = append(createdFiles, currentArchivePath)
+
+	defer func() {
+		if currentTarWriter != nil {
+			if err := currentTarWriter.Close(); err != nil {
+				simplelog.Debugf("failed extra close to tar file %v", err)
+			}
+		}
+		if currentWriter != nil {
+			if err := currentWriter.Close(); err != nil {
+				simplelog.Debugf("failed extra close to gz file %v", err)
+			}
+		}
+		if currentFile != nil {
+			if err := currentFile.Close(); err != nil {
+				simplelog.Debugf("failed extra close to tgz file %v", err)
+			}
+		}
+	}()
+
+	srcDir = strings.TrimSuffix(srcDir, string(os.PathSeparator))
+
+	err = filepath.Walk(srcDir, func(filePath string, fileInfo os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !filterList(filePath) {
+			return nil
+		}
+
+		// Get the relative path of the file
+		relativePath, err := filepath.Rel(srcDir, filePath)
+		if err != nil {
+			return err
+		}
+
+		header, err := tar.FileInfoHeader(fileInfo, relativePath)
+		if err != nil {
+			return err
+		}
+
+		// Convert path to use forward slashes
+		header.Name = filepath.ToSlash(relativePath)
+		header.Size = fileInfo.Size()
+
+		// Check if adding this file would exceed the size limit
+		// We estimate the compressed size as roughly the file size plus header overhead
+		estimatedSize := fileInfo.Size() + 1024 // Add some overhead for tar header and gzip compression
+		if sizeTracker.bytesWritten > 0 && sizeTracker.bytesWritten+estimatedSize > maxSizeBytes {
+			// Close current archive
+			if err := currentTarWriter.Close(); err != nil {
+				return fmt.Errorf("failed to close tar writer: %w", err)
+			}
+			if err := currentWriter.Close(); err != nil {
+				return fmt.Errorf("failed to close gzip writer: %w", err)
+			}
+			if err := currentFile.Close(); err != nil {
+				return fmt.Errorf("failed to close file: %w", err)
+			}
+
+			// Start new archive
+			partNumber++
+			currentArchivePath = fmt.Sprintf("%s.part%03d.tar.gz", destPrefix, partNumber)
+			currentFile, currentWriter, currentTarWriter, sizeTracker, err = createNewArchiveWithSizeTracking(currentArchivePath)
+			if err != nil {
+				return fmt.Errorf("failed to create archive part %d: %w", partNumber, err)
+			}
+			createdFiles = append(createdFiles, currentArchivePath)
+		}
+
+		if err := currentTarWriter.WriteHeader(header); err != nil {
+			return err
+		}
+
+		if !fileInfo.Mode().IsRegular() { // nothing more to do for non-regular
+			return nil
+		}
+
+		if !fileInfo.IsDir() {
+			file, err := os.Open(filepath.Clean(filePath))
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				if err := file.Close(); err != nil {
+					simplelog.Debugf("optional file close for file %v failed %v", filePath, err)
+				}
+			}()
+			if _, err := io.Copy(currentTarWriter, file); err != nil {
+				return fmt.Errorf("unable to copy file %v to tar: %w", filePath, err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return createdFiles, err
+	}
+
+	// Close the final archive
+	if err := currentTarWriter.Close(); err != nil {
+		return createdFiles, fmt.Errorf("failed close to tar file %w", err)
+	}
+	if err := currentWriter.Close(); err != nil {
+		return createdFiles, fmt.Errorf("failed close to gz file %w", err)
+	}
+	if err := currentFile.Close(); err != nil {
+		return createdFiles, fmt.Errorf("failed close to tgz file %w", err)
+	}
+
+	simplelog.Infof("Created %d archive parts: %v", len(createdFiles), createdFiles)
+	return createdFiles, nil
+}
+
+// createNewArchiveWithSizeTracking creates a new tar.gz archive file with size tracking
+func createNewArchiveWithSizeTracking(archivePath string) (*os.File, *gzip.Writer, *tar.Writer, *sizeTrackingWriter, error) {
+	file, err := os.Create(filepath.Clean(archivePath))
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	sizeTracker := &sizeTrackingWriter{writer: file, bytesWritten: 0}
+	gzWriter := gzip.NewWriter(sizeTracker)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	return file, gzWriter, tarWriter, sizeTracker, nil
+}
+
 // Sanitize archive file pathing from "G305: Zip Slip vulnerability"
 func SanitizeArchivePath(destination, header string) (v string, err error) {
 	v = filepath.ToSlash(filepath.Join(destination, header))
