@@ -184,13 +184,6 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
 	}
 
-	var clusterWg sync.WaitGroup
-	clusterWg.Add(1)
-	go func() {
-		defer clusterWg.Done()
-		// now safe to collect cluster level information
-		clusterCollection()
-	}()
 	var tarballs []string
 	var files []helpers.CollectedFile
 	var totalFailedFiles []string
@@ -307,7 +300,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	}
 	wg.Wait()
 	transferWg.Wait()
-	clusterWg.Wait()
+	// doing cluster collection after all transfers
+	clusterCollection()
 	end := time.Now().UTC()
 	var collectionInfo SummaryInfo
 	collectionInfo.EndTimeUTC = end

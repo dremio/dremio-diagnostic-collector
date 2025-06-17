@@ -6,6 +6,7 @@
 
 * copying now happens in chunks and not all at once, with a 30 second pause between chunks. This is to help with large tarballs and reduce the stress on the network and filesystem.
 * configurable archive splitting behavior with `-z, --archive-size-limit-mb` and `--disable-archive-splitting` flags
+* kubernetes cluster information collection now happens later in the process so we can see if there are any events during collection
 
 ## [3.4.1] - 2025-05-15 
 
