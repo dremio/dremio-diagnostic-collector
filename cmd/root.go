@@ -65,20 +65,22 @@ var (
 var outputLoc string
 
 var (
-	sudoUser              string
-	namespace             string
-	k8sContext            string
-	disableFreeSpaceCheck bool
-	disableKubeCtl        bool
-	minFreeSpaceGB        uint64
-	disablePrompt         bool
-	detectNamespace       bool
-	collectionMode        string
-	cliAuthToken          string
-	pid                   string
-	transferThreads       int
-	manualPATPrompt       bool
-	noLogDir              bool
+	sudoUser                string
+	namespace               string
+	k8sContext              string
+	disableFreeSpaceCheck   bool
+	disableKubeCtl          bool
+	minFreeSpaceGB          uint64
+	disablePrompt           bool
+	detectNamespace         bool
+	collectionMode          string
+	cliAuthToken            string
+	pid                     string
+	transferThreads         int
+	manualPATPrompt         bool
+	noLogDir                bool
+	archiveSizeLimitMB      int
+	disableArchiveSplitting bool
 )
 
 // var isEmbeddedK8s bool
@@ -552,18 +554,20 @@ func Execute(args []string) error {
 			hook.AddUIStop(stop)
 		}
 		collectionArgs := collection.Args{
-			OutputLoc:             filepath.Clean(outputLoc),
-			DDCfs:                 helpers.NewRealFileSystem(),
-			DremioPAT:             dremioPAT,
-			TransferDir:           transferDir,
-			DDCYamlLoc:            ddcYamlLoc,
-			Enabled:               enabled,
-			Disabled:              disabled,
-			DisableFreeSpaceCheck: disableFreeSpaceCheck,
-			MinFreeSpaceGB:        minFreeSpaceGB,
-			CollectionMode:        collectionMode,
-			TransferThreads:       transferThreads,
-			NoLogDir:              noLogDir,
+			OutputLoc:               filepath.Clean(outputLoc),
+			DDCfs:                   helpers.NewRealFileSystem(),
+			DremioPAT:               dremioPAT,
+			TransferDir:             transferDir,
+			DDCYamlLoc:              ddcYamlLoc,
+			Enabled:                 enabled,
+			Disabled:                disabled,
+			DisableFreeSpaceCheck:   disableFreeSpaceCheck,
+			MinFreeSpaceGB:          minFreeSpaceGB,
+			CollectionMode:          collectionMode,
+			TransferThreads:         transferThreads,
+			NoLogDir:                noLogDir,
+			ArchiveSizeLimitMB:      archiveSizeLimitMB,
+			DisableArchiveSplitting: disableArchiveSplitting,
 		}
 		sshArgs := ssh.Args{
 			SSHKeyLoc:      sshKeyLoc,
@@ -642,6 +646,8 @@ func init() {
 	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", 0, "min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check and WAF)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
+	RootCmd.Flags().IntVarP(&archiveSizeLimitMB, conf.KeyArchiveSizeLimitMB, "z", 256, "maximum size in MB for each archive file before splitting into multiple files")
+	RootCmd.Flags().BoolVarP(&disableArchiveSplitting, conf.KeyDisableArchiveSplitting, "a", false, "disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)")
 
 	execLoc, err := os.Executable()
 	if err != nil {
