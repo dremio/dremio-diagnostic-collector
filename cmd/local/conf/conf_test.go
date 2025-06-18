@@ -389,7 +389,7 @@ func TestConfReadingWithAValidConfigurationFile(t *testing.T) {
 	}
 
 	if cfg.CollectSystemTablesTimeoutSeconds() != 10 {
-		t.Errorf("expected timeout of 10 seconds for system tables collection")
+		t.Errorf("expected timeout of 10 seconds for system tables collection but was %v", cfg.CollectSystemTablesTimeoutSeconds())
 	}
 
 	if cfg.CollectClusterIDTimeoutSeconds() != 12 {

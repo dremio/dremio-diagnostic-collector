@@ -25,34 +25,7 @@ func setDefault(confData map[string]interface{}, key string, value interface{}) 
 	}
 }
 
-// SetViperDefaults wires up default values for viper when the ddc.yaml or the cli flags do not set the value
-func SetViperDefaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int, collectionMode string) {
-	// defaults change depending on the collection mode
-
-	if collectionMode == collects.QuickCollection {
-		setDefault(confData, KeyCollectJFR, false)
-		setDefault(confData, KeyCollectTtop, false)
-		setDefault(confData, KeyDremioLogsNumDays, 2)
-		setDefault(confData, KeyDremioQueriesJSONNumDays, 2)
-	} else {
-		setDefault(confData, KeyCollectJFR, true)
-		setDefault(confData, KeyCollectTtop, true)
-		setDefault(confData, KeyDremioLogsNumDays, 7)
-		setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
-	}
-	if collectionMode == collects.StandardPlusJSTACKCollection {
-		setDefault(confData, KeyCollectJStack, true)
-	} else {
-		setDefault(confData, KeyCollectJStack, false)
-	}
-	if collectionMode == collects.HealthCheckCollection {
-		setDefault(confData, KeyNumberJobProfiles, 10000)
-		setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 1440) // 24 minutes for health check system tables collection since they're very important for health check analysis.
-	} else {
-		setDefault(confData, KeyNumberJobProfiles, 20)
-		setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 120) // 2 minutes for system tables collection. This is a good balance between collection speed and completeness.
-	}
-
+func Defaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
 	// set default config
 	setDefault(confData, KeyVerbose, "vv")
 	setDefault(confData, KeyCollectAccelerationLog, false)
@@ -72,7 +45,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyTarballOutDir, "/tmp/ddc")
 	setDefault(confData, KeyCollectOSConfig, true)
 	setDefault(confData, KeyCollectDiskUsage, true)
-
 	setDefault(confData, KeyDremioGCFilePattern, "server*.gc*")
 	setDefault(confData, KeyCollectQueriesJSON, true)
 	setDefault(confData, KeyCollectServerLogs, true)
@@ -84,7 +56,6 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyCollectSystemTablesExport, true)
 	setDefault(confData, KeySystemTablesRowLimit, 100000)
 	setDefault(confData, KeyCollectWLM, true)
-	setDefault(confData, KeyCollectKVStoreReport, true)
 	setDefault(confData, KeyDremioJStackTimeSeconds, defaultCaptureSeconds)
 	setDefault(confData, KeyDremioJFRTimeSeconds, defaultCaptureSeconds)
 	setDefault(confData, KeyDremioJStackFreqSeconds, 1)
@@ -103,9 +74,91 @@ func SetViperDefaults(confData map[string]interface{}, hostName string, defaultC
 	setDefault(confData, KeyNoLogDir, false)
 	setDefault(confData, KeyMinFreeSpaceGB, 40)
 	setDefault(confData, KeyCollectClusterIDTimeoutSeconds, 60)
-	setDefault(confData, KeySysTables, SystemTableList())
 	setDefault(confData, KeySysTablesCloud, SystemTableListCloud())
 	setDefault(confData, KeyNumberThreads, 1)
 	setDefault(confData, KeyArchiveSizeLimitMB, 256)
 	setDefault(confData, KeyDisableArchiveSplitting, false)
+}
+
+func QuickCollectionProfile(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
+	Defaults(confData, hostName, defaultCaptureSeconds)
+	setDefault(confData, KeySysTables, SystemTableList())
+	setDefault(confData, KeyCollectKVStoreReport, true)
+	setDefault(confData, KeyCollectJStack, false)
+	setDefault(confData, KeyCollectJFR, false)
+	setDefault(confData, KeyCollectTtop, false)
+	setDefault(confData, KeyDremioLogsNumDays, 2)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 2)
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 120)
+	setDefault(confData, KeyNumberJobProfiles, 20)
+
+}
+
+func StandardCollectionProfile(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
+	Defaults(confData, hostName, defaultCaptureSeconds)
+	setDefault(confData, KeySysTables, SystemTableList())
+	setDefault(confData, KeyCollectKVStoreReport, true)
+	setDefault(confData, KeyCollectJStack, false)
+	setDefault(confData, KeyCollectJFR, true)
+	setDefault(confData, KeyCollectTtop, true)
+	setDefault(confData, KeyDremioLogsNumDays, 7)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 120)
+	setDefault(confData, KeyNumberJobProfiles, 20)
+}
+
+func WithJStackCollectionProfile(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
+	Defaults(confData, hostName, defaultCaptureSeconds)
+	setDefault(confData, KeySysTables, SystemTableList())
+	setDefault(confData, KeyCollectKVStoreReport, true)
+	setDefault(confData, KeyCollectJStack, true)
+	setDefault(confData, KeyCollectJFR, true)
+	setDefault(confData, KeyCollectTtop, true)
+	setDefault(confData, KeyDremioLogsNumDays, 7)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 120)
+	setDefault(confData, KeyNumberJobProfiles, 20)
+}
+
+func HealthCheckCollectionProfile(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
+	Defaults(confData, hostName, defaultCaptureSeconds)
+	setDefault(confData, KeySysTables, SystemTableList())
+	setDefault(confData, KeyCollectKVStoreReport, true)
+	setDefault(confData, KeyCollectJStack, false)
+	setDefault(confData, KeyCollectJFR, true)
+	setDefault(confData, KeyCollectTtop, true)
+	setDefault(confData, KeyDremioLogsNumDays, 7)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 30)
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 1440) // 24 minutes for health check system tables collection since they're very important for health check analysis.
+	setDefault(confData, KeyNumberJobProfiles, 10000)
+}
+
+func WAFCollectionProfile(confData map[string]interface{}, hostName string, defaultCaptureSeconds int) {
+	Defaults(confData, hostName, defaultCaptureSeconds)
+	setDefault(confData, KeySysTables, SystemTableListWaf())
+	setDefault(confData, KeyCollectKVStoreReport, false)
+	setDefault(confData, KeyCollectJStack, false)
+	setDefault(confData, KeyCollectJFR, false)
+	setDefault(confData, KeyCollectTtop, false)
+	setDefault(confData, KeyDremioLogsNumDays, 3)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 3)
+	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 7200) // 2 hours for health check system tables collection since they're very important for health check analysis.
+	setDefault(confData, KeyNumberJobProfiles, 25000)
+}
+
+// SetViperDefaults wires up default values for viper when the ddc.yaml or the cli flags do not set the value
+func SetViperDefaults(confData map[string]interface{}, hostName string, defaultCaptureSeconds int, collectionMode string) {
+	// defaults change depending on the collection mode
+	switch collectionMode {
+	case collects.StandardCollection:
+		StandardCollectionProfile(confData, hostName, defaultCaptureSeconds)
+	case collects.StandardPlusJSTACKCollection:
+		WithJStackCollectionProfile(confData, hostName, defaultCaptureSeconds)
+	case collects.HealthCheckCollection:
+		HealthCheckCollectionProfile(confData, hostName, defaultCaptureSeconds)
+	case collects.WAFCollection:
+		WAFCollectionProfile(confData, hostName, defaultCaptureSeconds)
+	default:
+		QuickCollectionProfile(confData, hostName, defaultCaptureSeconds)
+	}
 }
