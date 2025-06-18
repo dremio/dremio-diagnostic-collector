@@ -61,31 +61,35 @@ type Collector interface {
 }
 
 type Args struct {
-	DDCfs                 helpers.Filesystem
-	OutputLoc             string
-	CopyStrategy          CopyStrategy
-	DremioPAT             string
-	TransferDir           string
-	DDCYamlLoc            string
-	Disabled              []string
-	Enabled               []string
-	DisableFreeSpaceCheck bool
-	MinFreeSpaceGB        uint64
-	CollectionMode        string
-	TransferThreads       int
-	NoLogDir              bool
+	DDCfs                   helpers.Filesystem
+	OutputLoc               string
+	CopyStrategy            CopyStrategy
+	DremioPAT               string
+	TransferDir             string
+	DDCYamlLoc              string
+	Disabled                []string
+	Enabled                 []string
+	DisableFreeSpaceCheck   bool
+	MinFreeSpaceGB          uint64
+	CollectionMode          string
+	TransferThreads         int
+	NoLogDir                bool
+	ArchiveSizeLimitMB      int
+	DisableArchiveSplitting bool
 }
 
 type HostCaptureConfiguration struct {
-	IsCoordinator  bool
-	Collector      Collector
-	Host           string
-	CopyStrategy   CopyStrategy
-	DDCfs          helpers.Filesystem
-	DremioPAT      string
-	TransferDir    string
-	CollectionMode string
-	NoLogDir       bool
+	IsCoordinator           bool
+	Collector               Collector
+	Host                    string
+	CopyStrategy            CopyStrategy
+	DDCfs                   helpers.Filesystem
+	DremioPAT               string
+	TransferDir             string
+	CollectionMode          string
+	NoLogDir                bool
+	ArchiveSizeLimitMB      int
+	DisableArchiveSplitting bool
 }
 
 func FilterCoordinators(coordinators []string) []string {
@@ -152,6 +156,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	collectionMode := collectionArgs.CollectionMode
 	transferThreads := collectionArgs.TransferThreads
 	noLogDir := collectionArgs.NoLogDir
+	archiveSizeLimitMB := collectionArgs.ArchiveSizeLimitMB
+	disableArchiveSplitting := collectionArgs.DisableArchiveSplitting
 	var err error
 	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
 	err = os.MkdirAll(tmpInstallDir, 0o700)
@@ -214,15 +220,17 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		go func(host string) {
 			defer wg.Done()
 			coordinatorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  true,
-				Host:           host,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
-				DremioPAT:      dremioPAT,
-				CollectionMode: collectionMode,
-				NoLogDir:       noLogDir,
+				Collector:               c,
+				IsCoordinator:           true,
+				Host:                    host,
+				CopyStrategy:            s,
+				DDCfs:                   ddcfs,
+				TransferDir:             transferDir,
+				DremioPAT:               dremioPAT,
+				CollectionMode:          collectionMode,
+				NoLogDir:                noLogDir,
+				ArchiveSizeLimitMB:      archiveSizeLimitMB,
+				DisableArchiveSplitting: disableArchiveSplitting,
 			}
 			// we want to be able to capture the job profiles of all the nodes
 			skipRESTCalls := false
@@ -260,14 +268,16 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		go func(host string) {
 			defer wg.Done()
 			executorCaptureConf := HostCaptureConfiguration{
-				Collector:      c,
-				IsCoordinator:  false,
-				Host:           host,
-				CopyStrategy:   s,
-				DDCfs:          ddcfs,
-				TransferDir:    transferDir,
-				CollectionMode: collectionMode,
-				NoLogDir:       noLogDir,
+				Collector:               c,
+				IsCoordinator:           false,
+				Host:                    host,
+				CopyStrategy:            s,
+				DDCfs:                   ddcfs,
+				TransferDir:             transferDir,
+				CollectionMode:          collectionMode,
+				NoLogDir:                noLogDir,
+				ArchiveSizeLimitMB:      archiveSizeLimitMB,
+				DisableArchiveSplitting: disableArchiveSplitting,
 			}
 			// always skip executor calls
 			skipRESTCalls := true

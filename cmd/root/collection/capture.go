@@ -277,6 +277,15 @@ func StartCapture(c HostCaptureConfiguration, ddcBinaryInfo ddcbinary.BinaryInfo
 	if disableFreeSpaceCheck {
 		localCollectArgs = append(localCollectArgs, fmt.Sprintf("--%v", conf.KeyDisableFreeSpaceCheck))
 	}
+	if c.ArchiveSizeLimitMB > 0 {
+		// we use the short flag to avoid hitting limits on the length of the command line
+		localCollectArgs = append(localCollectArgs, "-z", fmt.Sprintf("%v", c.ArchiveSizeLimitMB))
+	}
+	if c.DisableArchiveSplitting {
+		// we use the short flag to avoid hitting limits on the length of the command line
+		localCollectArgs = append(localCollectArgs, "-a")
+	}
+
 	if c.NoLogDir {
 		localCollectArgs = append(localCollectArgs, "--no-log-dir")
 	}
