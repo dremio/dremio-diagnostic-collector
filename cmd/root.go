@@ -415,8 +415,8 @@ func Execute(args []string) error {
 				}
 			}
 			prompt = promptui.Select{
-				Label: "Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), standard+jstack (standard w jstack), health-check (needs PAT)",
-				Items: []string{"light", "standard", "standard+jstack", "health-check"},
+				Label: "Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), standard+jstack (standard w jstack), health-check (needs PAT), waf (needs PAT)",
+				Items: []string{"light", "standard", "standard+jstack", "health-check", "waf"},
 			}
 			_, collectionMode, err = prompt.Run()
 			if err != nil {
@@ -470,7 +470,7 @@ func Execute(args []string) error {
 			return err
 		}
 
-		if manualPATPrompt || (collectionMode == collects.HealthCheckCollection && dremioPAT == "") {
+		if manualPATPrompt || (collectionMode == collects.HealthCheckCollection || collectionMode == collects.WAFCollection) && dremioPAT == "" {
 			pat, err := masking.PromptForPAT()
 			if err != nil {
 				return fmt.Errorf("unable to get PAT: %w", err)
@@ -626,7 +626,7 @@ func init() {
 	RootCmd.Flags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 
 	// shared flags
-	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
+	RootCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 10,000 Job Profiles, 'waf' same as light, then 3 days of logs and queries.json, with 25,000 job profiles")
 	RootCmd.Flags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the --transfer-dir")
 	RootCmd.Flags().BoolVar(&disablePrompt, "disable-prompt", false, "disables the prompt ui")
 	RootCmd.Flags().BoolVarP(&disableKubeCtl, "disable-kubectl", "d", false, "uses the embedded k8s api client and skips the use of kubectl for transfers and copying")
@@ -639,7 +639,7 @@ func init() {
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
-	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", 0, "min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check)")
+	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", 0, "min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check and WAF)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
 
@@ -683,6 +683,8 @@ func getFreeSpace(b uint64, m string) uint64 {
 		case collects.StandardPlusJSTACKCollection:
 			b = 25
 		case collects.HealthCheckCollection:
+			b = 40
+		case collects.WAFCollection:
 			b = 40
 		}
 	}

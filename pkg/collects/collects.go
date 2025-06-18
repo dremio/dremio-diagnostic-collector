@@ -19,4 +19,5 @@ const (
 	StandardCollection           = "standard"
 	StandardPlusJSTACKCollection = "standard+jstack"
 	HealthCheckCollection        = "health-check"
+	WAFCollection                = "waf"
 )

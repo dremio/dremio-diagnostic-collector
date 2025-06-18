@@ -179,6 +179,29 @@ func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 	simplelog.Infof("Using default RocksDB path")
 	return filepath.Join(dremioHome, "data", "db")
 }
+func SystemTableListWaf() []string {
+	return []string{
+		"copy_errors_history",
+		"fragments",
+		"materializations",
+		"membership",
+		"memory",
+		"nodes",
+		"options",
+		"reflection_dependencies",
+		"reflections",
+		"refreshes",
+		"roles",
+		"services",
+		"slicing_threads",
+		"threads",
+		"user_defined_functions",
+		"version",
+		"cache.datasets",
+		"cache.mount_points",
+		"cache.storage_plugins",
+	}
+}
 
 func SystemTableList() []string {
 	return []string{
