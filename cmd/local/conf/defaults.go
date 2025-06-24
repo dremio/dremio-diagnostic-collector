@@ -141,7 +141,7 @@ func WAFCollectionProfile(confData map[string]interface{}, hostName string, defa
 	setDefault(confData, KeyCollectJFR, false)
 	setDefault(confData, KeyCollectTtop, false)
 	setDefault(confData, KeyDremioLogsNumDays, 3)
-	setDefault(confData, KeyDremioQueriesJSONNumDays, 3)
+	setDefault(confData, KeyDremioQueriesJSONNumDays, 28)
 	setDefault(confData, KeyCollectSystemTablesTimeoutSeconds, 7200) // 2 hours for health check system tables collection since they're very important for health check analysis.
 	setDefault(confData, KeyNumberJobProfiles, 25000)
 }
