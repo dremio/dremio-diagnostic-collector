@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.1] - 2025-06-24
+
+### Changed
+
+* Changed the number of days captured by queries.json from 3 to 28 for the WAF collect mode.
+
 ## [3.5.0] - 2025-06-18
 
 ### Added
@@ -916,6 +922,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.3.4...v3.4.0
