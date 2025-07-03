@@ -248,11 +248,14 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 		outDir = l.logsOutDir
 	}
 	unzippedFileDest := path.Join(outDir, unzippedFile)
+
 	// we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
+	simplelog.Debugf("Trying to copy file %v to %v", src, unzippedFileDest)
 	if err := ddcio.CopyFile(path.Clean(src), path.Clean(unzippedFileDest)); err != nil {
 		errs = append(errs, fmt.Errorf("copying of log file %v failed: %w", unzippedFile, err))
 	} else {
 		// if this is successful go ahead and gzip it
+		simplelog.Debugf("Trying to gzip file %v to %v", unzippedFileDest, unzippedFileDest+".gz")
 		if err := ddcio.GzipFile(path.Clean(unzippedFileDest), path.Clean(unzippedFileDest+".gz")); err != nil {
 			errs = append(errs, fmt.Errorf("archiving of log file %v failed: %w", unzippedFile, err))
 		} else {
@@ -264,20 +267,26 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 	}
 
 	today := time.Now()
-	files, err := os.ReadDir(filepath.Join(srcLogDir, "archive"))
+	archiveDir := filepath.Join(srcLogDir, "archive")
+	files, err := os.ReadDir(archiveDir)
 	if err != nil {
 		// no archives to read go ahead and exit as there is nothing to do
-		return fmt.Errorf("unable to read archive folder: %w", err)
+		return fmt.Errorf("unable to read archive folder %v: %w", archiveDir, err)
 	}
+	simplelog.Debugf("Found %v archive files in directory %v. NOTE: they may not match the dates we are looking for", len(files), archiveDir)
+
 	for i := 0; i <= archiveDays; i++ {
 		processingDate := today.AddDate(0, 0, -i).Format("2006-01-02")
+		simplelog.Debugf("Processing date %v in %v", processingDate, archiveDir)
 		// now search files for a match
+		isFound := false
 		for _, f := range files {
 			if strings.HasPrefix(f.Name(), fmt.Sprintf("%v.%v", logPrefix, processingDate)) {
-				simplelog.Debugf("Copying archive file for %v:%v", processingDate, f.Name())
+				isFound = true
+				simplelog.Debugf("Found archive file %v for date %v", f.Name(), processingDate)
 				src := filepath.Join(srcLogDir, "archive", f.Name())
 				dst := filepath.Join(outDir, f.Name())
-
+				simplelog.Debugf("For date %v: copying archive file %v to %v", processingDate, src, dst)
 				// we must copy before archival to avoid races around the archiving features of logging (which also use gzip)
 				if err := ddcio.CopyFile(path.Clean(src), path.Clean(dst)); err != nil {
 					errs = append(errs, fmt.Errorf("unable to move file %v to %v: %w", src, dst, err))
@@ -295,6 +304,9 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 					}
 				}
 			}
+		}
+		if !isFound {
+			simplelog.Debugf("Did not find archive file for date %v in %v", processingDate, archiveDir)
 		}
 	}
 	if len(errs) > 1 {

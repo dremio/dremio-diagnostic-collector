@@ -16,7 +16,6 @@
 package dirs
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -30,29 +29,29 @@ func CheckDirectory(dirPath string, fileCheck func([]fs.DirEntry) error) error {
 	fileInfo, err := os.Stat(dirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("directory does not exist")
+			return fmt.Errorf("directory %v does not exist", dirPath)
 		}
 		return fmt.Errorf("error checking directory: %w", err)
 	}
 
 	// Check if the path is a directory
 	if !fileInfo.IsDir() {
-		return errors.New("the path is not a directory")
+		return fmt.Errorf("the path %v is not a directory", dirPath)
 	}
 
 	// Read the contents of the directory
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		return fmt.Errorf("error reading directory: %w", err)
+		return fmt.Errorf("error reading directory %v: %w", dirPath, err)
 	}
 
 	// Check if the directory is empty
 	if len(files) == 0 {
-		return errors.New("directory is empty")
+		return fmt.Errorf("directory %v is empty", dirPath)
 	}
 
 	if err := fileCheck(files); err != nil {
-		return fmt.Errorf("file check function failed: %w", err)
+		return err
 	}
 	return nil
 }
