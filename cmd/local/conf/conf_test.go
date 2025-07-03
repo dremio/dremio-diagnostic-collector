@@ -520,7 +520,7 @@ dremio-conf-dir: %v
 	}
 	// typically the config directory "badlogs" does not have the right files, so
 	// we fall back to the auto-detect which in this case comes up empty (expected)
-	expected := `invalid dremio log dir '', set dremio-log-dir in ddc.yaml or if you want to skip log dir collection run --no-log-dir: directory does not exist`
+	expected := `invalid dremio log dir '', set dremio-log-dir in ddc.yaml or if you want to skip log dir collection run --no-log-dir: directory  does not exist`
 	if !strings.Contains(err.Error(), expected) {
 		t.Errorf("\nexpected:\n%v\nactual:\n%v", expected, err.Error())
 	}
