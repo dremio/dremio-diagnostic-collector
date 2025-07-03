@@ -455,18 +455,17 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 			// configure log dir
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
-			fmt.Printf("configured log dir is: %v\ndetected log dir is: %v\n", configuredLogDir, detectedConfig.LogDir)
+			fmt.Printf("ddc.yaml log dir is: %v, detected log dir is: %v\n", configuredLogDir, detectedConfig.LogDir)
 			// see if the configured dir is valid
 			if err := dirs.CheckDirectory(configuredLogDir, containsValidLog); err != nil {
-				msg := fmt.Sprintf("configured log %v is invalid: %v", configuredLogDir, err)
+				msg := fmt.Sprintf("the ddc.yaml configured log directory %v is not usable (%v), therefore we are using autodetected value of %v for log collection", configuredLogDir, err, detectedConfig.LogDir)
 				consoleprint.ErrorPrint(msg)
 				simplelog.Warning(msg)
 			} else {
+				// if the configured directory is valid ALWAYS pick that
+				simplelog.Infof("using ddc.yaml configured log directory for log collection: %v", configuredLogDir)
 				c.dremioLogDir = configuredLogDir
 			}
-			msg := fmt.Sprintf("using log dir '%v'", c.dremioLogDir)
-			simplelog.Info(msg)
-			fmt.Println(msg)
 			if err := dirs.CheckDirectory(c.dremioLogDir, containsValidLog); err != nil {
 				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', set dremio-log-dir in ddc.yaml or if you want to skip log dir collection run --no-log-dir: %w", c.dremioLogDir, err)
 			}
@@ -483,16 +482,14 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 					return errors.New("configuration directory is empty")
 				}
 			}); err != nil {
-				msg := fmt.Sprintf("configured dir %v is invalid: %v", configuredConfDir, err)
+				msg := fmt.Sprintf("the ddc.yaml configured configuration directory %v is not usable (%v), therefore we are using autodetected value of %v for configuration collection", configuredConfDir, err, detectedConfig.ConfDir)
 				fmt.Println(msg)
 				simplelog.Warning(msg)
 			} else {
 				// if the configured directory is valid ALWAYS pick that
+				simplelog.Infof("using ddc.yaml configured configuration directory for configuration collection: %v", configuredConfDir)
 				c.dremioConfDir = configuredConfDir
 			}
-			msg := fmt.Sprintf("using config dir '%v'", c.dremioConfDir)
-			simplelog.Info(msg)
-			fmt.Println(msg)
 			if err := dirs.CheckDirectory(c.dremioConfDir, func(de []fs.DirEntry) error {
 				if len(de) > 0 {
 					return nil
