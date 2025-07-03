@@ -952,7 +952,9 @@ services: {
 	// Create a mock HTTP server for API validation
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token": "valid"}`))
+		if _, err := w.Write([]byte(`{"token": "valid"}`)); err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer ts.Close()
 
