@@ -363,7 +363,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
 	c.noLogDir = GetBool(confData, KeyNoLogDir)
-	c.isMasterCoordinator = GetBool(confData, KeyIsMasterNode)
+	c.isMasterCoordinator = GetBool(confData, KeyIsMaster)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
