@@ -862,7 +862,7 @@ services: {
 	_, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.HealthCheckCollection)
 	if err == nil {
 		t.Error("Case 2: Expected error for master coordinator without PAT in health-check mode, got success")
-	} else if !strings.Contains(err.Error(), "INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one for master coordinators") {
+	} else if !strings.Contains(err.Error(), "INVALID CONFIGURATION: the pat is not set and --collect health-check or waf mode requires one for master coordinators") {
 		t.Errorf("Case 2: Expected specific error message, got: %v", err)
 	}
 
@@ -890,5 +890,140 @@ dremio-pat-token: "your_personal_access_token"
 	}
 	if !cfg.IsMasterCoordinator() {
 		t.Error("Case 3: Expected IsMasterCoordinator to be true, got false")
+	}
+}
+
+func TestIsMasterNodeFlagOverridesDetection(t *testing.T) {
+	// Test that the --is-master flag overrides automatic detection
+
+	// Setup common test environment
+	logDir := filepath.Join("testdata", "logs")
+	confDir := filepath.Join("testdata", "conf")
+
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pat-token: "your_personal_access_token"
+dremio-pid: 12345
+`, logDir, confDir)
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	// Create a mock dremio.conf that indicates this is NOT a master coordinator
+	mockConfDir := filepath.Join(t.TempDir(), "conf")
+	err := os.MkdirAll(mockConfDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock conf directory: %v", err)
+	}
+
+	mockConfFile := filepath.Join(mockConfDir, "dremio.conf")
+	mockConfContent := `
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: false,
+  executor.enabled: false
+}
+`
+	err = os.WriteFile(mockConfFile, []byte(mockConfContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write mock dremio.conf: %v", err)
+	}
+
+	// Setup overrides with the --is-master flag set to true
+	overrides := map[string]string{
+		"dremio-conf-dir": mockConfDir,
+		"is-master":       "true",
+	}
+
+	// Mock the process output to NOT include the master coordinator flag
+	originalReadPSEnv := conf.DefaultReadPSEnv
+	defer func() {
+		conf.DefaultReadPSEnv = originalReadPSEnv
+	}()
+
+	conf.DefaultReadPSEnv = func(hook shutdown.CancelHook, dremioPID int) (string, error) {
+		return `DREMIO_HOME=/opt/dremio DREMIO_CONF_DIR=/etc/dremio DREMIO_LOG_DIR=/var/log/dremio`, nil
+	}
+
+	// Create a mock HTTP server for API validation
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"token": "valid"}`))
+	}))
+	defer ts.Close()
+
+	// Update the endpoint to use our mock server
+	overrides["dremio-endpoint"] = ts.URL
+
+	// Test that the flag overrides detection
+	cfg, err := conf.ReadConf(hook, overrides, cfgFilePath, collects.StandardCollection)
+	if err != nil {
+		t.Errorf("Expected success, got error: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("invalid conf")
+	}
+
+	// Should be detected as a master coordinator due to the flag
+	// even though JVM args and dremio.conf say it's not
+	if !cfg.IsMasterCoordinator() {
+		t.Error("Expected IsMasterCoordinator to be true (from --is-master flag), got false")
+	}
+}
+
+func TestWAFCollectionRequiresPATForMasterCoordinator(t *testing.T) {
+	// Test that WAF collection mode requires PAT for master coordinators
+
+	// Setup common test environment
+	logDir := filepath.Join("testdata", "logs")
+	confDir := filepath.Join("testdata", "conf")
+
+	yaml := fmt.Sprintf(`
+dremio-log-dir: %v
+dremio-conf-dir: %v
+dremio-endpoint: "http://localhost:9047"
+dremio-username: "admin"
+dremio-pid: 12345
+`, logDir, confDir)
+	genericConfSetup(yaml)
+	defer afterEachConfTest()
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	// Create a mock dremio.conf that indicates this is a master coordinator
+	mockConfDir := filepath.Join(t.TempDir(), "conf")
+	err := os.MkdirAll(mockConfDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock conf directory: %v", err)
+	}
+
+	mockConfFile := filepath.Join(mockConfDir, "dremio.conf")
+	mockConfContent := `
+services: {
+  coordinator.enabled: true,
+  coordinator.master.enabled: true,
+  executor.enabled: false
+}
+`
+	err = os.WriteFile(mockConfFile, []byte(mockConfContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write mock dremio.conf: %v", err)
+	}
+
+	// Setup overrides without PAT token
+	overrides := map[string]string{
+		"dremio-conf-dir": mockConfDir,
+	}
+
+	// Test that WAF collection mode fails without PAT for master coordinator
+	_, err = conf.ReadConf(hook, overrides, cfgFilePath, collects.WAFCollection)
+	if err == nil {
+		t.Error("Expected error for master coordinator without PAT in WAF mode, got success")
+	} else if !strings.Contains(err.Error(), "INVALID CONFIGURATION: the pat is not set and --collect health-check or waf mode requires one for master coordinators") {
+		t.Errorf("Expected specific error message, got: %v", err)
 	}
 }

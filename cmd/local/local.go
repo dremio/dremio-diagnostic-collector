@@ -821,4 +821,5 @@ func init() {
 	LocalCollectCmd.Flags().StringVar(&collectionMode, "collect", "light", "type of collection: 'light'- 2 days of logs (no top, jstack or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles")
 	LocalCollectCmd.Flags().IntP(conf.KeyArchiveSizeLimitMB, "z", 256, "maximum size in MB for each archive file before splitting into multiple files")
 	LocalCollectCmd.Flags().BoolP(conf.KeyDisableArchiveSplitting, "a", false, "disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)")
+	LocalCollectCmd.Flags().Bool(conf.KeyIsMaster, false, "force node to be treated as a master coordinator, skipping automatic detection (useful for AWSE versions of Dremio)")
 }

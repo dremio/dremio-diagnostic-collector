@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.5.2] - 2025-07-03
+
+### Added
+
+* Added `--is-master` flag for local-collect job to force node to be treated as a master coordinator, skipping automatic detection. This is useful for obscure Dremio versions that don't work with normal master node detection.
+
+### Fixed
+
+* Fixed PAT token validation to require PAT for both health-check and WAF collection modes when running on master coordinators (previously only checked health-check mode).
+
 ## [3.5.1] - 2025-06-24
 
 ### Changed
@@ -922,6 +932,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.1...v3.5.2
 [3.5.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.4.0...v3.4.1

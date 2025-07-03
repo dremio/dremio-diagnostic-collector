@@ -83,4 +83,5 @@ const (
 	KeySysTablesCloud                    = "system-tables-cloud"
 	KeyArchiveSizeLimitMB                = "archive-size-limit-mb"
 	KeyDisableArchiveSplitting           = "disable-archive-splitting"
+	KeyIsMaster                          = "is-master"
 )
