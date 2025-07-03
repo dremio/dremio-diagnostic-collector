@@ -363,6 +363,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
 	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
 	c.noLogDir = GetBool(confData, KeyNoLogDir)
+	c.isMasterCoordinator = GetBool(confData, KeyIsMasterNode)
 
 	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
@@ -532,8 +533,10 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		}
 
 		// Check if this node is a master coordinator
-		// First check if it's set in the JVM arguments
-		if detectedConfig.IsMasterCoordinator {
+		// Skip detection if --is-master flag is already set
+		if c.isMasterCoordinator {
+			simplelog.Infof("Node forced to be treated as master coordinator via --is-master flag")
+		} else if detectedConfig.IsMasterCoordinator {
 			c.isMasterCoordinator = true
 			simplelog.Infof("Detected node as a master coordinator from JVM arguments")
 		} else {
@@ -554,9 +557,9 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 	}
 
-	// Only require PAT for health-check mode if this is a master coordinator
-	if c.dremioPATToken == "" && collectionMode == collects.HealthCheckCollection && c.isMasterCoordinator {
-		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check mode requires one for master coordinators")
+	// Only require PAT for health-check and WAF modes if this is a master coordinator
+	if c.dremioPATToken == "" && (collectionMode == collects.HealthCheckCollection || collectionMode == collects.WAFCollection) && c.isMasterCoordinator {
+		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check or waf mode requires one for master coordinators")
 	}
 
 	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)

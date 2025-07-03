@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.5.2] - 2025-07-03
+
+### Added
+
+* Added `--is-master` flag for local-collect job to force node to be treated as a master coordinator, skipping automatic detection. This is useful for obscure Dremio versions that don't work with normal master node detection.
+
+### Fixed
+
+* Fixed PAT token validation to require PAT for both health-check and WAF collection modes when running on master coordinators (previously only checked health-check mode).
+
 ## [3.5.1] - 2025-06-24
 
 ### Changed
