@@ -8,7 +8,8 @@ Automated log and analytics collection for Dremio clusters
 * Read the [FAQ](FAQ.md) for common questions on setting up DDC
 * Read the [ddc.yaml](default-ddc.yaml) for a full, detailed list of customizable collection parameters (optional)
 * Read the [official Dremio Support page](https://support.dremio.com/hc/en-us/articles/15560006579739) for more details on the DDC architecture
-* Read the [ddc help](https://github.com/dremio/dremio-diagnostic-collector/edit/main/README.md#ddc-flags)
+* Read the [ddc help](README.md#ddc-usage)
+* Read the [DDC Diagnostic Tarball Contents](docs/ddc-tarball.md) to know what is saved by a DDC tarball
 
 ### Install DDC on your local machine
 
