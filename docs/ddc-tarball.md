@@ -10,23 +10,23 @@ The DDC creates a compressed tarball containing diagnostic information from Drem
 
 ```
 diag.tgz
-├── summary.json                    # Collection summary and metadata
+├── summary.json                   # Collection summary and metadata
 ├── ddc.log                        # DDC execution log
-└── <node-name>/                   # Per-node directories (coordinator/executor)
-    ├── configuration/
-    ├── logs/
-    ├── node-info/
-    ├── queries/
-    ├── job-profiles/
-    ├── system-tables/
-    ├── cluster-stats/
-    ├── wlm/
-    ├── kvstore/
-    ├── jfr/
-    ├── thread-dumps/
-    ├── heap-dumps/
-    ├── ttop/
-    └── kubernetes/                # (K8s deployments only)
+├── <node-name>.log                # Individual detailed logs for node collect
+├── configuration/
+├── logs/
+├── node-info/
+├── queries/
+├── job-profiles/
+├── system-tables/
+├── cluster-stats/
+├── wlm/
+├── kvstore/
+├── jfr/
+├── thread-dumps/
+├── heap-dumps/
+├── ttop/
+└── kubernetes/ 
 ```
 
 ## Directory Contents
