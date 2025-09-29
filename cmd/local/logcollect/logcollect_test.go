@@ -929,3 +929,55 @@ func TestLogCollect_WhenGCLogsArePresentAndThereAreMoreThanOne(t *testing.T) {
 		})
 	}
 }
+
+func TestLogCollect_WhenAllServerJsonLogsArePresent(t *testing.T) {
+	var destinationDir string
+	var testLogDir string
+	var yesterdaysLog string
+	defer cleanUp(destinationDir, testLogDir)
+	defer AfterEachLogCollectTest()
+
+	destinationDir, testLogDir = setupEnv()
+
+	// First copy the base test data
+	if err := ddcio.CopyDir(startLogDir, testLogDir); err != nil {
+		t.Errorf("unexpected error setting up test directory: %v", err)
+	}
+
+	// Create json subdirectory structure
+	jsonLogDir := filepath.Join(testLogDir, "json")
+	if err := os.MkdirAll(filepath.Join(jsonLogDir, "archive"), 0o755); err != nil {
+		t.Errorf("unexpected error creating json log structure: %v", err)
+	}
+
+	// Create current server.json file
+	if err := os.WriteFile(filepath.Join(jsonLogDir, "server.json"), []byte("test json log content"), 0o644); err != nil {
+		t.Errorf("unexpected error creating server.json: %v", err)
+	}
+
+	// Create archived json file using existing test data
+	yesterdaysLog = "server." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".0.json.gz"
+	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "server.2022-04-30.log.gz"),
+		filepath.Join(jsonLogDir, "archive", yesterdaysLog)); err != nil {
+		t.Errorf("unexpected error setting up archived json: %v", err)
+	}
+
+	err := logCollector.RunCollectDremioServerLog()
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	// Verify server.json was collected and gzipped
+	actual := filepath.Join(destinationDir, "server.json.gz")
+	expected := filepath.Join(jsonLogDir, "server.json")
+	if match, err := tests.ContainThisFileInTheGzip(expected, actual); !match && err != nil {
+		t.Errorf("expected %v file to contain %v but it did not", expected, actual)
+	}
+
+	// Verify archived json was collected
+	actual = filepath.Join(destinationDir, yesterdaysLog)
+	expected = filepath.Join(jsonLogDir, "archive", yesterdaysLog)
+	if match, err := tests.MatchFile(expected, actual); !match && err != nil {
+		t.Errorf("expected %v file content does not match file content of %v", expected, actual)
+	}
+}
