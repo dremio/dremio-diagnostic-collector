@@ -58,7 +58,8 @@ func (l *Collector) RunCollectDremioServerLog() error {
 		errs = append(errs, fmt.Errorf("trying to archive server logs we got error: %w", err))
 	}
 	// server.json logs
-	if err := l.exportArchivedLogs(l.dremioLogDir, "server.json", "server", l.dremioLogsNumDays); err != nil {
+	jsonLogDir := filepath.Join(l.dremioLogDir, "json")
+	if err := l.exportArchivedLogs(jsonLogDir, "server.json", "server", l.dremioLogsNumDays); err != nil {
 		errs = append(errs, fmt.Errorf("trying to archive server json logs we got error: %w", err))
 	}
 	simplelog.Debug("... collecting server.out")
@@ -242,6 +243,7 @@ func (l *Collector) exportArchivedLogs(srcLogDir string, unzippedFile string, lo
 	var errs []error
 	src := path.Join(srcLogDir, unzippedFile)
 	var outDir string
+	// queries logs always go into a seperate directory
 	if logPrefix == "queries" {
 		outDir = l.queriesOutDir
 	} else {

@@ -15,8 +15,8 @@ ddc.log
 # vendor/
 
 covprofile
-
 bin/
+testdata/
 
 *.swp
 .DS_Store
@@ -33,3 +33,5 @@ __debug_bin
 server-install
 
 .attach_*
+ssh.json
+
