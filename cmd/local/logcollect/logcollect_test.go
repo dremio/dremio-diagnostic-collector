@@ -95,6 +95,12 @@ func TestLogCollect_WhenAllServerLogsArePresent(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 
+	// Create json subdirectory structure for server.json logs
+	jsonLogDir := filepath.Join(testLogDir, "json")
+	if err := os.MkdirAll(filepath.Join(jsonLogDir, "archive"), 0o755); err != nil {
+		t.Errorf("unexpected error creating json log structure: %v", err)
+	}
+
 	// rename archive to yesterday
 	yesterdaysLog = "server." + time.Now().AddDate(0, 0, -1).Format("2006-01-02") + ".log.gz"
 	if err := ddcio.CopyFile(filepath.Join(testLogDir, "archive", "server.2022-04-30.log.gz"), filepath.Join(testLogDir, "archive", yesterdaysLog)); err != nil {
