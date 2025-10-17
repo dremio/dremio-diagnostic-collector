@@ -125,7 +125,7 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 	}
 
 	// we can probably remove this now that we have gone to single threaded, but keeping it for the delayed execution and logging for now
-	t, err := threading.NewThreadPool(1, 1, true, false)
+	t, err := threading.NewThreadPool(2, 1, true, false)
 	if err != nil {
 		return fmt.Errorf("unable to spawn thread pool: %w", err)
 	}
@@ -336,6 +336,8 @@ func collect(c *conf.CollectConf, hook shutdown.Hook) error {
 	if err := runCollectClusterStats(c, hook); err != nil {
 		simplelog.Errorf("during unable to collect cluster stats like cluster ID: %v", err)
 	}
+
+	simplelog.Info("Collection completed successfully")
 	return nil
 }
 
@@ -495,6 +497,173 @@ func RunTtopCollect(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	}
 	simplelog.Debugf("top -H written to %v", loc)
 	return nil
+}
+
+// logCollectionSummary logs a comprehensive summary of what was collected
+func logCollectionSummary(c *conf.CollectConf, collectionMode string) {
+	simplelog.Info("=== COLLECTION SUMMARY ===")
+
+	// Basic collection info
+	simplelog.Infof("Node: %v", c.NodeName())
+	simplelog.Infof("Collection Mode: %v", collectionMode)
+	simplelog.Infof("Output Directory: %v", c.OutputDir())
+
+	// What was collected
+	var collected []string
+	var skipped []string
+
+	// System collections
+	if c.CollectDiskUsage() {
+		collected = append(collected, "Disk Usage")
+	} else {
+		skipped = append(skipped, "Disk Usage")
+	}
+
+	if c.CollectDremioConfiguration() {
+		collected = append(collected, "Dremio Configuration")
+	} else {
+		skipped = append(skipped, "Dremio Configuration")
+	}
+
+	if c.CollectOSConfig() {
+		collected = append(collected, "OS Configuration")
+	} else {
+		skipped = append(skipped, "OS Configuration")
+	}
+
+	// Log collections
+	if c.CollectServerLogs() {
+		collected = append(collected, "Server Logs")
+	} else {
+		skipped = append(skipped, "Server Logs")
+	}
+
+	if c.CollectGCLogs() {
+		collected = append(collected, "GC Logs")
+	} else {
+		skipped = append(skipped, "GC Logs")
+	}
+
+	if c.CollectAccelerationLogs() {
+		collected = append(collected, "Acceleration Logs")
+	} else {
+		skipped = append(skipped, "Acceleration Logs")
+	}
+
+	if c.CollectAccessLogs() {
+		collected = append(collected, "Access Logs")
+	} else {
+		skipped = append(skipped, "Access Logs")
+	}
+
+	if c.CollectAuditLogs() {
+		collected = append(collected, "Audit Logs")
+	} else {
+		skipped = append(skipped, "Audit Logs")
+	}
+
+	if c.CollectQueriesJSON() || c.NumberJobProfilesToCollect() > 0 {
+		collected = append(collected, "Queries JSON")
+	} else {
+		skipped = append(skipped, "Queries JSON")
+	}
+
+	// JVM collections
+	if c.CollectJVMFlags() {
+		collected = append(collected, "JVM Flags")
+	} else {
+		skipped = append(skipped, "JVM Flags")
+	}
+
+	if c.CollectTtop() {
+		collected = append(collected, fmt.Sprintf("TTOP (%ds duration, %ds frequency)", c.DremioTtopTimeSeconds(), c.DremioTtopFreqSeconds()))
+	} else {
+		skipped = append(skipped, "TTOP")
+	}
+
+	if c.CollectJFR() {
+		collected = append(collected, fmt.Sprintf("JFR (%ds duration)", c.DremioJFRTimeSeconds()))
+	} else {
+		skipped = append(skipped, "JFR")
+	}
+
+	if c.CollectJStack() {
+		collected = append(collected, fmt.Sprintf("JStack (%ds duration, %ds frequency)", c.DremioJStackTimeSeconds(), c.DremioJStackFreqSeconds()))
+	} else {
+		skipped = append(skipped, "JStack")
+	}
+
+	if c.CaptureHeapDump() {
+		collected = append(collected, "Heap Dump")
+	} else {
+		skipped = append(skipped, "Heap Dump")
+	}
+
+	// API collections (if not REST collect mode)
+	if !c.IsRESTCollect() {
+		if c.NumberJobProfilesToCollect() > 0 {
+			collected = append(collected, fmt.Sprintf("Job Profiles (%d requested)", c.NumberJobProfilesToCollect()))
+		} else {
+			skipped = append(skipped, "Job Profiles")
+		}
+	} else {
+		// REST collections
+		if c.CollectWLM() {
+			collected = append(collected, "WLM Report")
+		} else {
+			skipped = append(skipped, "WLM Report")
+		}
+
+		if c.CollectKVStoreReport() {
+			collected = append(collected, "KV Store Report")
+		} else {
+			skipped = append(skipped, "KV Store Report")
+		}
+
+		if c.CollectSystemTablesExport() {
+			collected = append(collected, "System Tables Export")
+		} else {
+			skipped = append(skipped, "System Tables Export")
+		}
+	}
+
+	// Log what was collected
+	if len(collected) > 0 {
+		simplelog.Info("COLLECTED:")
+		for _, item := range collected {
+			simplelog.Infof("  ✓ %s", item)
+		}
+	}
+
+	// Log what was skipped
+	if len(skipped) > 0 {
+		simplelog.Info("SKIPPED:")
+		for _, item := range skipped {
+			simplelog.Infof("  - %s", item)
+		}
+	}
+
+	// Configuration details
+	simplelog.Info("CONFIGURATION:")
+	simplelog.Infof("  Log retention: %d days", c.DremioLogsNumDays())
+	simplelog.Infof("  Queries JSON retention: %d days", c.DremioQueriesJSONNumDays())
+	if c.NumberJobProfilesToCollect() > 0 {
+		simplelog.Infof("  Job profile threads: %d", c.NumberThreads())
+	}
+	if c.DremioPID() > 0 {
+		simplelog.Infof("  Dremio PID: %d", c.DremioPID())
+	}
+	simplelog.Infof("  Archive splitting: %v", c.EnableArchiveSplitting())
+	if c.EnableArchiveSplitting() {
+		simplelog.Infof("  Archive size limit: %d MB", c.ArchiveSizeLimitMB())
+	}
+
+	// Summary counts
+	simplelog.Info("SUMMARY:")
+	simplelog.Infof("  Total items collected: %d", len(collected))
+	simplelog.Infof("  Total items skipped: %d", len(skipped))
+
+	simplelog.Info("=== END COLLECTION SUMMARY ===")
 }
 
 func runCollectOSConfig(c *conf.CollectConf, hook shutdown.CancelHook) error {
@@ -746,6 +915,9 @@ func Execute(args []string, overrides map[string]string) (string, error) {
 	if err := collect(c, hook); err != nil {
 		return "", fmt.Errorf("unable to collect: %w", err)
 	}
+
+	// Log collection summary to main ddc.log before copying to archive
+	logCollectionSummary(c, collectionMode)
 
 	logLoc := simplelog.GetLogLoc()
 	if logLoc != "" {

@@ -409,7 +409,8 @@ Collection Mode                : %v
 -- status --
 Transfers Complete             : %v/%v
 Result                         : %v
-Nodes (Coordinators/Executors) : %v/%v
+Coordinator Nodes              : %v
+Executor Nodes                 : %v
 Failed Nodes                   : %v
 
 %v
