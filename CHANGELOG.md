@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.5.5] - 2025-09-29
+
+### Fixed
+
+* Fixes #324 - handle sidecar containers better (don't assume the Dremio container is the first one)
+
+### Added
+
+* Simple summary to end of ddc logs
+
+
 ## [3.5.4] - 2025-09-29
 
 ### Fixed
@@ -945,6 +956,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.4...v3.5.5
 [3.5.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.3...v3.5.4
 [3.5.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.2...v3.5.3
 [3.5.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.1...v3.5.2
