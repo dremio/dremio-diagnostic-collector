@@ -631,7 +631,7 @@ func logCollectionSummary(c *conf.CollectConf, collectionMode string) {
 	if len(collected) > 0 {
 		simplelog.Info("COLLECTED:")
 		for _, item := range collected {
-			simplelog.Infof("  ✓ %s", item)
+			simplelog.Infof("  - %s", item)
 		}
 	}
 

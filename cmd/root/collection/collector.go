@@ -471,7 +471,7 @@ func logDistributedCollectionSummary(collectionMode string, coordinators, execut
 		var totalSize int64
 		for _, file := range files {
 			sizeStr := formatFileSize(file.Size)
-			simplelog.Infof("  ✓ %s (%s)", filepath.Base(file.Path), sizeStr)
+			simplelog.Infof("  %s (%s)", filepath.Base(file.Path), sizeStr)
 			totalSize += file.Size
 		}
 		simplelog.Infof("  Total Size: %s", formatFileSize(totalSize))
@@ -482,11 +482,11 @@ func logDistributedCollectionSummary(collectionMode string, coordinators, execut
 		simplelog.Info("FAILED COLLECTIONS:")
 		// Collection failures (nodes that failed during collection)
 		for _, node := range totalFailedNodes {
-			simplelog.Infof("  ✗ %s (collection failed)", node)
+			simplelog.Infof("   %s (collection failed)", node)
 		}
 		// Transfer failures (nodes that collected but failed to transfer)
 		for _, file := range totalFailedFiles {
-			simplelog.Infof("  ✗ %s (transfer failed)", file)
+			simplelog.Infof("   %s (transfer failed)", file)
 		}
 	}
 
