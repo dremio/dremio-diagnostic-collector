@@ -505,13 +505,43 @@ func (c *KubeCtlAPIActions) getPrimaryContainer(hostString string) (string, erro
 	if len(pods.Items) == 0 {
 		return "", fmt.Errorf("no pod match for %v", hostString)
 	}
-	var containerName string
+
 	for _, pod := range pods.Items {
 		if pod.Name == hostString {
-			containerName = pod.Spec.Containers[0].Name
+			if len(pod.Spec.Containers) == 0 {
+				return "", fmt.Errorf("no containers found in pod %s", hostString)
+			}
+
+			// Look for known Dremio container names first
+			knownDremioContainers := []string{
+				"dremio-coordinator",
+				"dremio-master-coordinator",
+				"dremio-executor",
+				"coordinator",
+				"executor",
+				"dremio",
+			}
+
+			for _, knownContainer := range knownDremioContainers {
+				for _, container := range pod.Spec.Containers {
+					if container.Name == knownContainer {
+						return container.Name, nil
+					}
+				}
+			}
+
+			// If no known container found, look for containers that contain "dremio" in the name
+			for _, container := range pod.Spec.Containers {
+				if strings.Contains(strings.ToLower(container.Name), "dremio") {
+					return container.Name, nil
+				}
+			}
+
+			// If still no match, fall back to the first container (original behavior)
+			return pod.Spec.Containers[0].Name, nil
 		}
 	}
-	return containerName, nil
+	return "", fmt.Errorf("pod %s not found", hostString)
 }
 
 func (c *KubeCtlAPIActions) CopyToHost(hostString string, source, destination string) (out string, err error) {
@@ -607,8 +637,48 @@ func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (pod
 		if len(p.Spec.Containers) == 0 {
 			return podName, fmt.Errorf("unsupported pod %v which has no containers attached", p)
 		}
-		containerName := p.Spec.Containers[0]
-		if compare(containerName.Name) {
+
+		// Look for known Dremio container names first
+		knownDremioContainers := []string{
+			"dremio-coordinator",
+			"dremio-master-coordinator",
+			"dremio-executor",
+			"coordinator",
+			"executor",
+			"dremio",
+		}
+
+		var targetContainer string
+
+		// First, try to find a known Dremio container
+		for _, knownContainer := range knownDremioContainers {
+			for _, container := range p.Spec.Containers {
+				if container.Name == knownContainer {
+					targetContainer = container.Name
+					break
+				}
+			}
+			if targetContainer != "" {
+				break
+			}
+		}
+
+		// If no known container found, look for containers that contain "dremio" in the name
+		if targetContainer == "" {
+			for _, container := range p.Spec.Containers {
+				if strings.Contains(strings.ToLower(container.Name), "dremio") {
+					targetContainer = container.Name
+					break
+				}
+			}
+		}
+
+		// If still no match, fall back to the first container (original behavior)
+		if targetContainer == "" {
+			targetContainer = p.Spec.Containers[0].Name
+		}
+
+		if compare(targetContainer) {
 			podName = append(podName, p.Name)
 		}
 	}

@@ -56,7 +56,7 @@ func TestKubectlExec(t *testing.T) {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
 	var expectedCall []string
-	expectedCall = []string{"kubectl", "-n", "testns", "--context", k8sContext, "get", "pods", podName, "-o", "jsonpath={.spec.containers[0].name}"}
+	expectedCall = []string{"kubectl", "-n", "testns", "--context", k8sContext, "get", "pods", podName, "-o", "jsonpath={.spec.containers[*].name}"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
@@ -170,6 +170,114 @@ func TestKubectCopyFromWindowsHost(t *testing.T) {
 	// we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
 	expectedDestination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
 	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
+	}
+}
+
+func TestKubectlContainerDetectionWithSidecars(t *testing.T) {
+	namespace := "testns"
+	k8sContext := "west-f1"
+	podName := "pod1"
+
+	// Test case 1: Pod with sidecar first, then dremio-coordinator
+	cli := &tests.MockCli{
+		StoredResponse: []string{"istio-proxy dremio-coordinator", "success"},
+		StoredErrors:   []error{nil, nil},
+	}
+	k := CliK8sActions{
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
+		k8sContext:  k8sContext,
+	}
+	out, err := k.HostExecute(false, podName, "ls", "-l")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if out != "success" {
+		t.Errorf("expected success but got %v", out)
+	}
+
+	calls := cli.Calls
+	if len(calls) != 2 {
+		t.Errorf("expected 2 calls but got %v", len(calls))
+	}
+
+	// Should use dremio-coordinator, not istio-proxy
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-coordinator", podName, "--", "ls", "-l"}
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
+	}
+}
+
+func TestKubectlContainerDetectionFallback(t *testing.T) {
+	namespace := "testns"
+	k8sContext := "west-f1"
+	podName := "pod1"
+
+	// Test case: Pod with no known dremio containers, should fall back to first container
+	cli := &tests.MockCli{
+		StoredResponse: []string{"istio-proxy some-other-container", "success"},
+		StoredErrors:   []error{nil, nil},
+	}
+	k := CliK8sActions{
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
+		k8sContext:  k8sContext,
+	}
+	out, err := k.HostExecute(false, podName, "ls", "-l")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if out != "success" {
+		t.Errorf("expected success but got %v", out)
+	}
+
+	calls := cli.Calls
+	if len(calls) != 2 {
+		t.Errorf("expected 2 calls but got %v", len(calls))
+	}
+
+	// Should fall back to first container (istio-proxy)
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "istio-proxy", podName, "--", "ls", "-l"}
+	if !reflect.DeepEqual(calls[1], expectedCall) {
+		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
+	}
+}
+
+func TestKubectlContainerDetectionWithDremioInName(t *testing.T) {
+	namespace := "testns"
+	k8sContext := "west-f1"
+	podName := "pod1"
+
+	// Test case: Pod with custom dremio container name
+	cli := &tests.MockCli{
+		StoredResponse: []string{"istio-proxy my-custom-dremio-app", "success"},
+		StoredErrors:   []error{nil, nil},
+	}
+	k := CliK8sActions{
+		cli:         cli,
+		kubectlPath: "kubectl",
+		namespace:   namespace,
+		k8sContext:  k8sContext,
+	}
+	out, err := k.HostExecute(false, podName, "ls", "-l")
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if out != "success" {
+		t.Errorf("expected success but got %v", out)
+	}
+
+	calls := cli.Calls
+	if len(calls) != 2 {
+		t.Errorf("expected 2 calls but got %v", len(calls))
+	}
+
+	// Should use my-custom-dremio-app because it contains "dremio"
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "my-custom-dremio-app", podName, "--", "ls", "-l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}

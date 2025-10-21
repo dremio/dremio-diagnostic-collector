@@ -124,11 +124,44 @@ func (c *CliK8sActions) cleanLocal(rawDest string) string {
 }
 
 func (c *CliK8sActions) getContainerName(podName string) (string, error) {
-	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "--context", c.k8sContext, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[0].name}`)
+	// Get all container names from the pod
+	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "--context", c.k8sContext, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[*].name}`)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(conts), nil
+
+	containerNames := strings.Fields(strings.TrimSpace(conts))
+	if len(containerNames) == 0 {
+		return "", fmt.Errorf("no containers found in pod %s", podName)
+	}
+
+	// Look for known Dremio container names first
+	knownDremioContainers := []string{
+		"dremio-coordinator",
+		"dremio-master-coordinator",
+		"dremio-executor",
+		"coordinator",
+		"executor",
+		"dremio",
+	}
+
+	for _, knownContainer := range knownDremioContainers {
+		for _, containerName := range containerNames {
+			if containerName == knownContainer {
+				return containerName, nil
+			}
+		}
+	}
+
+	// If no known container found, look for containers that contain "dremio" in the name
+	for _, containerName := range containerNames {
+		if strings.Contains(strings.ToLower(containerName), "dremio") {
+			return containerName, nil
+		}
+	}
+
+	// If still no match, fall back to the first container (original behavior)
+	return containerNames[0], nil
 }
 
 func (c *CliK8sActions) Name() string {

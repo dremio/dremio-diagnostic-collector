@@ -194,6 +194,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	var files []helpers.CollectedFile
 	var totalFailedFiles []string
 	var totalSkippedFiles []string
+	var totalFailedNodes []string
 	var nodesConnectedTo int
 	var m sync.Mutex
 	// block until transfers are commplete
@@ -237,6 +238,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
+				m.Lock()
+				totalFailedNodes = append(totalFailedNodes, host)
+				m.Unlock()
 				return
 			}
 			sem <- struct{}{}
@@ -284,6 +288,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
 			if err != nil {
 				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
+				m.Lock()
+				totalFailedNodes = append(totalFailedNodes, host)
+				m.Unlock()
 				return
 			}
 			sem <- struct{}{}
@@ -388,6 +395,9 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 		return err
 	}
 
+	// Log distributed collection summary
+	logDistributedCollectionSummary(collectionMode, coordinators, executors, files, totalFailedFiles, totalFailedNodes, totalSkippedFiles, nodesConnectedTo, time.Since(start))
+
 	// archives the collected files
 	// creates the summary file too
 	simplelog.Debugf("archiving collected files to %v", outputLoc)
@@ -425,4 +435,89 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 		return nil
 	})
 	return
+}
+
+// logDistributedCollectionSummary logs a comprehensive summary of the distributed collection
+func logDistributedCollectionSummary(collectionMode string, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles []string, nodesConnectedTo int, duration time.Duration) {
+	simplelog.Info("=== DISTRIBUTED COLLECTION SUMMARY ===")
+
+	// Basic collection info
+	simplelog.Infof("Collection Mode: %v", collectionMode)
+	simplelog.Infof("Collection Duration: %v", duration.Round(time.Second))
+
+	// Node information
+	simplelog.Info("CLUSTER TOPOLOGY:")
+	simplelog.Infof("  Coordinators: %d", len(coordinators))
+	for i, coord := range coordinators {
+		simplelog.Infof("    %d. %s", i+1, coord)
+	}
+	simplelog.Infof("  Executors: %d", len(executors))
+	for i, exec := range executors {
+		simplelog.Infof("    %d. %s", i+1, exec)
+	}
+	simplelog.Infof("  Total Nodes: %d", len(coordinators)+len(executors))
+	simplelog.Infof("  Nodes Connected: %d", nodesConnectedTo)
+
+	// Collection results
+	totalFailures := len(totalFailedFiles) + len(totalFailedNodes)
+	simplelog.Info("COLLECTION RESULTS:")
+	simplelog.Infof("  Successful Collections: %d", len(files))
+	simplelog.Infof("  Failed Collections: %d", totalFailures)
+	simplelog.Infof("  Skipped Collections: %d", len(totalSkippedFiles))
+
+	// File details
+	if len(files) > 0 {
+		simplelog.Info("COLLECTED FILES:")
+		var totalSize int64
+		for _, file := range files {
+			sizeStr := formatFileSize(file.Size)
+			simplelog.Infof("  %s (%s)", filepath.Base(file.Path), sizeStr)
+			totalSize += file.Size
+		}
+		simplelog.Infof("  Total Size: %s", formatFileSize(totalSize))
+	}
+
+	// Failed collections
+	if len(totalFailedNodes) > 0 || len(totalFailedFiles) > 0 {
+		simplelog.Info("FAILED COLLECTIONS:")
+		// Collection failures (nodes that failed during collection)
+		for _, node := range totalFailedNodes {
+			simplelog.Infof("   %s (collection failed)", node)
+		}
+		// Transfer failures (nodes that collected but failed to transfer)
+		for _, file := range totalFailedFiles {
+			simplelog.Infof("   %s (transfer failed)", file)
+		}
+	}
+
+	// Skipped files
+	if len(totalSkippedFiles) > 0 {
+		simplelog.Info("SKIPPED COLLECTIONS:")
+		for _, file := range totalSkippedFiles {
+			simplelog.Infof("  - %s", file)
+		}
+	}
+
+	// Success rate
+	totalAttempts := len(files) + totalFailures
+	if totalAttempts > 0 {
+		successRate := float64(len(files)) / float64(totalAttempts) * 100
+		simplelog.Infof("Success Rate: %.1f%% (%d/%d)", successRate, len(files), totalAttempts)
+	}
+
+	simplelog.Info("=== END DISTRIBUTED COLLECTION SUMMARY ===")
+}
+
+// formatFileSize formats file size in human-readable format
+func formatFileSize(size int64) string {
+	const unit = 1024
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
+	}
+	div, exp := int64(unit), 0
+	for n := size / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(size)/float64(div), "KMGTPE"[exp])
 }
