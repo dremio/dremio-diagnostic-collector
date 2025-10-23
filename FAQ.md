@@ -25,7 +25,8 @@ do the following in the ddc.yaml:
 
 ## I have a tiny /tmp folder and DDC is filling it up
 
-* set `--transfer-dir` at the cli or if doing a local-collect use `--tarball-out-dir` or set `tarball-out-dir` in ddc.yaml this will avoid the use the /tmp folder (as of ddc 0.9.0)
+* For remote collections (SSH/K8s): use `--transfer-dir` to specify a different staging directory and `--output-file` to specify where the final tarball is saved
+* For local collections: use `--tarball-out-dir` at the cli or set `tarball-out-dir` in ddc.yaml to specify where the final tarball is saved
 
 ## DDC didn't capture what I wanted
 
