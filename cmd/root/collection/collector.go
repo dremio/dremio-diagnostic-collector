@@ -201,6 +201,8 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	var transferWg sync.WaitGroup
 	// cap at transfer threads
 	sem := make(chan struct{}, transferThreads)
+	// cap at collection threads too
+	collectionSem := make(chan struct{}, transferThreads) // reuse transfer-threads value
 	// wait group for the per node capture
 	var wg sync.WaitGroup
 	consoleprint.UpdateRuntime(
@@ -269,8 +271,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	for _, executor := range executors {
 		nodesConnectedTo++
 		wg.Add(1)
+		collectionSem <- struct{}{} // acquire semaphore
 		go func(host string) {
 			defer wg.Done()
+			defer func() { <-collectionSem }() // release semaphore
 			executorCaptureConf := HostCaptureConfiguration{
 				Collector:               c,
 				IsCoordinator:           false,
