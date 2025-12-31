@@ -214,6 +214,7 @@ Available Commands:
 Flags:
   -z, --archive-size-limit-mb int   maximum size in MB for each archive file before splitting into multiple files (default 256)
       --collect string              type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 10,000 Job Profiles, 'waf' same as light, then 3 days of logs and queries.json, with 25,000 job profiles (default "light")
+      --collection-threads int      number of threads to collect from nodes simultaneously (0 = unlimited)
   -x, --context string              K8S ONLY: context to use for kubernetes pods
   -c, --coordinator string          SSH ONLY: set a list of ip addresses separated by commas
       --ddc-yaml string             location of ddc.yaml that will be transferred to remote nodes for collection configuration (default "/Users/mc/Support/dremio-diagnostic-collector/bin/ddc.yaml")
@@ -233,7 +234,7 @@ Flags:
   -s, --ssh-key string              SSH ONLY: of ssh key to use to login
   -u, --ssh-user string             SSH ONLY: user to use during ssh operations to login
   -b, --sudo-user string            SSH ONLY: if any diagnostics commands need a sudo user (i.e. for jcmd)
-      --transfer-dir string         directory to use for communication between the local-collect command and this one (default "/tmp/ddc-20251023151214")
+      --transfer-dir string         directory to use for communication between the local-collect command and this one (default "/tmp/ddc-20251231125859")
       --transfer-threads int        number of threads to transfer tarballs (default 2)
 
 Use "ddc [command] --help" for more information about a command.
