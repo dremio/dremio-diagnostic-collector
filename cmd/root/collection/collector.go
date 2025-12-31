@@ -73,6 +73,7 @@ type Args struct {
 	MinFreeSpaceGB          uint64
 	CollectionMode          string
 	TransferThreads         int
+	CollectionThreads       int
 	NoLogDir                bool
 	ArchiveSizeLimitMB      int
 	DisableArchiveSplitting bool
@@ -155,6 +156,7 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	minFreeSpaceGB := collectionArgs.MinFreeSpaceGB
 	collectionMode := collectionArgs.CollectionMode
 	transferThreads := collectionArgs.TransferThreads
+	collectionThreads := collectionArgs.CollectionThreads
 	noLogDir := collectionArgs.NoLogDir
 	archiveSizeLimitMB := collectionArgs.ArchiveSizeLimitMB
 	disableArchiveSplitting := collectionArgs.DisableArchiveSplitting
@@ -202,7 +204,10 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	// cap at transfer threads
 	sem := make(chan struct{}, transferThreads)
 	// cap at collection threads too
-	collectionSem := make(chan struct{}, transferThreads) // reuse transfer-threads value
+	var collectionSem chan struct{}
+	if collectionThreads > 0 {
+		collectionSem = make(chan struct{}, collectionThreads)
+	}
 	// wait group for the per node capture
 	var wg sync.WaitGroup
 	consoleprint.UpdateRuntime(
@@ -271,10 +276,14 @@ func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hoo
 	for _, executor := range executors {
 		nodesConnectedTo++
 		wg.Add(1)
-		collectionSem <- struct{}{} // acquire semaphore
+		if collectionSem != nil {
+			collectionSem <- struct{}{} // acquire semaphore only if limited
+		}
 		go func(host string) {
 			defer wg.Done()
-			defer func() { <-collectionSem }() // release semaphore
+			if collectionSem != nil {
+				defer func() { <-collectionSem }() // release semaphore only if limited
+			}
 			executorCaptureConf := HostCaptureConfiguration{
 				Collector:               c,
 				IsCoordinator:           false,

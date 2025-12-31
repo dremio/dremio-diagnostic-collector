@@ -77,6 +77,7 @@ var (
 	cliAuthToken            string
 	pid                     string
 	transferThreads         int
+	collectionThreads       int
 	manualPATPrompt         bool
 	noLogDir                bool
 	archiveSizeLimitMB      int
@@ -565,6 +566,7 @@ func Execute(args []string) error {
 			MinFreeSpaceGB:          minFreeSpaceGB,
 			CollectionMode:          collectionMode,
 			TransferThreads:         transferThreads,
+			CollectionThreads:       collectionThreads,
 			NoLogDir:                noLogDir,
 			ArchiveSizeLimitMB:      archiveSizeLimitMB,
 			DisableArchiveSplitting: disableArchiveSplitting,
@@ -643,6 +645,7 @@ func init() {
 		os.Exit(1)
 	}
 	RootCmd.Flags().IntVar(&transferThreads, "transfer-threads", 2, "number of threads to transfer tarballs")
+	RootCmd.Flags().IntVar(&collectionThreads, "collection-threads", 0, "number of threads to collect from nodes simultaneously (0 = unlimited)")
 	RootCmd.Flags().Uint64Var(&minFreeSpaceGB, "min-free-space-gb", 0, "min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check and WAF)")
 	RootCmd.Flags().StringVar(&transferDir, "transfer-dir", fmt.Sprintf("/tmp/ddc-%v", time.Now().Format("20060102150405")), "directory to use for communication between the local-collect command and this one")
 	RootCmd.Flags().StringVar(&outputLoc, "output-file", "diag.tgz", "name and location of diagnostic tarball")
