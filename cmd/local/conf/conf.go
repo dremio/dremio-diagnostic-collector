@@ -154,15 +154,50 @@ type CollectConf struct {
 
 func ValidateAPICredentials(c *CollectConf, hook shutdown.Hook) error {
 	simplelog.Debugf("Validating REST API user credentials...")
-	var url string
-	if !c.IsDremioCloud() {
-		url = c.DremioEndpoint() + "/apiv2/login"
-	} else {
-		url = c.DremioEndpoint() + "/v0/projects/" + c.DremioCloudProjectID()
+
+	// Build list of endpoints to try
+	endpoints := []string{c.DremioEndpoint()}
+
+	// If using default http://localhost:9047 for non-cloud deployments, also try https
+	// (Dremio Cloud is always HTTPS, so no retry needed)
+	if !c.IsDremioCloud() && c.DremioEndpoint() == "http://localhost:9047" {
+		endpoints = append(endpoints, "https://localhost:9047")
+		simplelog.Debugf("Default endpoint detected, will also try HTTPS if HTTP fails")
 	}
+
 	headers := map[string]string{"Content-Type": "application/json"}
-	_, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
-	return err
+	var lastErr error
+
+	// Try each endpoint
+	for i, endpoint := range endpoints {
+		var url string
+		if !c.IsDremioCloud() {
+			url = endpoint + "/apiv2/login"
+		} else {
+			url = endpoint + "/v0/projects/" + c.DremioCloudProjectID()
+		}
+
+		simplelog.Debugf("Attempting to validate credentials with endpoint: %s", endpoint)
+		_, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
+
+		if err == nil {
+			// Success! Update the endpoint if we used an alternate one
+			if i > 0 {
+				simplelog.Infof("Successfully connected using %s (original endpoint %s failed)", endpoint, endpoints[0])
+				c.dremioEndpoint = endpoint
+			} else {
+				simplelog.Debugf("Successfully validated credentials with %s", endpoint)
+			}
+			return nil
+		}
+
+		// Store the error and try next endpoint if available
+		lastErr = err
+		simplelog.Debugf("Failed to connect to %s: %v", endpoint, err)
+	}
+
+	// All endpoints failed
+	return lastErr
 }
 
 func DetectRocksDB(dremioHome string, dremioConfDir string) string {
