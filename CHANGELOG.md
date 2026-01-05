@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.6] - 2026-01-05
+
+### Added
+
+* Added #327 - Try both http and https when connecting to localhost for Health check and WAF modes
+* Added #328 - Collection throttling similar to transfer throttling
+
 ## [3.5.5] - 2025-09-29
 
 ### Fixed
@@ -956,6 +963,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.5...v3.5.6
 [3.5.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.4...v3.5.5
 [3.5.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.3...v3.5.4
 [3.5.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.2...v3.5.3
