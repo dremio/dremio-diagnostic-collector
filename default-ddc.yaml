@@ -10,6 +10,7 @@
 
 ## these are optional
 # dremio-endpoint: "http://localhost:9047" # dremio endpoint on each node to use for collecting Workload Manager, KV Report and Job Profiles
+#                                           # NOTE: When using the default endpoint, DDC will automatically retry with HTTPS if HTTP fails
 # dremio-username: "dremio" # dremio user to for collecting Workload Manager, KV Report and Job Profiles
 # dremio-pat-token: "" # when set will attempt to collect Workload Manager, KV report and Job Profiles. Dremio PATs can be enabled by the support key auth.personal-access-tokens.enabled
 # dremio-gclogs-dir: "" # if left blank detection is used to find the gc log dir
@@ -47,6 +48,8 @@
 # collect-system-tables-timeout-seconds: 120 # timeout in seconds for system table collection operations
 # collect-cluster-id-timeout-seconds: 60 # timeout in seconds for cluster ID collection
 # system-tables-row-limit: 100000 # maximum number of rows to collect per system table
+# number-threads: 1 #number of threads to use for job profile collection
+# collection-threads: 0 # number of threads to collect from nodes simultaneously (0 = unlimited)
 # system-tables: # list of system tables to collect from Dremio (requires dremio-pat-token)
 #  - "\\\"tables\\\""
 #  - "copy_errors_history"
