@@ -16,7 +16,7 @@ pipeline {
                 sh 'apk add bash curl'
             }
         }
-        stage('Release) {
+        stage('Release') {
             steps {
                 withVault(vaultSecrets: [[
                     path: 'secret/support/private/ddc_gh_pat', 
