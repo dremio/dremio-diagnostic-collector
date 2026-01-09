@@ -19,7 +19,7 @@ pipeline {
         stage('Release') {
             steps {
                 withVault(vaultSecrets: [[
-                    path: 'secret/support/private/ddc_gh_pat', 
+                    path: 'secret/support/private/ddc-gh-pat', 
                     secretValues: [
                         [envVar: 'GITHUB_RELEASE_TOKEN', vaultKey: 'ddc-gh-pat'],
                     ]
