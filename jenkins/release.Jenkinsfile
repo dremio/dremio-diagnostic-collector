@@ -16,5 +16,17 @@ pipeline {
                 sh 'apk add bash curl'
             }
         }
+        stage('Release) {
+            steps {
+                withVault(vaultSecrets: [[
+                    path: 'secret/support/private/ddc_gh_pat', 
+                    secretValues: [
+                        [envVar: 'GITHUB_RELEASE_TOKEN', vaultKey: 'ddc-gh-pat'],
+                    ]
+                ]]) {
+                    echo "Can use secret $GITHUB_RELEASE_TOKEN"
+                }
+            }
+        }
     }
 }
