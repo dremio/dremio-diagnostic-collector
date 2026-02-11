@@ -9,8 +9,8 @@ pipeline {
     }
 
     environment {
-        // Set PATH to include our custom bin directories
-        PATH = "${env.PATH}:${env.HOME}/go/bin:${env.HOME}/bin"
+        // Set PATH to include our custom bin directories and gcloud
+        PATH = "${env.PATH}:${env.WORKSPACE}/google-cloud-sdk/bin:${env.HOME}/go/bin:${env.HOME}/bin"
 
         // GCP Configuration - these should be set in Jenkins configuration or Vault
         GCP_PROJECT_ID = "${env.GCP_PROJECT_ID ?: 'your-gcp-project'}"
@@ -37,7 +37,18 @@ pipeline {
     stages {
         stage('Setup') {
             steps {
-                sh 'apk add bash curl'
+                sh '''#!/bin/bash
+                    apk add bash curl python3 py3-pip
+
+                    # Install gcloud SDK
+                    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-458.0.1-linux-x86_64.tar.gz
+                    tar -xzf google-cloud-sdk-458.0.1-linux-x86_64.tar.gz
+                    ./google-cloud-sdk/install.sh --quiet --path-update=true
+                    export PATH=$PATH:$(pwd)/google-cloud-sdk/bin
+
+                    # Verify gcloud is installed
+                    gcloud version
+                '''
             }
         }
 
@@ -175,6 +186,51 @@ pipeline {
             }
             steps {
                 sh './script/cibuild'
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                // Cleanup: Delete GCE instances
+                // This runs whether the build succeeds or fails to avoid leaving VMs running
+                withVault(vaultSecrets: [[
+                    path: 'secret/support/private/gcloud-service-account',
+                    secretValues: [
+                        [envVar: 'GOOGLE_APPLICATION_CREDENTIALS_JSON', vaultKey: 'credentials-file'],
+                    ]
+                ]]) {
+                    sh '''#!/bin/bash
+                        # Write the credentials to a temporary file
+                        echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > /tmp/gcloud-key.json
+
+                        gcloud auth activate-service-account --key-file /tmp/gcloud-key.json
+
+                        echo "Starting cleanup of GCE instances..."
+
+                        for n in {1..4}; do
+                            node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
+                            echo "Deleting $node_name"
+                            # Run deletion in background and capture results
+                            (
+                                if gcloud compute instances delete "$node_name" \\
+                                    --project=${GCP_PROJECT_ID} \\
+                                    --zone=${GCP_ZONE} \\
+                                    --quiet 2>/dev/null; then
+                                    echo "  ✓ Successfully deleted $node_name"
+                                else
+                                    echo "  ✗ Failed to delete $node_name (may not exist)"
+                                fi
+                            ) &
+                        done
+                        wait
+                        echo "Deletion complete"
+
+                        # Clean up the temporary file
+                        rm -f /tmp/gcloud-key.json
+                    '''
+                }
             }
         }
     }
