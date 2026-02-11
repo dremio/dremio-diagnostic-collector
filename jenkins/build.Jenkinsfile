@@ -91,7 +91,7 @@ pipeline {
                     ./google-cloud-sdk/install.sh --quiet --path-update=false
 
                     # Verify gcloud is installed
-                    gcloud version
+                    ./google-cloud-sdk/bin/gcloud version
 
                     # Generate SSH key for VM access
                     ssh-keygen -t ed25519 -f $HOME/.ssh/id_ed25519 -q -P ""
@@ -149,7 +149,7 @@ pipeline {
 
                     for n in {1..4}; do
                         node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
-                        gcloud compute instances create $node_name \\
+                        ./google-cloud-sdk/bin/gcloud compute instances create $node_name \\
                             --project=${GCP_PROJECT_ID} \\
                             --zone=${GCP_ZONE} \\
                             --machine-type=${GCP_MACHINE_TYPE} \\
@@ -178,10 +178,10 @@ pipeline {
                     for n in {1..4}; do
                         node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
                         if [ "$n" -eq 1 ]; then
-                            MASTER_IP=$(gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
+                            MASTER_IP=$(./google-cloud-sdk/bin/gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
                             $HOME/bin/k3sup install --ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
                         else
-                            IP=$(gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
+                            IP=$(./google-cloud-sdk/bin/gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
                             $HOME/bin/k3sup join --ip $IP --server-ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
                         fi
                     done
@@ -228,7 +228,7 @@ pipeline {
                             echo "Deleting $node_name"
                             # Run deletion in background and capture results
                             (
-                                if gcloud compute instances delete "$node_name" \\
+                                if ./google-cloud-sdk/bin/gcloud compute instances delete "$node_name" \\
                                     --project=${GCP_PROJECT_ID} \\
                                     --zone=${GCP_ZONE} \\
                                     --quiet 2>/dev/null; then
