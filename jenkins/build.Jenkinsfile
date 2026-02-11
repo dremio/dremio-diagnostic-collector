@@ -8,19 +8,67 @@ pipeline {
         }
     }
 
+    parameters {
+        string(
+            name: 'GCP_PROJECT_ID',
+            defaultValue: 'your-gcp-project',
+            description: 'GCP Project ID'
+        )
+        string(
+            name: 'GCP_ZONE',
+            defaultValue: 'us-west1-b',
+            description: 'GCP Zone for VM instances'
+        )
+        string(
+            name: 'GCP_SERVICE_ACCOUNT',
+            defaultValue: 'your-service-account@developer.gserviceaccount.com',
+            description: 'GCP Service Account email'
+        )
+        string(
+            name: 'GCP_NETWORK_SUBNET',
+            defaultValue: 'primary-west',
+            description: 'GCP Network Subnet name'
+        )
+        string(
+            name: 'GCP_MACHINE_TYPE',
+            defaultValue: 'e2-standard-16',
+            description: 'GCE instance machine type'
+        )
+        string(
+            name: 'GCP_DISK_SIZE',
+            defaultValue: '100',
+            description: 'Boot disk size in GB'
+        )
+        string(
+            name: 'GCP_DISK_POLICY',
+            defaultValue: '',
+            description: 'Disk resource policy (optional, leave empty if not needed)'
+        )
+        string(
+            name: 'GCP_IMAGE',
+            defaultValue: 'projects/debian-cloud/global/images/debian-12-bookworm-v20240910',
+            description: 'GCE boot disk image'
+        )
+        choice(
+            name: 'CLEANUP_INSTANCES',
+            choices: ['true', 'false'],
+            description: 'Automatically delete GCE instances after build completes?'
+        )
+    }
+
     environment {
         // Set PATH to include our custom bin directories and gcloud
         PATH = "${env.PATH}:${env.WORKSPACE}/google-cloud-sdk/bin:${env.HOME}/go/bin:${env.HOME}/bin"
 
-        // GCP Configuration - these should be set in Jenkins configuration or Vault
-        GCP_PROJECT_ID = "${env.GCP_PROJECT_ID ?: 'your-gcp-project'}"
-        GCP_ZONE = "${env.GCP_ZONE ?: 'us-west1-b'}"
-        GCP_SERVICE_ACCOUNT = "${env.GCP_SERVICE_ACCOUNT ?: 'your-service-account@developer.gserviceaccount.com'}"
-        GCP_NETWORK_SUBNET = "${env.GCP_NETWORK_SUBNET ?: 'primary-west'}"
-        GCP_MACHINE_TYPE = "${env.GCP_MACHINE_TYPE ?: 'e2-standard-16'}"
-        GCP_DISK_SIZE = "${env.GCP_DISK_SIZE ?: '100'}"
-        GCP_DISK_POLICY = "${env.GCP_DISK_POLICY ?: ''}"
-        GCP_IMAGE = "${env.GCP_IMAGE ?: 'projects/debian-cloud/global/images/debian-12-bookworm-v20240910'}"
+        // GCP Configuration - use parameters if provided, otherwise fall back to env vars
+        GCP_PROJECT_ID = "${params.GCP_PROJECT_ID}"
+        GCP_ZONE = "${params.GCP_ZONE}"
+        GCP_SERVICE_ACCOUNT = "${params.GCP_SERVICE_ACCOUNT}"
+        GCP_NETWORK_SUBNET = "${params.GCP_NETWORK_SUBNET}"
+        GCP_MACHINE_TYPE = "${params.GCP_MACHINE_TYPE}"
+        GCP_DISK_SIZE = "${params.GCP_DISK_SIZE}"
+        GCP_DISK_POLICY = "${params.GCP_DISK_POLICY}"
+        GCP_IMAGE = "${params.GCP_IMAGE}"
 
         // K3sup version
         K3SUP_VERSION = "0.13.9"
@@ -193,43 +241,49 @@ pipeline {
     post {
         always {
             script {
-                // Cleanup: Delete GCE instances
-                // This runs whether the build succeeds or fails to avoid leaving VMs running
-                withVault(vaultSecrets: [[
-                    path: 'secret/support/private/gcloud-service-account',
-                    secretValues: [
-                        [envVar: 'GOOGLE_APPLICATION_CREDENTIALS_JSON', vaultKey: 'credentials-file'],
-                    ]
-                ]]) {
-                    sh '''#!/bin/bash
-                        # Write the credentials to a temporary file
-                        echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > /tmp/gcloud-key.json
+                // Cleanup: Delete GCE instances if CLEANUP_INSTANCES is true
+                if (params.CLEANUP_INSTANCES == 'true') {
+                    echo "Cleanup enabled - deleting GCE instances..."
+                    withVault(vaultSecrets: [[
+                        path: 'secret/support/private/gcloud-service-account',
+                        secretValues: [
+                            [envVar: 'GOOGLE_APPLICATION_CREDENTIALS_JSON', vaultKey: 'credentials-file'],
+                        ]
+                    ]]) {
+                        sh '''#!/bin/bash
+                            # Write the credentials to a temporary file
+                            echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > /tmp/gcloud-key.json
 
-                        gcloud auth activate-service-account --key-file /tmp/gcloud-key.json
+                            gcloud auth activate-service-account --key-file /tmp/gcloud-key.json
 
-                        echo "Starting cleanup of GCE instances..."
+                            echo "Starting cleanup of GCE instances..."
 
-                        for n in {1..4}; do
-                            node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
-                            echo "Deleting $node_name"
-                            # Run deletion in background and capture results
-                            (
-                                if gcloud compute instances delete "$node_name" \\
-                                    --project=${GCP_PROJECT_ID} \\
-                                    --zone=${GCP_ZONE} \\
-                                    --quiet 2>/dev/null; then
-                                    echo "  ✓ Successfully deleted $node_name"
-                                else
-                                    echo "  ✗ Failed to delete $node_name (may not exist)"
-                                fi
-                            ) &
-                        done
-                        wait
-                        echo "Deletion complete"
+                            for n in {1..4}; do
+                                node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
+                                echo "Deleting $node_name"
+                                # Run deletion in background and capture results
+                                (
+                                    if gcloud compute instances delete "$node_name" \\
+                                        --project=${GCP_PROJECT_ID} \\
+                                        --zone=${GCP_ZONE} \\
+                                        --quiet 2>/dev/null; then
+                                        echo "  ✓ Successfully deleted $node_name"
+                                    else
+                                        echo "  ✗ Failed to delete $node_name (may not exist)"
+                                    fi
+                                ) &
+                            done
+                            wait
+                            echo "Deletion complete"
 
-                        # Clean up the temporary file
-                        rm -f /tmp/gcloud-key.json
-                    '''
+                            # Clean up the temporary file
+                            rm -f /tmp/gcloud-key.json
+                        '''
+                    }
+                } else {
+                    echo "Cleanup disabled - GCE instances will remain running"
+                    echo "Instance names: k8s-ddc-ci-{1..4}-${BUILD_NUMBER}"
+                    echo "To delete manually, run the delete.Jenkinsfile job"
                 }
             }
         }
