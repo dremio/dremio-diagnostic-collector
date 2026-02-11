@@ -111,7 +111,7 @@ pipeline {
         }
         stage('Create GCE Instances') {
             steps {
-                sh '''
+                sh '''#!/bin/bash
                     # Function to find and read SSH public key
                     get_ssh_public_key() {
                         local ssh_dir="$HOME/.ssh"
@@ -174,7 +174,7 @@ pipeline {
 
         stage('Setup K3s Cluster') {
             steps {
-                sh '''
+                sh '''#!/bin/bash
                     for n in {1..4}; do
                         node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
                         if [ "$n" -eq 1 ]; then
@@ -220,7 +220,7 @@ pipeline {
                 // Cleanup: Delete GCE instances if CLEANUP_INSTANCES is true
                 if (params.CLEANUP_INSTANCES == 'true') {
                     echo "Cleanup enabled - deleting GCE instances..."
-                    sh '''
+                    sh '''#!/bin/bash
                         echo "Starting cleanup of GCE instances..."
 
                         for n in {1..4}; do
