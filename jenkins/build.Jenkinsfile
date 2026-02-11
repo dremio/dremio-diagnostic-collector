@@ -20,11 +20,6 @@ pipeline {
             description: 'GCP Zone for VM instances'
         )
         string(
-            name: 'GCP_SERVICE_ACCOUNT',
-            defaultValue: 'your-service-account@developer.gserviceaccount.com',
-            description: 'GCP Service Account email'
-        )
-        string(
             name: 'GCP_NETWORK_SUBNET',
             defaultValue: 'primary-west',
             description: 'GCP Network Subnet name'
@@ -60,7 +55,6 @@ pipeline {
         // GCP Configuration - use parameters if provided, otherwise fall back to env vars
         GCP_PROJECT_ID = "${params.GCP_PROJECT_ID}"
         GCP_ZONE = "${params.GCP_ZONE}"
-        GCP_SERVICE_ACCOUNT = "${params.GCP_SERVICE_ACCOUNT}"
         GCP_NETWORK_SUBNET = "${params.GCP_NETWORK_SUBNET}"
         GCP_MACHINE_TYPE = "${params.GCP_MACHINE_TYPE}"
         GCP_DISK_SIZE = "${params.GCP_DISK_SIZE}"
@@ -157,7 +151,6 @@ pipeline {
                             --maintenance-policy=MIGRATE \\
                             --provisioning-model=STANDARD \\
                             --metadata="ssh-keys=jenkins:${SSH_PUBLIC_KEY}" \\
-                            --service-account=${GCP_SERVICE_ACCOUNT} \\
                             --scopes=https://www.googleapis.com/auth/devstorage.read_only,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write,https://www.googleapis.com/auth/service.management.readonly,https://www.googleapis.com/auth/servicecontrol,https://www.googleapis.com/auth/trace.append \\
                             --create-disk=auto-delete=yes,boot=yes,device-name=$node_name,${DISK_POLICY_PARAM}image=${GCP_IMAGE},mode=rw,size=${GCP_DISK_SIZE},type=pd-balanced \\
                             --no-shielded-secure-boot \\
