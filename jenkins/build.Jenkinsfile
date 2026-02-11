@@ -83,7 +83,7 @@ pipeline {
         stage('Setup') {
             steps {
                 sh '''
-                    apk add bash curl python3 py3-pip
+                    apk add bash curl python3 py3-pip openssh-client
 
                     # Install gcloud SDK
                     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-458.0.1-linux-x86_64.tar.gz
