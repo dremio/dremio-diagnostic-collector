@@ -57,9 +57,6 @@ pipeline {
     }
 
     environment {
-        // Set PATH to include our custom bin directories and gcloud
-        PATH = "${env.PATH}:${env.WORKSPACE}/google-cloud-sdk/bin:${env.HOME}/go/bin:${env.HOME}/bin"
-
         // GCP Configuration - use parameters if provided, otherwise fall back to env vars
         GCP_PROJECT_ID = "${params.GCP_PROJECT_ID}"
         GCP_ZONE = "${params.GCP_ZONE}"
@@ -85,24 +82,26 @@ pipeline {
     stages {
         stage('Setup') {
             steps {
-                sh '''#!/bin/bash
+                sh '''
                     apk add bash curl python3 py3-pip
 
                     # Install gcloud SDK
                     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-458.0.1-linux-x86_64.tar.gz
                     tar -xzf google-cloud-sdk-458.0.1-linux-x86_64.tar.gz
-                    ./google-cloud-sdk/install.sh --quiet --path-update=true
-                    export PATH=$PATH:$(pwd)/google-cloud-sdk/bin
+                    ./google-cloud-sdk/install.sh --quiet --path-update=false
 
                     # Verify gcloud is installed
                     gcloud version
+
+                    # Generate SSH key for VM access
+                    ssh-keygen -t ed25519 -f $HOME/.ssh/id_ed25519 -q -P ""
                 '''
             }
         }
 
         stage('Install k3sup') {
             steps {
-                sh '''#!/bin/bash
+                sh '''
                     curl -O -L https://github.com/alexellis/k3sup/releases/download/${K3SUP_VERSION}/k3sup
                     chmod +x k3sup
                     mkdir -p $HOME/bin
@@ -110,32 +109,9 @@ pipeline {
                 '''
             }
         }
-
-        stage('GCloud Auth & SSH Setup') {
-            steps {
-                withVault(vaultSecrets: [[
-                    path: 'secret/support/private/gcloud-service-account',
-                    secretValues: [
-                        [envVar: 'GOOGLE_APPLICATION_CREDENTIALS_JSON', vaultKey: 'credentials-file'],
-                    ]
-                ]]) {
-                    sh '''#!/bin/bash
-                        # Write the credentials to a temporary file
-                        echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > /tmp/gcloud-key.json
-
-                        gcloud auth activate-service-account --key-file /tmp/gcloud-key.json
-                        ssh-keygen -t ed25519 -f $HOME/.ssh/id_ed25519 -q -P ""
-
-                        # Clean up the temporary file
-                        rm -f /tmp/gcloud-key.json
-                    '''
-                }
-            }
-        }
-
         stage('Create GCE Instances') {
             steps {
-                sh '''#!/bin/bash
+                sh '''
                     # Function to find and read SSH public key
                     get_ssh_public_key() {
                         local ssh_dir="$HOME/.ssh"
@@ -190,7 +166,7 @@ pipeline {
                             --labels=goog-ec-src=vm_add-gcloud \\
                             --reservation-affinity=any &
                     done
-                    wait < <( jobs -p )
+                    wait
                     sleep 60
                 '''
             }
@@ -198,15 +174,15 @@ pipeline {
 
         stage('Setup K3s Cluster') {
             steps {
-                sh '''#!/bin/bash
+                sh '''
                     for n in {1..4}; do
                         node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
                         if [ "$n" -eq 1 ]; then
                             MASTER_IP=$(gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
-                            k3sup install --ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
+                            $HOME/bin/k3sup install --ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
                         else
                             IP=$(gcloud compute instances describe $node_name --zone=${GCP_ZONE} --format='get(networkInterfaces[0].networkIP)')
-                            k3sup join --ip $IP --server-ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
+                            $HOME/bin/k3sup join --ip $IP --server-ip $MASTER_IP --user jenkins --ssh-key $HOME/.ssh/id_ed25519
                         fi
                     done
 
@@ -218,7 +194,7 @@ pipeline {
 
         stage('Install Build Tools') {
             steps {
-                sh '''#!/bin/bash
+                sh '''
                     wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
                     tar -C ../ -xzf go${GO_VERSION}.linux-amd64.tar.gz
                     curl -LO https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl
@@ -244,42 +220,27 @@ pipeline {
                 // Cleanup: Delete GCE instances if CLEANUP_INSTANCES is true
                 if (params.CLEANUP_INSTANCES == 'true') {
                     echo "Cleanup enabled - deleting GCE instances..."
-                    withVault(vaultSecrets: [[
-                        path: 'secret/support/private/gcloud-service-account',
-                        secretValues: [
-                            [envVar: 'GOOGLE_APPLICATION_CREDENTIALS_JSON', vaultKey: 'credentials-file'],
-                        ]
-                    ]]) {
-                        sh '''#!/bin/bash
-                            # Write the credentials to a temporary file
-                            echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > /tmp/gcloud-key.json
+                    sh '''
+                        echo "Starting cleanup of GCE instances..."
 
-                            gcloud auth activate-service-account --key-file /tmp/gcloud-key.json
-
-                            echo "Starting cleanup of GCE instances..."
-
-                            for n in {1..4}; do
-                                node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
-                                echo "Deleting $node_name"
-                                # Run deletion in background and capture results
-                                (
-                                    if gcloud compute instances delete "$node_name" \\
-                                        --project=${GCP_PROJECT_ID} \\
-                                        --zone=${GCP_ZONE} \\
-                                        --quiet 2>/dev/null; then
-                                        echo "  ✓ Successfully deleted $node_name"
-                                    else
-                                        echo "  ✗ Failed to delete $node_name (may not exist)"
-                                    fi
-                                ) &
-                            done
-                            wait
-                            echo "Deletion complete"
-
-                            # Clean up the temporary file
-                            rm -f /tmp/gcloud-key.json
-                        '''
-                    }
+                        for n in {1..4}; do
+                            node_name=k8s-ddc-ci-$n-$BUILD_NUMBER
+                            echo "Deleting $node_name"
+                            # Run deletion in background and capture results
+                            (
+                                if gcloud compute instances delete "$node_name" \\
+                                    --project=${GCP_PROJECT_ID} \\
+                                    --zone=${GCP_ZONE} \\
+                                    --quiet 2>/dev/null; then
+                                    echo "  ✓ Successfully deleted $node_name"
+                                else
+                                    echo "  ✗ Failed to delete $node_name (may not exist)"
+                                fi
+                            ) &
+                        done
+                        wait
+                        echo "Deletion complete"
+                    '''
                 } else {
                     echo "Cleanup disabled - GCE instances will remain running"
                     echo "Instance names: k8s-ddc-ci-{1..4}-${BUILD_NUMBER}"
