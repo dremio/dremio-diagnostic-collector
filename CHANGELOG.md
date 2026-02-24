@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.5.7] - 2026-02-20
+
+### Changed
+
+* Changed - Bump golang to 1.24.13
+
 ## [3.5.6] - 2026-01-05
 
 ### Added
@@ -963,6 +969,7 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[3.5.7]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.6...v3.5.7
 [3.5.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.5...v3.5.6
 [3.5.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.4...v3.5.5
 [3.5.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.3...v3.5.4
