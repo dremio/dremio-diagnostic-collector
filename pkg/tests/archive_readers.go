@@ -95,7 +95,7 @@ func ExtractGZip(t *testing.T, gzipArchive, fileName string) string {
 		t.Fatalf("unexpected error reading tar.gz file %v: %v", cleanedArchiveFile, err)
 	}
 
-	newFile, err := os.Create(fileName)
+	newFile, err := os.Create(fileName) // #nosec G304 -- fileName is a test-controlled path in a temp dir
 	if err != nil {
 		t.Fatal(err)
 	}

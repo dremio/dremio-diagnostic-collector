@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.0.0-beta1] - 2026-04-16
+
+DDC v4 is a full redesign of the Dremio Diagnostic Collector.
+
+1. **Streaming architecture** — Files stream directly from remote nodes to the DDC host. No intermediate tarballs on pods/nodes, eliminating disk pressure and `kubectl cp` timeouts.
+2. **Two collection modes** — `standard` (lightweight logs) and `diagnosis` (full JVM diagnostics). Replaces the previous five overlapping collection profiles.
+3. **Three transports** — SSH, Kubernetes, and new Local mode for single-node collection without SSH/K8s overhead. A Local-K8s hybrid mode is also available.
+4. **Interactive TUI overhaul** — Rebuilt with `charmbracelet/huh` forms. Node discovery and selection, live CLI command preview, and transport-specific configuration screens.
+5. **No YAML configuration** — `ddc.yaml` is removed entirely. All settings are CLI flags. The TUI generates a reproducible one-liner via "Show CLI command".
+6. **SPDY-based K8s executor** — Kubernetes commands use the SPDY protocol for reliable streaming execution on clusters.
+7. **PAT-token-less collection** — System tables, WLM configuration, cluster stats, and queries-perf are collected directly from the coordinator node, removing the REST API and PAT token dependency for these data types.
+8. **Query performance data** — Collects per-query performance metrics, split into daily files (`queries-perf.YYYY-MM-DD.json`) for easier analysis.
+9. **Diagnosis tooling** — Async profiler, JFR, jstack, top, and heap dump collection with synchronized start across all nodes for consistent diagnostics.
+10. **Real-time progress reporting** — Per-node status with file-level progress (name, size, percentage), thread utilization, and per-tool error reporting in the TUI status screen.
+
 ## [3.5.7] - 2026-02-20
 
 ### Changed

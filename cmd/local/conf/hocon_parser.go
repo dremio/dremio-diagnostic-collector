@@ -17,10 +17,11 @@ package conf
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 	"github.com/gurkankaymak/hocon"
 )
 
@@ -84,35 +85,6 @@ func (c *DremioHOCONConfig) HasPath(path string) bool {
 	return c.config.GetString(path) != "" || c.config.GetBoolean(path)
 }
 
-// IsCoordinatorMaster checks if this node is configured as a master coordinator
-func (c *DremioHOCONConfig) IsCoordinatorMaster() bool {
-	// Check if services.coordinator.master.enabled is true
-	if c.HasPath("services.coordinator.master.enabled") {
-		return c.GetBool("services.coordinator.master.enabled")
-	}
-
-	// Default to false if not specified
-	return false
-}
-
-// IsCoordinator checks if this node is configured as a coordinator
-func (c *DremioHOCONConfig) IsCoordinator() bool {
-	if c.HasPath("services.coordinator.enabled") {
-		return c.GetBool("services.coordinator.enabled")
-	}
-	// Default to false if not specified
-	return false
-}
-
-// IsExecutor checks if this node is configured as an executor
-func (c *DremioHOCONConfig) IsExecutor() bool {
-	if c.HasPath("services.executor.enabled") {
-		return c.GetBool("services.executor.enabled")
-	}
-	// Default to false if not specified
-	return false
-}
-
 // GetRocksDBPath returns the path to the RocksDB directory
 func (c *DremioHOCONConfig) GetRocksDBPath(dremioHome string) string {
 	// First check for direct db path
@@ -131,11 +103,27 @@ func (c *DremioHOCONConfig) GetRocksDBPath(dremioHome string) string {
 		localPath = c.GetString("paths.local")
 	} else {
 		// Default local path
-		localPath = filepath.Join(dremioHome, "data")
+		localPath = path.Join(dremioHome, "data")
 	}
 
-	// Default RocksDB path
-	return filepath.Join(localPath, "db")
+	// Default RocksDB path — use path.Join (POSIX) since these are
+	// remote Linux paths, not local filesystem paths.
+	return path.Join(localPath, "db")
+}
+
+// NewDremioHOCONConfigFromString creates a DremioHOCONConfig from raw HOCON
+// content. Same logic as NewDremioHOCONConfig but skips the file read — useful
+// when the content has been fetched remotely (e.g. via kubectl exec cat).
+func NewDremioHOCONConfigFromString(content string, dremioHome string) (*DremioHOCONConfig, error) {
+	// Replace DREMIO_HOME placeholder with actual value
+	contentStr := strings.ReplaceAll(content, "${DREMIO_HOME}", dremioHome)
+
+	config, err := hocon.ParseString(contentStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse dremio.conf as HOCON: %w", err)
+	}
+
+	return &DremioHOCONConfig{config: config}, nil
 }
 
 // ParseDremioConf parses the dremio.conf file using the HOCON parser

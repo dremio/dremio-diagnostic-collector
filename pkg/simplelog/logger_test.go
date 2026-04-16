@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/output"
 )
 
 func TestLogger(t *testing.T) {
@@ -46,31 +46,32 @@ func TestLogger(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		logger := newLogger(temp, func() { temp.Close() })
-		logger.debugLogger.SetOutput(buf)
-		logger.infoLogger.SetOutput(buf)
-		logger.warningLogger.SetOutput(buf)
-		logger.errorLogger.SetOutput(buf)
+		lgr := newLogger(temp, func() { _ = temp.Close() })
+		lgr.debugLogger.SetOutput(buf)
+		lgr.infoLogger.SetOutput(buf)
+		lgr.warningLogger.SetOutput(buf)
+		lgr.errorLogger.SetOutput(buf)
 
-		logger.Debugf("debug message")
-		logger.Infof("info message")
-		logger.Warningf("warn message")
-		logger.Errorf("err message")
+		lgr.Debugf("debug message")
+		lgr.Infof("info message")
+		lgr.Warningf("warn message")
+		lgr.Errorf("err message")
+		lgr.Close()
 
-		output := buf.String()
+		logOutput := buf.String()
 
-		if !strings.Contains(output, test.debugMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, test.debugMessage)
+		if !strings.Contains(logOutput, test.debugMessage) {
+			t.Errorf("expected %v to contain %v but did not", logOutput, test.debugMessage)
 		}
 
-		if !strings.Contains(output, test.infoMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, test.infoMessage)
+		if !strings.Contains(logOutput, test.infoMessage) {
+			t.Errorf("expected %v to contain %v but did not", logOutput, test.infoMessage)
 		}
-		if !strings.Contains(output, test.warnMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, test.warnMessage)
+		if !strings.Contains(logOutput, test.warnMessage) {
+			t.Errorf("expected %v to contain %v but did not", logOutput, test.warnMessage)
 		}
-		if !strings.Contains(output, test.errMessage) {
-			t.Errorf("expected %v to contain %v but did not", output, test.errMessage)
+		if !strings.Contains(logOutput, test.errMessage) {
+			t.Errorf("expected %v to contain %v but did not", logOutput, test.errMessage)
 		}
 	}
 }
@@ -78,7 +79,7 @@ func TestLogger(t *testing.T) {
 func TestStartLogMessage(t *testing.T) {
 	tempDir := t.TempDir()
 	InitLoggerWithOutputDir(tempDir)
-	defer InitLoggerWithOutputDir(tempDir)
+	defer func() { _ = Close() }()
 	loc := GetLogLoc()
 	if loc == "" {
 		t.Error("expected log file to not be empty but it was")
@@ -97,6 +98,7 @@ func TestStartLogMessage(t *testing.T) {
 func TestEndLogMessage(t *testing.T) {
 	tempDir := t.TempDir()
 	InitLoggerWithOutputDir(tempDir)
+	defer func() { _ = Close() }()
 	loc := GetLogLoc()
 	out, err := output.CaptureOutput(func() {
 		LogEndMessage()
@@ -126,7 +128,7 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger := newLogger(temp, func() { temp.Close() })
+	logger := newLogger(temp, func() { _ = temp.Close() })
 	logger.debugLogger.SetOutput(dbbuf)
 	logger.infoLogger.SetOutput(infobuf)
 	logger.warningLogger.SetOutput(warnbuf)
@@ -136,25 +138,27 @@ func TestLoggerMessageIsTruncated(t *testing.T) {
 	logger.Info(msg)
 	logger.Warning(msg)
 	logger.Error(msg)
+	logger.Close()
 
-	expected := 1000
-	output := strings.TrimSpace(strings.Split(dbbuf.String(), ": ")[2])
+	// 1000 runes of content + 14 chars of "...[truncated]" suffix
+	expected := 1000 + len("...[truncated]")
+	logOutput := strings.TrimSpace(strings.Split(dbbuf.String(), ": ")[2])
 
-	if len(output) != expected {
-		t.Errorf("expected %q to be %v but was %v", string(output), expected, len(output))
+	if len(logOutput) != expected {
+		t.Errorf("expected %q to be %v but was %v", string(logOutput), expected, len(logOutput))
 	}
-	output = strings.TrimSpace(strings.Split(infobuf.String(), ": ")[2])
+	logOutput = strings.TrimSpace(strings.Split(infobuf.String(), ": ")[2])
 
-	if len(output) != expected {
-		t.Errorf("expected %q to be %v but was %v", string(output), expected, len(output))
+	if len(logOutput) != expected {
+		t.Errorf("expected %q to be %v but was %v", string(logOutput), expected, len(logOutput))
 	}
-	output = strings.TrimSpace(strings.Split(warnbuf.String(), ": ")[2])
-	if len(output) != expected {
-		t.Errorf("expected %q to be %v but was %v", string(output), expected, len(output))
+	logOutput = strings.TrimSpace(strings.Split(warnbuf.String(), ": ")[2])
+	if len(logOutput) != expected {
+		t.Errorf("expected %q to be %v but was %v", string(logOutput), expected, len(logOutput))
 	}
-	output = strings.TrimSpace(strings.Split(errbuf.String(), ": ")[2])
-	if len(output) != expected {
-		t.Errorf("expected %q to be %v but was %v", string(output), expected, len(output))
+	logOutput = strings.TrimSpace(strings.Split(errbuf.String(), ": ")[2])
+	if len(logOutput) != expected {
+		t.Errorf("expected %q to be %v but was %v", string(logOutput), expected, len(logOutput))
 	}
 }
 func TestLogIsCreatedInOutputDir(t *testing.T) {

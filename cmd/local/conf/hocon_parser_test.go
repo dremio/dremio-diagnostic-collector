@@ -72,21 +72,6 @@ debug: {
 		t.Errorf("Expected RocksDB path %s, got %s", expectedDBPath, dbPath)
 	}
 
-	// Test IsCoordinatorMaster
-	if !config.IsCoordinatorMaster() {
-		t.Errorf("Expected IsCoordinatorMaster to be true, got false")
-	}
-
-	// Test IsCoordinator
-	if !config.IsCoordinator() {
-		t.Errorf("Expected IsCoordinator to be true, got false")
-	}
-
-	// Test IsExecutor
-	if config.IsExecutor() {
-		t.Errorf("Expected IsExecutor to be false, got true")
-	}
-
 	// Test GetString
 	expectedLocalPath := "/opt/dremio/data"
 	localPath := config.GetString("paths.local")
@@ -143,18 +128,56 @@ paths: {
 		t.Errorf("Expected default RocksDB path %s, got %s", expectedDBPath, dbPath)
 	}
 
-	// Test IsCoordinatorMaster with default value
-	if config.IsCoordinatorMaster() {
-		t.Errorf("Expected default IsCoordinatorMaster to be false, got true")
-	}
+}
 
-	// Test IsCoordinator with default value
-	if config.IsCoordinator() {
-		t.Errorf("Expected default IsCoordinator to be false, got true")
+func TestNewDremioHOCONConfigFromString_WithPathsDB(t *testing.T) {
+	content := `
+paths: {
+  local: "/data/dremio"
+  db: "/data/dremio/rocksdb"
+}
+`
+	config, err := NewDremioHOCONConfigFromString(content, "/opt/dremio")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
+	got := config.GetRocksDBPath("/opt/dremio")
+	if got != "/data/dremio/rocksdb" {
+		t.Errorf("expected /data/dremio/rocksdb, got %s", got)
+	}
+}
 
-	// Test IsExecutor with default value
-	if config.IsExecutor() {
-		t.Errorf("Expected default IsExecutor to be false, got true")
+func TestNewDremioHOCONConfigFromString_WithDremioHomePlaceholder(t *testing.T) {
+	content := `
+paths: {
+  local: ${DREMIO_HOME}"/data"
+}
+`
+	config, err := NewDremioHOCONConfigFromString(content, "/opt/dremio")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := config.GetRocksDBPath("/opt/dremio")
+	if got != "/opt/dremio/data/db" {
+		t.Errorf("expected /opt/dremio/data/db, got %s", got)
+	}
+}
+
+func TestNewDremioHOCONConfigFromString_InvalidContent(t *testing.T) {
+	_, err := NewDremioHOCONConfigFromString("{{invalid hocon", "/opt/dremio")
+	if err == nil {
+		t.Fatal("expected error for invalid HOCON content")
+	}
+}
+
+func TestNewDremioHOCONConfigFromString_EmptyContent(t *testing.T) {
+	config, err := NewDremioHOCONConfigFromString("", "/opt/dremio")
+	if err != nil {
+		t.Fatalf("unexpected error for empty content: %v", err)
+	}
+	// With no paths configured, GetRocksDBPath falls back to default
+	got := config.GetRocksDBPath("/opt/dremio")
+	if got != "/opt/dremio/data/db" {
+		t.Errorf("expected /opt/dremio/data/db, got %s", got)
 	}
 }

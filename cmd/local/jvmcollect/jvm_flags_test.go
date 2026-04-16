@@ -23,10 +23,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/jvmcollect"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 )
 
 func TestJvmFlagsAreWritten(t *testing.T) {
@@ -43,36 +43,21 @@ func TestJvmFlagsAreWritten(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	overrides := make(map[string]string)
-	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0o700); err != nil {
-		t.Fatal(err)
+	overrides := map[string]string{
+		"dremio-log-dir":  filepath.Join("testdata", "logs"),
+		"dremio-conf-dir": filepath.Join("testdata", "conf"),
+		"output-file":     filepath.Join(t.TempDir(), "ddcout"),
+		"node-name":       "node1",
+		"dremio-pid":      fmt.Sprintf("%v", cmd.Process.Pid),
 	}
-	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
+	tmpOutDir := overrides["output-file"]
 	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
-
-	ddcYamlString := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-tarball-out-dir: %v
-node-name: %v
-dremio-pid: %v
-`, filepath.Join("testdata", "logs"),
-		filepath.Join("testdata", "conf"),
-		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
-		nodeName,
-		cmd.Process.Pid,
-	)
-	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +67,7 @@ dremio-pid: %v
 		t.Fatal(err)
 	}
 
-	err = jvmcollect.RunCollectJVMFlags(c, hook)
+	err = jvmcollect.RunJVMFlags(c, hook)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

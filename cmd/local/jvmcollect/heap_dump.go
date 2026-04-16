@@ -22,13 +22,13 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
-func RunCollectHeapDump(c *conf.CollectConf, hook shutdown.Hook) error {
+func RunHeapDump(c *conf.CollectConf, hook shutdown.Hook) error {
 	simplelog.Debug("Capturing Java Heap Dump")
 	dremioPID := c.DremioPID()
 	baseName := fmt.Sprintf("%v.hprof", c.NodeName())

@@ -40,14 +40,16 @@ func CaptureOutput(run func()) (string, error) {
 	os.Stdout = writer
 	os.Stderr = writer
 
-	outC := make(chan string)
+	outC := make(chan string, 1)
 
 	go func() {
 		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, reader); err != nil {
-			panic(err)
-		}
-		outC <- buf.String()
+		defer func() {
+			// Always send whatever was captured, even on panic.
+			_ = recover()
+			outC <- buf.String()
+		}()
+		_, _ = io.Copy(&buf, reader)
 	}()
 
 	run()

@@ -21,12 +21,11 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/tests"
 )
 
 func TestKubectlExec(t *testing.T) {
@@ -60,7 +59,7 @@ func TestKubectlExec(t *testing.T) {
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
-	expectedCall = []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", podName, "--", "ls", "-l"}
+	expectedCall = []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -96,82 +95,9 @@ func TestKubectlSearch(t *testing.T) {
 	if len(calls) != 4 {
 		t.Errorf("expected 4 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "--context", k8sContext, "-l", "role=dremio-pods", "-o", "name"}
+	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "--context", k8sContext, "-l", "role=dremio-pods", "--field-selector", "status.phase=Running", "-o", "name"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
-	}
-}
-
-func TestKubectCopyFrom(t *testing.T) {
-	namespace := "testns"
-	podName := "pod"
-	k8sContext := "west-f1"
-	source := filepath.Join(string(filepath.Separator), "podroot", "test.log")
-	destination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
-	cli := &tests.MockCli{
-		StoredResponse: []string{"dremio-executor", "success"},
-		StoredErrors:   []error{nil, nil},
-	}
-	k := CliK8sActions{
-		cli:            cli,
-		kubectlPath:    "kubectl",
-		namespace:      namespace,
-		k8sContext:     k8sContext,
-		retriesEnabled: true,
-	}
-	out, err := k.CopyFromHost(podName, source, destination)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-
-	if out != "success" {
-		t.Errorf("expected success but got %v", out)
-	}
-	calls := cli.Calls
-	if len(calls) != 2 {
-		t.Errorf("expected 2 call but got %v", len(calls))
-	}
-	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), destination}
-	if !reflect.DeepEqual(calls[1], expectedCall) {
-		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
-	}
-}
-
-func TestKubectCopyFromWindowsHost(t *testing.T) {
-	namespace := "testns"
-	podName := "pod"
-	k8sContext := "east-8x"
-	source := filepath.Join("podroot", "test.log")
-	destination := filepath.Join("C:", string(filepath.Separator), "mydir", "test.log")
-	cli := &tests.MockCli{
-		StoredResponse: []string{"dremio-executor", "success"},
-		StoredErrors:   []error{nil, nil},
-	}
-	k := CliK8sActions{
-		cli:            cli,
-		labelSelector:  "role=abc",
-		kubectlPath:    "kubectl",
-		namespace:      namespace,
-		k8sContext:     k8sContext,
-		retriesEnabled: true,
-	}
-	out, err := k.CopyFromHost(podName, source, destination)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-
-	if out != "success" {
-		t.Errorf("expected success but got %v", out)
-	}
-	calls := cli.Calls
-	if len(calls) != 2 {
-		t.Errorf("expected 2 call but got %v", len(calls))
-	}
-	// we remove the C: due to issue found in https://github.com/kubernetes/kubernetes/issues/77310"
-	expectedDestination := filepath.Join(string(filepath.Separator), "mydir", "test.log")
-	expectedCall := []string{"kubectl", "cp", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", "--retries", "999", fmt.Sprintf("%v:%v", podName, source), expectedDestination}
-	if !reflect.DeepEqual(calls[1], expectedCall) {
-		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
 }
 
@@ -205,7 +131,7 @@ func TestKubectlContainerDetectionWithSidecars(t *testing.T) {
 	}
 
 	// Should use dremio-coordinator, not istio-proxy
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-coordinator", podName, "--", "ls", "-l"}
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-coordinator", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -241,7 +167,7 @@ func TestKubectlContainerDetectionFallback(t *testing.T) {
 	}
 
 	// Should fall back to first container (istio-proxy)
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "istio-proxy", podName, "--", "ls", "-l"}
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "istio-proxy", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -277,7 +203,7 @@ func TestKubectlContainerDetectionWithDremioInName(t *testing.T) {
 	}
 
 	// Should use my-custom-dremio-app because it contains "dremio"
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "my-custom-dremio-app", podName, "--", "ls", "-l"}
+	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "my-custom-dremio-app", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -297,14 +223,14 @@ func TestKubectlCtrlVersion(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		defer out.Close()
+		defer func() { _ = out.Close() }()
 
 		// Get the data
 		resp, err := http.Get(url) //nolint
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Write the body to file
 		_, err = io.Copy(out, resp.Body)
@@ -339,5 +265,45 @@ func TestKubectlCtrlVersion(t *testing.T) {
 	}
 	if !result {
 		t.Error("failed should be able to retry on new exec")
+	}
+}
+
+func TestSearchPods_FieldSelectorFiltersRunningPods(t *testing.T) {
+	cli := &tests.MockCli{
+		// First call: get pods returns one pod; second call: getContainerName returns container name
+		StoredResponse: []string{"pod/dremio-master-0", "dremio-master-coordinator"},
+		StoredErrors:   []error{nil, nil},
+	}
+	k := CliK8sActions{
+		cli:           cli,
+		kubectlPath:   "kubectl",
+		namespace:     "testns",
+		k8sContext:    "west-f1",
+		labelSelector: "app=dremio",
+	}
+	pods, err := k.SearchPods(func(container string) bool {
+		return true
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pods) != 1 || pods[0] != "dremio-master-0" {
+		t.Errorf("expected [dremio-master-0] but got %v", pods)
+	}
+
+	// Verify the first call (get pods) includes --field-selector status.phase=Running
+	if len(cli.Calls) < 1 {
+		t.Fatal("expected at least 1 call")
+	}
+	getPodArgs := cli.Calls[0]
+	foundFieldSelector := false
+	for i, arg := range getPodArgs {
+		if arg == "--field-selector" && i+1 < len(getPodArgs) && getPodArgs[i+1] == "status.phase=Running" {
+			foundFieldSelector = true
+			break
+		}
+	}
+	if !foundFieldSelector {
+		t.Errorf("expected --field-selector status.phase=Running in kubectl args, got %v", getPodArgs)
 	}
 }

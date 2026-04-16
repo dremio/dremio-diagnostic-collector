@@ -44,16 +44,10 @@ fi
 # this is also set in script/release and is a copy paste
 GIT_SHA=`git rev-parse --short HEAD`
 VERSION=`git rev-parse --abbrev-ref HEAD`
-LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION"
-GOOS=linux GOARCH=amd64 go build  -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
-zip ./bin/ddc.zip ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-amd64.zip
-rm ./bin/ddc
-GOOS=linux GOARCH=amd64 go build  -ldflags "$LDFLAGS" -o ./bin/ddc ./cmd/local/main
-zip ./bin/ddc.zip ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
-rm ./bin/ddc
+LDFLAGS="-s -w -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.Version=$VERSION"
 
-go build -ldflags "$LDFLAGS" -o ./bin/ddc
+go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc
+# UPX on macOS can cause Gatekeeper/code-signing issues — only compress linux/windows binaries
+if [ "$(uname)" != "Darwin" ] && type "upx" > /dev/null 2>&1; then upx --best ./bin/ddc; fi
 
-cp ./default-ddc.yaml ./bin/ddc.yaml
+# default-ddc.yaml removed in v4 — all config via CLI flags

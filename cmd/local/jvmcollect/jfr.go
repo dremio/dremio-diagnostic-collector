@@ -21,13 +21,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
-func RunCollectJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
+func RunJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	var w bytes.Buffer
 	w = bytes.Buffer{}
 	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v VM.unlock_commercial_features", c.DremioPID())); err != nil {
@@ -46,11 +46,11 @@ func RunCollectJFR(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	}
 
 	w = bytes.Buffer{}
-	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DremioJFRTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
+	if err := ddcio.Shell(hook, &w, fmt.Sprintf("jcmd %v JFR.start name=\"DREMIO_JFR\" settings=profile maxage=%vs  filename=%v/%v.jfr dumponexit=true", c.DremioPID(), c.DiagTimeSeconds(), c.JFROutDir(), c.NodeName())); err != nil {
 		return fmt.Errorf("unable to run JFR: %w", err)
 	}
 	simplelog.Debugf("node: %v - jfr start output - %v", c.NodeName(), w.String())
-	secondsWaiting := c.DremioJFRTimeSeconds()
+	secondsWaiting := c.DiagTimeSeconds()
 	time.Sleep(time.Duration(secondsWaiting) * time.Second)
 	// do not "optimize". the recording first needs to be stopped for all processes before collecting the data.
 	simplelog.Debugf("... stopping JFR %v", c.NodeName())

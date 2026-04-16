@@ -20,8 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TestK8SMasking_WhenJsonItemsAreEmpty(t *testing.T) {
@@ -135,7 +135,7 @@ func TestK8SMasking_WhenRemoveSecretsFromK8sJSON(t *testing.T) {
 
 	_, err = masking.RemoveSecretsFromK8sJSON([]byte(input))
 	if err == nil {
-		t.Error("expected error but there was none")
+		t.Fatal("expected error but there was none")
 	}
 	if !strings.Contains(err.Error(), "items must be an array but was 'string'") {
 		t.Errorf("expected %v to contain message 'items must be an array but was 'string''", err.Error())

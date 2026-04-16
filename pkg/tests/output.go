@@ -20,8 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 // Tree prints the directory structure in a tree-like format.

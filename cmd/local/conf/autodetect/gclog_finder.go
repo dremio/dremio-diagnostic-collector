@@ -16,14 +16,18 @@
 package autodetect
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 const (
@@ -149,4 +153,92 @@ func ParseGCLogFromFlagsPre25(startupFlagsStr string) (logRegex string, gcLogLoc
 	// since jdk8 lets you set the pid also just doing *
 	gcRegex = strings.ReplaceAll(gcRegex, "%p", "*")
 	return gcRegex, path.Dir(gcPath), nil
+}
+
+// gcFallbackPatterns are file patterns that match GC log files across JDK versions.
+var gcFallbackPatterns = []string{"gc*.log*", "*.gc.log*", "gc-*.log*", "server*.gc*"}
+
+// gcMarkers are strings found in the first few lines of GC log files across JDK versions.
+var gcMarkers = []string{
+	"[gc",         // JDK 11+ unified logging: [gc, [gc,start
+	"GC(",         // JDK 8: GC(0), GC(1)
+	"Heap",        // JDK 8/11: Heap region size, Heap before GC
+	"CommandLine", // JDK 11+: CommandLine flags
+	"Using G1",    // JDK 8+: Using G1
+	"Memory:",     // JDK 11+: Memory: 4k page
+	"CPUs:",       // JDK 11+: CPUs: 4 total
+	"[Times:",     // JDK 8: [Times: user=0.01 sys=0.00, real=0.00 secs]
+	"-XX:",        // JDK 8/11: CommandLineFlags: -XX:InitialHeapSize=...
+	"Total time",  // JDK 8: Total time for which application threads were stopped
+}
+
+// FindGCLogsFallback scans common directories for GC log files when JVM flag
+// detection fails. It restricts results to files matching known GC log patterns,
+// modified within the given number of days, and whose first lines contain GC markers.
+func FindGCLogsFallback(dremioLogDir string, searchDirs []string, collectionDays int) (gcLogPattern string, gcLogDir string) {
+	if dremioLogDir != "" {
+		// Prepend dremio log dir as the highest-priority search location
+		searchDirs = append([]string{dremioLogDir}, searchDirs...)
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -collectionDays)
+
+	for _, dir := range searchDirs {
+		if dir == "" {
+			continue
+		}
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		for _, pattern := range gcFallbackPatterns {
+			matches, err := filepath.Glob(filepath.Join(dir, pattern))
+			if err != nil || len(matches) == 0 {
+				continue
+			}
+
+			// Filter by modification time and GC content
+			for _, match := range matches {
+				fi, err := os.Stat(match)
+				if err != nil || fi.IsDir() {
+					continue
+				}
+				if fi.ModTime().Before(cutoff) {
+					continue
+				}
+				if !looksLikeGCLog(match) {
+					continue
+				}
+
+				// Found a valid GC log file
+				simplelog.Infof("GC log fallback: found GC log at %v using pattern %v", match, pattern)
+				return pattern, dir
+			}
+		}
+	}
+
+	simplelog.Warningf("GC log fallback: no GC logs found in any of the searched directories")
+	return "", ""
+}
+
+// looksLikeGCLog reads the first few lines of a file and checks for GC log markers.
+func looksLikeGCLog(filePath string) bool {
+	f, err := os.Open(filepath.Clean(filePath))
+	if err != nil {
+		return false
+	}
+	defer f.Close() //nolint:errcheck // read-only file; close error is non-fatal
+
+	scanner := bufio.NewScanner(f)
+	linesToCheck := 10
+	for i := 0; i < linesToCheck && scanner.Scan(); i++ {
+		line := strings.ToLower(scanner.Text())
+		for _, marker := range gcMarkers {
+			if strings.Contains(line, strings.ToLower(marker)) {
+				return true
+			}
+		}
+	}
+	return false
 }

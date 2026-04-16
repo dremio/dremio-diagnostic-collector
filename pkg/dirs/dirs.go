@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 )
 
 // CheckDirectory checks if a directory exists and contains files.
@@ -76,7 +78,7 @@ func CheckFreeSpace(folder string, minGB uint64) error {
 
 // FormatFreeSpaceError formats an error message for free space issues based on the collection mode.
 // It provides a more specific error message suggesting to try a lighter collection mode if appropriate.
-func FormatFreeSpaceError(nonDefaultFreeSpace bool, err error, collectionMode, fallbackMode string) error {
+func FormatFreeSpaceError(nonDefaultFreeSpace bool, err error, collectionMode, fallbackMode collects.CollectionMode) error {
 	if collectionMode == fallbackMode || nonDefaultFreeSpace {
 		// If already using the lightest mode, just return the original error
 		return fmt.Errorf("%w", err)

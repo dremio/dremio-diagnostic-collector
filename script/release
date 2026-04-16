@@ -6,6 +6,10 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+echo "Running bootstrap to install build tools (upx, linters, …)"
+date "+%H:%M:%S"
+./script/bootstrap
+
 echo "Checking if gh is installed…"
 date "+%H:%M:%S"
 

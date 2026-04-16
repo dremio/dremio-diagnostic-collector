@@ -1,15 +1,13 @@
-[![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector/v3)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector/v3)
-
+[![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector/v4)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector/v4)
 
 Automated log and analytics collection for Dremio clusters
 
-## IMPORTANT LINKS
+## Important Links
 
 * Read the [FAQ](FAQ.md) for common questions on setting up DDC
-* Read the [ddc.yaml](default-ddc.yaml) for a full, detailed list of customizable collection parameters (optional)
-* Read the [official Dremio Support page](https://support.dremio.com/hc/en-us/articles/15560006579739) for more details on the DDC architecture
-* Read the [ddc help](README.md#ddc-usage)
+* Read the [official Dremio Support page](https://support.dremio.com/hc/en-us/articles/15560006579739) for more details on DDC
 * Read the [DDC Diagnostic Tarball Contents](docs/ddc-tarball.md) to know what is saved by a DDC tarball
+* Read the [Architecture Docs](docs/architecture/) for design decisions, patterns, and development history
 
 ### Install DDC on your local machine
 
@@ -19,241 +17,253 @@ Download the [latest release binary](https://github.com/dremio/dremio-diagnostic
 2. Open a terminal and change to the directory where you unzipped your binary
 3. Run the command `./ddc help`. If you see the DDC command help, you are good to go.
 
-### Guided Collection
+### Architecture Overview
+
+DDC collects diagnostics from Dremio clusters using a **streaming transport** — files are transferred directly from each node to your local machine through a pipe, with no intermediate staging on the remote node.
+
+- **Kubernetes**: DDC uses the Kubernetes API to stream file contents from each pod via `cat`.
+- **SSH**: DDC opens an SSH session to each node and streams file contents via `cat` over the SSH channel.
+- **Local**: DDC collects diagnostics directly on the current host (no remote transport). Useful for standalone Dremio installations.
+
+**Remote JVM collection**: JVM diagnostics (jcmd for JFR, jstack for thread dumps, top for process snapshots) are executed remotely on each Dremio node. Async-profiler is streamed as a binary to the remote node via stdin and executed in place. All results are streamed back — no binaries are left behind.
+
+### Command Structure
+
+DDC v4 uses a subcommand-based CLI:
+
+```
+ddc collect <transport> <mode> [flags]
+```
+
+Where `<transport>` is `k8s`, `ssh`, or `local`, and `<mode>` is `standard` or `diagnosis`.
+
+### Collection Modes
+
+| Mode | Purpose | Default behavior |
+|------|---------|-----------------|
+| `diagnosis` | Active incident investigation | Full diagnostics: JFR, jstack, top, async-profiler, all logs, GC logs, heap monitor analysis. Parallel collection. |
+| `standard` | Routine collection / performance review | Lightweight: server logs (1 day), queries.json (30 days), config. Sequential. |
+
+All settings are configured via CLI flags. There is no `ddc.yaml` configuration file.
+
+### Guided Collection (Interactive TUI)
 
 ```bash
 ddc
 ```
-#### select transport
-```bash
- ? select transport for file transfers: 
-  ▸ kubernetes
-    ssh
-```
 
-#### select namespace for k8s
-```bash
-✔ kubernetes
-Use the arrow keys to navigate: ↓ ↑ → ← 
-? The following k8s namespaces have dremio clusters. Select the one you want to collect from: 
-  ▸ default
-    ns1
-```
-
-#### select collection type
-```bash
-✔ kubernetes
-✔ default
-Use the arrow keys to navigate: ↓ ↑ → ← 
-? Collection Type: light (2 days logs), standard (7 days logs + 30 days queries.json), standard+jstack (standard w jstack), health-check (needs PAT): 
-  ▸ light
-    standard
-    standard+jstack
-    health-check
-```
-#### enjoy progress
-```bash
-=================================
-== Dremio Diagnostic Collector ==
-=================================
-Wed, 12 Mar 2025 14:20:54 CET
-
-Version              : ddc v3.3.1-d5a0c02
-Yaml                 : /opt/homebrew/Cellar/ddc/3.3.1/libexec/ddc.yaml
-Log File             : /opt/homebrew/Cellar/ddc/3.3.1/libexec/ddc.log
-Collection Type      : Kubectl - context used: default
-Collections Enabled  : disk-usage,dremio-configuration,gc-logs,jfr,jvm-flags,meta-refresh-log,os-config,queries-json,reflection-log,server-logs,ttop,vacuum-log
-Collections Disabled : acceleration-log,access-log,audit-log,job-profiles,jstack,kvstore-report,system-tables-export,wlm
-Collection Mode      : STANDARD
-Collection Args      : namespace: 'default', label selector: 'role=dremio-cluster-pod'
-Dremio PAT Set       : No (disables Job Profiles, WLM, KV Store and System Table Reports use --collect health-check if you want these)
-Autodetect Enabled   : Yes
-
--- status --
-Transfers Complete   : 0/1
-Collect Duration     : elapsed 17 seconds
-Tarball              : 
-Result               : 
-
--- Warnings --
-
-
-
-Kubernetes:
------------
-Last file collected   : pod dremio-master-0 logs
-files collected       : 23
-
-Nodes:
-------
-1. node dremio-master-0 - elapsed 8 secs - status COPY DDC TO HOST 
-```
+The interactive TUI guides you through transport selection (Kubernetes, SSH, or Local), collection mode, path configuration, and collection toggles.
 
 ### Scripting - Dremio on Kubernetes
 
-DDC connects via SSH or the kubernetes API and collects a series of logs and files for Dremio, then puts those collected files in an archive
+DDC connects via the Kubernetes API and streams logs and files from each Dremio pod, then archives the results locally.
 
-For Kubernetes deployments _(Relies on a kubernetes configuration file to be at $HOME/.kube/config or at $KUBECONFIG)_:
+For Kubernetes deployments _(relies on a kubeconfig at `$HOME/.kube/config` or `$KUBECONFIG`)_:
 
-##### default collection
+##### standard collection
 ```bash
-ddc --namespace mynamespace
-```
-      
-##### to collect job profiles, system tables, kv reports and wlm (via REST API)
-_Requires Dremio admin privileges. Dremio PATs can be enabled by the support key `auth.personal-access-tokens.enabled`_
-```bash
-ddc  -n mynamespace  --collect health-check
+ddc collect k8s standard --namespace mynamespace
 ```
 
-### Scripting - Dremio on-prem
+##### diagnosis collection
+```bash
+ddc collect k8s diagnosis --namespace mynamespace
+```
 
-Specify executors that you want include in diagnostic collection with the `-e` flag and coordinators with the `-c` flag. Specify SSH user, and SSH key to use.
+##### diagnosis with API-based collection (job profiles, system tables, WLM, KV store)
+_Requires Dremio admin privileges. Set `DDC_PAT_TOKEN` env var or use `--dremio-pat-token`._
+```bash
+export DDC_PAT_TOKEN="your-token-here"
+ddc collect k8s diagnosis --namespace mynamespace --dremio-pat-token "$DDC_PAT_TOKEN"
+```
 
-For SSH based communication to VMs or Bare Metal hardware:
+##### standard with system tables
+```bash
+ddc collect k8s standard --namespace mynamespace --dremio-pat-token "$DDC_PAT_TOKEN"
+```
+
+### Scripting - Dremio on-prem (SSH)
+
+Specify executors with the `-e` flag and coordinators with the `-c` flag. Specify SSH user and SSH key.
 
 ##### coordinator only
-
 ```bash
-ddc --coordinator 10.0.0.19 --ssh-user myuser 
-```    
+ddc collect ssh standard --coordinator 10.0.0.19 --ssh-user myuser
+```
+
 ##### coordinator and executors
-        
 ```bash
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
+ddc collect ssh standard --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser
 ```
 
-##### to collect job profiles, system tables, kv reports and wlm (via REST API)
-_Requires Dremio admin privileges. Dremio PATs can be enabled by the support key `auth.personal-access-tokens.enabled`_
+##### diagnosis with API collection
+_Requires Dremio admin privileges._
 ```bash
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --sudo-user dremio --ssh-user myuser --collect health-check
-```    
-    
-##### to avoid using the /tmp folder on nodes
-
-```bash
-ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --sudo-user dremio --ssh-user myuser --transfer-dir /mnt/lots_of_storage/ --output-file /path/to/final/diag.tgz
+ddc collect ssh diagnosis --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --sudo-user dremio --ssh-user myuser --dremio-pat-token "$DDC_PAT_TOKEN"
 ```
 
-### Dremio AWSE
+### Scripting - Local Collection
 
-Log-only collection from a Dremio AWSE coordinator is possible via the following command. This will produce a tarball with logs from all nodes.
+Collect diagnostics directly on the Dremio host (no SSH or Kubernetes required):
 
 ```bash
-./ddc awselogs
+ddc collect local standard
+ddc collect local diagnosis --days 5
 ```
 
-### REST-API-only collection (works for all Dremio Software variants)
-To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
-```yaml
-is-rest-collect: true
-rest-collect-daily-jobs-limit: 100000 # Optional; Used to prevent reading from large sys.jobs_recent table
-dremio-endpoint: "<DREMIO_ENDPOINT>"
-dremio-pat-token: "<DREMIO_PAT>"
-tarball-out-dir: /full/path/to/local/dir  # Specify local target directory
-```
-and run `./ddc local-collect` from your local machine
+### Date-Range Filtering (Diagnosis Mode)
 
-### Dremio Cloud
-To collect job profiles, system tables, and wlm via REST API, specify the following parameters in `ddc.yaml`
-```yaml
-is-dremio-cloud: true
-dremio-endpoint: "[eu.]dremio.cloud"    # Specify whether EU Dremio Cloud or not
-dremio-cloud-project-id: "<PROJECT_ID>"
-dremio-pat-token: "<DREMIO_PAT>"
-tarball-out-dir: /full/path/to/dir      # Specify local target directory
+In diagnosis mode, `--days` or `--date-start`/`--date-end` control which log files are collected across all log types.
+
+```bash
+# Collect last 5 days
+ddc collect k8s diagnosis --namespace mynamespace --days 5
+
+# Collect a specific time window
+ddc collect ssh diagnosis --coordinator 10.0.0.19 --ssh-user myuser --date-start 2026-03-20T10:00:00 --date-end 2026-03-22T18:00:00
 ```
-and run `./ddc local-collect` from your local machine
 
 ### Windows Users
 
-If you are running DDC from Windows, always run in a shell from the `C:` drive prompt. 
-This is because of a limitation of kubectl ( see https://github.com/kubernetes/kubernetes/issues/77310 )
+If you are running DDC from Windows, always run in a shell from the `C:` drive prompt.
+This is because of a limitation of kubectl (see https://github.com/kubernetes/kubernetes/issues/77310).
 
-### ddc.yaml
+### Key CLI Flags
 
-The `ddc.yaml` file is located next to your DDC binary and can be edited to fit your environment. The [default-ddc.yaml](default-ddc.yaml) documents the full list of available parameters.
+These flags apply to `ddc collect <transport> <mode>` (non-interactive mode). In interactive mode (`ddc` with no subcommand), most settings are prompted.
 
+#### Transport Flags
+
+**SSH** (`ddc collect ssh ...`):
+
+| Flag | Description |
+|------|-------------|
+| `-c, --coordinator` | Coordinator IP(s), comma-separated |
+| `-e, --executors` | Executor IP(s), comma-separated |
+| `-s, --ssh-key` | SSH private key file path |
+| `-u, --ssh-user` | SSH user for login |
+| `-b, --sudo-user` | Sudo user for privileged commands (e.g. jcmd) |
+| `--ssh-strict-host-keys` | Enable strict host key checking (default: false) |
+
+**Kubernetes** (`ddc collect k8s ...`):
+
+| Flag | Description |
+|------|-------------|
+| `-n, --namespace` | K8s namespace |
+| `-x, --context` | K8s context to use |
+| `-l, --label-selector` | K8s label selector (default: `role=dremio-cluster-pod`) |
+| `-d, --enable-kubectl` | Use kubectl CLI instead of embedded K8s API client |
+| `--collect-container-logs` | Collect K8s container logs (default: enabled for diagnosis) |
+| `--nodes` | Collect from specific nodes only (comma-separated) |
+| `--exclude-nodes` | Exclude specific nodes (comma-separated) |
+
+**Local** (`ddc collect local ...`):
+
+| Flag | Description |
+|------|-------------|
+| `--dremio-home` | Dremio installation directory (default: `/opt/dremio`) |
+| `--local-log-dir` | Log directory on this node (autodetected if not specified) |
+
+#### Authentication
+| Flag | Description |
+|------|-------------|
+| `--dremio-pat-token` | Dremio PAT token (env: `DDC_PAT_TOKEN`) |
+| `-t, --pat-prompt` | Prompt for PAT token interactively |
+| `--allow-insecure-ssl` | Allow insecure SSL connections (default: true) |
+| `--dremio-endpoint` | Dremio REST API endpoint |
+
+#### Date Range (Diagnosis Only)
+| Flag | Description |
+|------|-------------|
+| `--days` | Number of days to collect (applies to all log types) |
+| `--date-start` | Start of date range (ISO 8601, e.g. `2026-03-20T10:00:00`) |
+| `--date-end` | End of date range (defaults to now if `--date-start` is set) |
+
+#### Diagnostic Tool Toggles (Diagnosis Only)
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--diag-jfr` | true | Collect Java Flight Recorder recording |
+| `--diag-jstack` | true | Collect jstack thread dumps |
+| `--diag-top` | true | Collect top process snapshots |
+| `--diag-async-profiler` | true | Collect async-profiler recording |
+| `--diag-heap-dump` | false | Collect heap dump |
+| `--diag-time-seconds` | 60 | Duration in seconds for all diagnostic tools |
+
+#### Log Collection Toggles
+| Flag | Default (diagnosis) | Default (standard) |
+|------|--------------------|--------------------|
+| `--collect-server-logs` | true | true |
+| `--collect-queries-json` | true | true |
+| `--collect-gc-logs` | true | N/A |
+| `--collect-tracker-json` | false | true |
+| `--collect-vacuum-log` | false | true |
+| `--collect-acceleration-log` | false | N/A |
+| `--collect-access-log` | false | N/A |
+| `--collect-hs-err-files` | true | N/A |
+
+#### Per-Log Day Counts (Standard Mode Only)
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--server-logs-num-days` | 1 | Days of server logs to collect |
+| `--tracker-json-num-days` | 1 | Days of tracker.json to collect |
+| `--vacuum-log-num-days` | 1 | Days of vacuum.json to collect |
+| `--dremio-queries-json-num-days` | 30 | Days of queries.json to collect |
+
+#### API Collection (Requires PAT)
+| Flag | Default (diagnosis) | Default (standard) |
+|------|--------------------|--------------------|
+| `--collect-wlm` | true | true |
+| `--collect-kvstore-report` | false | false |
+| `--collect-problematic-profiles` | true | N/A |
+| `--system-tables` | full list | full list |
+
+#### Directory Overrides
+| Flag | Description |
+|------|-------------|
+| `--coordinator-log-dir` | Coordinator log directory (autodetected if not set) |
+| `--executor-log-dir` | Executor log directory (autodetected if not set) |
+| `--dremio-conf-dir` | Dremio configuration directory (autodetected if not set) |
+| `--dremio-rocksdb-dir` | Dremio RocksDB directory (autodetected if not set) |
+
+#### Control
+| Flag | Description |
+|------|-------------|
+| `--output-file` | Name and location of the diagnostic tarball |
+| `--collection-threads` | Concurrent node collection (0 = mode default: 20 diagnosis, 5 standard) |
+| `--collector-timeout` | Per-collector timeout (default: 20m diagnosis, 10m standard) |
+| `--progress=json` | Machine-readable NDJSON progress output for CI/CD |
+| `--skip-version-check` | Skip update check at startup |
+| `--disable-free-space-check` | Skip disk space check |
 
 ### ddc usage
 
-```bash
-ddc v3.2.5
- ddc connects via ssh or kubectl and collects a series of logs and files for dremio, then puts those collected files in an archive
+```
+ddc connects via ssh, kubectl, or locally and collects a series of logs and files
+for dremio, then puts those collected files in an archive
+
 examples:
 
-for a ui prompt just run:
+for interactive mode just run:
         ddc
 
-for ssh based communication to VMs or Bare metal hardware:
-
-        ddc --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio
+for non-interactive collection use the collect subcommand with a transport:
 
 for kubernetes deployments:
+        ddc collect k8s standard --namespace mynamespace
+        ddc collect k8s diagnosis --namespace mynamespace --dremio-pat-token $DDC_PAT_TOKEN
 
-        # run against a specific namespace and retrieve 2 days of logs
-        ddc --namespace mynamespace
+for ssh based communication to VMs or bare metal hardware:
+        ddc collect ssh standard --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio
 
-        # run against a specific namespace with a standard collection (includes jfr, top and 30 days of queries.json logs)
-        ddc --namespace mynamespace     --collect standard
-
-        # run against a specific namespace with a Health Check (runs 2 threads and includes everything in a standard collection plus collect 25,000 job profiles, system tables, kv reports and Work Load Manager (WLM) reports)
-        ddc --namespace mynamespace     --collect health-check
+for local collection on the Dremio host:
+        ddc collect local standard
 
 Usage:
   ddc [flags]
   ddc [command]
 
 Available Commands:
-  awselogs      Log only collect of AWSE from the coordinator node
-  completion    Generate the autocompletion script for the specified shell
-  help          Help about any command
-  local-collect Retrieves all the dremio logs and diagnostics for the local node and saves the results in a compatible format for Dremio support
-  version       Print the version number of DDC
-
-Flags:
-  -z, --archive-size-limit-mb int   maximum size in MB for each archive file before splitting into multiple files (default 256)
-      --collect string              type of collection: 'light'- 2 days of logs (no top or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 10,000 Job Profiles, 'waf' same as light, then 3 days of logs and queries.json, with 25,000 job profiles (default "light")
-      --collection-threads int      number of threads to collect from nodes simultaneously (0 = unlimited)
-  -x, --context string              K8S ONLY: context to use for kubernetes pods
-  -c, --coordinator string          SSH ONLY: set a list of ip addresses separated by commas
-      --ddc-yaml string             location of ddc.yaml that will be transferred to remote nodes for collection configuration (default "/Users/mc/Support/dremio-diagnostic-collector/bin/ddc.yaml")
-      --detect-namespace            detect namespace feature to pass the namespace automatically
-  -a, --disable-archive-splitting   disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)
-      --disable-free-space-check    disables the free space check for the --transfer-dir
-  -d, --disable-kubectl             uses the embedded k8s api client and skips the use of kubectl for transfers and copying
-      --disable-prompt              disables the prompt ui
-  -e, --executors string            SSH ONLY: set a list of ip addresses separated by commas
-  -h, --help                        help for ddc
-  -l, --label-selector string       K8S ONLY: select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors (default "role=dremio-cluster-pod")
-      --min-free-space-gb uint      min free space needed in GB for the process to run (default 5GB light collect, 25GB for standard and standard+jstack, 40GB for health-check and WAF)
-  -n, --namespace string            K8S ONLY: namespace to use for kubernetes pods
-      --no-log-dir                  when enabled then the process will not fail if the log directory is invalid. This is useful if one just wants to collect kubernetes log output and diagnostics information
-      --output-file string          name and location of diagnostic tarball (default "diag.tgz")
-  -t, --pat-prompt                  prompt for the pat, which will enable collection of kv report, system tables, job profiles and the workload manager report
-  -s, --ssh-key string              SSH ONLY: of ssh key to use to login
-  -u, --ssh-user string             SSH ONLY: user to use during ssh operations to login
-  -b, --sudo-user string            SSH ONLY: if any diagnostics commands need a sudo user (i.e. for jcmd)
-      --transfer-dir string         directory to use for communication between the local-collect command and this one (default "/tmp/ddc-20251231125859")
-      --transfer-threads int        number of threads to transfer tarballs (default 2)
-
-Use "ddc [command] --help" for more information about a command.
-
-Usage:
-  ddc local-collect [flags]
-
-Flags:
-      --allow-insecure-ssl          When true allow insecure ssl certs when doing API calls
-  -z, --archive-size-limit-mb int   maximum size in MB for each archive file before splitting into multiple files (default 256)
-      --collect string              type of collection: 'light'- 2 days of logs (no top, jstack or jfr). 'standard' - includes jfr, top, 7 days of logs and 30 days of queries.json logs. 'standard+jstack' - all of 'standard' plus jstack. 'health-check' - all of 'standard' + WLM, KV Store Report, 25,000 Job Profiles (default "light")
-      --ddc-yaml string             location of ddc.yaml that will be transferred to remote nodes for collection configuration (default "/Users/mc/Support/dremio-diagnostic-collector/bin/ddc.yaml")
-  -a, --disable-archive-splitting   disable splitting archives when they exceed the size limit (when enabled, creates single archive regardless of size)
-      --disable-free-space-check    disables the free space check for the --tarball-out-dir
-      --dremio-pat-token string     Dremio Personal Access Token (PAT) (default "\t")
-  -h, --help                        help for local-collect
-      --is-master                   force node to be treated as a master coordinator, skipping automatic detection (useful for AWSE versions of Dremio)
-      --no-log-dir                  when enabled then the process will not fail if the log directory is invalid. This is useful if one just wants to collect kubernetes log output and diagnostics information
-      --pat-stdin                   allows one to pipe the pat to standard in
-      --tarball-out-dir string      directory where the final <hostname>.tar.gz file is placed. This is also the location where final archive will be output for pickup by the ddc command (default "/tmp/ddc")
-  -v, --verbose count               Logging verbosity
+  collect     Run non-interactive collection with provided flags
+  version     Print the version number of DDC
+  help        Help about any command
 ```

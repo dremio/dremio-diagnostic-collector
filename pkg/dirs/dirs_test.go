@@ -21,7 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/dirs"
 )
 
 func TestCheckDirectoryFull(t *testing.T) {
@@ -65,40 +66,32 @@ func TestFormatFreeSpaceError(t *testing.T) {
 		name           string
 		isNonDefault   bool
 		baseErr        error
-		collectionMode string
-		fallbackMode   string
+		collectionMode collects.CollectionMode
+		fallbackMode   collects.CollectionMode
 		expectedMsg    string
 	}{
 		{
 			name:           "Same mode",
 			isNonDefault:   false,
-			baseErr:        errors.New("there are only 3.50 GB free on /tmp and 5 GB is the minimum"),
-			collectionMode: "light",
-			fallbackMode:   "light",
-			expectedMsg:    "there are only 3.50 GB free on /tmp and 5 GB is the minimum",
-		},
-		{
-			name:           "Higher mode with fallback suggestion",
-			isNonDefault:   false,
-			baseErr:        errors.New("there are only 10.75 GB free on /tmp and 25 GB is the minimum"),
+			baseErr:        errors.New("there are only 3.50 GB free on /tmp and 25 GB is the minimum"),
 			collectionMode: "standard",
-			fallbackMode:   "light",
-			expectedMsg:    "there are only 10.75 GB free on /tmp and 25 GB is the minimum for standard mode, try light mode instead",
+			fallbackMode:   "standard",
+			expectedMsg:    "there are only 3.50 GB free on /tmp and 25 GB is the minimum",
 		},
 		{
-			name:           "Health check with fallback",
+			name:           "Diagnosis mode with fallback suggestion",
 			isNonDefault:   false,
 			baseErr:        errors.New("there are only 15.25 GB free on /tmp and 40 GB is the minimum"),
-			collectionMode: "health-check",
-			fallbackMode:   "light",
-			expectedMsg:    "there are only 15.25 GB free on /tmp and 40 GB is the minimum for health-check mode, try light mode instead",
+			collectionMode: "diagnosis",
+			fallbackMode:   "standard",
+			expectedMsg:    "there are only 15.25 GB free on /tmp and 40 GB is the minimum for diagnosis mode, try standard mode instead",
 		},
 		{
-			name:           "Health check custom size",
+			name:           "Diagnosis custom size",
 			isNonDefault:   true,
 			baseErr:        errors.New("there are only 15.25 GB free on /tmp and 40 GB is the minimum"),
-			collectionMode: "health-check",
-			fallbackMode:   "light",
+			collectionMode: "diagnosis",
+			fallbackMode:   "standard",
 			expectedMsg:    "there are only 15.25 GB free on /tmp and 40 GB is the minimum",
 		},
 	}

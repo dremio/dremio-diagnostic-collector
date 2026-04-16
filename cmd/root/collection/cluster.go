@@ -25,10 +25,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/helpers"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sapi "k8s.io/client-go/kubernetes"
@@ -37,16 +38,17 @@ import (
 var clusterRequestTimeout = 120
 
 func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
-	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "events", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc"}
+	cmds := []string{"nodes", "sc", "pvc", "pv", "service", "endpoints", "pods", "deployments", "statefulsets", "daemonset", "replicaset", "cronjob", "job", "ingress", "limitrange", "resourcequota", "hpa", "pdb", "pc", "events"}
 	path, err := cs.CreatePath("kubernetes", "", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster config path %v with error %v", path, err)
 		return err
 	}
 
-	// everything else
-	for _, cmd := range cmds {
+	// Collect each K8s resource type.
+	for i, cmd := range cmds {
 		resource := cmd
+		consoleprint.UpdateResult(fmt.Sprintf("Collecting K8s resources (%d/%d): %s...", i+1, len(cmds), resource))
 		out, err := clusterExecuteBytes(hook, namespace, c, resource)
 		if err != nil {
 			simplelog.Errorf("when getting cluster config, error was %v", err)
@@ -67,7 +69,63 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 	return nil
 }
 
-func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
+// GetPreviousLogsForRestartedPods collects previous container logs for pods that have restarted.
+// This runs unconditionally (not gated by --collect-container-logs) so that restart evidence is always captured.
+func GetPreviousLogsForRestartedPods(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, labelSelector string) error {
+	path, err := cs.CreatePath("kubernetes", "container-logs", "")
+	if err != nil {
+		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
+		return err
+	}
+
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 60*time.Second, errors.New("timeout while retrieving pods for previous logs"))
+	defer cancel()
+	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	if pods == nil {
+		return nil
+	}
+	for i, podObj := range pods.Items {
+		if !podHasRestarts(podObj) {
+			continue
+		}
+		consoleprint.UpdateResult(fmt.Sprintf("Collecting previous logs for restarted pods (%d/%d): %s...", i+1, len(pods.Items), podObj.Name))
+		savePreviousLogsFromPod(podObj, hook, cs, ddfs, namespace, clientSet, path)
+	}
+	return nil
+}
+
+func podHasRestarts(pod corev1.Pod) bool {
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.RestartCount > 0 {
+			return true
+		}
+	}
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.RestartCount > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func savePreviousLogsFromPod(podObj corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace string, c *k8sapi.Clientset, path string) {
+	podName := podObj.Name
+	var containers []string
+	for _, c := range podObj.Spec.Containers {
+		containers = append(containers, c.Name)
+	}
+	for _, c := range podObj.Spec.InitContainers {
+		containers = append(containers, c.Name)
+	}
+	for _, container := range containers {
+		copyContainerLog(hook, cs, ddfs, container, namespace, c, path, podName, true)
+	}
+}
+
+func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, labelSelector string) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -76,12 +134,19 @@ func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sap
 
 	ctx, cancel := context.WithTimeoutCause(context.Background(), 60*time.Second, errors.New("timeout while retrieving pods"))
 	defer cancel()
-	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return err
+	}
+	if pods == nil {
+		return nil
+	}
 	// Loop over pods
-	for _, podObj := range pods.Items {
+	for i, podObj := range pods.Items {
+		consoleprint.UpdateResult(fmt.Sprintf("Collecting K8s container logs (%d/%d): %s...", i+1, len(pods.Items), podObj.Name))
 		saveLogsFromPod(podObj, hook, cs, ddfs, namespace, clientSet, path)
 	}
-	return err
+	return nil
 }
 
 func saveLogsFromPod(podObj corev1.Pod, hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Filesystem, namespace string, c *k8sapi.Clientset, path string) {
@@ -118,10 +183,10 @@ func copyContainerLog(hook shutdown.CancelHook, cs CopyStrategy, ddfs helpers.Fi
 			simplelog.Errorf("%v", context.Cause(ctx))
 		default:
 			simplelog.Errorf("trying to get log from pod: %v container: %v with error: %v", pod, container, err)
-			return
 		}
+		return
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, r)

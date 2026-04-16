@@ -20,14 +20,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/masking"
 )
 
 func TestConfig_WhenRemoveSecretsFromDremioConfAndConfIsNotFound(t *testing.T) {
 	// It("should throw an error if the provided file is not a dremio.conf", func() {
 	err := masking.RemoveSecretsFromDremioConf("testdata/myFile.txt")
 	if err == nil {
-		t.Errorf("we expected an error but there was not one")
+		t.Fatal("we expected an error but there was not one")
 	}
 	if !strings.Contains(err.Error(), "expected file with name 'dremio.conf', got ") {
 		t.Errorf("should be 'expected file with name 'dremio.conf'' in string '%v' but there was not", err.Error())

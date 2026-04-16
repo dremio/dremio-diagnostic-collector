@@ -18,8 +18,8 @@ package main
 import (
 	"os"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
 )
 
 func main() {

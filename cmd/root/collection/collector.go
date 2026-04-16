@@ -17,26 +17,21 @@ package collection
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/ddcbinary"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/helpers"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/clusterstats"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/clusterstats"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 var DirPerms fs.FileMode = 0o750
@@ -48,7 +43,6 @@ type CopyStrategy interface {
 }
 
 type Collector interface {
-	CopyFromHost(hostString string, source, destination string) (out string, err error)
 	CopyToHost(hostString string, source, destination string) (out string, err error)
 	GetCoordinators() (podName []string, err error)
 	GetExecutors() (podName []string, err error)
@@ -56,41 +50,86 @@ type Collector interface {
 	HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) error
 	HelpText() string
 	Name() string
+	// Protocol returns the transport protocol in use, e.g. "WebSocket", "SPDY", "SSH", "Local".
+	Protocol() string
 	SetHostPid(host, pidFile string)
 	CleanupRemote() error
+	// StreamFromHost streams the raw bytes of a remote file to writer.
+	// When useGzip is true the remote command uses "gzip -c" instead of "cat"
+	// so the stream arrives compressed; the caller is responsible for decompression.
+	// Implementations must preserve binary integrity (no line splitting or encoding).
+	StreamFromHost(host, remotePath string, writer io.Writer, useGzip bool) error
+	// DiscoverFiles runs lightweight shell commands on a remote host to enumerate
+	// log files, config files, GC logs, and the Dremio PID. Individual command
+	// failures are logged as warnings — partial results are always returned.
+	// When logDir or confDir are non-empty, they override probing for that path.
+	DiscoverFiles(host, logDir, confDir string) (*RemoteNodeInfo, error)
 }
 
 type Args struct {
-	DDCfs                   helpers.Filesystem
-	OutputLoc               string
-	CopyStrategy            CopyStrategy
-	DremioPAT               string
-	TransferDir             string
-	DDCYamlLoc              string
-	Disabled                []string
-	Enabled                 []string
-	DisableFreeSpaceCheck   bool
-	MinFreeSpaceGB          uint64
-	CollectionMode          string
-	TransferThreads         int
-	CollectionThreads       int
-	NoLogDir                bool
-	ArchiveSizeLimitMB      int
-	DisableArchiveSplitting bool
-}
+	DDCfs                 helpers.Filesystem
+	OutputLoc             string
+	CopyStrategy          CopyStrategy
+	DremioPAT             string
+	Disabled              []string
+	Enabled               []string
+	DisableFreeSpaceCheck bool
+	CollectionMode        collects.CollectionMode
+	CollectionThreads     int
+	CoordinatorLogDir     string
+	ExecutorLogDir        string
+	DremioConfDir         string
+	DremioRocksDBDir      string
 
-type HostCaptureConfiguration struct {
-	IsCoordinator           bool
-	Collector               Collector
-	Host                    string
-	CopyStrategy            CopyStrategy
-	DDCfs                   helpers.Filesystem
-	DremioPAT               string
-	TransferDir             string
-	CollectionMode          string
-	NoLogDir                bool
-	ArchiveSizeLimitMB      int
-	DisableArchiveSplitting bool
+	// Per-log day counts (standard mode)
+	ServerLogsNumDays  int
+	TrackerJSONNumDays int
+	VacuumLogNumDays   int
+	QueriesJSONNumDays int
+
+	// queries-perf collection
+	CollectQueriesPerf bool
+	QueriesPerfNumDays int
+
+	// Diagnosis mode: unified day limit for all log types (from --days)
+	DiagLogDays int
+
+	// Start date (diagnosis mode, date-only format 2006-01-02)
+	StartDate string
+
+	// JVM collection (diagnosis mode)
+	CollectJStack        bool
+	CollectTop           bool
+	CollectJVMFlags      bool
+	CollectJFR           bool
+	CollectHeapDump      bool
+	CollectAsyncProfiler bool
+	DiagTimeSeconds      int
+
+	// Node filtering (diagnosis mode node selection or --nodes/--exclude-nodes flags)
+	IncludeNodes []string // if non-empty, only collect from these nodes
+	ExcludeNodes []string // if non-empty, skip these nodes
+
+	// File collection gating
+	CollectGCLogs          bool
+	CollectServerLogs      bool
+	CollectQueriesJSON     bool
+	CollectTrackerJSON     bool
+	CollectVacuumLog       bool
+	CollectAccelerationLog bool
+	CollectAccessLog       bool
+	CollectHSErrFiles      bool
+	CollectHiveDeprecated  bool
+
+	// API collections (run from orchestrator)
+	DremioEndpoint             string
+	AllowInsecureSSL           bool
+	RestHTTPTimeout            int
+	CollectWLM                 bool
+	CollectKVStoreReport       bool
+	CollectProblematicProfiles bool
+	CollectSystemTables        bool
+	SystemTables               []string
 }
 
 func FilterCoordinators(coordinators []string) []string {
@@ -144,286 +183,41 @@ func FilterExecutors(executors []string, coordinators []string) []string {
 	return result
 }
 
+// FilterByNodeSelection applies include/exclude node filters to a node list.
+// If includeNodes is non-empty, only nodes in that list are kept.
+// If excludeNodes is non-empty, nodes in that list are removed.
+func FilterByNodeSelection(nodes, includeNodes, excludeNodes []string) []string {
+	if len(includeNodes) == 0 && len(excludeNodes) == 0 {
+		return nodes
+	}
+	if len(includeNodes) > 0 {
+		include := make(map[string]bool, len(includeNodes))
+		for _, n := range includeNodes {
+			include[n] = true
+		}
+		var result []string
+		for _, n := range nodes {
+			if include[n] {
+				result = append(result, n)
+			}
+		}
+		return result
+	}
+	exclude := make(map[string]bool, len(excludeNodes))
+	for _, n := range excludeNodes {
+		exclude[n] = true
+	}
+	var result []string
+	for _, n := range nodes {
+		if !exclude[n] {
+			result = append(result, n)
+		}
+	}
+	return result
+}
+
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection func()) error {
-	start := time.Now().UTC()
-	outputLoc := collectionArgs.OutputLoc
-	outputLocDir := filepath.Dir(outputLoc)
-	ddcfs := collectionArgs.DDCfs
-	dremioPAT := collectionArgs.DremioPAT
-	transferDir := collectionArgs.TransferDir
-	ddcYamlFilePath := collectionArgs.DDCYamlLoc
-	disableFreeSpaceCheck := collectionArgs.DisableFreeSpaceCheck
-	minFreeSpaceGB := collectionArgs.MinFreeSpaceGB
-	collectionMode := collectionArgs.CollectionMode
-	transferThreads := collectionArgs.TransferThreads
-	collectionThreads := collectionArgs.CollectionThreads
-	noLogDir := collectionArgs.NoLogDir
-	archiveSizeLimitMB := collectionArgs.ArchiveSizeLimitMB
-	disableArchiveSplitting := collectionArgs.DisableArchiveSplitting
-	var err error
-	tmpInstallDir := filepath.Join(outputLocDir, fmt.Sprintf("ddcex-output-%v", time.Now().Unix()))
-	err = os.MkdirAll(tmpInstallDir, 0o700)
-	if err != nil {
-		return err
-	}
-	hook.AddFinalSteps(func() {
-		if err := os.RemoveAll(tmpInstallDir); err != nil {
-			simplelog.Warningf("unable to cleanup temp install directory: '%v'", err)
-		}
-	}, "cleaning temp install dir")
-	ddcFilePath, err := ddcbinary.WriteOutDDC(tmpInstallDir)
-	if err != nil {
-		return fmt.Errorf("making ddc binary failed: %w", err)
-	}
-
-	coordinators, err := c.GetCoordinators()
-	if err != nil {
-		return err
-	}
-
-	executorsRaw, err := c.GetExecutors()
-	if err != nil {
-		return err
-	}
-	executors := FilterExecutors(executorsRaw, coordinators)
-
-	totalNodes := len(executors) + len(coordinators)
-	if totalNodes == 0 {
-		return fmt.Errorf("no hosts found nothing to collect: %v", c.HelpText())
-	}
-
-	var tarballs []string
-	var files []helpers.CollectedFile
-	var totalFailedFiles []string
-	var totalSkippedFiles []string
-	var totalFailedNodes []string
-	var nodesConnectedTo int
-	var m sync.Mutex
-	// block until transfers are commplete
-	var transferWg sync.WaitGroup
-	// cap at transfer threads
-	sem := make(chan struct{}, transferThreads)
-	// cap at collection threads too
-	var collectionSem chan struct{}
-	if collectionThreads > 0 {
-		collectionSem = make(chan struct{}, collectionThreads)
-	}
-	// wait group for the per node capture
-	var wg sync.WaitGroup
-	consoleprint.UpdateRuntime(
-		versions.GetCLIVersion(),
-		simplelog.GetLogLoc(),
-		0,
-		len(coordinators)+len(executors),
-	)
-	hook.AddCancelOnlyTasks(func() {
-		err := c.CleanupRemote()
-		if err != nil {
-			simplelog.Errorf("error during cleanup %v", err)
-		}
-	}, "killing ddc local-collect processes")
-	for _, coordinator := range coordinators {
-		nodesConnectedTo++
-		wg.Add(1)
-		go func(host string) {
-			defer wg.Done()
-			coordinatorCaptureConf := HostCaptureConfiguration{
-				Collector:               c,
-				IsCoordinator:           true,
-				Host:                    host,
-				CopyStrategy:            s,
-				DDCfs:                   ddcfs,
-				TransferDir:             transferDir,
-				DremioPAT:               dremioPAT,
-				CollectionMode:          collectionMode,
-				NoLogDir:                noLogDir,
-				ArchiveSizeLimitMB:      archiveSizeLimitMB,
-				DisableArchiveSplitting: disableArchiveSplitting,
-			}
-			// we want to be able to capture the job profiles of all the nodes
-			skipRESTCalls := false
-			err := StartCapture(coordinatorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
-			if err != nil {
-				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
-				m.Lock()
-				totalFailedNodes = append(totalFailedNodes, host)
-				m.Unlock()
-				return
-			}
-			sem <- struct{}{}
-			transferWg.Add(1)
-			go func() {
-				defer transferWg.Done()
-				size, f, err := TransferCapture(coordinatorCaptureConf, hook, s.GetTmpDir())
-				if err != nil {
-					m.Lock()
-					totalFailedFiles = append(totalFailedFiles, f)
-					m.Unlock()
-				} else {
-					m.Lock()
-					tarballs = append(tarballs, f)
-					files = append(files, helpers.CollectedFile{
-						Path: f,
-						Size: size,
-					})
-					m.Unlock()
-				}
-				<-sem
-			}()
-		}(coordinator)
-	}
-
-	for _, executor := range executors {
-		nodesConnectedTo++
-		wg.Add(1)
-		if collectionSem != nil {
-			collectionSem <- struct{}{} // acquire semaphore only if limited
-		}
-		go func(host string) {
-			defer wg.Done()
-			if collectionSem != nil {
-				defer func() { <-collectionSem }() // release semaphore only if limited
-			}
-			executorCaptureConf := HostCaptureConfiguration{
-				Collector:               c,
-				IsCoordinator:           false,
-				Host:                    host,
-				CopyStrategy:            s,
-				DDCfs:                   ddcfs,
-				TransferDir:             transferDir,
-				CollectionMode:          collectionMode,
-				NoLogDir:                noLogDir,
-				ArchiveSizeLimitMB:      archiveSizeLimitMB,
-				DisableArchiveSplitting: disableArchiveSplitting,
-			}
-			// always skip executor calls
-			skipRESTCalls := true
-			err := StartCapture(executorCaptureConf, ddcFilePath, ddcYamlFilePath, skipRESTCalls, disableFreeSpaceCheck, minFreeSpaceGB)
-			if err != nil {
-				simplelog.Errorf("failed generating tarball for host %v: %v", host, err)
-				m.Lock()
-				totalFailedNodes = append(totalFailedNodes, host)
-				m.Unlock()
-				return
-			}
-			sem <- struct{}{}
-			transferWg.Add(1)
-			go func() {
-				defer transferWg.Done()
-				size, f, err := TransferCapture(executorCaptureConf, hook, s.GetTmpDir())
-				if err != nil {
-					m.Lock()
-					totalFailedFiles = append(totalFailedFiles, f)
-					m.Unlock()
-				} else {
-					m.Lock()
-					tarballs = append(tarballs, f)
-					files = append(files, helpers.CollectedFile{
-						Path: f,
-						Size: size,
-					})
-					m.Unlock()
-				}
-				<-sem
-			}()
-		}(executor)
-	}
-	wg.Wait()
-	transferWg.Wait()
-	// doing cluster collection after all transfers
-	clusterCollection()
-	end := time.Now().UTC()
-	var collectionInfo SummaryInfo
-	collectionInfo.EndTimeUTC = end
-	collectionInfo.StartTimeUTC = start
-	seconds := end.Unix() - start.Unix()
-	collectionInfo.TotalRuntimeSeconds = seconds
-	collectionInfo.ClusterInfo.TotalNodesAttempted = len(coordinators) + len(executors)
-	collectionInfo.ClusterInfo.NumberNodesContacted = nodesConnectedTo
-	collectionInfo.CollectedFiles = files
-	totalBytes := int64(0)
-	for _, f := range files {
-		totalBytes += f.Size
-	}
-	collectionInfo.TotalBytesCollected = totalBytes
-	collectionInfo.Coordinators = coordinators
-	collectionInfo.Executors = executors
-	collectionInfo.FailedFiles = totalFailedFiles
-	collectionInfo.SkippedFiles = totalSkippedFiles
-	collectionInfo.DDCVersion = versions.GetCLIVersion()
-	collectionInfo.CollectionsEnabled = collectionArgs.Enabled
-	collectionInfo.CollectionsDisabled = collectionArgs.Disabled
-
-	if len(tarballs) > 0 {
-		simplelog.Debugf("extracting the following tarballs %v", strings.Join(tarballs, ", "))
-		for _, tarballEntry := range tarballs {
-			// Handle both single files and comma-separated multiple files (for split archives)
-			tarballFiles := strings.Split(tarballEntry, ",")
-			for _, tarball := range tarballFiles {
-				tarball = strings.TrimSpace(tarball)
-				if tarball == "" {
-					continue
-				}
-				simplelog.Debugf("extracting %v to %v", tarball, s.GetTmpDir())
-				if err := archive.ExtractTarGz(tarball, s.GetTmpDir()); err != nil {
-					simplelog.Errorf("unable to extract tarball %v: %v", tarball, err)
-				}
-				simplelog.Debugf("extracted %v", tarball)
-				// run a delete immediately as this takes up substantial space
-				if err := os.Remove(tarball); err != nil {
-					simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
-				}
-				hook.AddFinalSteps(func() {
-					// run it again on cleanup just to be sure it's removed in case we got a ctrl+c
-					if err := os.Remove(tarball); err != nil {
-						simplelog.Errorf("unable to delete tarball %v: %v", tarball, err)
-					}
-				}, fmt.Sprintf("removing local tarball %v", tarball))
-				simplelog.Debugf("removed %v", tarball)
-			}
-		}
-	}
-
-	clusterstats, err := FindClusterID(s.GetTmpDir())
-	if err != nil {
-		simplelog.Errorf("unable to find cluster ID in %v: %v", s.GetTmpDir(), err)
-	} else {
-		versions := make(map[string]string)
-		clusterIDs := make(map[string]string)
-		for _, stats := range clusterstats {
-			versions[stats.NodeName] = stats.DremioVersion
-			clusterIDs[stats.NodeName] = stats.ClusterID
-		}
-		collectionInfo.ClusterID = clusterIDs
-		collectionInfo.DremioVersion = versions
-	}
-	if len(files) == 0 {
-		return errors.New("no files transferred")
-	}
-
-	// converts the collection info to a string
-	// ready to write out to a file
-	outString, err := collectionInfo.String()
-	if err != nil {
-		return err
-	}
-
-	// Log distributed collection summary
-	logDistributedCollectionSummary(collectionMode, coordinators, executors, files, totalFailedFiles, totalFailedNodes, totalSkippedFiles, nodesConnectedTo, time.Since(start))
-
-	// archives the collected files
-	// creates the summary file too
-	simplelog.Debugf("archiving collected files to %v", outputLoc)
-	err = s.ArchiveDiag(outString, outputLoc)
-	if err != nil {
-		return err
-	}
-	fullPath, err := filepath.Abs(outputLoc)
-	if err != nil {
-		return err
-	}
-	consoleprint.UpdateTarballDir(fullPath)
-	return nil
+	return ExecuteStreamingCollect(c, s, collectionArgs, hook, clusterCollection)
 }
 
 func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterStats, err error) {
@@ -432,7 +226,7 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 			return err // Handle the error according to your needs
 		}
 		if info.Name() == "cluster-stats.json" {
-			b, err := os.ReadFile(filepath.Clean(path))
+			b, err := os.ReadFile(filepath.Clean(path)) // #nosec G122 -- path is from Walk over controlled output dir
 			if err != nil {
 				return err
 			}
@@ -451,7 +245,7 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 }
 
 // logDistributedCollectionSummary logs a comprehensive summary of the distributed collection
-func logDistributedCollectionSummary(collectionMode string, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles []string, nodesConnectedTo int, duration time.Duration) {
+func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles []string, nodesConnectedTo int, duration time.Duration) {
 	simplelog.Info("=== DISTRIBUTED COLLECTION SUMMARY ===")
 
 	// Basic collection info

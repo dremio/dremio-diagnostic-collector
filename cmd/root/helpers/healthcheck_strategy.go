@@ -21,8 +21,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 type TimeService interface {
@@ -56,6 +57,7 @@ type CopyStrategyHC struct {
 	BaseDir      string     // the base dir of where the output is routed
 	Fs           Filesystem // filesystem interface (so we can pass in realof fake filesystem, assists testing)
 	TimeService  TimeService
+	IsK8s        bool // when true, pod names are descriptive enough — skip -C/-E suffix
 }
 
 /*
@@ -94,17 +96,17 @@ func (s *CopyStrategyHC) CreatePath(fileType, source, nodeType string) (path str
 	baseDir := s.BaseDir
 	tmpDir := s.TmpDir
 
-	// We only tag a suffix of '-C' / '-E' for ssh nodes, the K8s pods are desriptive enough to determine the coordinator / executor
-	// also add exceptions for general k8s directories
-	if fileType != "kubernetes" {
-		// ssh nodes types
+	// We only tag a suffix of '-C' / '-E' for ssh nodes, the K8s pods are descriptive enough to determine the coordinator / executor.
+	// Skip suffix when running in K8s mode (IsK8s) or for the general "kubernetes" fileType directory.
+	if s.IsK8s || fileType == "kubernetes" {
+		path = filepath.Join(tmpDir, baseDir, fileType, source)
+	} else {
+		// ssh node types
 		if nodeType == "coordinator" {
 			path = filepath.Join(tmpDir, baseDir, fileType, source+"-C")
 		} else {
 			path = filepath.Join(tmpDir, baseDir, fileType, source+"-E")
 		}
-	} else { // K8s node types
-		path = filepath.Join(tmpDir, baseDir, fileType, source)
 	}
 	err = s.Fs.MkdirAll(path, DirPerms)
 	if err != nil {
@@ -155,8 +157,8 @@ func (s *CopyStrategyHC) ArchiveDiag(o string, outputLoc string) error {
 		return err
 	}
 
-	// call general archive routine
-	return archive.TarDDC(s.TmpDir, outputLoc, s.BaseDir)
+	// call general archive routine with progress reporting
+	return archive.TarDDCWithProgress(s.TmpDir, outputLoc, s.BaseDir, consoleprint.UpdateArchiveProgress)
 }
 
 // This function creates a couple of supplemental files required for the HC data to be uploaded
@@ -164,11 +166,11 @@ func (s *CopyStrategyHC) createHCFiles() (file string, err error) {
 	baseDir := s.BaseDir
 	tmpDir := s.TmpDir
 
-	path := filepath.Join(tmpDir, baseDir, "completed")
-	compFile := filepath.Join(path, baseDir)
-	err = s.Fs.MkdirAll(path, DirPerms)
+	filePath := filepath.Join(tmpDir, baseDir, "completed")
+	compFile := filepath.Join(filePath, baseDir)
+	err = s.Fs.MkdirAll(filePath, DirPerms)
 	if err != nil {
-		return compFile, fmt.Errorf("ERROR: failed to create HC completed dir %v: %w", path, err)
+		return compFile, fmt.Errorf("ERROR: failed to create HC completed dir %v: %w", filePath, err)
 	}
 
 	txt := []byte(baseDir)

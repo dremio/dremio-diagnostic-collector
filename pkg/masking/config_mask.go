@@ -23,8 +23,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 var secretKeywords = []string{
@@ -33,24 +33,17 @@ var secretKeywords = []string{
 	"secret",
 }
 
-// checkStringForSecret inspects a given string for presence of any keyword that might indicate a secret.
-// It returns true if a potential secret keyword is found, otherwise returns false.
-func checkStringForSecret(s string) bool {
-	// secretKeywords is a list of keywords that might indicate a secret.
-	// This is defined elsewhere and can contain keywords such as "passw", "token", etc.
-	// Note: As of the last update, "passw" was the only keyword used.
+var reConfigSecret = regexp.MustCompile(`:\s*([^,\n]+)`)
+var rePATToken = regexp.MustCompile(`--` + conf.KeyDremioPatToken + ` [^ ]+`)
+var rePATShort = regexp.MustCompile(`-t [^ ]+`)
 
-	// Iterate over each keyword in the secretKeywords list.
+// checkStringForSecret returns true if the string contains any keyword that might indicate a secret.
+func checkStringForSecret(s string) bool {
 	for _, keyword := range secretKeywords {
-		// Convert the string to lower case and check if it contains the keyword.
-		// strings.ToLower is used to ensure the check is case-insensitive.
-		// If the keyword is found in the string, the function immediately returns true.
 		if strings.Contains(strings.ToLower(s), keyword) {
 			return true
 		}
 	}
-
-	// If no secret keyword is found after checking the entire list, the function returns false.
 	return false
 }
 
@@ -62,9 +55,7 @@ func checkStringForSecret(s string) bool {
 // \s* matches zero or more whitespace characters.
 // ([^,\n]+) captures one or more characters that are not a comma or a newline. This is the value that you want to replace.
 func maskConfigSecret(line string) string {
-	regexPattern := `:\s*([^,\n]+)`
-	re := regexp.MustCompile(regexPattern)
-	matches := re.FindStringSubmatch(line)
+	matches := reConfigSecret.FindStringSubmatch(line)
 	// If there is more than one match, the secret will be the second element in the slice (at index 1)
 	if len(matches) > 1 {
 		secret := matches[1]
@@ -75,18 +66,14 @@ func maskConfigSecret(line string) string {
 }
 
 func MaskPAT(line string) string {
-	regexPattern := `--` + conf.KeyDremioPatToken + ` [^ ]+`
-	regexPattern2 := `-t [^ ]+`
-	re := regexp.MustCompile(regexPattern)
-	re2 := regexp.MustCompile(regexPattern2)
-	matches := re.FindStringSubmatch(line)
+	matches := rePATToken.FindStringSubmatch(line)
 	// If there is more than one match, the secret will be the second element in the slice (at index 1)
 	if len(matches) >= 1 {
 		secret := matches[0]
 		// Replace the secret with the masking text
 		line = strings.ReplaceAll(line, secret, "\"<REMOVED_PAT_TOKEN>\"")
 	}
-	matches2 := re2.FindStringSubmatch(line)
+	matches2 := rePATShort.FindStringSubmatch(line)
 	// If there is more than one match, the secret will be the second element in the slice (at index 1)
 	if len(matches2) >= 1 {
 		secret := matches2[0]
@@ -109,6 +96,7 @@ func RemoveSecretsFromDremioConf(configFile string) error {
 		if err != nil {
 			return fmt.Errorf("unable to open file %v: %w", configFile, err)
 		}
+		defer file.Close()
 		scanner := bufio.NewScanner(file)
 
 		// This slice will hold all the lines from the file, after potentially modifying them
@@ -121,11 +109,6 @@ func RemoveSecretsFromDremioConf(configFile string) error {
 				line = maskConfigSecret(line)
 			}
 			cleansedData = append(cleansedData, line)
-		}
-
-		// Close the file and check for any errors. If there is an issue closing the file, an error is returned.
-		if err := file.Close(); err != nil {
-			return fmt.Errorf("unable to close file %v: %w", configFile, err)
 		}
 
 		// Write the contents of cleansedData back into the file.

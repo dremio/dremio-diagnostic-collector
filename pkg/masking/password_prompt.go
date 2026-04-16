@@ -18,19 +18,18 @@ package masking
 import (
 	"fmt"
 
-	"github.com/manifoldco/promptui"
+	"github.com/charmbracelet/huh"
 )
 
 func PromptForPAT() (string, error) {
-	prompt := promptui.Prompt{
-		Label: "Enter Dremio personal access token",
-		Mask:  '*',
-	}
-
-	result, err := prompt.Run()
+	var pat string
+	err := huh.NewInput().
+		Title("Enter Dremio personal access token").
+		EchoMode(huh.EchoModePassword).
+		Value(&pat).
+		Run()
 	if err != nil {
-		return "", fmt.Errorf("prompt failed %w", err)
+		return "", fmt.Errorf("prompt failed: %w", err)
 	}
-
-	return result, nil
+	return pat, nil
 }

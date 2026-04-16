@@ -1,0 +1,5 @@
+2025-07-10T14:32:05.750+0000 [0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d:foreman] ERROR c.d.s.work.foreman.AttemptManager - OUT_OF_MEMORY ERROR: Query failed
+2025-07-10T14:32:06.100+0000 [fabric-rpc-pool-30] ERROR c.d.s.work.fragment.FragmentTracker - Fragment 1b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e:0:0 failed during execution
+2025-07-10T14:33:00.200+0000 [maestro-pool-12] WARN c.d.s.work.foreman.AttemptManager - Canceling query 2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f due to resource limits
+2025-07-10T14:34:00.300+0000 [maestro-pool-13] ERROR c.d.s.work.foreman.AttemptManager - Query 3d4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f80 failed with OOM
+2025-07-10T14:35:00.400+0000 [pool-20] INFO c.d.s.exec.Server - Normal query completed successfully

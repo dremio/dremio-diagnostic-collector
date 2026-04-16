@@ -18,12 +18,12 @@ package validation
 import (
 	"fmt"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 )
 
-func ValidateCollectMode(collectionMode string) error {
-	if collectionMode != collects.HealthCheckCollection && collectionMode != collects.QuickCollection && collectionMode != collects.StandardCollection && collectionMode != collects.StandardPlusJSTACKCollection && collectionMode != collects.WAFCollection {
-		return fmt.Errorf("invalid --collect option '%v' the only valid options are %v, %v, %v, %v, and %v", collectionMode, collects.QuickCollection, collects.StandardCollection, collects.StandardPlusJSTACKCollection, collects.HealthCheckCollection, collects.WAFCollection)
+func ValidateCollectMode(collectionMode collects.CollectionMode) error {
+	if collectionMode != collects.DiagnosisCollection && collectionMode != collects.StandardCollection {
+		return fmt.Errorf("invalid --mode option '%v': the only valid options are %v and %v", collectionMode, collects.DiagnosisCollection, collects.StandardCollection)
 	}
 	return nil
 }

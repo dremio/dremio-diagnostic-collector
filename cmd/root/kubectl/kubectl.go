@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -26,11 +27,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/kubernetes"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/kubernetes"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 type KubeArgs struct {
@@ -168,6 +170,10 @@ func (c *CliK8sActions) Name() string {
 	return "Kubectl"
 }
 
+func (c *CliK8sActions) Protocol() string {
+	return "Kubectl"
+}
+
 func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	container, err := c.getContainerName(hostString)
 	if err != nil {
@@ -180,34 +186,12 @@ func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, outpu
 		kubectlArgs = []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
 	}
 
-	kubectlArgs = append(kubectlArgs, args...)
+	kubectlArgs = append(kubectlArgs, "sh", "-c", strings.Join(args, " "))
 	return c.cli.ExecuteAndStreamOutput(mask, output, pat, kubectlArgs...)
 }
 
-func (c *CliK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
-	var outBuilder strings.Builder
-	writer := func(line string) {
-		outBuilder.WriteString(line)
-	}
-	err = c.HostExecuteAndStream(mask, hostString, writer, "", args...)
-	out = outBuilder.String()
-	return
-}
-
-func (c *CliK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
-	}
-	container, err := c.getContainerName(hostString)
-	if err != nil {
-		return "", fmt.Errorf("unable to get container name: %w", err)
-	}
-	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
-	args = c.addRetries(args)
-	args = append(args, fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
-	return c.cli.Execute(false, args...)
+func (c *CliK8sActions) HostExecute(mask bool, hostString string, args ...string) (string, error) {
+	return cli.CollectOutput(c.HostExecuteAndStream, mask, hostString, args...)
 }
 
 func (c *CliK8sActions) addRetries(args []string) []string {
@@ -240,7 +224,7 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", c.labelSelector, "-o", "name")
+	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", c.labelSelector, "--field-selector", "status.phase=Running", "-o", "name")
 	if err != nil {
 		return []string{}, err
 	}
@@ -386,4 +370,62 @@ func (c *CliK8sActions) CleanupRemote() error {
 		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
 	}
 	return nil
+}
+
+// StreamFromHost streams the raw bytes of a remote file to writer by executing
+// "kubectl exec ... <cmd> '<path>'" as a subprocess where <cmd> is "cat" or
+// "gzip -c" depending on useGzip. Binary data integrity is preserved — stdout
+// goes directly to writer with no line splitting or encoding.
+func (c *CliK8sActions) StreamFromHost(host, remotePath string, writer io.Writer, useGzip bool) error {
+	if remotePath == "" {
+		return fmt.Errorf("StreamFromHost: remotePath is empty for host %v", host)
+	}
+
+	streamCmd := "cat"
+	if useGzip {
+		streamCmd = "gzip -c"
+	}
+	simplelog.Infof("StreamFromHost: streaming %v:%v via kubectl exec (cmd=%s)", host, remotePath, streamCmd)
+
+	containerName, err := c.getContainerName(host)
+	if err != nil {
+		return fmt.Errorf("StreamFromHost: failed to get container for pod %v: %w", host, err)
+	}
+
+	escapedPath := strings.ReplaceAll(remotePath, "'", "'\\''")
+	args := []string{"exec", host, "-n", c.namespace, "-c", containerName, "--", "sh", "-c", fmt.Sprintf("%s '%s'", streamCmd, escapedPath)}
+
+	// #nosec G204 -- arguments are controlled by the caller
+	cmd := exec.Command(c.kubectlPath, args...)
+	cmd.Stdout = writer
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("StreamFromHost: failed to create stderr pipe for %v:%v: %w", host, remotePath, err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("StreamFromHost: failed to start kubectl for %v:%v: %w", host, remotePath, err)
+	}
+
+	stderrBytes, _ := io.ReadAll(stderrPipe)
+
+	if err := cmd.Wait(); err != nil {
+		stderrMsg := strings.TrimSpace(string(stderrBytes))
+		if stderrMsg != "" {
+			return fmt.Errorf("StreamFromHost: %s failed on %v:%v: %w (stderr: %s)", streamCmd, host, remotePath, err, stderrMsg)
+		}
+		return fmt.Errorf("StreamFromHost: %s failed on %v:%v: %w", streamCmd, host, remotePath, err)
+	}
+
+	simplelog.Infof("StreamFromHost: completed streaming %v:%v", host, remotePath)
+	return nil
+}
+
+// DiscoverFiles runs remote discovery shell commands on a K8s pod (via kubectl exec)
+// to enumerate log files, config files, GC logs, and the Dremio PID.
+func (c *CliK8sActions) DiscoverFiles(host, logDir, confDir string) (*collection.RemoteNodeInfo, error) {
+	return collection.RunDiscovery(func(h string, args ...string) (string, error) {
+		return c.HostExecute(false, h, args...)
+	}, host, logDir, confDir)
 }

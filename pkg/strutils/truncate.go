@@ -41,6 +41,19 @@ func TruncateString(str string, maxLength int) string {
 	return str[:maxLength]
 }
 
+// GetStartOfString returns the first maxLength runes of str. If the string is
+// truncated, a "...[truncated]" suffix is appended. The suffix is budgeted into
+// maxLength so the returned string never exceeds maxLength + len(suffix) runes.
+func GetStartOfString(str string, maxLength int) string {
+	const suffix = "...[truncated]"
+	maxLength = max(maxLength, 0)
+	if utf8.RuneCountInString(str) <= maxLength {
+		return str
+	}
+	runes := []rune(str)
+	return string(runes[:maxLength]) + suffix
+}
+
 func GetLastLine(str string) string {
 	index := strings.LastIndex(str, "\n")
 	if index == -1 {

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 )
 
-func setupTestSetViperDefaults(collectionType string) (map[string]interface{}, string, int) {
+func setupTestSetViperDefaults(collectionType collects.CollectionMode) (map[string]interface{}, string, int) {
 	hostName := "test-host"
 	defaultCaptureSeconds := 30
 	confData := make(map[string]interface{})
@@ -34,66 +34,62 @@ func setupTestSetViperDefaults(collectionType string) (map[string]interface{}, s
 	return confData, hostName, defaultCaptureSeconds
 }
 
-func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
-	confData, hostName, defaultCaptureSeconds := setupTestSetViperDefaults(collects.HealthCheckCollection)
+func TestSetViperDefaultsWithDiagnosis(t *testing.T) {
+	confData, hostName, _ := setupTestSetViperDefaults(collects.DiagnosisCollection)
 
 	checks := []struct {
 		key      string
 		expected interface{}
 	}{
+		// Log collection — selective in diagnosis mode
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
-		{conf.KeyCollectAuditLog, false},
-		{conf.KeyCollectJVMFlags, true},
-		{conf.KeyDremioLogDir, "/var/log/dremio"},
-		{conf.KeyNumberThreads, 1},
-		{conf.KeyDremioPid, 0},
-		{conf.KeyDremioPidDetection, true},
-		{conf.KeyDremioUsername, "dremio"},
-		{conf.KeyDremioPatToken, ""},
-		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
-		{conf.KeyDremioRocksdbDir, "/opt/dremio/data/db"},
-		{conf.KeyCollectDremioConfiguration, true},
-		{conf.KeyCaptureHeapDump, false},
-		{conf.KeyNumberJobProfiles, 10000},
-		{conf.KeyDremioEndpoint, "http://localhost:9047"},
-		{conf.KeyTarballOutDir, "/tmp/ddc"},
-		{conf.KeyCollectOSConfig, true},
-		{conf.KeyCollectDiskUsage, true},
-		{conf.KeyDremioLogsNumDays, 7},
-		{conf.KeyDremioQueriesJSONNumDays, 30},
-		{conf.KeyDremioGCFilePattern, "server*.gc*"},
-		{conf.KeyCollectQueriesJSON, true},
 		{conf.KeyCollectServerLogs, true},
+		{conf.KeyCollectGCLogs, true},
 		{conf.KeyCollectMetaRefreshLog, true},
 		{conf.KeyCollectReflectionLog, true},
-		{conf.KeyCollectVacuumLog, true},
-		{conf.KeyCollectGCLogs, true},
+		{conf.KeyCollectVacuumLog, false},
 		{conf.KeyCollectHSErrFiles, true},
-		{conf.KeyCollectJFR, true},
+		{conf.KeyCollectQueriesJSON, true},
+		{conf.KeyCollectTrackerJSON, false},
+		{conf.KeyCollectHiveDeprecatedLog, false},
+
+		// JVM diagnostic tools — all opt-in via TUI checkboxes or CLI flags
+		{conf.KeyCollectJFR, false},
 		{conf.KeyCollectJStack, false},
-		{conf.KeyCollectSystemTablesExport, true},
+		{conf.KeyCollectTop, false},
+		{conf.KeyCollectAsyncProfiler, false},
+		{conf.KeyCaptureHeapDump, false},
+
+		// JVM tool timing
+		{conf.KeyDiagTimeSeconds, 60},
+
+		// Date range defaults
+		{conf.KeyDremioLogsNumDays, 3},
+		{conf.KeyQueriesJSONNumDays, 3},
+		{conf.KeyCollectQueriesPerfJSON, true},
+
+		// API collection
 		{conf.KeyCollectWLM, true},
-		{conf.KeyCollectTtop, true},
-		{conf.KeyCollectKVStoreReport, true},
-		{conf.KeyDremioJStackTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJFRTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJStackFreqSeconds, 1},
-		{conf.KeyDremioTtopFreqSeconds, 1},
-		{conf.KeyDremioTtopTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioGCLogsDir, ""},
+		{conf.KeyCollectKVStoreReport, false},
+		{conf.KeyCollectProblematicProfiles, false},
+		{conf.KeyCollectSystemTablesExport, true},
+		{conf.KeySysTables, conf.SystemTableList()},
+		{conf.KeyNumberJobProfiles, 0}, // auto-identified from server.log
+
+		// Common fields
+		{conf.KeyCollectJVMFlags, true},
+		{conf.KeyDremioLogDir, "/var/log/dremio"},
+		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
+		{conf.KeyDremioRocksdbDir, "/opt/dremio/data/db"},
+		{conf.KeyDremioEndpoint, "http://localhost:9047"},
+		{conf.KeyCollectDremioConfiguration, true},
+		{conf.KeyCollectOSConfig, true},
+		{conf.KeyCollectDiskUsage, true},
+		{conf.KeyAllowInsecureSSL, true},
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
-		{conf.KeyAllowInsecureSSL, true},
-		{conf.KeyCollectSystemTablesTimeoutSeconds, 1440},
-		{conf.KeyCollectClusterIDTimeoutSeconds, 60},
-		{conf.KeyNoLogDir, false},
-		{conf.KeySysTables, conf.SystemTableList()},
-		{conf.KeySysTablesCloud, conf.SystemTableListCloud()},
-		{conf.KeyIsRESTCollect, false},
-		{conf.KeyIsDremioCloud, false},
-		{conf.KeyArchiveSizeLimitMB, 256},
-		{conf.KeyDisableArchiveSplitting, false},
+		{conf.KeyCollectSystemTablesTimeoutSeconds, 120},
 	}
 
 	for _, check := range checks {
@@ -104,61 +100,65 @@ func TestSetViperDefaultsWithHealthCheck(t *testing.T) {
 	}
 }
 
-func TestSetViperDefaultsQuickCollect(t *testing.T) {
-	confData, hostName, defaultCaptureSeconds := setupTestSetViperDefaults(collects.QuickCollection)
+func TestSetViperDefaultsWithStandard(t *testing.T) {
+	confData, hostName, _ := setupTestSetViperDefaults(collects.StandardCollection)
+
 	checks := []struct {
 		key      string
 		expected interface{}
 	}{
+		// Log collection — limited set with per-log day counts
+		{conf.KeyCollectServerLogs, true},
+		{conf.KeyServerLogsNumDays, 1},
+		{conf.KeyCollectTrackerJSON, true},
+		{conf.KeyTrackerJSONNumDays, 1},
+		{conf.KeyCollectVacuumLog, true},
+		{conf.KeyVacuumLogNumDays, 1},
+		{conf.KeyCollectQueriesJSON, true},
+		{conf.KeyQueriesJSONNumDays, 30},
+		{conf.KeyCollectQueriesPerfJSON, true},
+		{conf.KeyQueriesPerfNumDays, 30},
+
+		// Explicitly disabled
+		{conf.KeyCollectGCLogs, false},
+		{conf.KeyCollectMetaRefreshLog, false},
+		{conf.KeyCollectReflectionLog, false},
 		{conf.KeyCollectAccelerationLog, false},
 		{conf.KeyCollectAccessLog, false},
-		{conf.KeyCollectAuditLog, false},
-		{conf.KeyCollectJVMFlags, true},
-		{conf.KeyDremioLogDir, "/var/log/dremio"},
-		{conf.KeyNumberThreads, 1},
-		{conf.KeyDremioPid, 0},
-		{conf.KeyDremioPidDetection, true},
-		{conf.KeyDremioUsername, "dremio"},
-		{conf.KeyDremioPatToken, ""},
-		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
-		{conf.KeyDremioRocksdbDir, "/opt/dremio/data/db"},
-		{conf.KeyCollectDremioConfiguration, true},
-		{conf.KeyCaptureHeapDump, false},
-		{conf.KeyNumberJobProfiles, 20},
-		{conf.KeyDremioEndpoint, "http://localhost:9047"},
-		{conf.KeyTarballOutDir, "/tmp/ddc"},
-		{conf.KeyCollectOSConfig, true},
-		{conf.KeyCollectDiskUsage, true},
-		{conf.KeyDremioLogsNumDays, 2},
-		{conf.KeyDremioQueriesJSONNumDays, 2},
-		{conf.KeyDremioGCFilePattern, "server*.gc*"},
-		{conf.KeyCollectQueriesJSON, true},
-		{conf.KeyCollectServerLogs, true},
-		{conf.KeyCollectMetaRefreshLog, true},
-		{conf.KeyCollectReflectionLog, true},
-		{conf.KeyCollectVacuumLog, true},
-		{conf.KeyCollectGCLogs, true},
-		{conf.KeyCollectHSErrFiles, true},
+		{conf.KeyCollectHSErrFiles, false},
+		{conf.KeyCollectHiveDeprecatedLog, false},
+
+		// JVM diagnostic tools — all disabled
 		{conf.KeyCollectJFR, false},
 		{conf.KeyCollectJStack, false},
-		{conf.KeyCollectSystemTablesExport, true},
+		{conf.KeyCollectTop, false},
+		{conf.KeyCollectAsyncProfiler, false},
+		{conf.KeyCaptureHeapDump, false},
+		{conf.KeyDiagTimeSeconds, 30},
+
+		// No job profiles in standard mode
+		{conf.KeyNumberJobProfiles, 0},
+
+		// WLM enabled (via RocksDB viewer), KV store disabled
 		{conf.KeyCollectWLM, true},
-		{conf.KeyCollectTtop, false},
-		{conf.KeyCollectKVStoreReport, true},
-		{conf.KeyDremioJStackTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJFRTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJStackFreqSeconds, 1},
-		{conf.KeyDremioTtopFreqSeconds, 1},
-		{conf.KeyDremioTtopTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioGCLogsDir, ""},
+		{conf.KeyCollectKVStoreReport, false},
+
+		// Transfer rate limiting
+		{conf.KeyDiskBandwidthLimitPct, 20},
+
+		// Common fields
+		{conf.KeyCollectJVMFlags, true},
+		{conf.KeyDremioLogDir, "/var/log/dremio"},
+		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
+		{conf.KeyDremioRocksdbDir, "/opt/dremio/data/db"},
+		{conf.KeyDremioEndpoint, "http://localhost:9047"},
+		{conf.KeyCollectDremioConfiguration, true},
+		{conf.KeyCollectOSConfig, true},
+		{conf.KeyCollectDiskUsage, true},
+		{conf.KeyAllowInsecureSSL, true},
 		{conf.KeyNodeName, hostName},
 		{conf.KeyAcceptCollectionConsent, true},
-		{conf.KeyAllowInsecureSSL, true},
-		{conf.KeyNoLogDir, false},
-		{conf.KeyIsRESTCollect, false},
-		{conf.KeyIsDremioCloud, false},
-		{conf.KeyArchiveSizeLimitMB, 256},
-		{conf.KeyDisableArchiveSplitting, false},
+		{conf.KeyCollectSystemTablesTimeoutSeconds, 120},
 	}
 
 	for _, check := range checks {
@@ -169,67 +169,64 @@ func TestSetViperDefaultsQuickCollect(t *testing.T) {
 	}
 }
 
-func TestSetViperDefaults(t *testing.T) {
-	confData, hostName, defaultCaptureSeconds := setupTestSetViperDefaults(collects.StandardCollection)
-	checks := []struct {
-		key      string
-		expected interface{}
-	}{
-		{conf.KeyCollectAccelerationLog, false},
-		{conf.KeyCollectAccessLog, false},
-		{conf.KeyCollectAuditLog, false},
-		{conf.KeyCollectJVMFlags, true},
-		{conf.KeyDremioLogDir, "/var/log/dremio"},
-		{conf.KeyNumberThreads, 1},
-		{conf.KeyDremioPid, 0},
-		{conf.KeyDremioPidDetection, true},
-		{conf.KeyDremioUsername, "dremio"},
-		{conf.KeyDremioPatToken, ""},
-		{conf.KeyDremioConfDir, "/opt/dremio/conf"},
-		{conf.KeyDremioRocksdbDir, "/opt/dremio/data/db"},
-		{conf.KeyCollectDremioConfiguration, true},
-		{conf.KeyCaptureHeapDump, false},
-		{conf.KeyNumberJobProfiles, 20},
-		{conf.KeyDremioEndpoint, "http://localhost:9047"},
-		{conf.KeyTarballOutDir, "/tmp/ddc"},
-		{conf.KeyCollectOSConfig, true},
-		{conf.KeyCollectDiskUsage, true},
-		{conf.KeyDremioLogsNumDays, 7},
-		{conf.KeyDremioQueriesJSONNumDays, 30},
-		{conf.KeyDremioGCFilePattern, "server*.gc*"},
-		{conf.KeyCollectQueriesJSON, true},
-		{conf.KeyCollectServerLogs, true},
-		{conf.KeyCollectMetaRefreshLog, true},
-		{conf.KeyCollectReflectionLog, true},
-		{conf.KeyCollectVacuumLog, true},
-		{conf.KeyCollectGCLogs, true},
-		{conf.KeyCollectHSErrFiles, true},
-		{conf.KeyCollectJFR, true},
-		{conf.KeyCollectJStack, false},
-		{conf.KeyCollectSystemTablesExport, true},
-		{conf.KeyCollectWLM, true},
-		{conf.KeyCollectTtop, true},
-		{conf.KeyCollectKVStoreReport, true},
-		{conf.KeyDremioJStackTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJFRTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioJStackFreqSeconds, 1},
-		{conf.KeyDremioTtopFreqSeconds, 1},
-		{conf.KeyDremioTtopTimeSeconds, defaultCaptureSeconds},
-		{conf.KeyDremioGCLogsDir, ""},
-		{conf.KeyNodeName, hostName},
-		{conf.KeyAcceptCollectionConsent, true},
-		{conf.KeyAllowInsecureSSL, true},
-		{conf.KeyNoLogDir, false},
-		{conf.KeyIsRESTCollect, false},
-		{conf.KeyIsDremioCloud, false},
-		{conf.KeyArchiveSizeLimitMB, 256},
-		{conf.KeyDisableArchiveSplitting, false},
-	}
-
-	for _, check := range checks {
-		actual := fmt.Sprint(confData[check.key])
-		if actual != fmt.Sprint(check.expected) {
-			t.Errorf("Unexpected value for '%s'. Got %v, expected %v", check.key, actual, check.expected)
+func TestDefaultMapHelpers(t *testing.T) {
+	t.Run("DiagnosisDefaultMap returns populated map", func(t *testing.T) {
+		m := conf.DiagnosisDefaultMap()
+		if len(m) == 0 {
+			t.Fatal("DiagnosisDefaultMap returned empty map")
 		}
+		// Verify key types via helpers
+		if conf.GetStringDefault(m, conf.KeyDremioLogDir) == "" {
+			t.Error("Expected non-empty log dir default")
+		}
+		if conf.GetIntDefault(m, conf.KeyDiagTimeSeconds) != 60 {
+			t.Errorf("Expected diag-time-seconds=60, got %d", conf.GetIntDefault(m, conf.KeyDiagTimeSeconds))
+		}
+	})
+
+	t.Run("StandardDefaultMap returns populated map", func(t *testing.T) {
+		m := conf.StandardDefaultMap()
+		if len(m) == 0 {
+			t.Fatal("StandardDefaultMap returned empty map")
+		}
+		if conf.GetIntDefault(m, conf.KeyServerLogsNumDays) != 1 {
+			t.Errorf("Expected server-logs-num-days=1, got %d", conf.GetIntDefault(m, conf.KeyServerLogsNumDays))
+		}
+	})
+
+	t.Run("GetBoolDefault missing key returns false", func(t *testing.T) {
+		m := map[string]interface{}{}
+		if conf.GetBoolDefault(m, "nonexistent") {
+			t.Error("Expected false for missing key")
+		}
+	})
+
+	t.Run("GetIntDefault missing key returns 0", func(t *testing.T) {
+		m := map[string]interface{}{}
+		if conf.GetIntDefault(m, "nonexistent") != 0 {
+			t.Error("Expected 0 for missing key")
+		}
+	})
+
+	t.Run("GetStringDefault missing key returns empty", func(t *testing.T) {
+		m := map[string]interface{}{}
+		if conf.GetStringDefault(m, "nonexistent") != "" {
+			t.Error("Expected empty string for missing key")
+		}
+	})
+}
+
+func TestSetViperDefaults_UnknownMode_DefaultsStandard(t *testing.T) {
+	confData, _, _ := setupTestSetViperDefaults("unknown-mode")
+
+	// Unknown mode should default to standard profile
+	if actual := fmt.Sprint(confData[conf.KeyCollectJFR]); actual != "false" {
+		t.Errorf("Expected JFR disabled for unknown mode (standard fallback), got %v", actual)
+	}
+	if actual := fmt.Sprint(confData[conf.KeyCollectJStack]); actual != "false" {
+		t.Errorf("Expected JStack disabled for unknown mode (standard fallback), got %v", actual)
+	}
+	if actual := fmt.Sprint(confData[conf.KeyQueriesJSONNumDays]); actual != "30" {
+		t.Errorf("Expected 30 days queries.json for unknown mode (standard fallback), got %v", actual)
 	}
 }

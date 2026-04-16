@@ -35,3 +35,42 @@ if ! type "gosec" > /dev/null; then
     go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
 fi
 
+echo "Checking if upx is installed…"
+date "+%H:%M:%S"
+
+if ! type "upx" > /dev/null; then
+    echo "upx not found installing…"
+    date "+%H:%M:%S"
+    UPX_VERSION=5.1.1
+    OS="`uname`"
+    case $OS in
+      'Linux')
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64)  UPX_ARCH=amd64 ;;
+          aarch64) UPX_ARCH=arm64 ;;
+          *) echo "upx: unsupported arch $ARCH"; exit 1 ;;
+        esac
+        mkdir -p "$HOME/bin"
+        curl -fsSL -o /tmp/upx.tar.xz "https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-${UPX_ARCH}_linux.tar.xz"
+        tar -xJf /tmp/upx.tar.xz -C /tmp
+        mv "/tmp/upx-${UPX_VERSION}-${UPX_ARCH}_linux/upx" "$HOME/bin/upx"
+        chmod +x "$HOME/bin/upx"
+        rm -rf /tmp/upx.tar.xz "/tmp/upx-${UPX_VERSION}-${UPX_ARCH}_linux"
+        echo "upx installed to \$HOME/bin/upx — make sure \$HOME/bin is on PATH"
+        ;;
+      'Darwin')
+        if type "brew" > /dev/null; then
+            brew install upx
+        else
+            echo "install homebrew to have upx https://brew.sh/"
+            exit 1
+        fi
+        ;;
+      *)
+        echo "upx auto-install not supported on $OS — install manually from https://github.com/upx/upx/releases"
+        exit 1
+        ;;
+    esac
+fi
+
