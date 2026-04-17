@@ -113,14 +113,14 @@ ddc collect local diagnosis --days 5
 
 ### Date-Range Filtering (Diagnosis Mode)
 
-In diagnosis mode, `--days` or `--date-start`/`--date-end` control which log files are collected across all log types.
+In diagnosis mode, `--days` and `--start-date` control which log files are collected across all log types.
 
 ```bash
-# Collect last 5 days
+# Collect last 5 days (counting back from now)
 ddc collect k8s diagnosis --namespace mynamespace --days 5
 
-# Collect a specific time window
-ddc collect ssh diagnosis --coordinator 10.0.0.19 --ssh-user myuser --date-start 2026-03-20T10:00:00 --date-end 2026-03-22T18:00:00
+# Collect 3 days starting from a specific date
+ddc collect ssh diagnosis --coordinator 10.0.0.19 --ssh-user myuser --start-date 2026-03-20 --days 3
 ```
 
 ### Windows Users
@@ -175,9 +175,8 @@ These flags apply to `ddc collect <transport> <mode>` (non-interactive mode). In
 #### Date Range (Diagnosis Only)
 | Flag | Description |
 |------|-------------|
-| `--days` | Number of days to collect (applies to all log types) |
-| `--date-start` | Start of date range (ISO 8601, e.g. `2026-03-20T10:00:00`) |
-| `--date-end` | End of date range (defaults to now if `--date-start` is set) |
+| `--days` | Number of days to collect (default: 3, applies to all log types) |
+| `--start-date` | Start of date range (date-only, e.g. `2026-03-20`). Defaults to now minus `--days` |
 
 #### Diagnostic Tool Toggles (Diagnosis Only)
 | Flag | Default | Description |
