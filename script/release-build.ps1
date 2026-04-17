@@ -57,12 +57,5 @@ Get-Date -Format "HH:mm:ss"
 $env:GOOS="windows"
 $env:GOARCH="arm64"
 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-# upx does not yet support win64/arm64 — tolerate failure and ship uncompressed.
-if (Get-Command "upx" -ErrorAction SilentlyContinue) {
-    upx --best ./bin/ddc.exe
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "upx failed on windows-arm64 (exit $LASTEXITCODE, likely unsupported target); continuing with uncompressed binary"
-        $global:LASTEXITCODE = 0
-    }
-}
+# upx does not support win64/arm64 — ship uncompressed.
 Compress-Archive -Path ./bin/ddc.exe, ./README.md, ./FAQ.md -DestinationPath ./bin/ddc-windows-arm64.zip

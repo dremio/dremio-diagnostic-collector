@@ -71,6 +71,5 @@ zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./README.md ./FAQ.md
 echo "Building windows-arm64…"
 date "+%H:%M:%S"
 GOOS=windows GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-# upx does not yet support win64/arm64 — tolerate failure and ship uncompressed.
-if type "upx" > /dev/null 2>&1; then upx --best ./bin/ddc.exe || echo "upx failed on windows-arm64 (unsupported target); continuing with uncompressed binary"; fi
+# upx does not support win64/arm64 — ship uncompressed.
 zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./README.md ./FAQ.md

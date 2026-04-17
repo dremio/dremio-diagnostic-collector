@@ -19,6 +19,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 )
@@ -140,8 +141,8 @@ func ExtractAsprof(targetDir string) (string, error) {
 	if err := os.WriteFile(binPath, bin, 0o600); err != nil {
 		return "", fmt.Errorf("failed to write embedded asprof to %s: %w", binPath, err)
 	}
-	if err := os.Chmod(binPath, 0o700); err != nil { // #nosec G302 -- asprof must be executable to run locally
-		return "", fmt.Errorf("failed to chmod embedded asprof at %s: %w", binPath, err)
+	if out, err := exec.Command("chmod", "+x", binPath).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("failed to chmod embedded asprof at %s: %w (%s)", binPath, err, out)
 	}
 	if err := os.WriteFile(libPath, lib, 0o600); err != nil {
 		return "", fmt.Errorf("failed to write embedded libasyncProfiler.so to %s: %w", libPath, err)
