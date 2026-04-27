@@ -438,6 +438,17 @@ var alwaysExcludedPrefixes = []string{
 	"server.out",
 }
 
+// alwaysExcludedSuffixes are file extensions that hold secrets (keystores,
+// certificates, private keys) and must never be collected in any mode.
+// Matched case-insensitively against the file's base name.
+var alwaysExcludedSuffixes = []string{
+	".jks",
+	".pem",
+	".key",
+	".cer",
+	".crt",
+}
+
 // isLogAllowedInStandardMode returns true if the log file base name matches
 // the standard-mode allowlist (prefix match to cover archived rotations).
 func isLogAllowedInStandardMode(baseName string) bool {
@@ -450,9 +461,17 @@ func isLogAllowedInStandardMode(baseName string) bool {
 }
 
 // isAlwaysExcluded returns true if the file should never be collected.
+// Combines a name-prefix blocklist (e.g. admin_backup, audit.) with a
+// suffix blocklist for secret-bearing extensions (.jks, .pem, .key, .cer, .crt).
 func isAlwaysExcluded(baseName string) bool {
 	for _, prefix := range alwaysExcludedPrefixes {
 		if strings.HasPrefix(baseName, prefix) {
+			return true
+		}
+	}
+	lower := strings.ToLower(baseName)
+	for _, suffix := range alwaysExcludedSuffixes {
+		if strings.HasSuffix(lower, suffix) {
 			return true
 		}
 	}

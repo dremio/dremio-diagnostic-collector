@@ -444,6 +444,49 @@ func TestIsTransientError(t *testing.T) {
 	}
 }
 
+// TestIsAlwaysExcluded verifies that the discovery-time filter blocks
+// secret-bearing files (keystores, certs, private keys) and the existing
+// admin_backup / audit prefixes, while leaving ordinary configs alone.
+func TestIsAlwaysExcluded(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseName string
+		want     bool
+	}{
+		// Suffix-based blocks for secrets.
+		{"jks keystore", "keystore.jks", true},
+		{"jks keystore uppercase", "KEYSTORE.JKS", true},
+		{"jks mixed case", "TrustStore.Jks", true},
+		{"pem cert", "server.pem", true},
+		{"key file", "private.key", true},
+		{"cer cert", "ca.cer", true},
+		{"crt cert", "ca.crt", true},
+		{"pem with path-like name", "dremio.test.pem", true},
+		// Prefix-based blocks (existing behaviour).
+		{"admin backup", "admin_backup-2024-01-01.tar", true},
+		{"audit log", "audit.log", true},
+		{"server.json", "server.json", true},
+		{"server.out", "server.out", true},
+		// Should NOT be blocked.
+		{"dremio.conf", "dremio.conf", false},
+		{"dremio-env", "dremio-env", false},
+		{"server.log", "server.log", false},
+		{"queries.json", "queries.json", false},
+		{"logback.xml", "logback.xml", false},
+		// Substring-only matches must not trigger (e.g. ".key" must be a suffix).
+		{"name containing key", "key-mappings.conf", false},
+		{"name containing pem", "pem-config.yaml", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAlwaysExcluded(tt.baseName); got != tt.want {
+				t.Errorf("isAlwaysExcluded(%q) = %v, want %v", tt.baseName, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFileTypeToStrategyType(t *testing.T) {
 	tests := []struct {
 		input string
