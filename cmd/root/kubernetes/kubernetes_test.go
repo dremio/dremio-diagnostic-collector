@@ -16,7 +16,6 @@
 package kubernetes
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/url"
@@ -88,9 +87,7 @@ func TestK8SWriterChunkedWrites(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got []string
-			var buff bytes.Buffer
 			w := &K8SWriter{
-				Buff:   &buff,
 				Output: func(line string) { got = append(got, line) },
 			}
 			for _, chunk := range tt.chunks {

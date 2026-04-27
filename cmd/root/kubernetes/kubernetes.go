@@ -339,9 +339,7 @@ func (c *KubeCtlAPIActions) HostExecuteAndStream(mask bool, hostString string, o
 	if err != nil {
 		return err
 	}
-	var buff bytes.Buffer
 	writer := &K8SWriter{
-		Buff:   &buff,
 		Output: output,
 	}
 
@@ -368,7 +366,6 @@ func (c *KubeCtlAPIActions) HostExecuteAndStream(mask bool, hostString string, o
 
 type K8SWriter struct {
 	Output  cli.OutputHandler
-	Buff    *bytes.Buffer
 	partial strings.Builder // buffers an incomplete line across Write calls
 }
 
@@ -387,7 +384,7 @@ func (w *K8SWriter) Write(p []byte) (n int, err error) {
 		w.partial.Reset()
 		data = data[idx+1:]
 	}
-	return w.Buff.Write(p)
+	return len(p), nil
 }
 
 // Flush sends any remaining partial line to the output handler.

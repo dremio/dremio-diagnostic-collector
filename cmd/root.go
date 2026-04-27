@@ -570,7 +570,14 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 }
 
 // diagLogDays returns the unified day limit for diagnosis mode log collection.
+// Returns 0 in non-diagnosis modes so the default value Cobra writes into
+// daysFlag at init() time (a side effect of registering --days only on
+// diagnosis subcommands) does not leak into standard mode and override
+// per-log day flags like --queries-perf-num-days.
 func diagLogDays() int {
+	if collectionMode != collects.DiagnosisCollection {
+		return 0
+	}
 	return daysFlag
 }
 
@@ -1105,6 +1112,8 @@ func Execute(args []string) error {
 			}
 		}
 		simplelog.Debugf("system tables to collect (%d): %v", len(systemTablesList), systemTablesList)
+		simplelog.Infof("collection args resolved: mode=%s daysFlag=%d diagLogDays=%d queriesPerfNumDays=%d queriesJSONNumDays=%d serverLogsNumDays=%d trackerJSONNumDays=%d vacuumLogNumDays=%d startDate=%q",
+			collectionMode, daysFlag, diagLogDays(), queriesPerfNumDays, queriesJSONNumDays, serverLogsNumDays, trackerJSONNumDays, vacuumLogNumDays, startDate)
 		collectionArgs := collection.Args{
 			OutputLoc:             filepath.Clean(outputLoc),
 			DDCfs:                 helpers.NewRealFileSystem(),

@@ -332,6 +332,8 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	var mu sync.Mutex
 	var writeErr error
 	lineCount := 0
+	lastUI := time.Now()
+	lastLog := time.Now()
 
 	handler := func(line string) {
 		mu.Lock()
@@ -344,19 +346,34 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 			return
 		}
 		lineCount++
-		if totalRecords > 0 && (lineCount%100 == 0 || lineCount >= totalRecords) {
-			if lineCount >= totalRecords {
+		// Update UX on first record, every 2s, every 100 records, or on completion —
+		// whichever comes first. Time-based update keeps progress responsive even when
+		// records are large or arrive slowly.
+		if lineCount == 1 || lineCount%100 == 0 || lineCount >= totalRecords || time.Since(lastUI) >= 2*time.Second {
+			if totalRecords > 0 && lineCount >= totalRecords {
 				consoleprint.UpdateNodeState(consoleprint.NodeState{
 					Node:     host,
 					StatusUX: fmt.Sprintf("Finalizing queries-perf data (%d queries)", lineCount),
 				})
-			} else {
+			} else if totalRecords > 0 {
 				pct := lineCount * 100 / totalRecords
 				consoleprint.UpdateNodeState(consoleprint.NodeState{
 					Node:     host,
 					StatusUX: fmt.Sprintf("Collecting queries-perf data (%d of %d)     [%d%%]", lineCount, totalRecords, pct),
 				})
+			} else {
+				consoleprint.UpdateNodeState(consoleprint.NodeState{
+					Node:     host,
+					StatusUX: fmt.Sprintf("Collecting queries-perf data (%d queries)", lineCount),
+				})
 			}
+			lastUI = time.Now()
+		}
+		// Per-1000-record / per-10s log so ddc.log records the true streaming rate
+		// independently of UI throttling — useful when triaging "stuck" reports.
+		if lineCount%1000 == 0 || time.Since(lastLog) >= 10*time.Second {
+			simplelog.Infof("rocksdb-viewer queries_perf streaming on %s: %d/%d records", host, lineCount, totalRecords)
+			lastLog = time.Now()
 		}
 	}
 
