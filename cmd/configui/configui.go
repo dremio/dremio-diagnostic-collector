@@ -819,15 +819,10 @@ func buildStandardCLICommand(cfg *StandardConfig, queryDays, queriesPerfDays, se
 		parts = append(parts, fmt.Sprintf("  --collect-container-logs=%t"+cont, cfg.CollectContainerLogs))
 	}
 
-	// WLM and system tables
+	// WLM and system tables — always emit --system-tables, even when empty,
+	// so the user's deselection overrides the non-empty package default.
 	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t"+cont, cfg.CollectWLM))
-	if len(cfg.SystemTables) > 0 {
-		parts = append(parts, fmt.Sprintf("  --system-tables=%s", strings.Join(cfg.SystemTables, ",")))
-	} else {
-		// Remove trailing continuation from last line
-		last := len(parts) - 1
-		parts[last] = strings.TrimSuffix(parts[last], cont)
-	}
+	parts = append(parts, fmt.Sprintf("  --system-tables=%s", strings.Join(cfg.SystemTables, ",")))
 
 	return strings.Join(parts, "\n")
 }
@@ -902,11 +897,10 @@ func buildDiagnosisCLICommand(cfg *DiagnosisConfig, tools *[]string, nodes *[]st
 		parts = append(parts, fmt.Sprintf("  --nodes=%s"+cont, strings.Join(*nodes, ",")))
 	}
 
-	// PAT-dependent collections
+	// PAT-dependent collections — always emit --system-tables, even when empty,
+	// so the user's deselection overrides the non-empty package default.
 	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t --collect-kvstore-report=%t --collect-problematic-profiles=%t"+cont, cfg.CollectWLM, cfg.CollectKVStore, cfg.CollectProblematicProfiles))
-	if len(cfg.SystemTables) > 0 {
-		parts = append(parts, fmt.Sprintf("  --system-tables=%s"+cont, strings.Join(cfg.SystemTables, ",")))
-	}
+	parts = append(parts, fmt.Sprintf("  --system-tables=%s"+cont, strings.Join(cfg.SystemTables, ",")))
 
 	// Endpoint and PAT
 	if cfg.PATToken != "" {

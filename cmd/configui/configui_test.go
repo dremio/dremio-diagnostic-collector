@@ -95,6 +95,36 @@ func TestBuildStandardCLICommand_QueriesPerfEnabled(t *testing.T) {
 	}
 }
 
+// TestBuildStandardCLICommand_NoSystemTables verifies that deselecting all
+// system tables in the TUI produces a CLI command with --system-tables=
+// (empty value). Without this, re-running the generated command would fall
+// back to the package-level default (a non-empty list of tables) and collect
+// system tables despite the user's deselection.
+func TestBuildStandardCLICommand_NoSystemTables(t *testing.T) {
+	cfg := &StandardConfig{
+		Transport:         "k8s",
+		Namespace:         "dremio-ns",
+		CoordinatorLogDir: "/var/log/dremio",
+		ExecutorLogDir:    "/var/log/dremio",
+		DremioConfDir:     "/opt/dremio/conf",
+		DremioRocksDBDir:  "/opt/dremio/data/db",
+		CollectWLM:        true,
+		SystemTables:      nil, // user deselected all tables
+	}
+	cmd := buildStandardCLICommand(cfg, 7, 7, 1, 1, 1)
+	if !strings.Contains(cmd, "--system-tables=") {
+		t.Errorf("expected --system-tables= flag to be emitted even when SystemTables is empty, got:\n%s", cmd)
+	}
+	// Reject any non-empty system-tables value (e.g. --system-tables=options,...).
+	for _, line := range strings.Split(cmd, "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "`"))
+		trimmed = strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))
+		if strings.HasPrefix(trimmed, "--system-tables=") && trimmed != "--system-tables=" {
+			t.Errorf("expected --system-tables= with empty value, got %q in:\n%s", trimmed, cmd)
+		}
+	}
+}
+
 func TestBuildStandardCLICommand_WithoutContext(t *testing.T) {
 	cfg := &StandardConfig{
 		Transport:         "k8s",
@@ -157,6 +187,36 @@ func TestBuildDiagnosisCLICommand_QueriesPerfEnabled(t *testing.T) {
 	cmd := buildDiagnosisCLICommand(cfg, &allTools, nil, &days, &dur, new(string))
 	if !strings.Contains(cmd, "--collect-queries-perf-json=true") {
 		t.Errorf("expected --collect-queries-perf-json=true when CollectQueriesPerf is true, got:\n%s", cmd)
+	}
+}
+
+// TestBuildDiagnosisCLICommand_NoSystemTables verifies that deselecting all
+// system tables in the TUI produces a diagnosis CLI command with --system-tables=
+// (empty value). Same rationale as the standard-mode counterpart: without this,
+// re-running the generated command would silently collect system tables.
+func TestBuildDiagnosisCLICommand_NoSystemTables(t *testing.T) {
+	days := "3"
+	dur := "60"
+	cfg := &DiagnosisConfig{
+		Transport:         "k8s",
+		Namespace:         "dremio-ns",
+		CoordinatorLogDir: "/var/log/dremio",
+		ExecutorLogDir:    "/var/log/dremio",
+		DremioConfDir:     "/opt/dremio/conf",
+		DremioRocksDBDir:  "/opt/dremio/data/db",
+		CollectWLM:        true,
+		SystemTables:      nil, // user deselected all tables
+	}
+	cmd := buildDiagnosisCLICommand(cfg, &allTools, nil, &days, &dur, new(string))
+	if !strings.Contains(cmd, "--system-tables=") {
+		t.Errorf("expected --system-tables= flag to be emitted even when SystemTables is empty, got:\n%s", cmd)
+	}
+	for _, line := range strings.Split(cmd, "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "`"))
+		trimmed = strings.TrimSpace(strings.TrimSuffix(trimmed, "\\"))
+		if strings.HasPrefix(trimmed, "--system-tables=") && trimmed != "--system-tables=" {
+			t.Errorf("expected --system-tables= with empty value, got %q in:\n%s", trimmed, cmd)
+		}
 	}
 }
 
