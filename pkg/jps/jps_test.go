@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/jps"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
@@ -40,9 +41,32 @@ func TestJvmFlagCapture(t *testing.T) {
 	}()
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	flags, err := jps.CaptureFlagsFromPID(hook, cmd.Process.Pid)
-	if err != nil {
-		t.Fatalf("expected no error but got %v", err)
+
+	// Poll until the JVM has registered itself with hsperfdata and shows up
+	// in jps output. There's a short, race-prone window between cmd.Start()
+	// and JVM self-registration; in CI we routinely saw the test hit jps
+	// before the PID was visible. Polling makes the test deterministic
+	// without depending on an arbitrary fixed sleep.
+	const (
+		maxWait      = 30 * time.Second
+		pollInterval = 200 * time.Millisecond
+	)
+	var (
+		flags   string
+		err     error
+		attempt int
+	)
+	deadline := time.Now().Add(maxWait)
+	for {
+		attempt++
+		flags, err = jps.CaptureFlagsFromPID(hook, cmd.Process.Pid)
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected no error within %v (attempt %d) but got %v", maxWait, attempt, err)
+		}
+		time.Sleep(pollInterval)
 	}
 	expected := "-Dmyflag=1 -Xmx512M"
 	if !strings.Contains(flags, expected) {
