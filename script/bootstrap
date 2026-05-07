@@ -41,7 +41,7 @@ date "+%H:%M:%S"
 if ! type "upx" > /dev/null; then
     echo "upx not found installing…"
     date "+%H:%M:%S"
-    UPX_VERSION=5.1.1
+    UPX_VERSION=4.2.4
     OS="`uname`"
     case $OS in
       'Linux')

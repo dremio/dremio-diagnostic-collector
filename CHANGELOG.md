@@ -1,8 +1,9 @@
 # Changelog
 
-## [4.0.0-beta3]
+## [4.0.0-rc.1]
 
 - TUI prompts for kubeconfig path when none is auto-detected; new --kubeconfig flag on k8s and local-k8s subcommands.
+- Downgraded UPX 4.2.4 because of WSL issues.
 
 ## [4.0.0-beta1] - 2026-04-16
 
