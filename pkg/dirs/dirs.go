@@ -20,6 +20,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 )
@@ -113,8 +114,10 @@ func ExpandTilde(path string) string {
 		if len(path) == 1 {
 			return home
 		}
-		// Strip the leading "~" then join — filepath.Join normalises separators.
-		return filepath.Join(home, path[2:])
+		// Strip the leading "~" then join. Normalise backslashes to slashes
+		// so windows-style paths resolve correctly on non-Windows hosts too;
+		// filepath.Join converts to the native separator when running on Windows.
+		return filepath.Join(home, strings.ReplaceAll(path[2:], `\`, "/"))
 	}
 	// "~user/..." — leave alone.
 	return path
