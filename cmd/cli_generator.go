@@ -33,6 +33,7 @@ func CLIShellFormat() (binary, continuation, patEnvVar string) {
 type CLICommandConfig struct {
 	Transport        string // "ssh", "k8s", "local", or "local-k8s"
 	Mode             string
+	Kubeconfig       string // K8s/local-k8s — emitted only if non-empty
 	Namespace        string // K8s transport
 	Coordinator      string // SSH transport
 	Executors        string
@@ -63,6 +64,9 @@ func GenerateCLICommand(c CLICommandConfig) string {
 	parts = append(parts, c.Mode)
 
 	// Transport flags — always included
+	if c.Kubeconfig != "" {
+		parts = append(parts, fmt.Sprintf("--kubeconfig=%s", c.Kubeconfig))
+	}
 	if c.Namespace != "" {
 		parts = append(parts, fmt.Sprintf("--namespace=%s", c.Namespace))
 	}

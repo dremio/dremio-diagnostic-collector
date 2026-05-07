@@ -18,6 +18,7 @@ package dirs_test
 import (
 	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -58,6 +59,34 @@ func TestCheckDirectoryEmpty(t *testing.T) {
 func TestCheckDirectoryNotPresent(t *testing.T) {
 	if err := dirs.CheckDirectory(filepath.Join("testdata", "fdljk"), func([]fs.DirEntry) error { return nil }); err == nil {
 		t.Error("expected an error")
+	}
+}
+
+func TestExpandTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir failed: %v", err)
+	}
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty string", "", ""},
+		{"no tilde", "/etc/passwd", "/etc/passwd"},
+		{"tilde alone", "~", home},
+		{"tilde slash", "~/.kube/config", filepath.Join(home, ".kube", "config")},
+		{"tilde backslash (windows-style)", `~\.kube\config`, filepath.Join(home, ".kube", "config")},
+		{"tilde user (unsupported, untouched)", "~someone/file", "~someone/file"},
+		{"tilde in middle (untouched)", "/foo/~bar", "/foo/~bar"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := dirs.ExpandTilde(tc.in)
+			if got != tc.want {
+				t.Errorf("ExpandTilde(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 

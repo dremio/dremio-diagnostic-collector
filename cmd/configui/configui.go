@@ -57,6 +57,7 @@ type StandardConfig struct {
 	// Transport info (set by caller, not shown in form — used for CLI command generation).
 	Transport   string // "ssh", "k8s", "local", or "local-k8s"
 	Namespace   string
+	Kubeconfig  string // empty unless user supplied a non-default kubeconfig path
 	Coordinator string
 	Executors   string
 	SSHUser     string
@@ -95,6 +96,7 @@ type DiagnosisConfig struct {
 	// Transport info (set by caller, not shown in form — used for CLI command generation).
 	Transport   string // "ssh", "k8s", "local", or "local-k8s"
 	Namespace   string
+	Kubeconfig  string // empty unless user supplied a non-default kubeconfig path
 	Coordinator string
 	Executors   string
 	SSHUser     string
@@ -227,6 +229,7 @@ type DetectedPaths struct {
 	// Transport info — set by caller for CLI command generation.
 	Transport   string // "ssh", "k8s", "local", or "local-k8s"
 	Namespace   string
+	Kubeconfig  string // empty unless user supplied a non-default kubeconfig path
 	Coordinator string
 	Executors   string
 	SSHUser     string
@@ -288,6 +291,7 @@ func RunStandardConfigScreen(detected *DetectedPaths, _ string) (*StandardConfig
 	if detected != nil {
 		cfg.Transport = detected.Transport
 		cfg.Namespace = detected.Namespace
+		cfg.Kubeconfig = detected.Kubeconfig
 		cfg.Coordinator = detected.Coordinator
 		cfg.Executors = detected.Executors
 		cfg.SSHUser = detected.SSHUser
@@ -433,6 +437,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 	if detected != nil {
 		cfg.Transport = detected.Transport
 		cfg.Namespace = detected.Namespace
+		cfg.Kubeconfig = detected.Kubeconfig
 		cfg.Coordinator = detected.Coordinator
 		cfg.Executors = detected.Executors
 		cfg.SSHUser = detected.SSHUser
@@ -751,14 +756,20 @@ func syncDiagLogTypes(cfg *DiagnosisConfig, logTypes []string) {
 
 // appendTransportAndPathFlags appends the transport-specific flags (namespace/coordinator/ssh-user/dremio-home)
 // and path flags (log dirs, conf dir, rocksdb dir) shared by both CLI command builders.
-func appendTransportAndPathFlags(parts []string, transport, namespace, k8sContext, coordinator, executors, sshUser, dremioHome, coordinatorLogDir, executorLogDir, confDir, rocksdbDir, cont string) []string {
+func appendTransportAndPathFlags(parts []string, transport, namespace, k8sContext, kubeconfig, coordinator, executors, sshUser, dremioHome, coordinatorLogDir, executorLogDir, confDir, rocksdbDir, cont string) []string {
 	switch transport {
-	case "k8s":
-		line := fmt.Sprintf("  --namespace=%s", namespace)
-		if k8sContext != "" {
-			line += fmt.Sprintf(" --context=%s", k8sContext)
+	case "k8s", "local-k8s":
+		// --kubeconfig appears on its own line above --namespace, only if user supplied one.
+		if kubeconfig != "" {
+			parts = append(parts, fmt.Sprintf("  --kubeconfig=%s"+cont, kubeconfig))
 		}
-		parts = append(parts, line+cont)
+		if transport == "k8s" {
+			line := fmt.Sprintf("  --namespace=%s", namespace)
+			if k8sContext != "" {
+				line += fmt.Sprintf(" --context=%s", k8sContext)
+			}
+			parts = append(parts, line+cont)
+		}
 	case "ssh":
 		parts = append(parts, fmt.Sprintf("  --coordinator=%s"+cont, coordinator))
 		if executors != "" {
@@ -785,7 +796,7 @@ func buildStandardCLICommand(cfg *StandardConfig, queryDays, queriesPerfDays, se
 	var parts []string
 
 	parts = append(parts, bin+" collect "+cfg.Transport+" standard"+cont)
-	parts = appendTransportAndPathFlags(parts, cfg.Transport, cfg.Namespace, cfg.K8sContext, cfg.Coordinator, cfg.Executors, cfg.SSHUser, cfg.DremioHome, cfg.CoordinatorLogDir, cfg.ExecutorLogDir, cfg.DremioConfDir, cfg.DremioRocksDBDir, cont)
+	parts = appendTransportAndPathFlags(parts, cfg.Transport, cfg.Namespace, cfg.K8sContext, cfg.Kubeconfig, cfg.Coordinator, cfg.Executors, cfg.SSHUser, cfg.DremioHome, cfg.CoordinatorLogDir, cfg.ExecutorLogDir, cfg.DremioConfDir, cfg.DremioRocksDBDir, cont)
 
 	// Log collection
 	if serverDays > 0 {
@@ -856,7 +867,7 @@ func buildDiagnosisCLICommand(cfg *DiagnosisConfig, tools *[]string, nodes *[]st
 	var parts []string
 
 	parts = append(parts, bin+" collect "+cfg.Transport+" diagnosis"+cont)
-	parts = appendTransportAndPathFlags(parts, cfg.Transport, cfg.Namespace, cfg.K8sContext, cfg.Coordinator, cfg.Executors, cfg.SSHUser, cfg.DremioHome, cfg.CoordinatorLogDir, cfg.ExecutorLogDir, cfg.DremioConfDir, cfg.DremioRocksDBDir, cont)
+	parts = appendTransportAndPathFlags(parts, cfg.Transport, cfg.Namespace, cfg.K8sContext, cfg.Kubeconfig, cfg.Coordinator, cfg.Executors, cfg.SSHUser, cfg.DremioHome, cfg.CoordinatorLogDir, cfg.ExecutorLogDir, cfg.DremioConfDir, cfg.DremioRocksDBDir, cont)
 	// Start date + days on one line
 	dateDaysLine := "  "
 	if dateStart != nil && *dateStart != "" {

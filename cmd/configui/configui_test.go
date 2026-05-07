@@ -564,3 +564,42 @@ func TestBuildDiagnosisCLICommand_LocalTransport(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildStandardCLICommand_KubeconfigEmittedAboveNamespace(t *testing.T) {
+	cfg := &StandardConfig{
+		Transport:         "k8s",
+		Namespace:         "dremio",
+		Kubeconfig:        "/home/user/.kube/config",
+		CoordinatorLogDir: "/var/log/dremio",
+		ExecutorLogDir:    "/var/log/dremio",
+		DremioConfDir:     "/etc/dremio",
+		DremioRocksDBDir:  "/var/dremio/db",
+	}
+	out := buildStandardCLICommand(cfg, 0, 0, 0, 0, 0)
+	if !strings.Contains(out, "--kubeconfig=/home/user/.kube/config") {
+		t.Errorf("expected --kubeconfig in output, got:\n%s", out)
+	}
+	kIdx := strings.Index(out, "--kubeconfig=")
+	nIdx := strings.Index(out, "--namespace=")
+	if kIdx < 0 || nIdx < 0 {
+		t.Fatalf("missing flags:\n%s", out)
+	}
+	if kIdx > nIdx {
+		t.Errorf("--kubeconfig must appear before --namespace; got:\n%s", out)
+	}
+}
+
+func TestBuildStandardCLICommand_KubeconfigOmittedWhenEmpty(t *testing.T) {
+	cfg := &StandardConfig{
+		Transport:         "k8s",
+		Namespace:         "dremio",
+		CoordinatorLogDir: "/var/log/dremio",
+		ExecutorLogDir:    "/var/log/dremio",
+		DremioConfDir:     "/etc/dremio",
+		DremioRocksDBDir:  "/var/dremio/db",
+	}
+	out := buildStandardCLICommand(cfg, 0, 0, 0, 0, 0)
+	if strings.Contains(out, "--kubeconfig") {
+		t.Errorf("expected NO --kubeconfig (empty Kubeconfig field), got:\n%s", out)
+	}
+}

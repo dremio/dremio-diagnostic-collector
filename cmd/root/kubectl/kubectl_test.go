@@ -55,11 +55,11 @@ func TestKubectlExec(t *testing.T) {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
 	var expectedCall []string
-	expectedCall = []string{"kubectl", "-n", "testns", "--context", k8sContext, "get", "pods", podName, "-o", "jsonpath={.spec.containers[*].name}"}
+	expectedCall = []string{"kubectl", "--context", k8sContext, "-n", "testns", "get", "pods", podName, "-o", "jsonpath={.spec.containers[*].name}"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
-	expectedCall = []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-executor", podName, "--", "sh", "-c", "ls -l"}
+	expectedCall = []string{"kubectl", "--context", k8sContext, "exec", "-n", namespace, "-c", "dremio-executor", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -95,7 +95,7 @@ func TestKubectlSearch(t *testing.T) {
 	if len(calls) != 4 {
 		t.Errorf("expected 4 call but got %v", len(calls))
 	}
-	expectedCall := []string{"kubectl", "get", "pods", "-n", namespace, "--context", k8sContext, "-l", "role=dremio-pods", "--field-selector", "status.phase=Running", "-o", "name"}
+	expectedCall := []string{"kubectl", "--context", k8sContext, "get", "pods", "-n", namespace, "-l", "role=dremio-pods", "--field-selector", "status.phase=Running", "-o", "name"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[0])
 	}
@@ -131,7 +131,7 @@ func TestKubectlContainerDetectionWithSidecars(t *testing.T) {
 	}
 
 	// Should use dremio-coordinator, not istio-proxy
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "dremio-coordinator", podName, "--", "sh", "-c", "ls -l"}
+	expectedCall := []string{"kubectl", "--context", k8sContext, "exec", "-n", namespace, "-c", "dremio-coordinator", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -167,7 +167,7 @@ func TestKubectlContainerDetectionFallback(t *testing.T) {
 	}
 
 	// Should fall back to first container (istio-proxy)
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "istio-proxy", podName, "--", "sh", "-c", "ls -l"}
+	expectedCall := []string{"kubectl", "--context", k8sContext, "exec", "-n", namespace, "-c", "istio-proxy", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -203,7 +203,7 @@ func TestKubectlContainerDetectionWithDremioInName(t *testing.T) {
 	}
 
 	// Should use my-custom-dremio-app because it contains "dremio"
-	expectedCall := []string{"kubectl", "exec", "-n", namespace, "--context", k8sContext, "-c", "my-custom-dremio-app", podName, "--", "sh", "-c", "ls -l"}
+	expectedCall := []string{"kubectl", "--context", k8sContext, "exec", "-n", namespace, "-c", "my-custom-dremio-app", podName, "--", "sh", "-c", "ls -l"}
 	if !reflect.DeepEqual(calls[1], expectedCall) {
 		t.Errorf("\nexpected call\n%v\nbut got\n%v", expectedCall, calls[1])
 	}
@@ -265,6 +265,29 @@ func TestKubectlCtrlVersion(t *testing.T) {
 	}
 	if !result {
 		t.Error("failed should be able to retry on new exec")
+	}
+}
+
+func TestCliK8sActions_k8sFlags(t *testing.T) {
+	tests := []struct {
+		name       string
+		kubeconfig string
+		context    string
+		want       []string
+	}{
+		{"both empty", "", "", nil},
+		{"only kubeconfig", "/tmp/cfg", "", []string{"--kubeconfig", "/tmp/cfg"}},
+		{"only context", "", "prod", []string{"--context", "prod"}},
+		{"both", "/tmp/cfg", "prod", []string{"--kubeconfig", "/tmp/cfg", "--context", "prod"}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &CliK8sActions{kubeconfigPath: tc.kubeconfig, k8sContext: tc.context}
+			got := c.k8sFlags()
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

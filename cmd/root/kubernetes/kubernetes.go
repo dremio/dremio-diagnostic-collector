@@ -35,6 +35,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/collection"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/archive"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/dirs"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/masking"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
@@ -48,15 +49,16 @@ import (
 )
 
 type KubeArgs struct {
-	Namespace     string
-	K8SContext    string
-	LabelSelector string
+	Namespace      string
+	K8SContext     string
+	LabelSelector  string
+	KubeconfigPath string
 }
 
 // NewK8sAPI is the only supported way to initialize the NewK8sAPI struct
 // one must pass the path to kubectl
 func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions, error) {
-	clientset, config, err := GetClientset(kubeArgs.K8SContext)
+	clientset, config, err := GetClientset(kubeArgs.K8SContext, kubeArgs.KubeconfigPath)
 	if err != nil {
 		return &KubeCtlAPIActions{}, err
 	}
@@ -76,29 +78,31 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 	}, nil
 }
 
-func GetClientset(k8sContext string) (*kubernetes.Clientset, *rest.Config, error) {
-	kubeConfig := os.Getenv("KUBECONFIG")
-	if kubeConfig == "" {
-		home, err := os.UserHomeDir()
+// GetClientset returns a clientset and rest.Config using the supplied
+// kubeconfigPath if non-empty (with precedence: explicit → $KUBECONFIG →
+// ~/.kube/config). Falls back to in-cluster config when no kubeconfig
+// file exists.
+func GetClientset(k8sContext, kubeconfigPath string) (*kubernetes.Clientset, *rest.Config, error) {
+	resolved := resolveKubeconfigPath(kubeconfigPath)
+	var config *rest.Config
+	if resolved == "" {
+		// No path determinable — try in-cluster.
+		var err error
+		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, nil, err
 		}
-		kubeConfig = filepath.Join(home, ".kube", "config")
-	}
-	var config *rest.Config
-	_, err := os.Stat(kubeConfig) // #nosec G703 -- kubeConfig is user-provided kubeconfig path
-	if err != nil {
-		// fall back to include config
+	} else if _, err := os.Stat(resolved); err != nil { // #nosec G703 -- resolved is user-supplied kubeconfig path
+		// File does not exist — fall back to in-cluster.
 		config, err = rest.InClusterConfig()
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
 		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfig},
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: resolved},
 			&clientcmd.ConfigOverrides{CurrentContext: k8sContext},
 		)
-		// for when we have a context of "" we need to log the detected default context so we can display this
 		if k8sContext == "" {
 			startConfig, err := clientConfig.ConfigAccess().GetStartingConfig()
 			if err != nil {
@@ -108,6 +112,7 @@ func GetClientset(k8sContext string) (*kubernetes.Clientset, *rest.Config, error
 		} else {
 			simplelog.Infof("using kubernetes context of %v", k8sContext)
 		}
+		var err error
 		config, err = clientConfig.ClientConfig()
 		if err != nil {
 			return nil, nil, err
@@ -596,8 +601,8 @@ func (c *KubeCtlAPIActions) GetExecutors() (podName []string, err error) {
 // classifying each as coordinator or executor based on container names.
 // It uses the same container-name matching logic as SearchPods.
 // This is a standalone function that does not require a full Collector.
-func DiscoverPods(k8sContext, namespace, labelSelector string) (coordinators []string, executors []string, err error) {
-	clientset, _, err := GetClientset(k8sContext)
+func DiscoverPods(k8sContext, namespace, labelSelector, kubeconfigPath string) (coordinators []string, executors []string, err error) {
+	clientset, _, err := GetClientset(k8sContext, kubeconfigPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("DiscoverPods: failed to get clientset: %w", err)
 	}
@@ -710,7 +715,7 @@ func (c *KubeCtlAPIActions) DiscoverFiles(host, logDir, confDir string) (*collec
 // CheckRBAC verifies minimum RBAC permissions for DDC collection on the given namespace.
 // It checks: get pods, list pods, create pods/exec.
 // Returns an error listing any missing permissions.
-func CheckRBAC(k8sContext, namespace string) error {
+func CheckRBAC(k8sContext, namespace, kubeconfigPath string) error {
 	checks := []struct {
 		verb     string
 		resource string
@@ -721,10 +726,15 @@ func CheckRBAC(k8sContext, namespace string) error {
 	}
 	var missing []string
 	for _, check := range checks {
-		cmd := exec.Command("kubectl", "auth", "can-i", check.verb, check.resource, "-n", namespace)
-		if k8sContext != "" {
-			cmd = exec.Command("kubectl", "auth", "can-i", check.verb, check.resource, "-n", namespace, "--context", k8sContext)
+		var args []string
+		if kubeconfigPath != "" {
+			args = append(args, "--kubeconfig", kubeconfigPath)
 		}
+		if k8sContext != "" {
+			args = append(args, "--context", k8sContext)
+		}
+		args = append(args, "auth", "can-i", check.verb, check.resource, "-n", namespace)
+		cmd := exec.Command("kubectl", args...)
 		output, err := cmd.CombinedOutput()
 		result := strings.TrimSpace(string(output))
 		if err != nil || result != "yes" {
@@ -738,10 +748,15 @@ func CheckRBAC(k8sContext, namespace string) error {
 }
 
 // ListContexts parses the kubeconfig and returns all context names (sorted)
-// and the current-context. If no kubeconfig file exists (e.g. running in-cluster),
-// it returns (nil, "", nil) so the caller can skip the context picker.
-func ListContexts() (contexts []string, currentContext string, err error) {
+// and the current-context. If kubeconfigPath is non-empty, it is used as
+// the explicit kubeconfig source (overriding $KUBECONFIG and ~/.kube/config).
+// If no kubeconfig file exists (e.g. running in-cluster), it returns
+// (nil, "", nil) so the caller can skip the context picker.
+func ListContexts(kubeconfigPath string) (contexts []string, currentContext string, err error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if resolved := resolveKubeconfigPath(kubeconfigPath); resolved != "" {
+		loadingRules.ExplicitPath = resolved
+	}
 	config, err := loadingRules.Load()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -763,8 +778,8 @@ func ListContexts() (contexts []string, currentContext string, err error) {
 	return contexts, config.CurrentContext, nil
 }
 
-func GetClusters(k8sContext, labelSelector string) ([]string, error) {
-	clientset, _, err := GetClientset(k8sContext)
+func GetClusters(k8sContext, labelSelector, kubeconfigPath string) ([]string, error) {
+	clientset, _, err := GetClientset(k8sContext, kubeconfigPath)
 	if err != nil {
 		return []string{}, err
 	}
@@ -786,4 +801,45 @@ func GetClusters(k8sContext, labelSelector string) ([]string, error) {
 	}
 	sort.Strings(dremioClusters)
 	return dremioClusters, nil
+}
+
+// VerifyConnectivity issues a lightweight namespace-list call against the
+// cluster identified by the given kubeconfigPath and k8sContext. Used by
+// the TUI to confirm the user's kubeconfig actually reaches a cluster
+// before moving on. The returned error wraps the underlying transport or
+// auth error verbatim — callers should surface it to the user.
+func VerifyConnectivity(kubeconfigPath, k8sContext string) error {
+	clientset, _, err := GetClientset(k8sContext, kubeconfigPath)
+	if err != nil {
+		return fmt.Errorf("kubeconfig load: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := clientset.CoreV1().Namespaces().List(ctx, meta_v1.ListOptions{Limit: 1}); err != nil {
+		return fmt.Errorf("cluster reachable check failed: %w", err)
+	}
+	return nil
+}
+
+// resolveKubeconfigPath returns the effective kubeconfig file path with
+// precedence:
+//
+//  1. explicit (e.g. --kubeconfig flag or TUI input), tilde-expanded
+//  2. $KUBECONFIG env var, tilde-expanded
+//  3. $HOME/.kube/config
+//
+// Returns "" only if all three are unavailable (e.g. no home dir).
+// Matches `kubectl --kubeconfig` precedence so flag overrides env.
+func resolveKubeconfigPath(explicit string) string {
+	if explicit != "" {
+		return dirs.ExpandTilde(explicit)
+	}
+	if env := os.Getenv("KUBECONFIG"); env != "" {
+		return dirs.ExpandTilde(env)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".kube", "config")
 }

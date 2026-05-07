@@ -60,7 +60,7 @@ users:
 	}
 	t.Setenv("KUBECONFIG", kubeconfigPath)
 
-	contexts, currentContext, err := ListContexts()
+	contexts, currentContext, err := ListContexts("")
 	if err != nil {
 		t.Fatalf("ListContexts() returned unexpected error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestListContexts_NoKubeconfig(t *testing.T) {
 	nonexistent := filepath.Join(tmpDir, "does-not-exist", "config")
 	t.Setenv("KUBECONFIG", nonexistent)
 
-	contexts, currentContext, err := ListContexts()
+	contexts, currentContext, err := ListContexts("")
 	if err != nil {
 		t.Fatalf("ListContexts() returned unexpected error: %v", err)
 	}
@@ -121,7 +121,7 @@ users:
 	}
 	t.Setenv("KUBECONFIG", kubeconfigPath)
 
-	contexts, currentContext, err := ListContexts()
+	contexts, currentContext, err := ListContexts("")
 	if err != nil {
 		t.Fatalf("ListContexts() returned unexpected error: %v", err)
 	}
@@ -133,5 +133,43 @@ users:
 	}
 	if contexts[0] != "only-ctx" {
 		t.Errorf("contexts[0] = %q, want %q", contexts[0], "only-ctx")
+	}
+}
+
+func TestListContexts_ExplicitPath(t *testing.T) {
+	kubeconfig := `apiVersion: v1
+kind: Config
+current-context: explicit-ctx
+clusters:
+- cluster:
+    server: https://explicit.example.com
+  name: explicit-cluster
+contexts:
+- context:
+    cluster: explicit-cluster
+    user: explicit-user
+  name: explicit-ctx
+users:
+- name: explicit-user
+`
+	tmpDir := t.TempDir()
+	explicitPath := filepath.Join(tmpDir, "explicit-config")
+	if err := os.WriteFile(explicitPath, []byte(kubeconfig), 0600); err != nil {
+		t.Fatalf("write explicit kubeconfig: %v", err)
+	}
+
+	// Set KUBECONFIG to a different (nonexistent) path to prove the explicit
+	// path takes precedence.
+	t.Setenv("KUBECONFIG", filepath.Join(tmpDir, "does-not-exist"))
+
+	contexts, currentContext, err := ListContexts(explicitPath)
+	if err != nil {
+		t.Fatalf("ListContexts(explicitPath) returned error: %v", err)
+	}
+	if currentContext != "explicit-ctx" {
+		t.Errorf("currentContext = %q, want %q", currentContext, "explicit-ctx")
+	}
+	if len(contexts) != 1 || contexts[0] != "explicit-ctx" {
+		t.Errorf("contexts = %v, want [explicit-ctx]", contexts)
 	}
 }

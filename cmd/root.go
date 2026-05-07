@@ -24,6 +24,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -53,6 +54,7 @@ import (
 	k8sapi "k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // in case one needs auth plugins
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -69,6 +71,7 @@ var (
 	sudoUser              string
 	namespace             string
 	k8sContext            string
+	kubeconfigPath        string
 	disableFreeSpaceCheck bool
 	enableKubeCtl         bool
 	collectionMode        collects.CollectionMode
@@ -389,36 +392,55 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 			collectContainerLogs = (collectionMode == collects.DiagnosisCollection)
 		}
 
-		// Auto-detect namespace and set up K8s cluster-level collection
+		// Auto-detect namespace; fall back to kubeconfig current-context if
+		// no service-account file is present.
 		const nsPath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 		detectedNS, nsErr := detectK8sNamespace(nsPath)
-		if nsErr != nil {
-			simplelog.Warningf("local-k8s: K8s API unavailable (namespace detection failed: %v) — skipping cluster resource and container log collection", nsErr)
-		} else {
-			restCfg, cfgErr := rest.InClusterConfig()
-			if cfgErr != nil {
-				simplelog.Warningf("local-k8s: K8s API unavailable (in-cluster config failed: %v) — skipping cluster resource and container log collection", cfgErr)
+
+		// Try in-cluster config first; if that fails, fall back to a
+		// user-supplied kubeconfig (flag → env → home).
+		var clientSet *k8sapi.Clientset
+		restCfg, cfgErr := rest.InClusterConfig()
+		if cfgErr == nil {
+			kclientSet, csErr := k8sapi.NewForConfig(restCfg)
+			if csErr != nil {
+				simplelog.Warningf("local-k8s: K8s API unavailable (clientset creation failed: %v) — skipping cluster resource and container log collection", csErr)
 			} else {
-				clientSet, csErr := k8sapi.NewForConfig(restCfg)
-				if csErr != nil {
-					simplelog.Warningf("local-k8s: K8s API unavailable (clientset creation failed: %v) — skipping cluster resource and container log collection", csErr)
-				} else {
-					simplelog.Infof("local-k8s: K8s API available, namespace=%s — collecting cluster resources and container logs", detectedNS)
-					clusterCollect = func() {
-						if err := collection.ClusterK8sExecute(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
-							simplelog.Errorf("local-k8s: error collecting K8s resources: %v", err)
-						}
-						if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
-							simplelog.Errorf("local-k8s: error collecting previous container logs for restarted pods: %v", err)
-						}
-						if collectContainerLogs {
-							if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
-								simplelog.Errorf("local-k8s: error collecting container logs: %v", err)
-							}
-						} else {
-							simplelog.Info("local-k8s: skipping container log collection (disabled)")
-						}
+				clientSet = kclientSet
+			}
+		} else {
+			kclientSet, _, kcErr := kubernetes.GetClientset("", kubeconfigPath)
+			if kcErr != nil {
+				simplelog.Warningf("local-k8s: K8s API unavailable (in-cluster config failed: %v; kubeconfig fallback also failed: %v) — skipping cluster resource and container log collection", cfgErr, kcErr)
+			} else {
+				clientSet = kclientSet
+				simplelog.Info("local-k8s: using kubeconfig fallback for K8s API access")
+				// If the namespace file wasn't readable, use the kubeconfig's current-context namespace.
+				if nsErr != nil {
+					if nsFromKubeconfig, kcNsErr := readNamespaceFromKubeconfig(kubeconfigPath); kcNsErr == nil && nsFromKubeconfig != "" {
+						detectedNS = nsFromKubeconfig
+						nsErr = nil
 					}
+				}
+			}
+		}
+		if nsErr != nil {
+			simplelog.Warningf("local-k8s: namespace detection failed (%v) and no fallback available — skipping cluster resource and container log collection", nsErr)
+		} else if clientSet != nil {
+			simplelog.Infof("local-k8s: K8s API available, namespace=%s — collecting cluster resources and container logs", detectedNS)
+			clusterCollect = func() {
+				if err := collection.ClusterK8sExecute(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
+					simplelog.Errorf("local-k8s: error collecting K8s resources: %v", err)
+				}
+				if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
+					simplelog.Errorf("local-k8s: error collecting previous container logs for restarted pods: %v", err)
+				}
+				if collectContainerLogs {
+					if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
+						simplelog.Errorf("local-k8s: error collecting container logs: %v", err)
+					}
+				} else {
+					simplelog.Info("local-k8s: skipping container log collection (disabled)")
 				}
 			}
 		}
@@ -458,7 +480,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		_ = spinner.New().
 			Title("Checking Kubernetes permissions...").
 			Action(func() {
-				if err := kubernetes.CheckRBAC(kubeArgs.K8SContext, kubeArgs.Namespace); err != nil {
+				if err := kubernetes.CheckRBAC(kubeArgs.K8SContext, kubeArgs.Namespace, kubeArgs.KubeconfigPath); err != nil {
 					simplelog.Warningf("RBAC check: %v", err)
 				}
 			}).
@@ -487,7 +509,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 		}
 
 		clusterCollect = func() {
-			clientSet, _, err := kubernetes.GetClientset(k8sContext)
+			clientSet, _, err := kubernetes.GetClientset(k8sContext, kubeconfigPath)
 			if err != nil {
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 				return
@@ -893,11 +915,24 @@ func Execute(args []string) error {
 				coordinatorStr = strings.ReplaceAll(coordinatorStr, " ", "")
 				executorsStr = strings.ReplaceAll(executorsStr, " ", "")
 			case "k8s":
-				// Step 3b: K8s context selection (if multiple contexts available)
-				contexts, currentCtx, ctxErr := kubernetes.ListContexts()
+				// Step 3a (new): If no kubeconfig auto-detected (file missing or zero contexts),
+				// prompt for an explicit path with inline validation and a connectivity probe.
+				contexts, currentCtx, ctxErr := kubernetes.ListContexts(kubeconfigPath)
 				if ctxErr != nil {
 					simplelog.Warningf("could not list kubeconfig contexts: %v", ctxErr)
 				}
+				if len(contexts) == 0 {
+					if err := promptKubeconfigPath(); err != nil {
+						return err
+					}
+					// Re-enumerate contexts now that the user has supplied a path.
+					contexts, currentCtx, ctxErr = kubernetes.ListContexts(kubeconfigPath)
+					if ctxErr != nil {
+						simplelog.Warningf("could not list kubeconfig contexts after input: %v", ctxErr)
+					}
+				}
+
+				// Step 3b: K8s context selection (if multiple contexts available)
 				if len(contexts) > 0 {
 					// Preselect the current context.
 					k8sContext = currentCtx
@@ -926,7 +961,7 @@ func Execute(args []string) error {
 				_ = spinner.New().
 					Title("Detecting Kubernetes namespaces...").
 					Action(func() {
-						clustersToList, clusterErr = kubernetes.GetClusters(k8sContext, labelSelector)
+						clustersToList, clusterErr = kubernetes.GetClusters(k8sContext, labelSelector, kubeconfigPath)
 					}).
 					Run()
 				if clusterErr != nil {
@@ -959,7 +994,7 @@ func Execute(args []string) error {
 			if transportCmd == "local" || transportCmd == "local-k8s" {
 				detected = runLocalPathDiscovery()
 			} else {
-				detected = runPathDiscovery(namespace, coordinatorStr, sshUser, sshKeyLoc, k8sContext)
+				detected = runPathDiscovery(namespace, coordinatorStr, sshUser, sshKeyLoc, k8sContext, kubeconfigPath)
 			}
 			switch collectionMode {
 			case collects.StandardCollection:
@@ -1174,9 +1209,10 @@ func Execute(args []string) error {
 			CoordinatorStr: coordinatorStr,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace:     namespace,
-			LabelSelector: labelSelector,
-			K8SContext:    k8sContext,
+			Namespace:      namespace,
+			LabelSelector:  labelSelector,
+			K8SContext:     k8sContext,
+			KubeconfigPath: kubeconfigPath,
 		}
 		// Local transport uses the fallback (local collector) path in RemoteCollect.
 		if transportCmd == "local" {
@@ -1255,6 +1291,7 @@ func init() {
 	// ── K8s transport flags — on K8sCmd.PersistentFlags() ──
 	K8sCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to use for kubernetes pods")
 	K8sCmd.PersistentFlags().StringVarP(&k8sContext, "context", "x", "", "context to use for kubernetes pods")
+	K8sCmd.PersistentFlags().StringVar(&kubeconfigPath, "kubeconfig", "", "path to kubeconfig file (overrides $KUBECONFIG and ~/.kube/config)")
 	K8sCmd.PersistentFlags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
 	K8sCmd.PersistentFlags().BoolVarP(&enableKubeCtl, "enable-kubectl", "d", false, "uses the kubectl CLI for transfers and copying instead of the embedded k8s api client")
 	K8sCmd.PersistentFlags().BoolVar(&collectContainerLogs, "collect-container-logs", false, "collect Kubernetes container logs (default: disabled for standard, enabled for diagnosis)")
@@ -1268,6 +1305,7 @@ func init() {
 	// ── Local-K8s transport flags — on LocalK8sCmd.PersistentFlags() ──
 	LocalK8sCmd.PersistentFlags().StringVar(&dremioHome, "dremio-home", "/opt/dremio", "Dremio installation directory")
 	LocalK8sCmd.PersistentFlags().StringVar(&localLogDir, "local-log-dir", "", "Log directory on this node (autodetected if not specified)")
+	LocalK8sCmd.PersistentFlags().StringVar(&kubeconfigPath, "kubeconfig", "", "path to kubeconfig file used when in-cluster config is unavailable")
 
 	// ── Shared flags — on CollectCmd.PersistentFlags(), inherited by all leaf commands ──
 	CollectCmd.PersistentFlags().BoolVar(&disableFreeSpaceCheck, conf.KeyDisableFreeSpaceCheck, false, "disables the free space check for the output directory")
@@ -1380,6 +1418,30 @@ func detectK8sNamespace(path string) (string, error) {
 	return ns, nil
 }
 
+// readNamespaceFromKubeconfig returns the default namespace declared on the
+// current-context of the supplied kubeconfig (after the standard precedence
+// resolution explicit → $KUBECONFIG → ~/.kube/config). Returns "" with no
+// error if the current-context has no default namespace declared.
+func readNamespaceFromKubeconfig(explicit string) (string, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if explicit != "" {
+		loadingRules.ExplicitPath = dirs.ExpandTilde(explicit)
+	}
+	cfg, err := loadingRules.Load()
+	if err != nil {
+		return "", err
+	}
+	currentCtx := cfg.CurrentContext
+	if currentCtx == "" {
+		return "", nil
+	}
+	ctx, ok := cfg.Contexts[currentCtx]
+	if !ok || ctx == nil {
+		return "", nil
+	}
+	return ctx.Namespace, nil
+}
+
 func validateSSHParameters(sshArgs ssh.Args) error {
 	if sshArgs.SSHKeyLoc == "" {
 		return errors.New("the ssh private key location was empty, pass --ssh-key or -s with the key to get past this error. Example --ssh-key ~/.ssh/id_rsa")
@@ -1442,6 +1504,9 @@ func populateDetectedPaths(detected *configui.DetectedPaths) *configui.DetectedP
 	detected.Transport = transportCmd
 	if detected.Namespace == "" {
 		detected.Namespace = namespace
+	}
+	if detected.Kubeconfig == "" {
+		detected.Kubeconfig = kubeconfigPath
 	}
 	if detected.Coordinator == "" {
 		detected.Coordinator = coordinatorStr
@@ -1518,7 +1583,7 @@ func runDiagnosisConfigScreen(detected *configui.DetectedPaths) error {
 			Title("Discovering Dremio pods...").
 			Action(func() {
 				var discoverErr error
-				discoveredCoordinators, discoveredExecutors, discoverErr = kubernetes.DiscoverPods(k8sContext, namespace, labelSelector)
+				discoveredCoordinators, discoveredExecutors, discoverErr = kubernetes.DiscoverPods(k8sContext, namespace, labelSelector, kubeconfigPath)
 				if discoverErr != nil {
 					simplelog.Warningf("Pod discovery failed: %v. Continuing without node selection.", discoverErr)
 					discoveredCoordinators = nil
@@ -1722,7 +1787,7 @@ func runLocalPathDiscovery() *configui.DetectedPaths {
 // It runs `ps eww` on the target to parse -Ddremio.log.path= and DREMIO_CONF_DIR=
 // from the Dremio process — the same approach used by the main branch.
 // No DDC binary needs to be pre-installed on the target.
-func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx string) *configui.DetectedPaths {
+func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx, kubeconfig string) *configui.DetectedPaths {
 	var targetHost string
 
 	// makeRemoteCmd builds a function that runs a command on the given remote host.
@@ -1730,6 +1795,9 @@ func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx string) *configui.
 		if ns != "" {
 			return func(args ...string) *exec.Cmd {
 				var fullArgs []string
+				if kubeconfig != "" {
+					fullArgs = append(fullArgs, "--kubeconfig", kubeconfig)
+				}
 				if k8sCtx != "" {
 					fullArgs = append(fullArgs, "--context", k8sCtx)
 				}
@@ -1899,7 +1967,15 @@ func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx string) *configui.
 			var executorHost string
 			if ns != "" {
 				// K8s: find first executor pod
-				listCmd := exec.Command("kubectl", "get", "pods", "-n", ns, "-o", "name")
+				var listArgs []string
+				if kubeconfig != "" {
+					listArgs = append(listArgs, "--kubeconfig", kubeconfig)
+				}
+				if k8sCtx != "" {
+					listArgs = append(listArgs, "--context", k8sCtx)
+				}
+				listArgs = append(listArgs, "get", "pods", "-n", ns, "-o", "name")
+				listCmd := exec.Command("kubectl", listArgs...)
 				if listOut, err := listCmd.Output(); err == nil {
 					executorHost = findExecutorPod(string(listOut))
 				}
@@ -1956,4 +2032,61 @@ func extractEnvValue(ps, key string) string {
 		return strings.TrimSpace(rest)
 	}
 	return strings.TrimSpace(rest[:end])
+}
+
+// promptKubeconfigPath shows a TUI input step asking the user for a
+// kubeconfig file path, validates it inline (file/parse/contexts), and then
+// runs a connectivity probe in a spinner. On connectivity failure the form
+// is re-shown up to 2 retries (3 attempts total). On success, the global
+// kubeconfigPath is set. Returns a non-nil error only on user cancel or
+// final retry exhaustion.
+func promptKubeconfigPath() error {
+	placeholder := "/home/you/.kube/config"
+	if runtime.GOOS == "windows" {
+		placeholder = `C:\Users\you\.kube\config`
+	}
+
+	const maxAttempts = 3
+	var entered string
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 && lastErr != nil {
+			fmt.Println()
+			fmt.Println("─────────────────────────────────────────────────────────────")
+			fmt.Printf("unable to reach cluster: %v\n", lastErr)
+			fmt.Println("─────────────────────────────────────────────────────────────")
+			fmt.Println()
+		}
+
+		form := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("Kubeconfig file path").
+					Description("No Kubernetes config auto-detected. Enter the path to your kubeconfig file.").
+					Placeholder(placeholder).
+					Value(&entered).
+					Validate(configui.ValidateKubeconfigPath),
+			),
+		).WithTheme(huh.ThemeCharm())
+		if err := form.Run(); err != nil {
+			return fmt.Errorf("kubeconfig input cancelled: %w", err)
+		}
+
+		// Inline validate has passed (file/parse/contexts). Now probe connectivity.
+		candidate := dirs.ExpandTilde(entered)
+		var probeErr error
+		_ = spinner.New().
+			Title("Verifying cluster connectivity...").
+			Action(func() {
+				probeErr = kubernetes.VerifyConnectivity(candidate, "")
+			}).
+			Run()
+		if probeErr == nil {
+			kubeconfigPath = candidate
+			return nil
+		}
+		simplelog.Warningf("kubeconfig connectivity probe failed (attempt %d/%d): %v", attempt+1, maxAttempts, probeErr)
+		lastErr = probeErr
+	}
+	return fmt.Errorf("could not reach a Kubernetes cluster with any of the supplied kubeconfig paths after %d attempts", maxAttempts)
 }

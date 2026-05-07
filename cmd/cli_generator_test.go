@@ -217,3 +217,43 @@ func TestGenerateCLICommand_LocalK8sDiagnosis(t *testing.T) {
 		t.Error("expected --days=3")
 	}
 }
+
+func TestGenerateCLICommand_KubeconfigEmitted(t *testing.T) {
+	cmd := GenerateCLICommand(CLICommandConfig{
+		Transport:  "k8s",
+		Mode:       "diagnosis",
+		Namespace:  "dremio",
+		Kubeconfig: "/home/user/.kube/config",
+	})
+	if !strings.Contains(cmd, "--kubeconfig=/home/user/.kube/config") {
+		t.Errorf("expected --kubeconfig flag in output, got: %s", cmd)
+	}
+}
+
+func TestGenerateCLICommand_KubeconfigOmittedWhenEmpty(t *testing.T) {
+	cmd := GenerateCLICommand(CLICommandConfig{
+		Transport: "k8s",
+		Mode:      "standard",
+		Namespace: "dremio",
+	})
+	if strings.Contains(cmd, "--kubeconfig") {
+		t.Errorf("expected NO --kubeconfig flag (empty Kubeconfig field), got: %s", cmd)
+	}
+}
+
+func TestGenerateCLICommand_KubeconfigPositionedAboveNamespace(t *testing.T) {
+	cmd := GenerateCLICommand(CLICommandConfig{
+		Transport:  "k8s",
+		Mode:       "standard",
+		Namespace:  "dremio",
+		Kubeconfig: "/path/to/kc",
+	})
+	kIdx := strings.Index(cmd, "--kubeconfig=")
+	nIdx := strings.Index(cmd, "--namespace=")
+	if kIdx < 0 || nIdx < 0 {
+		t.Fatalf("missing flags in output: %s", cmd)
+	}
+	if kIdx > nIdx {
+		t.Errorf("--kubeconfig must appear before --namespace; got: %s", cmd)
+	}
+}

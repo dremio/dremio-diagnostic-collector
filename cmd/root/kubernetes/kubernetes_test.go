@@ -18,7 +18,12 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
@@ -270,5 +275,160 @@ func TestSearchPods_FiltersNonRunningPods(t *testing.T) {
 	}
 	if pods[0] != "dremio-executor-0" {
 		t.Errorf("expected dremio-executor-0, got %v", pods[0])
+	}
+}
+
+func TestGetClientset_ExplicitPathOverridesEnv(t *testing.T) {
+	mkConfig := func(server string) string {
+		return `apiVersion: v1
+kind: Config
+current-context: ctx
+clusters:
+- cluster:
+    server: ` + server + `
+  name: c
+contexts:
+- context:
+    cluster: c
+    user: u
+  name: ctx
+users:
+- name: u
+`
+	}
+	tmpDir := t.TempDir()
+	envPath := filepath.Join(tmpDir, "env-config")
+	explicitPath := filepath.Join(tmpDir, "explicit-config")
+	if err := os.WriteFile(envPath, []byte(mkConfig("https://env.example.com")), 0600); err != nil {
+		t.Fatalf("write env config: %v", err)
+	}
+	if err := os.WriteFile(explicitPath, []byte(mkConfig("https://explicit.example.com")), 0600); err != nil {
+		t.Fatalf("write explicit config: %v", err)
+	}
+	t.Setenv("KUBECONFIG", envPath)
+
+	_, restCfg, err := GetClientset("", explicitPath)
+	if err != nil {
+		t.Fatalf("GetClientset error: %v", err)
+	}
+	if restCfg.Host != "https://explicit.example.com" {
+		t.Errorf("explicit path lost — Host = %q, want https://explicit.example.com", restCfg.Host)
+	}
+
+	// Sanity: when explicit is empty, env wins.
+	_, restCfg, err = GetClientset("", "")
+	if err != nil {
+		t.Fatalf("GetClientset (env-only) error: %v", err)
+	}
+	if restCfg.Host != "https://env.example.com" {
+		t.Errorf("env path not used — Host = %q, want https://env.example.com", restCfg.Host)
+	}
+}
+
+func TestResolveKubeconfigPath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir failed: %v", err)
+	}
+	defaultHomePath := filepath.Join(home, ".kube", "config")
+
+	tests := []struct {
+		name     string
+		explicit string
+		envValue string
+		envSet   bool // distinguishes env-unset from env-empty
+		want     string
+	}{
+		{"explicit wins over env", "/explicit/path", "/env/path", true, "/explicit/path"},
+		{"explicit wins over env (env unset)", "/explicit/path", "", false, "/explicit/path"},
+		{"env used when explicit empty", "", "/env/path", true, "/env/path"},
+		{"home used when both empty", "", "", false, defaultHomePath},
+		{"home used when env empty-string", "", "", true, defaultHomePath},
+		{"explicit tilde expanded", "~/.kube/conf", "", false, filepath.Join(home, ".kube", "conf")},
+		{"env tilde expanded", "", "~/.kube/conf", true, filepath.Join(home, ".kube", "conf")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.envSet {
+				t.Setenv("KUBECONFIG", tc.envValue)
+			} else {
+				// t.Setenv unsets at end, but we need it actually unset for this case.
+				t.Setenv("KUBECONFIG", "")
+				if err := os.Unsetenv("KUBECONFIG"); err != nil {
+					t.Fatalf("unset KUBECONFIG: %v", err)
+				}
+			}
+			got := resolveKubeconfigPath(tc.explicit)
+			if got != tc.want {
+				t.Errorf("resolveKubeconfigPath(%q) = %q, want %q", tc.explicit, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestVerifyConnectivity_Success(t *testing.T) {
+	// Spin up a minimal fake apiserver that returns 200 on namespace list.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/namespaces") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"kind":"NamespaceList","apiVersion":"v1","items":[]}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	// Build a kubeconfig pointing at the fake server.
+	kubeconfig := `apiVersion: v1
+kind: Config
+current-context: fake
+clusters:
+- cluster:
+    server: ` + srv.URL + `
+    insecure-skip-tls-verify: true
+  name: fake
+contexts:
+- context:
+    cluster: fake
+    user: fake
+  name: fake
+users:
+- name: fake
+`
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config")
+	if err := os.WriteFile(cfgPath, []byte(kubeconfig), 0600); err != nil {
+		t.Fatalf("write kubeconfig: %v", err)
+	}
+
+	if err := VerifyConnectivity(cfgPath, ""); err != nil {
+		t.Errorf("VerifyConnectivity returned error: %v", err)
+	}
+}
+
+func TestVerifyConnectivity_Failure(t *testing.T) {
+	// Kubeconfig pointing at a port nothing listens on.
+	kubeconfig := `apiVersion: v1
+kind: Config
+current-context: dead
+clusters:
+- cluster:
+    server: http://127.0.0.1:1
+  name: dead
+contexts:
+- context:
+    cluster: dead
+    user: dead
+  name: dead
+users:
+- name: dead
+`
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config")
+	if err := os.WriteFile(cfgPath, []byte(kubeconfig), 0600); err != nil {
+		t.Fatalf("write kubeconfig: %v", err)
+	}
+	if err := VerifyConnectivity(cfgPath, ""); err == nil {
+		t.Error("VerifyConnectivity expected error, got nil")
 	}
 }

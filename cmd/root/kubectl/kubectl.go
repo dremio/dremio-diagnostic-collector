@@ -49,7 +49,12 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 	cliInstance := cli.NewCli(hook)
 	k8sContext := kubeArgs.K8SContext
 	if k8sContext == "" {
-		k8sContextRaw, err := cliInstance.Execute(false, kubectl, "config", "current-context")
+		ctxArgs := []string{kubectl}
+		if kubeArgs.KubeconfigPath != "" {
+			ctxArgs = append(ctxArgs, "--kubeconfig", kubeArgs.KubeconfigPath)
+		}
+		ctxArgs = append(ctxArgs, "config", "current-context")
+		k8sContextRaw, err := cliInstance.Execute(false, ctxArgs...)
 		if err != nil {
 			return &CliK8sActions{}, fmt.Errorf("unable to retrieve context: %w", err)
 		}
@@ -65,6 +70,7 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 		labelSelector:  kubeArgs.LabelSelector,
 		namespace:      kubeArgs.Namespace,
 		k8sContext:     k8sContext,
+		kubeconfigPath: kubeArgs.KubeconfigPath,
 		pidHosts:       make(map[string]string),
 		retriesEnabled: retriesEnabled,
 	}, nil
@@ -77,13 +83,30 @@ type CliK8sActions struct {
 	kubectlPath    string
 	namespace      string
 	k8sContext     string
+	kubeconfigPath string
 	pidHosts       map[string]string
 	m              sync.Mutex
 	retriesEnabled bool
 }
 
+// k8sFlags returns the cluster-routing flags (--kubeconfig, --context)
+// that must precede any kubectl subcommand. Empty values are omitted.
+// Order matches kubectl convention: global flags before subcommand.
+func (c *CliK8sActions) k8sFlags() []string {
+	var flags []string
+	if c.kubeconfigPath != "" {
+		flags = append(flags, "--kubeconfig", c.kubeconfigPath)
+	}
+	if c.k8sContext != "" {
+		flags = append(flags, "--context", c.k8sContext)
+	}
+	return flags
+}
+
 func CanRetryTransfers(kubectlPath string) (bool, error) {
-	kubectlExec := exec.Command(kubectlPath, "version", "-o", "json")
+	// Use --client so the call doesn't depend on cluster reachability or
+	// a valid kubeconfig — we only parse ClientVersion from the JSON.
+	kubectlExec := exec.Command(kubectlPath, "version", "--client", "-o", "json")
 	out, err := kubectlExec.Output()
 	if err != nil {
 		return false, err
@@ -127,7 +150,10 @@ func (c *CliK8sActions) cleanLocal(rawDest string) string {
 
 func (c *CliK8sActions) getContainerName(podName string) (string, error) {
 	// Get all container names from the pod
-	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "--context", c.k8sContext, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[*].name}`)
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[*].name}`)
+	conts, err := c.cli.Execute(false, args...)
 	if err != nil {
 		return "", err
 	}
@@ -179,14 +205,13 @@ func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, outpu
 	if err != nil {
 		return fmt.Errorf("unable to get container name: %w", err)
 	}
-	var kubectlArgs []string
-	if pat == "" {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
-	} else {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
+	kubectlArgs := []string{c.kubectlPath}
+	kubectlArgs = append(kubectlArgs, c.k8sFlags()...)
+	kubectlArgs = append(kubectlArgs, "exec")
+	if pat != "" {
+		kubectlArgs = append(kubectlArgs, "-i")
 	}
-
-	kubectlArgs = append(kubectlArgs, "sh", "-c", strings.Join(args, " "))
+	kubectlArgs = append(kubectlArgs, "-n", c.namespace, "-c", container, hostString, "--", "sh", "-c", strings.Join(args, " "))
 	return c.cli.ExecuteAndStreamOutput(mask, output, pat, kubectlArgs...)
 }
 
@@ -211,7 +236,9 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %w", err)
 	}
-	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "cp", "-n", c.namespace, "-c", container)
 	args = c.addRetries(args)
 	args = append(args, c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 	return c.cli.Execute(false, args...)
@@ -224,7 +251,10 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", c.labelSelector, "--field-selector", "status.phase=Running", "-o", "name")
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "get", "pods", "-n", c.namespace, "-l", c.labelSelector, "--field-selector", "status.phase=Running", "-o", "name")
+	out, err := c.cli.Execute(false, args...)
 	if err != nil {
 		return []string{}, err
 	}
@@ -286,7 +316,8 @@ func (c *CliK8sActions) CleanupRemote() error {
 			simplelog.Warningf("output of container for host %v: %v", host, err)
 			return
 		}
-		kubectlArgs := []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
+		kubectlArgs := append([]string{}, c.k8sFlags()...)
+		kubectlArgs = append(kubectlArgs, "exec", "-n", c.namespace, "-c", container, host, "--")
 		kubectlArgs = append(kubectlArgs, "cat")
 		kubectlArgs = append(kubectlArgs, pidFile)
 		ctx, timeoutPid := context.WithTimeout(context.Background(), time.Second*time.Duration(30))
@@ -299,7 +330,8 @@ func (c *CliK8sActions) CleanupRemote() error {
 			return
 		}
 		simplelog.Infof("pid for host %v is %v", host, string(out[:]))
-		kubectlArgs = []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
+		kubectlArgs = append([]string{}, c.k8sFlags()...)
+		kubectlArgs = append(kubectlArgs, "exec", "-n", c.namespace, "-c", container, host, "--")
 		kubectlArgs = append(kubectlArgs, "kill")
 		kubectlArgs = append(kubectlArgs, "-15")
 		kubectlArgs = append(kubectlArgs, string(out[:]))
@@ -393,7 +425,8 @@ func (c *CliK8sActions) StreamFromHost(host, remotePath string, writer io.Writer
 	}
 
 	escapedPath := strings.ReplaceAll(remotePath, "'", "'\\''")
-	args := []string{"exec", host, "-n", c.namespace, "-c", containerName, "--", "sh", "-c", fmt.Sprintf("%s '%s'", streamCmd, escapedPath)}
+	args := append([]string{}, c.k8sFlags()...)
+	args = append(args, "exec", host, "-n", c.namespace, "-c", containerName, "--", "sh", "-c", fmt.Sprintf("%s '%s'", streamCmd, escapedPath))
 
 	// #nosec G204 -- arguments are controlled by the caller
 	cmd := exec.Command(c.kubectlPath, args...)
