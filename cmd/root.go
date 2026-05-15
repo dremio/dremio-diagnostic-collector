@@ -30,6 +30,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh/spinner"
 
 	"github.com/charmbracelet/huh"
@@ -810,8 +811,8 @@ func Execute(args []string) error {
 					huh.NewSelect[collects.CollectionMode]().
 						Title("Collection Mode").
 						Options(
-							huh.NewOption("Standard  — Usage data", collects.StandardCollection),
-							huh.NewOption("Diagnosis — Full diagnostics [Support only]", collects.DiagnosisCollection),
+							huh.NewOption("Standard  — Usage data       [Healthcheck, WAF]", collects.StandardCollection),
+							huh.NewOption("Diagnosis — Full diagnostics [Support ONLY]", collects.DiagnosisCollection),
 						).
 						Value(&collectionMode),
 					huh.NewNote().Description("\n\n\n\n\n\n\n\n\n\n"),
@@ -821,17 +822,27 @@ func Execute(args []string) error {
 				os.Exit(0)
 			}
 
-			// Diagnosis mode: show warning before proceeding
+			// Diagnosis mode: gate behind support password before proceeding
 			if collectionMode == collects.DiagnosisCollection {
-				diagProceed := true
+				var pw string
+				diagKeymap := huh.NewDefaultKeyMap()
+				diagKeymap.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"))
 				if err := huh.NewForm(
 					huh.NewGroup(
-						huh.NewConfirm().
+						huh.NewInput().
 							Title("WARNING: Diagnosis mode runs JVM diagnostic tools that may cause\nbrief unresponsiveness on an already degraded cluster.").
-							Value(&diagProceed).Affirmative("Continue").Negative("Cancel"),
+							Description("\nType the support password to continue, or press Esc to cancel.").
+							EchoMode(huh.EchoModePassword).
+							Value(&pw).
+							Validate(func(s string) error {
+								if s != "support" {
+									return fmt.Errorf("incorrect password")
+								}
+								return nil
+							}),
 						huh.NewNote().Description("\n\n\n\n\n\n\n\n\n\n"),
 					),
-				).WithTheme(huh.ThemeCharm()).Run(); err != nil || !diagProceed {
+				).WithTheme(huh.ThemeCharm()).WithKeyMap(diagKeymap).Run(); err != nil {
 					fmt.Println("\nCancelled")
 					os.Exit(0)
 				}
