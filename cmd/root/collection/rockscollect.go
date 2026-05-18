@@ -227,7 +227,7 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 				Node:     host,
 				StatusUX: fmt.Sprintf("Collecting WLM: %s", wt),
 			})
-			fname := fmt.Sprintf("%s.json", wt)
+			fname := strings.TrimPrefix(wt, "wlm_") + ".json"
 			if cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, wt, "wlm", fname); err != nil {
 				simplelog.Errorf("rocksdb %s on %s: %v", wt, host, err)
 			} else if cf != nil {

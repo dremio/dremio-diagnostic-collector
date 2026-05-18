@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -127,4 +128,101 @@ func countLines(data []byte) int {
 		}
 	}
 	return n
+}
+
+func TestWLMFileLayout(t *testing.T) {
+	tmpDir := t.TempDir()
+	cs := &mockCopyStrategy{tmpDir: tmpDir}
+
+	wlmPayloads := map[string]string{
+		"wlm_queues":        `{"queues":[]}`,
+		"wlm_rules":         `{"rules":[]}`,
+		"wlm_engines":       `{"engines":[]}`,
+		"wlm_cluster_usage": `{"cluster_usage":[]}`,
+	}
+
+	mc := &mockStreamCollector{
+		coordinators: []string{"dremio-master-0"},
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			switch {
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64\n", nil
+			case strings.Contains(cmd, "chmod +x"):
+				return "", nil
+			case strings.Contains(cmd, "rm -f"):
+				return "", nil
+			// cluster_stats must succeed so collection reaches the WLM loop
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			for wt, payload := range wlmPayloads {
+				if strings.Contains(cmd, "-type "+wt) {
+					return payload, nil
+				}
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+		copyToHostFunc: func(_, _, _ string) (string, error) { return "", nil },
+	}
+
+	args := RocksCollectArgs{
+		Collector:           mc,
+		CopyStrategy:        cs,
+		Host:                "dremio-master-0",
+		NodeType:            "coordinator",
+		RocksDBDir:          "/opt/dremio/data/db",
+		CollectSystemTables: false,
+		CollectWLM:          true,
+		CollectQueriesPerf:  false,
+	}
+
+	got, err := RunRocksDBCollection(args)
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+
+	wantContent := map[string]string{
+		"queues.json":        `{"queues":[]}`,
+		"rules.json":         `{"rules":[]}`,
+		"engines.json":       `{"engines":[]}`,
+		"cluster_usage.json": `{"cluster_usage":[]}`,
+	}
+
+	var wlmDir string
+	seen := map[string]bool{}
+	for _, cf := range got {
+		base := filepath.Base(cf.Path)
+		want, ok := wantContent[base]
+		if !ok {
+			continue // ignore cluster_stats and anything else
+		}
+		seen[base] = true
+		if wlmDir == "" {
+			wlmDir = filepath.Dir(cf.Path)
+		}
+		data, err := os.ReadFile(cf.Path)
+		if err != nil {
+			t.Errorf("read %s: %v", cf.Path, err)
+			continue
+		}
+		if string(data) != want {
+			t.Errorf("content mismatch for %s: got %q want %q", base, string(data), want)
+		}
+	}
+	for base := range wantContent {
+		if !seen[base] {
+			t.Errorf("expected WLM file %s in returned collected files, but it was not present", base)
+		}
+	}
+	if wlmDir == "" {
+		t.Fatal("no WLM files were returned, cannot perform negative-glob check")
+	}
+	leaks, err := filepath.Glob(filepath.Join(wlmDir, "wlm_*.json"))
+	if err != nil {
+		t.Fatalf("glob failed: %v", err)
+	}
+	if len(leaks) != 0 {
+		t.Errorf("unexpected v4-style filenames present: %v", leaks)
+	}
 }
