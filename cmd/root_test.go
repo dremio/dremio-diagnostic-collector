@@ -449,3 +449,104 @@ func TestDetectNamespaceFromFile_Whitespace(t *testing.T) {
 		t.Errorf("expected 'my-namespace', got %q", ns)
 	}
 }
+
+func TestExtractEnvValue(t *testing.T) {
+	tests := []struct {
+		name string
+		ps   string
+		key  string
+		want string
+	}{
+		{
+			name: "single -D flag",
+			ps:   "java -Ddremio.log.path=/opt/dremio/log -Xmx2g",
+			key:  "-Ddremio.log.path=",
+			want: "/opt/dremio/log",
+		},
+		{
+			name: "duplicate -D flag — last wins (JVM semantics)",
+			ps:   "java -Ddremio.log.path=/opt/dremio/log -Xmx2g -Ddremio.log.path=/opt/dremio/data/log -XX:+UseG1GC",
+			key:  "-Ddremio.log.path=",
+			want: "/opt/dremio/data/log",
+		},
+		{
+			name: "trailing comma is stripped",
+			ps:   "java -Ddremio.log.path=/opt/dremio/log, -Xmx2g",
+			key:  "-Ddremio.log.path=",
+			want: "/opt/dremio/log",
+		},
+		{
+			name: "duplicate with first having trailing comma — last still wins",
+			ps:   "java -Ddremio.log.path=/opt/dremio/log, -Ddremio.log.path=/opt/dremio/data/log",
+			key:  "-Ddremio.log.path=",
+			want: "/opt/dremio/data/log",
+		},
+		{
+			name: "env-var style key",
+			ps:   "DREMIO_HOME=/opt/dremio DREMIO_LOG_DIR=/opt/dremio/log PATH=/bin",
+			key:  "DREMIO_LOG_DIR=",
+			want: "/opt/dremio/log",
+		},
+		{
+			name: "key not found",
+			ps:   "java -Xmx2g",
+			key:  "-Ddremio.log.path=",
+			want: "",
+		},
+		{
+			name: "value at end of string (no trailing space)",
+			ps:   "java -Ddremio.log.path=/opt/dremio/data/log",
+			key:  "-Ddremio.log.path=",
+			want: "/opt/dremio/data/log",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := extractEnvValue(tc.ps, tc.key)
+			if got != tc.want {
+				t.Errorf("extractEnvValue(%q, %q) = %q, want %q", tc.ps, tc.key, got, tc.want)
+			}
+		})
+	}
+}
+
+// oldExtractEnvValue is a verbatim copy of the pre-fix implementation, preserved
+// here as a control so the regression test below can prove the old code failed
+// on the diag-20260521-171640 bundle's input while the new code succeeds.
+func oldExtractEnvValue(ps, key string) string {
+	idx := strings.Index(ps, key)
+	if idx < 0 {
+		return ""
+	}
+	rest := ps[idx+len(key):]
+	end := strings.IndexAny(rest, " \t\n\x00")
+	if end < 0 {
+		return strings.TrimSpace(rest)
+	}
+	return strings.TrimSpace(rest[:end])
+}
+
+// TestExtractEnvValue_RegressionDiagBundle pins down the exact failure mode from
+// diag-20260521-171640: pods.json shows DREMIO_LOG_DIR=/opt/dremio/log and
+// DREMIO_JAVA_SERVER_EXTRA_OPTS containing -Ddremio.log.path=/opt/dremio/data/log.
+// The launcher derives -Ddremio.log.path=$DREMIO_LOG_DIR for its own defaults,
+// then appends the extra opts — resulting in two -Ddremio.log.path= flags on the
+// java command line. JVM resolves the last one (jvm_settings.txt confirmed
+// dremio.log.path=/opt/dremio/data/log) but the old extractEnvValue took the
+// first.
+func TestExtractEnvValue_RegressionDiagBundle(t *testing.T) {
+	// Simulates /proc/1/cmdline | tr '\0' ' ' — both -D flags present.
+	// The trailing comma on the first reproduces the artifact seen in
+	// ddc.log:34 ('dremio-log-dir':'/opt/dremio/log,').
+	cmdline := "java -Xms2g -Xmx2g -Ddremio.log.path=/opt/dremio/log, -Djava.security.krb5.conf=/opt/dremio/krb/krb5.conf -Ddremio.log.path=/opt/dremio/data/log -XX:+UseG1GC DREMIO_LOG_DIR=/opt/dremio/log"
+
+	oldGot := oldExtractEnvValue(cmdline, "-Ddremio.log.path=")
+	if oldGot != "/opt/dremio/log," {
+		t.Errorf("control: old strings.Index-based code should have produced the buggy %q, got %q — input may not faithfully reproduce the bundle", "/opt/dremio/log,", oldGot)
+	}
+
+	newGot := extractEnvValue(cmdline, "-Ddremio.log.path=")
+	if newGot != "/opt/dremio/data/log" {
+		t.Errorf("fix: new code should return JVM-resolved %q, got %q", "/opt/dremio/data/log", newGot)
+	}
+}

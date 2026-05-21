@@ -2032,17 +2032,22 @@ func findExecutorPod(podListOutput string) string {
 // extractEnvValue extracts a value from a process string for a given key.
 // Handles both "KEY=value " and "KEY=value\0" formats.
 func extractEnvValue(ps, key string) string {
-	idx := strings.Index(ps, key)
+	// LastIndex matches JVM semantics: when -Dfoo= appears multiple times on
+	// the java command line, the JVM resolves the LAST one. Dremio launcher
+	// scripts that derive -Ddremio.log.path= from DREMIO_LOG_DIR and then let
+	// DREMIO_JAVA_SERVER_EXTRA_OPTS override it produce exactly this case.
+	idx := strings.LastIndex(ps, key)
 	if idx < 0 {
 		return ""
 	}
 	rest := ps[idx+len(key):]
 	// Value ends at space, null byte, or end of string
 	end := strings.IndexAny(rest, " \t\n\x00")
-	if end < 0 {
-		return strings.TrimSpace(rest)
+	value := rest
+	if end >= 0 {
+		value = rest[:end]
 	}
-	return strings.TrimSpace(rest[:end])
+	return strings.TrimRight(strings.TrimSpace(value), ",")
 }
 
 // promptKubeconfigPath shows a TUI input step asking the user for a
