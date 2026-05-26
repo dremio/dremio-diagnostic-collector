@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking changes
+
+* `--label-selector` has been split into two flags with single, distinct purposes:
+  * `--detect-label-selector` (no short form, default `role=dremio-cluster-pod`) — identifies Dremio coordinator/executor pods for file streaming.
+  * `-l, --container-log-label-selector` (default empty) — filters which pods' container logs end up in `kubernetes/container-logs/`. Empty means all pods in the namespace, restoring the v3 behavior of capturing ecosystem pods (catalog-server, opensearch, mongodb, nats, operators) that issue #335 reported missing.
+
+  Anyone passing `--label-selector` will see cobra's unknown-flag error. Migration:
+  * To scope which Dremio pods get their files streamed: `--detect-label-selector <selector>`.
+  * To scope which pods' container logs are collected: `-l <selector>` (same short form as before, but new semantics).
+  * For the v3-style "scope everything to one pod" behavior, pass both flags with the same value.
+
 ## [4.0.0-rc.1]
 
 - TUI prompts for kubeconfig path when none is auto-detected; new --kubeconfig flag on k8s and local-k8s subcommands.

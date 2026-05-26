@@ -59,11 +59,12 @@ import (
 )
 
 var (
-	coordinatorStr string
-	executorsStr   string
-	labelSelector  string
-	sshKeyLoc      string
-	sshUser        string
+	coordinatorStr              string
+	executorsStr                string
+	detectLabelSelector         string
+	containerLogLabelSelector   string
+	sshKeyLoc                   string
+	sshUser                     string
 )
 
 var outputLoc string
@@ -433,11 +434,11 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 				if err := collection.ClusterK8sExecute(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
 					simplelog.Errorf("local-k8s: error collecting K8s resources: %v", err)
 				}
-				if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
+				if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
 					simplelog.Errorf("local-k8s: error collecting previous container logs for restarted pods: %v", err)
 				}
 				if collectContainerLogs {
-					if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
+					if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
 						simplelog.Errorf("local-k8s: error collecting container logs: %v", err)
 					}
 				} else {
@@ -472,7 +473,7 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 	} else if kubeArgs.Namespace != "" {
 		cs.IsK8s = true
 		simplelog.Info("using Kubernetes api based collection")
-		consoleprint.UpdateCollectionArgs(fmt.Sprintf("namespace: '%v', label selector: '%v'", kubeArgs.Namespace, kubeArgs.LabelSelector))
+		consoleprint.UpdateCollectionArgs(fmt.Sprintf("namespace: '%v', detect-label-selector: '%v'", kubeArgs.Namespace, kubeArgs.DetectLabelSelector))
 		collectorStrategy, err = kubernetes.NewK8sAPI(kubeArgs, hook)
 		if err != nil {
 			return err
@@ -520,12 +521,12 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
 			// Always collect previous logs for pods that have restarted
-			err = collection.GetPreviousLogsForRestartedPods(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
+			err = collection.GetPreviousLogsForRestartedPods(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, containerLogLabelSelector)
 			if err != nil {
 				simplelog.Errorf("when getting previous container logs for restarted pods, the following error was returned: %v", err)
 			}
 			if collectContainerLogs {
-				err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
+				err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, containerLogLabelSelector)
 				if err != nil {
 					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 				}
@@ -972,7 +973,7 @@ func Execute(args []string) error {
 				_ = spinner.New().
 					Title("Detecting Kubernetes namespaces...").
 					Action(func() {
-						clustersToList, clusterErr = kubernetes.GetClusters(k8sContext, labelSelector, kubeconfigPath)
+						clustersToList, clusterErr = kubernetes.GetClusters(k8sContext, detectLabelSelector, kubeconfigPath)
 					}).
 					Run()
 				if clusterErr != nil {
@@ -1221,7 +1222,7 @@ func Execute(args []string) error {
 		}
 		kubeArgs := kubernetes.KubeArgs{
 			Namespace:      namespace,
-			LabelSelector:  labelSelector,
+			DetectLabelSelector:  detectLabelSelector,
 			K8SContext:     k8sContext,
 			KubeconfigPath: kubeconfigPath,
 		}
@@ -1303,7 +1304,8 @@ func init() {
 	K8sCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to use for kubernetes pods")
 	K8sCmd.PersistentFlags().StringVarP(&k8sContext, "context", "x", "", "context to use for kubernetes pods")
 	K8sCmd.PersistentFlags().StringVar(&kubeconfigPath, "kubeconfig", "", "path to kubeconfig file (overrides $KUBECONFIG and ~/.kube/config)")
-	K8sCmd.PersistentFlags().StringVarP(&labelSelector, "label-selector", "l", "role=dremio-cluster-pod", "select which pods to collect: follows kubernetes label syntax see https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors")
+	K8sCmd.PersistentFlags().StringVar(&detectLabelSelector, "detect-label-selector", "role=dremio-cluster-pod", "label selector used to identify Dremio coordinator/executor pods for file streaming; follows kubernetes label syntax (https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)")
+	K8sCmd.PersistentFlags().StringVarP(&containerLogLabelSelector, "container-log-label-selector", "l", "", "label selector to filter which pods' container logs are collected (default: empty = all pods in the namespace); follows kubernetes label syntax")
 	K8sCmd.PersistentFlags().BoolVarP(&enableKubeCtl, "enable-kubectl", "d", false, "uses the kubectl CLI for transfers and copying instead of the embedded k8s api client")
 	K8sCmd.PersistentFlags().BoolVar(&collectContainerLogs, "collect-container-logs", false, "collect Kubernetes container logs (default: disabled for standard, enabled for diagnosis)")
 	K8sCmd.PersistentFlags().StringVar(&nodesFlag, "nodes", "", "comma-separated list of nodes to collect from")
@@ -1594,7 +1596,7 @@ func runDiagnosisConfigScreen(detected *configui.DetectedPaths) error {
 			Title("Discovering Dremio pods...").
 			Action(func() {
 				var discoverErr error
-				discoveredCoordinators, discoveredExecutors, discoverErr = kubernetes.DiscoverPods(k8sContext, namespace, labelSelector, kubeconfigPath)
+				discoveredCoordinators, discoveredExecutors, discoverErr = kubernetes.DiscoverPods(k8sContext, namespace, detectLabelSelector, kubeconfigPath)
 				if discoverErr != nil {
 					simplelog.Warningf("Pod discovery failed: %v. Continuing without node selection.", discoverErr)
 					discoveredCoordinators = nil

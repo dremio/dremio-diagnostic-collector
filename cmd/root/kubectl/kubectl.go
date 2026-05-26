@@ -67,7 +67,7 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 	return &CliK8sActions{
 		cli:            cliInstance,
 		kubectlPath:    kubectl,
-		labelSelector:  kubeArgs.LabelSelector,
+		detectLabelSelector:  kubeArgs.DetectLabelSelector,
 		namespace:      kubeArgs.Namespace,
 		k8sContext:     k8sContext,
 		kubeconfigPath: kubeArgs.KubeconfigPath,
@@ -78,8 +78,8 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 
 // CliK8sActions provides a way to collect and copy files using kubectl
 type CliK8sActions struct {
-	cli            cli.CmdExecutor
-	labelSelector  string
+	cli                  cli.CmdExecutor
+	detectLabelSelector  string
 	kubectlPath    string
 	namespace      string
 	k8sContext     string
@@ -253,7 +253,7 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	args := []string{c.kubectlPath}
 	args = append(args, c.k8sFlags()...)
-	args = append(args, "get", "pods", "-n", c.namespace, "-l", c.labelSelector, "--field-selector", "status.phase=Running", "-o", "name")
+	args = append(args, "get", "pods", "-n", c.namespace, "-l", c.detectLabelSelector, "--field-selector", "status.phase=Running", "-o", "name")
 	out, err := c.cli.Execute(false, args...)
 	if err != nil {
 		return []string{}, err

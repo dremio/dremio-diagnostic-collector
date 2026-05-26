@@ -193,8 +193,11 @@ func TestGenerateCLICommand_LocalK8sStandard(t *testing.T) {
 	if strings.Contains(cmd, "--namespace") {
 		t.Error("local-k8s mode should not include --namespace")
 	}
-	if strings.Contains(cmd, "--label-selector") {
-		t.Error("local-k8s mode should not include --label-selector")
+	if strings.Contains(cmd, "--detect-label-selector") {
+		t.Error("local-k8s mode should not include --detect-label-selector")
+	}
+	if strings.Contains(cmd, "--container-log-label-selector") {
+		t.Error("local-k8s mode should not include --container-log-label-selector")
 	}
 	if strings.Contains(cmd, "--context") {
 		t.Error("local-k8s mode should not include --context")

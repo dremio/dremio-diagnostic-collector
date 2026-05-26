@@ -75,7 +75,7 @@ func TestKubectlSearch(t *testing.T) {
 	}
 	k := CliK8sActions{
 		cli:           cli,
-		labelSelector: "role=dremio-pods",
+		detectLabelSelector: "role=dremio-pods",
 		kubectlPath:   "kubectl",
 		namespace:     namespace,
 		k8sContext:    k8sContext,
@@ -302,7 +302,7 @@ func TestSearchPods_FieldSelectorFiltersRunningPods(t *testing.T) {
 		kubectlPath:   "kubectl",
 		namespace:     "testns",
 		k8sContext:    "west-f1",
-		labelSelector: "app=dremio",
+		detectLabelSelector: "app=dremio",
 	}
 	pods, err := k.SearchPods(func(container string) bool {
 		return true

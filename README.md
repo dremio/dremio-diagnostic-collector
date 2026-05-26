@@ -151,7 +151,8 @@ These flags apply to `ddc collect <transport> <mode>` (non-interactive mode). In
 |------|-------------|
 | `-n, --namespace` | K8s namespace |
 | `-x, --context` | K8s context to use |
-| `-l, --label-selector` | K8s label selector (default: `role=dremio-cluster-pod`) |
+| `--detect-label-selector` | K8s label selector to identify Dremio coordinator/executor pods (default: `role=dremio-cluster-pod`) |
+| `-l, --container-log-label-selector` | K8s label selector to filter which pods' container logs are collected (default: empty = all namespace pods) |
 | `-d, --enable-kubectl` | Use kubectl CLI instead of embedded K8s API client |
 | `--collect-container-logs` | Collect K8s container logs (default: enabled for diagnosis) |
 | `--nodes` | Collect from specific nodes only (comma-separated) |

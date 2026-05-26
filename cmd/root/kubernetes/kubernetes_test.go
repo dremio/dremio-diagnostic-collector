@@ -245,7 +245,7 @@ func TestSearchPods_FiltersNonRunningPods(t *testing.T) {
 
 	actions := &KubeCtlAPIActions{
 		namespace:     "dremio",
-		labelSelector: "app=dremio",
+		detectLabelSelector: "app=dremio",
 		client:        fakeClient,
 	}
 

@@ -51,7 +51,7 @@ import (
 type KubeArgs struct {
 	Namespace      string
 	K8SContext     string
-	LabelSelector  string
+	DetectLabelSelector  string
 	KubeconfigPath string
 }
 
@@ -66,7 +66,7 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 		namespace:      kubeArgs.Namespace,
 		client:         clientset,
 		config:         config,
-		labelSelector:  kubeArgs.LabelSelector,
+		detectLabelSelector:  kubeArgs.DetectLabelSelector,
 		hook:           hook,
 		pidHosts:       make(map[string]string),
 		containerCache: make(map[string]string),
@@ -132,8 +132,8 @@ type ExecutorFactory func(config *rest.Config, method string, url *url.URL) (rem
 // KubeCtlAPIActions provides a way to collect and copy files using kubectl
 type KubeCtlAPIActions struct {
 	namespace      string
-	labelSelector  string
-	client         kubernetes.Interface
+	detectLabelSelector  string
+	client               kubernetes.Interface
 	config         *rest.Config
 	hook           shutdown.CancelHook
 	pidHosts       map[string]string
@@ -456,7 +456,7 @@ func (c *KubeCtlAPIActions) getPrimaryContainer(hostString string) (string, erro
 	}
 	c.m.Unlock()
 
-	pods, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{LabelSelector: c.labelSelector})
+	pods, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{LabelSelector: c.detectLabelSelector})
 	if err != nil {
 		return "", err
 	}
@@ -561,7 +561,7 @@ func (c *KubeCtlAPIActions) GetCoordinators() (podName []string, err error) {
 
 func (c *KubeCtlAPIActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
 	podList, err := c.client.CoreV1().Pods(c.namespace).List(context.Background(), meta_v1.ListOptions{
-		LabelSelector: c.labelSelector,
+		LabelSelector: c.detectLabelSelector,
 	})
 	if err != nil {
 		return podName, err
