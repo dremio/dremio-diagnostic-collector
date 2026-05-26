@@ -436,6 +436,7 @@ func TestRemoteCollectOnK8s(t *testing.T) {
 		"dremio-master-0-start-only-one-dremio-master.txt",
 		"dremio-master-0-upgrade-task.txt",
 		"dremio-master-0-wait-for-zookeeper.txt",
+		"zk-0-kubernetes-zookeeper.txt",
 	}
 
 	expectedEmptyFiles := []string{
@@ -454,7 +455,7 @@ func TestRemoteCollectOnK8s(t *testing.T) {
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	expectedEntries := 13
+	expectedEntries := 14
 	if len(entries) != expectedEntries {
 		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}
@@ -637,6 +638,7 @@ func TestRemoteCollectOnK8sUsingTheK8sGoAPI(t *testing.T) {
 		"dremio-master-0-start-only-one-dremio-master.txt",
 		"dremio-master-0-upgrade-task.txt",
 		"dremio-master-0-wait-for-zookeeper.txt",
+		"zk-0-kubernetes-zookeeper.txt",
 	}
 
 	expectedEmptyFiles := []string{
@@ -655,7 +657,7 @@ func TestRemoteCollectOnK8sUsingTheK8sGoAPI(t *testing.T) {
 	for _, entry := range entries {
 		t.Logf("directories %v", entry.Name())
 	}
-	expectedEntries := 13
+	expectedEntries := 14
 	if len(entries) != expectedEntries {
 		t.Errorf("expected to find %v entries but found %v", expectedEntries, len(entries))
 	}

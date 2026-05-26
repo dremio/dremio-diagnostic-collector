@@ -71,7 +71,10 @@ func ClusterK8sExecute(hook shutdown.CancelHook, namespace string, c *k8sapi.Cli
 
 // GetPreviousLogsForRestartedPods collects previous container logs for pods that have restarted.
 // This runs unconditionally (not gated by --collect-container-logs) so that restart evidence is always captured.
-func GetPreviousLogsForRestartedPods(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, labelSelector string) error {
+// Lists all pods in the namespace — the --label-selector flag intentionally does NOT scope this,
+// since restart evidence from sidecar/ecosystem pods (catalog-server, opensearch, mongodb, nats, etc.)
+// is just as relevant as restart evidence from Dremio coordinator/executor pods.
+func GetPreviousLogsForRestartedPods(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -125,7 +128,11 @@ func savePreviousLogsFromPod(podObj corev1.Pod, hook shutdown.CancelHook, cs Cop
 	}
 }
 
-func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem, labelSelector string) error {
+// GetClusterLogs collects current container logs from every pod in the namespace.
+// The --label-selector flag intentionally does NOT scope this, since cluster-context
+// pods (catalog-server, opensearch, mongodb, nats, operators, etc.) live alongside
+// Dremio coordinator/executor pods and their logs are equally valuable for diagnostics.
+func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sapi.Clientset, cs CopyStrategy, ddfs helpers.Filesystem) error {
 	path, err := cs.CreatePath("kubernetes", "container-logs", "")
 	if err != nil {
 		simplelog.Errorf("trying to construct cluster container log path %v with error %v", path, err)
@@ -134,7 +141,7 @@ func GetClusterLogs(hook shutdown.CancelHook, namespace string, clientSet *k8sap
 
 	ctx, cancel := context.WithTimeoutCause(context.Background(), 60*time.Second, errors.New("timeout while retrieving pods"))
 	defer cancel()
-	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	pods, err := clientSet.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

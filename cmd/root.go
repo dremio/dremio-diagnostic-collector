@@ -433,11 +433,11 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 				if err := collection.ClusterK8sExecute(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
 					simplelog.Errorf("local-k8s: error collecting K8s resources: %v", err)
 				}
-				if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
+				if err := collection.GetPreviousLogsForRestartedPods(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
 					simplelog.Errorf("local-k8s: error collecting previous container logs for restarted pods: %v", err)
 				}
 				if collectContainerLogs {
-					if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs, ""); err != nil {
+					if err := collection.GetClusterLogs(hook, detectedNS, clientSet, cs, collectionArgs.DDCfs); err != nil {
 						simplelog.Errorf("local-k8s: error collecting container logs: %v", err)
 					}
 				} else {
@@ -520,12 +520,12 @@ func RemoteCollect(collectionArgs collection.Args, sshArgs ssh.Args, kubeArgs ku
 				simplelog.Errorf("when getting Kubernetes info, the following error was returned: %v", err)
 			}
 			// Always collect previous logs for pods that have restarted
-			err = collection.GetPreviousLogsForRestartedPods(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, kubeArgs.LabelSelector)
+			err = collection.GetPreviousLogsForRestartedPods(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
 			if err != nil {
 				simplelog.Errorf("when getting previous container logs for restarted pods, the following error was returned: %v", err)
 			}
 			if collectContainerLogs {
-				err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs, kubeArgs.LabelSelector)
+				err = collection.GetClusterLogs(hook, kubeArgs.Namespace, clientSet, cs, collectionArgs.DDCfs)
 				if err != nil {
 					simplelog.Errorf("when getting container logs, the following error was returned: %v", err)
 				}
