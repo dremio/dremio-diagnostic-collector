@@ -966,25 +966,37 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 		}
 
 		// --- RocksDB viewer collection (coordinator only) ---
-		if nodeType == "coordinator" && collectionArgs.DremioRocksDBDir != "" {
-			rocksArgs := RocksCollectArgs{
-				Collector:           c,
-				CopyStrategy:        s,
-				Host:                host,
-				NodeType:            nodeType,
-				RocksDBDir:          collectionArgs.DremioRocksDBDir,
-				CollectSystemTables: collectionArgs.CollectSystemTables,
-				SystemTables:        collectionArgs.SystemTables,
-				CollectWLM:          collectionArgs.CollectWLM,
-				CollectQueriesPerf:  collectionArgs.CollectQueriesPerf,
-				QueriesPerfDays:     collectionArgs.QueriesPerfNumDays,
-				Days:                collectionArgs.DiagLogDays,
-				StartDate:           collectionArgs.StartDate,
+		// Prefer the per-node autodetected RocksDB dir; fall back to the CLI flag.
+		// Mirrors the resolution used by the rocksdb-disk-allocation block above so
+		// queries-perf / cluster-stats / WLM / system-tables aren't silently skipped
+		// when the user omits --dremio-rocksdb-dir.
+		if nodeType == "coordinator" {
+			rocksDBDir := info.RocksDBDir
+			if rocksDBDir == "" {
+				rocksDBDir = collectionArgs.DremioRocksDBDir
 			}
-			if rocksFiles, err := RunRocksDBCollection(rocksArgs); err != nil {
-				simplelog.Errorf("RocksDB collection failed on %s: %v", host, err)
+			if rocksDBDir != "" {
+				rocksArgs := RocksCollectArgs{
+					Collector:           c,
+					CopyStrategy:        s,
+					Host:                host,
+					NodeType:            nodeType,
+					RocksDBDir:          rocksDBDir,
+					CollectSystemTables: collectionArgs.CollectSystemTables,
+					SystemTables:        collectionArgs.SystemTables,
+					CollectWLM:          collectionArgs.CollectWLM,
+					CollectQueriesPerf:  collectionArgs.CollectQueriesPerf,
+					QueriesPerfDays:     collectionArgs.QueriesPerfNumDays,
+					Days:                collectionArgs.DiagLogDays,
+					StartDate:           collectionArgs.StartDate,
+				}
+				if rocksFiles, err := RunRocksDBCollection(rocksArgs); err != nil {
+					simplelog.Errorf("RocksDB collection failed on %s: %v", host, err)
+				} else {
+					nodeCollected = append(nodeCollected, rocksFiles...)
+				}
 			} else {
-				nodeCollected = append(nodeCollected, rocksFiles...)
+				simplelog.Warningf("RocksDB collection skipped on %s: no RocksDB dir detected and --dremio-rocksdb-dir not set", host)
 			}
 		}
 

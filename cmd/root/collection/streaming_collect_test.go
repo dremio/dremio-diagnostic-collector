@@ -339,6 +339,126 @@ func TestStreamingCollect_SkipNodeOnDiscoveryFailure(t *testing.T) {
 	}
 }
 
+// TestStreamingCollect_RocksDBViewer_UsesAutodetectedDir ensures the rocksdb-viewer
+// collection runs when the per-node autodetected RocksDB dir is available, even if
+// --dremio-rocksdb-dir was not passed on the CLI. Regression test for the gate that
+// previously required collectionArgs.DremioRocksDBDir to be set.
+func TestStreamingCollect_RocksDBViewer_UsesAutodetectedDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	cs := &mockCopyStrategy{tmpDir: tmpDir}
+
+	var unameCalled atomic.Bool
+	mc := &mockStreamCollector{
+		coordinators: []string{"coord1"},
+		executors:    nil,
+		discoverFunc: func(_ string) (*RemoteNodeInfo, error) {
+			return &RemoteNodeInfo{
+				LogDir:     "/var/log/dremio",
+				ConfDir:    "/opt/dremio/conf",
+				RocksDBDir: "/opt/dremio/data/db",
+				Files: []RemoteFileInfo{
+					{Path: "/var/log/dremio/server.log", Size: 10, FileType: "log"},
+				},
+			}, nil
+		},
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			switch {
+			case strings.Contains(cmd, "uname -m"):
+				unameCalled.Store(true)
+				return "x86_64\n", nil
+			case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"):
+				return "", nil
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			return "", nil
+		},
+		streamFunc: func(_, _ string, w io.Writer) error {
+			_, err := w.Write([]byte("stub"))
+			return err
+		},
+		copyToHostFunc: func(_, _, _ string) (string, error) { return "", nil },
+	}
+
+	args := Args{
+		OutputLoc:         filepath.Join(tmpDir, "output.tar.gz"),
+		CopyStrategy:      cs,
+		CollectionMode:    "standard",
+		CollectionThreads: 1,
+		CollectServerLogs: true,
+		// DremioRocksDBDir intentionally left empty — the bug condition.
+		DremioRocksDBDir:   "",
+		CollectQueriesPerf: false, // cluster_stats runs unconditionally inside RunRocksDBCollection
+	}
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	if err := ExecuteStreamingCollect(mc, cs, args, hook, func() {}); err != nil {
+		t.Fatalf("ExecuteStreamingCollect failed: %v", err)
+	}
+
+	if !unameCalled.Load() {
+		t.Error("expected rocksdb-viewer collection to run (uname -m should have been called), but it was skipped")
+	}
+	clusterStats := filepath.Join(tmpDir, "cluster-stats", "coord1", "cluster-stats.json")
+	if _, err := os.Stat(clusterStats); os.IsNotExist(err) {
+		t.Errorf("expected %v to exist (rocksdb-viewer ran), but it does not", clusterStats)
+	}
+}
+
+// TestStreamingCollect_RocksDBViewer_SkippedWhenNoDir verifies the rocksdb-viewer
+// collection is skipped (no panic, no error) when neither autodetection nor the
+// CLI flag yields a RocksDB dir.
+func TestStreamingCollect_RocksDBViewer_SkippedWhenNoDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	cs := &mockCopyStrategy{tmpDir: tmpDir}
+
+	var unameCalled atomic.Bool
+	mc := &mockStreamCollector{
+		coordinators: []string{"coord1"},
+		discoverFunc: func(_ string) (*RemoteNodeInfo, error) {
+			return &RemoteNodeInfo{
+				LogDir:     "/var/log/dremio",
+				RocksDBDir: "",
+				Files: []RemoteFileInfo{
+					{Path: "/var/log/dremio/server.log", Size: 10, FileType: "log"},
+				},
+			}, nil
+		},
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			if strings.Contains(cmd, "uname -m") {
+				unameCalled.Store(true)
+			}
+			return "", nil
+		},
+		streamFunc: func(_, _ string, w io.Writer) error {
+			_, err := w.Write([]byte("stub"))
+			return err
+		},
+	}
+
+	args := Args{
+		OutputLoc:         filepath.Join(tmpDir, "output.tar.gz"),
+		CopyStrategy:      cs,
+		CollectionMode:    "standard",
+		CollectionThreads: 1,
+		CollectServerLogs: true,
+		DremioRocksDBDir:  "",
+	}
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	if err := ExecuteStreamingCollect(mc, cs, args, hook, func() {}); err != nil {
+		t.Fatalf("ExecuteStreamingCollect failed: %v", err)
+	}
+
+	if unameCalled.Load() {
+		t.Error("rocksdb-viewer should not run when no RocksDB dir is available")
+	}
+}
+
 func TestStreamingCollect_ZeroNodes(t *testing.T) {
 	tmpDir := t.TempDir()
 	cs := &mockCopyStrategy{tmpDir: tmpDir}
