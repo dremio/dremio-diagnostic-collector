@@ -120,6 +120,7 @@ type Args struct {
 	CollectAccessLog       bool
 	CollectHSErrFiles      bool
 	CollectHiveDeprecated  bool
+	CollectMetaRefreshLog  bool
 
 	// API collections (run from orchestrator)
 	DremioEndpoint             string

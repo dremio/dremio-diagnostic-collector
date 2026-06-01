@@ -428,6 +428,7 @@ var standardModeLogAllowlist = []string{
 	"server.",
 	"tracker.",
 	"vacuum.",
+	"metadata_refresh.",
 }
 
 // alwaysExcludedPrefixes are log files that should never be collected in any mode.
@@ -486,7 +487,7 @@ func isAlwaysExcluded(baseName string) bool {
 // and dated archives (server.2026-03-31.0.log.gz, queries.2026-03-28.0.json.gz).
 // isLogTypeEnabled returns true if the log file should be collected based on
 // the user's log type selections. Files that don't match any known prefix are
-// collected by default (e.g. meta-refresh, reflection logs have no toggle).
+// collected by default (e.g. reflection logs have no toggle).
 func isLogTypeEnabled(baseName string, args Args) bool {
 	switch {
 	case strings.HasPrefix(baseName, "server."):
@@ -503,6 +504,8 @@ func isLogTypeEnabled(baseName string, args Args) bool {
 		return args.CollectHSErrFiles
 	case strings.HasPrefix(baseName, "hive-deprecated."):
 		return args.CollectHiveDeprecated
+	case strings.HasPrefix(baseName, "metadata_refresh."):
+		return args.CollectMetaRefreshLog
 	default:
 		return true
 	}

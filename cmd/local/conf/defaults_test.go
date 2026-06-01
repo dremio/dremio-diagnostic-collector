@@ -41,18 +41,18 @@ func TestSetViperDefaultsWithDiagnosis(t *testing.T) {
 		key      string
 		expected interface{}
 	}{
-		// Log collection — selective in diagnosis mode
-		{conf.KeyCollectAccelerationLog, false},
-		{conf.KeyCollectAccessLog, false},
+		// Log collection — enabled by default in diagnosis mode
+		{conf.KeyCollectAccelerationLog, true},
+		{conf.KeyCollectAccessLog, true},
 		{conf.KeyCollectServerLogs, true},
 		{conf.KeyCollectGCLogs, true},
 		{conf.KeyCollectMetaRefreshLog, true},
 		{conf.KeyCollectReflectionLog, true},
-		{conf.KeyCollectVacuumLog, false},
+		{conf.KeyCollectVacuumLog, true},
 		{conf.KeyCollectHSErrFiles, true},
 		{conf.KeyCollectQueriesJSON, true},
-		{conf.KeyCollectTrackerJSON, false},
-		{conf.KeyCollectHiveDeprecatedLog, false},
+		{conf.KeyCollectTrackerJSON, true},
+		{conf.KeyCollectHiveDeprecatedLog, true},
 
 		// JVM diagnostic tools — all opt-in via TUI checkboxes or CLI flags
 		{conf.KeyCollectJFR, false},

@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
 )
 
 var perLogNumDaysFlags = []string{
@@ -76,5 +78,53 @@ func TestQueriesPerfNumDaysOnlyOnStandard(t *testing.T) {
 	}
 	if SSHDiagnosisCmd.Flags().Lookup("queries-perf-num-days") != nil {
 		t.Error("SSHDiagnosisCmd should not have --queries-perf-num-days")
+	}
+}
+
+func TestHiveDeprecatedOnlyOnDiagnosis(t *testing.T) {
+	if SSHDiagnosisCmd.Flags().Lookup("collect-hive-deprecated-log") == nil {
+		t.Error("SSHDiagnosisCmd should have --collect-hive-deprecated-log")
+	}
+	if K8sDiagnosisCmd.Flags().Lookup("collect-hive-deprecated-log") == nil {
+		t.Error("K8sDiagnosisCmd should have --collect-hive-deprecated-log")
+	}
+	if SSHStandardCmd.Flags().Lookup("collect-hive-deprecated-log") != nil {
+		t.Error("SSHStandardCmd should not have --collect-hive-deprecated-log")
+	}
+}
+
+func TestMetaRefreshLogOnBothModes(t *testing.T) {
+	if SSHStandardCmd.Flags().Lookup("collect-meta-refresh-log") == nil {
+		t.Error("SSHStandardCmd should have --collect-meta-refresh-log")
+	}
+	if SSHDiagnosisCmd.Flags().Lookup("collect-meta-refresh-log") == nil {
+		t.Error("SSHDiagnosisCmd should have --collect-meta-refresh-log")
+	}
+	if K8sStandardCmd.Flags().Lookup("collect-meta-refresh-log") == nil {
+		t.Error("K8sStandardCmd should have --collect-meta-refresh-log")
+	}
+	if K8sDiagnosisCmd.Flags().Lookup("collect-meta-refresh-log") == nil {
+		t.Error("K8sDiagnosisCmd should have --collect-meta-refresh-log")
+	}
+}
+
+func TestResolveMetaRefresh(t *testing.T) {
+	stdDefault := map[string]interface{}{conf.KeyCollectMetaRefreshLog: false}
+	diagDefault := map[string]interface{}{conf.KeyCollectMetaRefreshLog: true}
+
+	// CLI standard, flag unset: confData=false must win over the leaked global=true.
+	if resolveMetaRefresh(true, true, stdDefault) {
+		t.Error("CLI standard default must resolve false despite leaked global=true")
+	}
+	// CLI, user enabled (confData=true): resolves true.
+	if !resolveMetaRefresh(true, false, diagDefault) {
+		t.Error("CLI must honor confData=true")
+	}
+	// TUI: trust the global, ignore confData.
+	if !resolveMetaRefresh(false, true, stdDefault) {
+		t.Error("TUI must trust global=true even when confData=false")
+	}
+	if resolveMetaRefresh(false, false, diagDefault) {
+		t.Error("TUI must trust global=false even when confData=true")
 	}
 }

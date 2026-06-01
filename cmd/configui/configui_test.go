@@ -603,3 +603,17 @@ func TestBuildStandardCLICommand_KubeconfigOmittedWhenEmpty(t *testing.T) {
 		t.Errorf("expected NO --kubeconfig (empty Kubeconfig field), got:\n%s", out)
 	}
 }
+
+func TestSyncDiagLogTypes_MetaRefresh(t *testing.T) {
+	cfg := &DiagnosisConfig{}
+	syncDiagLogTypes(cfg, []string{"meta-refresh"})
+	if !cfg.CollectMetaRefresh {
+		t.Error("expected CollectMetaRefresh=true when 'meta-refresh' is selected")
+	}
+
+	cfg2 := &DiagnosisConfig{}
+	syncDiagLogTypes(cfg2, []string{"server"})
+	if cfg2.CollectMetaRefresh {
+		t.Error("expected CollectMetaRefresh=false when 'meta-refresh' is not selected")
+	}
+}

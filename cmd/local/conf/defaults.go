@@ -84,15 +84,15 @@ func DiagnosisCollectionProfile(confData map[string]interface{}, hostName string
 	setDefault(confData, KeyCollectGCLogs, true)
 	setDefault(confData, KeyCollectMetaRefreshLog, true)
 	setDefault(confData, KeyCollectReflectionLog, true)
-	setDefault(confData, KeyCollectVacuumLog, false)
-	setDefault(confData, KeyCollectAccelerationLog, false)
-	setDefault(confData, KeyCollectAccessLog, false)
+	setDefault(confData, KeyCollectVacuumLog, true)
+	setDefault(confData, KeyCollectAccelerationLog, true)
+	setDefault(confData, KeyCollectAccessLog, true)
 	setDefault(confData, KeyCollectHSErrFiles, true)
 	setDefault(confData, KeyCollectQueriesJSON, true)
 
 	// New log types for v4
-	setDefault(confData, KeyCollectTrackerJSON, false)
-	setDefault(confData, KeyCollectHiveDeprecatedLog, false)
+	setDefault(confData, KeyCollectTrackerJSON, true)
+	setDefault(confData, KeyCollectHiveDeprecatedLog, true)
 
 	// Job profiles — auto-identified from server.log, not sampling-based
 	setDefault(confData, KeyNumberJobProfiles, 0)

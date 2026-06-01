@@ -113,13 +113,15 @@ var (
 	collectQueriesPerf bool
 
 	// log collection toggles
-	collectServerLogs   bool
-	collectGCLogs       bool
-	collectTrackerJSON  bool
-	collectVacuumLog    bool
-	collectQueriesJSON  bool
-	collectAcceleration bool
-	collectAccessLog    bool
+	collectServerLogs     bool
+	collectGCLogs         bool
+	collectTrackerJSON    bool
+	collectVacuumLog      bool
+	collectQueriesJSON    bool
+	collectAcceleration   bool
+	collectAccessLog      bool
+	collectHiveDeprecated bool
+	collectMetaRefresh    bool
 	// collectAuditLog removed — flag and feature deleted
 	collectHSErrFiles bool
 
@@ -605,6 +607,22 @@ func diagLogDays() int {
 	return daysFlag
 }
 
+// resolveMetaRefresh returns the effective collect-meta-refresh-log value.
+// The flag is registered on both the standard and diagnosis command loops via a
+// single shared global; because the diagnosis loop registers last, the global's
+// init-time default is the diagnosis value (true) and pflag does not reset it for
+// an unset standard run. In CLI mode (skipPromptUI) the mode-resolved confData
+// (mode default + explicit-flag override) is authoritative; in TUI mode the form
+// sets the global explicitly, so trust it.
+func resolveMetaRefresh(skipPromptUI bool, global bool, confData map[string]interface{}) bool {
+	if skipPromptUI {
+		if v, ok := confData[conf.KeyCollectMetaRefreshLog].(bool); ok {
+			return v
+		}
+	}
+	return global
+}
+
 // BuildConfData constructs the configuration map from CLI flags and mode defaults.
 // All settings come from flags or mode profile defaults.
 func BuildConfData(cmd *cobra.Command, collectionMode collects.CollectionMode) map[string]interface{} {
@@ -650,6 +668,9 @@ func BuildConfData(cmd *cobra.Command, collectionMode collects.CollectionMode) m
 		}
 		if cmd.Flags().Changed(conf.KeyCollectVacuumLog) {
 			confData[conf.KeyCollectVacuumLog] = collectVacuumLog
+		}
+		if cmd.Flags().Changed(conf.KeyCollectMetaRefreshLog) {
+			confData[conf.KeyCollectMetaRefreshLog] = collectMetaRefresh
 		}
 	}
 	// Log the configuration
@@ -1208,7 +1229,8 @@ func Execute(args []string) error {
 			CollectAccelerationLog: collectAcceleration,
 			CollectAccessLog:       collectAccessLog,
 			CollectHSErrFiles:      collectHSErrFiles,
-			CollectHiveDeprecated:  false,
+			CollectHiveDeprecated:  collectHiveDeprecated,
+			CollectMetaRefreshLog:  resolveMetaRefresh(skipPromptUI, collectMetaRefresh, confData),
 			// Node filtering (from TUI node selection or --nodes/--exclude-nodes flags)
 			IncludeNodes: parseNodeList(nodesFlag),
 			ExcludeNodes: parseNodeList(excludeNodesFlag),
@@ -1348,6 +1370,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectServerLogs, "collect-server-logs", conf.GetBoolDefault(stdDef, conf.KeyCollectServerLogs), "collect server.log files")
 		cmd.Flags().BoolVar(&collectTrackerJSON, "collect-tracker-json", conf.GetBoolDefault(stdDef, conf.KeyCollectTrackerJSON), "collect tracker.json files")
 		cmd.Flags().BoolVar(&collectVacuumLog, "collect-vacuum-log", conf.GetBoolDefault(stdDef, conf.KeyCollectVacuumLog), "collect vacuum.json files")
+		cmd.Flags().BoolVar(&collectMetaRefresh, "collect-meta-refresh-log", conf.GetBoolDefault(stdDef, conf.KeyCollectMetaRefreshLog), "collect metadata_refresh.log files")
 		cmd.Flags().BoolVar(&collectWLM, "collect-wlm", conf.GetBoolDefault(stdDef, conf.KeyCollectWLM), "collect WLM configuration")
 		cmd.Flags().StringVar(&systemTables, "system-tables", strings.Join(conf.SystemTableList(), ","), "comma-separated list of system tables to collect")
 		cmd.Flags().IntVar(&queriesPerfNumDays, conf.KeyQueriesPerfNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays), "number of days of queries performance data to collect")
@@ -1359,6 +1382,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectServerLogs, "collect-server-logs", conf.GetBoolDefault(diagDef, conf.KeyCollectServerLogs), "collect server.log files")
 		cmd.Flags().BoolVar(&collectTrackerJSON, "collect-tracker-json", conf.GetBoolDefault(diagDef, conf.KeyCollectTrackerJSON), "collect tracker.json files")
 		cmd.Flags().BoolVar(&collectVacuumLog, "collect-vacuum-log", conf.GetBoolDefault(diagDef, conf.KeyCollectVacuumLog), "collect vacuum.json files")
+		cmd.Flags().BoolVar(&collectMetaRefresh, "collect-meta-refresh-log", conf.GetBoolDefault(diagDef, conf.KeyCollectMetaRefreshLog), "collect metadata_refresh.log files")
 		cmd.Flags().BoolVar(&collectWLM, "collect-wlm", conf.GetBoolDefault(diagDef, conf.KeyCollectWLM), "collect WLM configuration")
 		cmd.Flags().StringVar(&systemTables, "system-tables", strings.Join(conf.SystemTableList(), ","), "comma-separated list of system tables to collect")
 	}
@@ -1390,6 +1414,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectGCLogs, "collect-gc-logs", conf.GetBoolDefault(diagDef, conf.KeyCollectGCLogs), "collect GC log files")
 		cmd.Flags().BoolVar(&collectAcceleration, "collect-acceleration-log", conf.GetBoolDefault(diagDef, conf.KeyCollectAccelerationLog), "collect acceleration.log files")
 		cmd.Flags().BoolVar(&collectAccessLog, "collect-access-log", conf.GetBoolDefault(diagDef, conf.KeyCollectAccessLog), "collect access.log files")
+		cmd.Flags().BoolVar(&collectHiveDeprecated, "collect-hive-deprecated-log", conf.GetBoolDefault(diagDef, conf.KeyCollectHiveDeprecatedLog), "collect hive-deprecated.log files")
 		cmd.Flags().IntVar(&diagTimeSeconds, "diag-time-seconds", conf.GetIntDefault(diagDef, conf.KeyDiagTimeSeconds), "duration in seconds for all diagnostic tools (JFR, jstack, top, async-profiler)")
 		cmd.Flags().StringVar(&startDate, "start-date", "", "start of collection date range (date-only, e.g. 2026-03-20). Defaults to now minus --days")
 		cmd.Flags().IntVar(&daysFlag, "days", conf.GetIntDefault(diagDef, conf.KeyDremioLogsNumDays), "number of days to collect from --start-date (default: 3)")
@@ -1572,6 +1597,7 @@ func runStandardConfigScreen(detected *configui.DetectedPaths) error {
 	trackerJSONNumDays = cfg.TrackerJSONDays
 	collectVacuumLog = cfg.CollectVacuumLog
 	vacuumLogNumDays = cfg.VacuumLogDays
+	collectMetaRefresh = cfg.CollectMetaRefresh
 	collectQueriesJSON = cfg.CollectQueriesJSON
 	queriesJSONNumDays = cfg.QueriesJSONDays
 	collectQueriesPerf = cfg.CollectQueriesPerf
@@ -1672,6 +1698,8 @@ func runDiagnosisConfigScreen(detected *configui.DetectedPaths) error {
 	collectVacuumLog = cfg.CollectVacuumLog
 	collectAcceleration = cfg.CollectAcceleration
 	collectAccessLog = cfg.CollectAccess
+	collectHiveDeprecated = cfg.CollectHiveDeprecated
+	collectMetaRefresh = cfg.CollectMetaRefresh
 	collectHSErrFiles = cfg.CollectHSErr
 	collectQueriesPerf = cfg.CollectQueriesPerf
 	dremioEndpoint = cfg.DremioEndpoint

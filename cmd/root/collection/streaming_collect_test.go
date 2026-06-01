@@ -2051,3 +2051,30 @@ func TestStreamFileOnce_8MBBuffer(t *testing.T) {
 		t.Errorf("file size = %d, want %d", len(data), len(content))
 	}
 }
+
+func TestIsLogTypeEnabled_MetadataRefresh(t *testing.T) {
+	enabled := Args{CollectMetaRefreshLog: true}
+	disabled := Args{CollectMetaRefreshLog: false}
+
+	if !isLogTypeEnabled("metadata_refresh.log", enabled) {
+		t.Error("metadata_refresh.log should be enabled when CollectMetaRefreshLog=true")
+	}
+	if isLogTypeEnabled("metadata_refresh.log", disabled) {
+		t.Error("metadata_refresh.log should be disabled when CollectMetaRefreshLog=false")
+	}
+	if !isLogTypeEnabled("metadata_refresh.2022-12-04.log.gz", enabled) {
+		t.Error("dated metadata_refresh rotation should be enabled when CollectMetaRefreshLog=true")
+	}
+	if isLogTypeEnabled("metadata_refresh.2022-12-04.log.gz", disabled) {
+		t.Error("dated metadata_refresh rotation should be disabled when CollectMetaRefreshLog=false")
+	}
+}
+
+func TestIsLogAllowedInStandardMode_MetadataRefresh(t *testing.T) {
+	if !isLogAllowedInStandardMode("metadata_refresh.log") {
+		t.Error("metadata_refresh.log should be in the standard-mode allowlist")
+	}
+	if !isLogAllowedInStandardMode("metadata_refresh.2022-12-04.log.gz") {
+		t.Error("dated metadata_refresh rotation should be allowlisted in standard mode")
+	}
+}

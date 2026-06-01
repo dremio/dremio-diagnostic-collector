@@ -76,6 +76,7 @@ type StandardConfig struct {
 	TrackerJSONDays    int
 	CollectVacuumLog   bool
 	VacuumLogDays      int
+	CollectMetaRefresh bool
 	CollectQueriesJSON bool
 	QueriesJSONDays    int
 	CollectQueriesPerf bool
@@ -127,6 +128,7 @@ type DiagnosisConfig struct {
 	CollectAccess         bool
 	CollectHSErr          bool
 	CollectHiveDeprecated bool
+	CollectMetaRefresh    bool
 	CollectQueriesJSON    bool
 	CollectQueriesPerf    bool
 
@@ -280,6 +282,7 @@ func RunStandardConfigScreen(detected *DetectedPaths, _ string) (*StandardConfig
 		TrackerJSONDays:    conf.GetIntDefault(stdDef, conf.KeyTrackerJSONNumDays),
 		CollectVacuumLog:   conf.GetBoolDefault(stdDef, conf.KeyCollectVacuumLog),
 		VacuumLogDays:      conf.GetIntDefault(stdDef, conf.KeyVacuumLogNumDays),
+		CollectMetaRefresh: conf.GetBoolDefault(stdDef, conf.KeyCollectMetaRefreshLog),
 		CollectQueriesJSON: conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesJSON),
 		QueriesJSONDays:    conf.GetIntDefault(stdDef, conf.KeyQueriesJSONNumDays),
 		CollectQueriesPerf: conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesPerfJSON),
@@ -423,6 +426,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 		CollectAccess:              conf.GetBoolDefault(diagDef, conf.KeyCollectAccessLog),
 		CollectHSErr:               conf.GetBoolDefault(diagDef, conf.KeyCollectHSErrFiles),
 		CollectHiveDeprecated:      conf.GetBoolDefault(diagDef, conf.KeyCollectHiveDeprecatedLog),
+		CollectMetaRefresh:         conf.GetBoolDefault(diagDef, conf.KeyCollectMetaRefreshLog),
 		CollectQueriesJSON:         conf.GetBoolDefault(diagDef, conf.KeyCollectQueriesJSON),
 		CollectQueriesPerf:         conf.GetBoolDefault(diagDef, conf.KeyCollectQueriesPerfJSON),
 		CollectContainerLogs:       true, // K8s diagnosis always collects container logs by default
@@ -509,6 +513,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 		huh.NewOption("Hive deprecated log", "hive").Selected(cfg.CollectHiveDeprecated),
 		huh.NewOption("Acceleration log", "acceleration").Selected(cfg.CollectAcceleration),
 		huh.NewOption("Access log", "access").Selected(cfg.CollectAccess),
+		huh.NewOption("Metadata refresh log", "meta-refresh").Selected(cfg.CollectMetaRefresh),
 		huh.NewOption("Problematic job profiles [Requires PAT token]", "profiles").Selected(cfg.CollectProblematicProfiles),
 		huh.NewOption("KV store report [Requires PAT token]", "kvstore").Selected(cfg.CollectKVStore),
 	)
@@ -708,6 +713,7 @@ func buildStandardLogGroup(cfg *StandardConfig, queriesDayChoice, queriesPerfDay
 				huh.NewOption("Skip", 0).Selected(*vacuumDayChoice == 0),
 			).Value(vacuumDayChoice),
 	}
+	fields = append(fields, huh.NewConfirm().Title("Collect metadata refresh log").Value(&cfg.CollectMetaRefresh).Inline(true).Affirmative("Yes").Negative("No"))
 	if cfg.Transport == "k8s" {
 		fields = append(fields, huh.NewConfirm().Title("Collect K8s container logs").Value(&cfg.CollectContainerLogs).Inline(true).Affirmative("Yes").Negative("No"))
 	}
@@ -750,6 +756,7 @@ func syncDiagLogTypes(cfg *DiagnosisConfig, logTypes []string) {
 	cfg.CollectHiveDeprecated = logSet["hive"]
 	cfg.CollectAcceleration = logSet["acceleration"]
 	cfg.CollectAccess = logSet["access"]
+	cfg.CollectMetaRefresh = logSet["meta-refresh"]
 	cfg.CollectProblematicProfiles = logSet["profiles"]
 	cfg.CollectKVStore = logSet["kvstore"]
 }
@@ -814,6 +821,7 @@ func buildStandardCLICommand(cfg *StandardConfig, queryDays, queriesPerfDays, se
 	} else {
 		parts = append(parts, "  --collect-vacuum-log=false"+cont)
 	}
+	parts = append(parts, fmt.Sprintf("  --collect-meta-refresh-log=%t"+cont, cfg.CollectMetaRefresh))
 	if queryDays > 0 {
 		parts = append(parts, fmt.Sprintf("  --collect-queries-json=true --queries-json-num-days=%d"+cont, queryDays))
 	} else {
@@ -897,11 +905,12 @@ func buildDiagnosisCLICommand(cfg *DiagnosisConfig, tools *[]string, nodes *[]st
 	parts = append(parts, fmt.Sprintf("  --collect-server-logs=%t --collect-queries-json=%t --collect-queries-perf-json=%t"+cont, cfg.CollectServerLogs, cfg.CollectQueriesJSON, cfg.CollectQueriesPerf))
 	parts = append(parts, fmt.Sprintf("  --collect-tracker-json=%t --collect-vacuum-log=%t --collect-hs-err-files=%t"+cont, cfg.CollectTrackerJSON, cfg.CollectVacuumLog, cfg.CollectHSErr))
 	parts = append(parts, fmt.Sprintf("  --collect-gc-logs=%t --collect-acceleration-log=%t --collect-access-log=%t"+cont, cfg.CollectGCLogs, cfg.CollectAcceleration, cfg.CollectAccess))
-
-	// Container logs — K8s only
+	// Hive-deprecated + meta-refresh (+ K8s container logs) on one line
+	logToggleLine := fmt.Sprintf("  --collect-hive-deprecated-log=%t --collect-meta-refresh-log=%t", cfg.CollectHiveDeprecated, cfg.CollectMetaRefresh)
 	if cfg.Transport == "k8s" {
-		parts = append(parts, fmt.Sprintf("  --collect-container-logs=%t"+cont, cfg.CollectContainerLogs))
+		logToggleLine += fmt.Sprintf(" --collect-container-logs=%t", cfg.CollectContainerLogs)
 	}
+	parts = append(parts, logToggleLine+cont)
 
 	// Node selection
 	if nodes != nil && len(*nodes) > 0 {
