@@ -50,7 +50,7 @@ Logs are collected over a date range (`--days`, default 3, or `--start-date`). B
 * server.log, queries.json, queries performance data, tracker.json, vacuum.json
 * GC logs, hs\_err crash dumps, metadata\_refresh.log, reflection.log, acceleration.log, access.log, hive-deprecated.log
 
-JVM diagnostics are **opt-in** — off by default on the CLI, pre-selected in the interactive TUI:
+JVM diagnostics are **opt-in** — off by default in both CLI and TUI:
 
 * Java Flight Recorder — `--diag-jfr`
 * jstack thread dumps — `--diag-jstack`

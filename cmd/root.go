@@ -153,6 +153,13 @@ for kubernetes deployments:
 
 for ssh based communication to VMs or Bare metal hardware:
 	ddc collect ssh standard --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio
+
+for local collection (on this host):
+	ddc collect local standard
+	ddc collect local diagnosis
+
+for local collection inside a Kubernetes pod:
+	ddc collect local-k8s standard
 `,
 	Run: func(_ *cobra.Command, _ []string) {
 	},

@@ -85,7 +85,7 @@ Where `<transport>` is `k8s`, `ssh`, `local`, or `local-k8s`, and `<mode>` is `s
 
 | Mode | Purpose | Default behavior |
 |------|---------|-----------------|
-| `diagnosis` | Active incident investigation | All log types (3 days), GC logs, hs_err crash dumps, system tables, and (with a PAT) problematic job profiles. JVM tools (JFR, jstack, top, async-profiler) are **opt-in** via `--diag-*` flags — off by default on the CLI, pre-selected in the interactive TUI. Parallel collection. |
+| `diagnosis` | Active incident investigation | All log types (3 days), GC logs, hs_err crash dumps, system tables, and (with a PAT) problematic job profiles. JVM tools (JFR, jstack, top, async-profiler) are **opt-in** via `--diag-*` flags — off by default. Parallel collection. |
 | `standard` | Routine collection / performance review | Lightweight: server logs (1 day), queries.json (30 days), tracker.json, vacuum logs, config, OS info. Sequential. |
 
 All settings are configured via CLI flags. There is no `ddc.yaml` configuration file.
@@ -238,7 +238,7 @@ These flags are only registered on the `diagnosis` subcommands, and the PAT is u
 
 #### Diagnostic Tool Toggles (Diagnosis Only)
 
-All `--diag-*` tools are **opt-in on the CLI** (default `false`). The interactive TUI pre-selects JFR, jstack, top, and async-profiler.
+All `--diag-*` tools are **opt-in** (default `false`) in both CLI and TUI.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -326,6 +326,13 @@ for kubernetes deployments:
 
 for ssh based communication to VMs or Bare metal hardware:
         ddc collect ssh standard --coordinator 10.0.0.19 --executors 10.0.0.20,10.0.0.21,10.0.0.22 --ssh-user myuser --ssh-key ~/.ssh/mykey --sudo-user dremio
+
+for local collection (on this host):
+        ddc collect local standard
+        ddc collect local diagnosis
+
+for local collection inside a Kubernetes pod:
+        ddc collect local-k8s standard
 
 Usage:
   ddc [flags]
