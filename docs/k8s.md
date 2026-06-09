@@ -2,7 +2,9 @@
 
 ## Missing Nodes or None Found
 
-Make sure the labels you use actually correspond to kubernetes nodes in your pod. Run the following command to see your labels
+DDC identifies the Dremio coordinator/executor pods to stream files from using the
+`--detect-label-selector` flag (default `role=dremio-cluster-pod`). Make sure your Dremio pods
+actually carry that label. Run the following command to see your pod labels:
 
 ```bash
  kubectl get pods --show-labels
@@ -13,10 +15,11 @@ dremio-master-0     1/1     Running   0          6h32m   app=dremio-coordinator,
 zk-0                1/1     Running   0          6h32m   app=zk,controller-revision-hash=zk-67ffd74b67,statefulset.kubernetes.io/pod-name=zk-0
 ```
 
-pick one for executors and one for coordinators that matches what pods you want logs for. In this case since I want coordinators and executors I can run the following command
+If your pods use a different label, pass it explicitly. The example pods above all share
+`role=dremio-cluster-pod`, so the default works; to instead match the `app` labels you would run:
 
 ```bash
-ddc -k -e app=dremio-executor -c app=dremio-coordinator
+ddc collect k8s diagnosis --namespace mynamespace --detect-label-selector app=dremio-coordinator
 ```
 
 ## No job profiles collected
