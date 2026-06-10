@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [4.0.0] - 2026-06-10
 
 - Documentation accuracy fixes (README, FAQ): corrected JVM tool opt-in wording, added local/local-k8s examples to help text.
 
