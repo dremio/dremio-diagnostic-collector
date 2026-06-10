@@ -5,5 +5,4 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-rm -f ./cmd/root/ddcbinary/output/*
 rm -fr ./bin

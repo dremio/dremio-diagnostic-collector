@@ -21,15 +21,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/jvmcollect"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/tests"
 )
 
 func TestHeapDumpCapture(t *testing.T) {
@@ -50,11 +49,6 @@ func TestHeapDumpCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	overrides := make(map[string]string)
-	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
 	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -64,29 +58,21 @@ func TestHeapDumpCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
-	ddcYamlString := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-tmp-output-dir: %v
-node-name: %v
-dremio-pid: %v
-`, filepath.Join("testdata", "logs"),
-		filepath.Join("testdata", "conf"),
-		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
-		nodeName,
-		cmd.Process.Pid,
-	)
-	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
-		t.Fatal(err)
+	overrides := map[string]string{
+		"dremio-log-dir":  filepath.Join("testdata", "logs"),
+		"dremio-conf-dir": filepath.Join("testdata", "conf"),
+		"tmp-output-dir":  tmpOutDir,
+		"node-name":       nodeName,
+		"dremio-pid":      fmt.Sprintf("%v", cmd.Process.Pid),
+		"output-file":     t.TempDir(),
 	}
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = jvmcollect.RunCollectHeapDump(c, hook)
+	err = jvmcollect.RunHeapDump(c, hook)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}

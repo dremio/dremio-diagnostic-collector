@@ -39,7 +39,7 @@ fi
 # this is also set in script/build and is a copy paste
 GIT_SHA=`git rev-parse --short HEAD`
 VERSION=$1
-LDFLAGS="-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION"
+LDFLAGS="-s -w -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.Version=$VERSION"
 
 echo "Cleaning bin folder…"
 date "+%H:%M:%S"
@@ -67,50 +67,37 @@ if ! type "x86_64-linux-musl-cc" > /dev/null; then
 fi
 
 
-echo "Building embedded binary for linux-amd64…"
-date "+%H:%M:%S"
-
-CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
-zip ./bin/ddc.zip ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-amd64.zip
-rm ./bin/ddc
-
-echo "Building embedded binary for linux-arm64…"
-date "+%H:%M:%S"
-
-CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc ./cmd/local/main
-zip ./bin/ddc.zip ./bin/ddc
-mv ./bin/ddc.zip ./cmd/root/ddcbinary/output/ddc-arm64.zip
-rm ./bin/ddc
-
-cp ./default-ddc.yaml ./bin/ddc.yaml
-
 echo "Building linux-amd64…"
 date "+%H:%M:%S"
-CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
-zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+CC=x86_64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+if type "upx" > /dev/null 2>&1; then upx --best ./bin/ddc; fi
+zip ./bin/ddc-linux-amd64.zip ./bin/ddc ./README.md ./FAQ.md
 
 echo "Building linux-arm64…"
 date "+%H:%M:%S"
-CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
-zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+CC=aarch64-linux-musl-cc CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS -linkmode external -extldflags \"-static\"" -o ./bin/ddc
+if type "upx" > /dev/null 2>&1; then upx --best ./bin/ddc; fi
+zip ./bin/ddc-linux-arm64.zip ./bin/ddc ./README.md ./FAQ.md
 
+# UPX on macOS can cause Gatekeeper/code-signing issues — skip for darwin
 echo "Building darwin-os-x-amd64…"
 date "+%H:%M:%S"
-GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-mac-intel.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc
+zip ./bin/ddc-mac-intel.zip ./bin/ddc ./README.md ./FAQ.md
 
 echo "Building darwin-os-x-arm64…"
 date "+%H:%M:%S"
-GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc
-zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./bin/ddc.yaml ./README.md ./FAQ.md
+GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc
+zip ./bin/ddc-mac-m-series.zip ./bin/ddc ./README.md ./FAQ.md
 
 echo "Building windows-amd64…"
 date "+%H:%M:%S"
-GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md
+GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc.exe
+if type "upx" > /dev/null 2>&1; then upx --best ./bin/ddc.exe; fi
+zip ./bin/ddc-windows-amd64.zip ./bin/ddc.exe ./README.md ./FAQ.md
 
 echo "Building windows-arm64…"
 date "+%H:%M:%S"
-GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o ./bin/ddc.exe
-zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./bin/ddc.yaml ./README.md ./FAQ.md
+GOOS=windows GOARCH=arm64 go build -trimpath -ldflags "$LDFLAGS" -o ./bin/ddc.exe
+# upx does not support win64/arm64 — ship uncompressed.
+zip ./bin/ddc-windows-arm64.zip ./bin/ddc.exe ./README.md ./FAQ.md

@@ -21,9 +21,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 // GetDremioPIDFromText takes the ouput from

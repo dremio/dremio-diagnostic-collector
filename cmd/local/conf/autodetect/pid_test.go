@@ -17,7 +17,7 @@ package autodetect_test
 import (
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf/autodetect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf/autodetect"
 )
 
 func TestGetDremioPIDFromTextHasNoText(t *testing.T) {

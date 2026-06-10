@@ -11,30 +11,10 @@ Set-Location -Path (Get-Item (Split-Path -Parent $MyInvocation.MyCommand.Definit
 # Get Git SHA and Version
 $GIT_SHA = git rev-parse --short HEAD
 $VERSION = git rev-parse --abbrev-ref HEAD
-$LDFLAGS = "-X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v3/pkg/versions.Version=$VERSION"
-
-# This assumes that you have 'go' installed in your environment
-$env:GOOS="linux"
-$env:GOARCH="amd64"
-go build -ldflags "$LDFLAGS" -o .\bin\ddc .\cmd\local\main
-
-# Use Compress-Archive to create zip file and then move it
-Compress-Archive -Path .\bin\ddc -DestinationPath .\bin\ddc.zip
-Move-Item -Force -Path  .\bin\ddc.zip -Destination .\cmd\root\ddcbinary\output\ddc-amd64.zip
-Remove-Item -Path .\bin\ddc
-
-# This assumes that you have 'go' installed in your environment
-$env:GOOS="linux"
-$env:GOARCH="arm64"
-
-go build -ldflags "$LDFLAGS" -o .\bin\ddc .\cmd\local\main
-# Use Compress-Archive to create zip file and then move it
-Compress-Archive -Path .\bin\ddc -DestinationPath .\bin\ddc.zip
-Move-Item -Force -Path  .\bin\ddc.zip -Destination .\cmd\root\ddcbinary\output\ddc-arm64.zip
-Remove-Item -Path .\bin\ddc
+$LDFLAGS = "-s -w -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.GitSha=$GIT_SHA -X github.com/dremio/dremio-diagnostic-collector/v4/pkg/versions.Version=$VERSION"
 
 $env:GOOS="windows"
 $env:GOARCH="amd64"
-# Build again and copy default-ddc.yaml
-go build -ldflags "$LDFLAGS" -o .\bin\ddc.exe
-Copy-Item -Path .\default-ddc.yaml -Destination .\bin\ddc.yaml
+# Build main binary (default-ddc.yaml removed in v4 — all config via CLI flags)
+go build -trimpath -ldflags "$LDFLAGS" -o .\bin\ddc.exe
+if (Get-Command "upx" -ErrorAction SilentlyContinue) { upx --best .\bin\ddc.exe }

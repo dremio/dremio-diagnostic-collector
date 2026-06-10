@@ -43,8 +43,6 @@ func (n *NodeCaptureStats) Update(node string, secondsElapsed int, status string
 type Stats struct {
 	ddcVersion        string
 	logFile           string
-	ddcYaml           string
-	ddcYamlIsValid    bool
 	TransfersComplete int
 	totalTransfers    int
 	collectionType    string
@@ -53,24 +51,28 @@ type Stats struct {
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
-func (c *Stats) UpdateDDCVersion(ddcVersion, logFile, ddcYaml, collectionType string, ddcYamlIsValid bool, transfersComplete, totalTransfers int) {
+func (c *Stats) UpdateDDCVersion(ddcVersion, logFile, collectionType string, transfersComplete, totalTransfers int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.ddcVersion = ddcVersion
 	c.logFile = logFile
-	c.ddcYaml = ddcYaml
-	c.ddcYamlIsValid = ddcYamlIsValid
 	c.TransfersComplete = transfersComplete
 	c.totalTransfers = totalTransfers
 	c.collectionType = collectionType
 }
 
-var CollectionStatsGlobal *Stats
+// collectionStatsGlobal is the package-level stats instance, accessed via GetCollectionStats.
+var collectionStatsGlobal *Stats
 
 func init() {
-	CollectionStatsGlobal = &Stats{
+	collectionStatsGlobal = &Stats{
 		nodeCaptureStats: make(map[string]*NodeCaptureStats),
 	}
+}
+
+// GetCollectionStats returns the package-level Stats singleton.
+func GetCollectionStats() *Stats {
+	return collectionStatsGlobal
 }
 
 // Update updates the CollectionStats fields in a thread-safe manner.
@@ -92,10 +94,6 @@ func (c *Stats) PrintState() {
 	fmt.Print("\033[H\033[2J")
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ddcYamlStatus := "INVALID"
-	if c.ddcYamlIsValid {
-		ddcYamlStatus = "VALID"
-	}
 	total := c.totalTransfers
 	keys := make([]string, 0, len(c.nodeCaptureStats))
 	for k := range c.nodeCaptureStats {
@@ -110,12 +108,10 @@ func (c *Stats) PrintState() {
 	fmt.Printf(
 		`
 		DDC Version          : %v
-		DDC Yaml             : %v
-		DDC Yaml Status      : %v
 		Log File             : %v
 		Collection Type      : %v
 		Transfers Complete   : %v/%v
 		-----------------------------
 		%v
-		`, c.ddcVersion, c.ddcYaml, ddcYamlStatus, c.logFile, c.collectionType, c.TransfersComplete, total, nodes.String())
+		`, c.ddcVersion, c.logFile, c.collectionType, c.TransfersComplete, total, nodes.String())
 }

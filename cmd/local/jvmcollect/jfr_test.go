@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/jvmcollect"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TestJFRCapture(t *testing.T) {
@@ -45,7 +45,7 @@ func TestJFRCapture(t *testing.T) {
 		if err != nil {
 			t.Log(err)
 		}
-		simplelog.InitLoggerWithOutputDir(tempDir)
+		simplelog.InitLoggerWithOutputDir(os.TempDir())
 	}()
 
 	defer func() {
@@ -59,50 +59,34 @@ func TestJFRCapture(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	overrides := make(map[string]string)
-	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
 	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-
 	nodeName := "node1"
-	ddcYamlString := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-tarball-out-dir: %v
-node-name: %v
-dremio-pid: %v
-dremio-jfr-time-seconds: 2
-`,
-		filepath.Join("testdata", "logs"),
-		filepath.Join("testdata", "conf"),
-		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
-		nodeName,
-		cmd.Process.Pid,
-	)
-	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
-		t.Fatal(err)
+	overrides := map[string]string{
+		"dremio-log-dir":    filepath.Join("testdata", "logs"),
+		"dremio-conf-dir":   filepath.Join("testdata", "conf"),
+		"output-file":       tmpOutDir,
+		"node-name":         nodeName,
+		"dremio-pid":        fmt.Sprintf("%v", cmd.Process.Pid),
+		"diag-time-seconds": "2",
 	}
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
 
-	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create the directory before hand as what happens when we run local-collect
+	// create the directory beforehand as what happens during collection
 	jfrOutDir := filepath.Join(c.OutputDir(), "jfr")
 	if err := os.MkdirAll(jfrOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
-	err = jvmcollect.RunCollectJFR(c, hook)
+	err = jvmcollect.RunJFR(c, hook)
 	if err != nil {
 		t.Fatalf("expected no error but got %v", err)
 	}
@@ -169,39 +153,23 @@ func TestJFRCaptureWithExistingJFR(t *testing.T) {
 			t.Log("Process killed successfully.")
 		}
 	}()
-	overrides := make(map[string]string)
-	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
 	tmpOutDir := t.TempDir()
-	ddcYamlString := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-tarball-out-dir: %v
-node-name: %v
-dremio-pid: %v
-dremio-jfr-time-seconds: 2
-
-`,
-		filepath.Join("testdata", "logs"),
-		filepath.Join("testdata", "conf"),
-		strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
-		nodeName,
-		cmd.Process.Pid,
-	)
-	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
-		t.Fatal(err)
+	overrides := map[string]string{
+		"dremio-log-dir":    filepath.Join("testdata", "logs"),
+		"dremio-conf-dir":   filepath.Join("testdata", "conf"),
+		"output-file":       tmpOutDir,
+		"node-name":         nodeName,
+		"dremio-pid":        fmt.Sprintf("%v", cmd.Process.Pid),
+		"diag-time-seconds": "2",
 	}
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = jvmcollect.RunCollectJFR(c, hook)
+	err = jvmcollect.RunJFR(c, hook)
 	if err != nil {
 		t.Fatal(err)
 	}

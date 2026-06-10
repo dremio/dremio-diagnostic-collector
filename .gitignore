@@ -4,10 +4,18 @@
 *.dll
 *.so
 *.dylib
+*.zip
 musl-build/
+.paul
+.augment
+.claude
+.bg-shell
+.mcp.json
 
-
+skills-lock.json
 ddc.log
+diag-*.tgz
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -16,7 +24,6 @@ ddc.log
 
 covprofile
 bin/
-testdata/
 
 *.swp
 .DS_Store
@@ -27,11 +34,66 @@ lsp-quickpick
 lsp-quickpick-filter
 
 test.out
-ddc.log
 diag.tgz
 __debug_bin
 server-install
 
 .attach_*
 ssh.json
+.idea
+.claude
 
+# ── GSD: ignore runtime/binary artifacts, keep documentation ──
+.gsd/gsd.db
+.gsd/gsd.db-shm
+.gsd/gsd.db-wal
+.gsd/activity/
+.gsd/runtime/
+.gsd/journal/
+.gsd/reports/
+.gsd/worktrees/
+.gsd/browser-state/
+.gsd/browser-baselines/
+.gsd/completed-units*.json
+.gsd/doctor-history.jsonl
+.gsd/event-log.jsonl
+.gsd/metrics.json
+.gsd/state-manifest.json
+.gsd/repo-meta.json
+Thumbs.db
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+.env
+.env.*
+!.env.example
+node_modules/
+.next/
+dist/
+build/
+__pycache__/
+*.pyc
+.venv/
+venv/
+target/
+vendor/
+*.log
+coverage/
+.cache/
+tmp/
+
+# Keep logparser fixtures and async-profiler shared libraries
+!pkg/logparser/testdata/**
+!cmd/local/jvmcollect/asprof/libasyncProfiler-linux-amd64.so
+!cmd/local/jvmcollect/asprof/libasyncProfiler-linux-arm64.so
+
+# ── GSD baseline (auto-generated) ──
+#.gsd
+
+# ── GSD baseline (auto-generated) ──
+/bash.exe.stackdump
+
+# ── GSD baseline (auto-generated) ──
+.bg-shell/

@@ -25,8 +25,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 var client *http.Client
@@ -75,6 +75,7 @@ func APIRequest(hook shutdown.CancelHook, url string, pat string, request string
 			return nil, err
 		}
 	}
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return nil, errors.New(res.Status)
 	}
@@ -108,6 +109,7 @@ func PostQuery(hook shutdown.CancelHook, url string, pat string, headers map[str
 			return "", err
 		}
 	}
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
 		return "", errors.New(res.Status)
 	}

@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/strutils"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/strutils"
 )
 
 const (
@@ -35,6 +35,8 @@ const (
 	LevelDebug
 )
 
+// msgMax is the maximum character length for log messages. Messages exceeding
+// this limit are truncated (keeping the tail) to prevent oversized log entries.
 const msgMax = 1000
 
 var (
@@ -197,13 +199,16 @@ func CopyLog(dest string) error {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
 
+	// Close the current logger to release the file handle before reading
+	logger.Close()
+
 	// now the log is down and we are blocking until this is done
 	logRead, err := os.ReadFile(filepath.Clean(GetLogLoc()))
 	if err != nil {
 		return err
 	}
 	// ok we copy the file out
-	err = os.WriteFile(dest, logRead, 0o600)
+	err = os.WriteFile(dest, logRead, 0o600) // #nosec G703 -- dest is DDC's own log archive path
 	if err != nil {
 		return err
 	}
@@ -247,42 +252,42 @@ func newLogger(writer io.Writer, cleanup func()) *Logger {
 }
 
 func (l *Logger) Debug(format string) {
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(l.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func (l *Logger) Info(format string) {
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(l.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func (l *Logger) Warning(format string) {
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(l.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func (l *Logger) Error(format string) {
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(l.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func (l *Logger) Debugf(format string, v ...interface{}) {
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func (l *Logger) Infof(format string, v ...interface{}) {
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func (l *Logger) Warningf(format string, v ...interface{}) {
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func (l *Logger) Errorf(format string, v ...interface{}) {
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(l.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 
@@ -291,56 +296,56 @@ func (l *Logger) Errorf(format string, v ...interface{}) {
 func Debug(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(logger.debugLogger.Output(2, trimmed), trimmed, "DEBUG")
 }
 
 func Info(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(logger.infoLogger.Output(2, trimmed), trimmed, "INFO")
 }
 
 func Warning(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(logger.warningLogger.Output(2, trimmed), trimmed, "WARNING")
 }
 
 func Error(format string) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	trimmed := strutils.GetEndOfString(format, msgMax)
+	trimmed := strutils.GetStartOfString(format, msgMax)
 	handleLogError(logger.errorLogger.Output(2, trimmed), trimmed, "ERROR")
 }
 
 func Debugf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.debugLogger.Output(2, msg), msg, "DEBUGF")
 }
 
 func Infof(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.infoLogger.Output(2, msg), msg, "INFOF")
 }
 
 func Warningf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.warningLogger.Output(2, msg), msg, "WARNINGF")
 }
 
 func Errorf(format string, v ...interface{}) {
 	ddcLogMut.Lock()
 	defer ddcLogMut.Unlock()
-	msg := strutils.GetEndOfString(fmt.Sprintf(format, v...), msgMax)
+	msg := strutils.GetStartOfString(fmt.Sprintf(format, v...), msgMax)
 	handleLogError(logger.errorLogger.Output(2, msg), msg, "ERRORF")
 }
 

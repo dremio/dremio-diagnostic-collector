@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TestCopyFile(t *testing.T) {
@@ -33,8 +33,8 @@ func TestCopyFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary source file: %v", err)
 	}
-	defer os.Remove(srcFile.Name())
-	defer srcFile.Close()
+	defer func() { _ = os.Remove(srcFile.Name()) }()
+	defer func() { _ = srcFile.Close() }()
 
 	// Write content to the source file
 	_, err = srcFile.Write(srcContent)
@@ -47,8 +47,8 @@ func TestCopyFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary destination file: %v", err)
 	}
-	defer os.Remove(dstFile.Name())
-	defer dstFile.Close()
+	defer func() { _ = os.Remove(dstFile.Name()) }()
+	defer func() { _ = dstFile.Close() }()
 
 	// Call the method under test
 	err = ddcio.CopyFile(srcFile.Name(), dstFile.Name())
@@ -73,7 +73,7 @@ func TestCopyDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary source directory: %v", err)
 	}
-	defer os.RemoveAll(srcDir)
+	defer func() { _ = os.RemoveAll(srcDir) }()
 
 	// Create a subdirectory within the source directory
 	subDir := filepath.Join(srcDir, "subdir")
@@ -88,7 +88,7 @@ func TestCopyDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create source file: %v", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	_, err = file.WriteString("This is the source file content")
 	if err != nil {
@@ -99,7 +99,7 @@ func TestCopyDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temporary destination directory: %v", err)
 	}
-	defer os.RemoveAll(dstDir)
+	defer func() { _ = os.RemoveAll(dstDir) }()
 
 	// Call the method under test
 	err = ddcio.CopyDir(srcDir, dstDir)
@@ -155,6 +155,7 @@ func TestEnsureClose(t *testing.T) {
 	// so the simplelogger output will be captured
 	tempDir := t.TempDir()
 	simplelog.InitLoggerWithOutputDir(tempDir)
+	defer simplelog.Close()
 	ddcio.EnsureClose(expectedFile, failedClose)
 
 	raw, err := os.ReadFile(simplelog.GetLogLoc())

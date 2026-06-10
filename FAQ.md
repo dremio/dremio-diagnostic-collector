@@ -1,84 +1,69 @@
 # FAQ
 
-## DDC is resource intensive
+DDC v4 uses a subcommand-based CLI: `ddc collect <transport> <mode>`, where `<transport>` is
+`k8s`, `ssh`, `local`, or `local-k8s`, and `<mode>` is `standard` or `diagnosis`. There is no
+`--mode` flag and no `ddc.yaml` configuration file — every setting is a CLI flag.
 
-do the following in the ddc.yaml:
+## Which collection mode should I use?
 
-* set `number-threads: 1`
-* set `dremio-jstack-freq-seconds: 10`
-* set `dremio-queries-json-num-days: 7`
-* if using `--dremio-pat-prompt` when running ddc or setting `dremio-pat-token` in the ddc.yaml then set `number-job-profiles: 50`
+* **`standard`** — for capturing routine **usage** data: server logs, queries.json, configuration, system tables, and WLM. This is the day-to-day mode.
+* **`diagnosis`** — for **support cases and incident investigation**: the full set of logs plus opt-in JVM diagnostics (JFR, jstack, top, async-profiler, heap dump). Diagnosis is intended for use with Dremio Support and is gated behind a support password in the TUI.
 
-## DDC tarball is too big
+## The tarball is too large
 
-do the following in the ddc.yaml:
+Reduce the number of days collected:
 
-* set `dremio-queries-json-num-days: 7`
-* set `collect-gc-logs: false`
+* **Diagnosis:** lower `--days` (e.g. `--days 1`), or use `--start-date` to target a specific window.
+* **Standard:** lower the per-log day counts, e.g. `--server-logs-num-days` and `--queries-json-num-days`.
 
-## DDC is too slow
+## DDC didn't capture what I expected
 
-do the following in the ddc.yaml:
-
-* set `number-threads: 4`
-* if using `--dremio-pat-prompt` when running ddc or setting `dremio-pat-token` in the ddc.yaml then set `number-job-profiles: 50`
-
-## I have a tiny /tmp folder and DDC is filling it up
-
-* For remote collections (SSH/K8s): use `--transfer-dir` to specify a different staging directory and `--output-file` to specify where the final tarball is saved
-* For local collections: use `--tarball-out-dir` at the cli or set `tarball-out-dir` in ddc.yaml to specify where the final tarball is saved
-
-## DDC didn't capture what I wanted
-
-* read the `ddc-HOSTNAME.log` logs and see what errors there are (ie literally grep for ERROR)
-* are the dremio-log-dir, dremio-conf-dir set correctly? (assuming the node is offline or the version of DDC is under 0.8 this may be necessary to set)
-* the job profiles, KV report, WLM report, and system table report all need `dremio-pat-token` to be set in ddc.yaml or `--dremio-pat-prompt` to be passed at the command line
-* are you running the latest version of DDC? We had over 15 releases  in 2023 containing bug fixes and new functionality, check here https://github.com/dremio/dremio-diagnostic-collector/releases
-* If you are running ssh..did you remember to use --sudo-user as the dremio user or as a user with admin rights?
+* Read `ddc.log` (and the per-node `<node-name>.log` files) in the bundle and grep for `ERROR` / `WARN`
+* Check `summary.json` in the bundle root — it records per-node results and any errors
+* If path autodetection failed, set the directories explicitly: `--coordinator-log-dir`, `--executor-log-dir`, `--local-log-dir`, `--dremio-conf-dir`, `--dremio-rocksdb-dir`
+* For SSH, make sure `--sudo-user` can run `jcmd` / `jstack` (typically the `dremio` user)
+* Make sure you are on the latest DDC release: https://github.com/dremio/dremio-diagnostic-collector/releases
 
 ## What is captured by DDC?
 
-DDC has 4 modes - but you can alter the `ddc.yaml` and override collection modes to suit your own configuration
+DDC has two collection modes, selected as a subcommand. All settings are configurable via CLI flags.
 
-### Light mode
+### Standard mode (`ddc collect <transport> standard`)
 
-* system disk usage
-* server.log and 2 days of archives
-* metadata\_refresh.log and 2 days of archives
-* reflection.log and 2 days of archives
-* queries.json and up to 2 days of archives
-* all Dremio configurations
-* all GC logs if present
+* server.log (1 day by default; `--server-logs-num-days`)
+* queries.json (30 days by default; `--queries-json-num-days`)
+* queries performance data from RocksDB (30 days; `--queries-perf-num-days`)
+* tracker.json (1 day; `--tracker-json-num-days`)
+* vacuum.json (1 day; `--vacuum-log-num-days`)
+* Dremio configuration files (dremio.conf, dremio-env, logback.xml) with passwords masked
+* OS config and disk usage
+* WLM configuration and system tables export — both read from RocksDB (no PAT required)
+* metadata\_refresh.log — off by default in standard mode; enable with `--collect-meta-refresh-log`
+* Kubernetes resource info (k8s / local-k8s transports)
 
-### Standard mode
+Standard mode does not use a PAT token at all.
 
-* perf metrics (cpu and GC usage by thread)
-* system disk usage
-* Java Flight Recorder recording of 60 seconds
-* top output of 60 seconds - older versions used [ttop](https://github.com/aragozin/jvm-tools/blob/master/sjk-core/docs/TTOP.md)
-* server.log and 7 days of archives
-* metadata\_refresh.log and 7 days of archives
-* reflection.log and 7 days of archives
-* queries.json and up to 30 days of archives 
-* all Dremio configurations
-* all GC logs if present
+### Diagnosis mode (`ddc collect <transport> diagnosis`)
 
-### Standard+jstack mode
+Logs are collected over a date range (`--days`, default 3, or `--start-date`). By default this includes:
 
-* everything stated in standard
-* captures 60 seconds of jstack at 1 second intervals
+* server.log, queries.json, queries performance data, tracker.json, vacuum.json
+* GC logs, hs\_err crash dumps, metadata\_refresh.log, reflection.log, acceleration.log, access.log, hive-deprecated.log
 
-### Healthcheck mode (with a Dremio Personal Access Token)
+JVM diagnostics are **opt-in** — off by default in both CLI and TUI:
 
-* everything stated in standard
-* a sampling of job profiles (note 10000 jobs can take 15 minutes to collect)
-* Dremio key value store report
-* Dremio work load manager details
-* system tables and their details
+* Java Flight Recorder — `--diag-jfr`
+* jstack thread dumps — `--diag-jstack`
+* top process snapshots — `--diag-top`
+* async-profiler — `--diag-async-profiler`
+* heap dump — `--diag-heap-dump`
+* duration for all of the above — `--diag-time-seconds` (default 60)
 
-### Optionally with the appropriate change to ddc.yaml
+System tables and WLM are read from RocksDB (no PAT). A PAT (`--dremio-pat-token` or `DDC_PAT_TOKEN`) is used only for these two opt-in REST-API collectors:
 
-* access.log and 7 days of archives
-* audit.log and 7 days of archives
-* Java heap dump
+* problematic job profiles auto-identified from server.log — `--collect-problematic-profiles`
+* KV store report — `--collect-kvstore-report`
 
+> Note: access, acceleration, and hive-deprecated logs are collected by default in diagnosis mode
+> and are not exposed in standard mode. The `--collect-audit-log` flag from older DDC versions has
+> been removed.

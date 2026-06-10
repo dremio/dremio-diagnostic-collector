@@ -14,10 +14,10 @@
 
 package collects
 
+// CollectionMode represents the type of diagnostic collection to perform.
+type CollectionMode string
+
 const (
-	QuickCollection              = "light"
-	StandardCollection           = "standard"
-	StandardPlusJSTACKCollection = "standard+jstack"
-	HealthCheckCollection        = "health-check"
-	WAFCollection                = "waf"
+	DiagnosisCollection CollectionMode = "diagnosis"
+	StandardCollection  CollectionMode = "standard"
 )

@@ -66,17 +66,43 @@ func TestGetPathHC(t *testing.T) {
 	ddcfs := NewFakeFileSystem()
 	tmpDir := t.TempDir()
 	testStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()}, tmpDir)
-	// Test path for coordinators
+
+	// SSH mode (IsK8s=false, default) — coordinator gets -C suffix
 	expected := filepath.Join(tmpDir, testStrat.BaseDir, "log", "node1-C")
 	actual, _ := testStrat.CreatePath("log", "node1", "coordinator")
 	if expected != actual {
-		t.Errorf("\nERROR: returned path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
+		t.Errorf("\nERROR: SSH coordinator path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
 	}
-	// Test path for executors
+
+	// SSH mode — executor gets -E suffix
 	expected = filepath.Join(tmpDir, testStrat.BaseDir, "log", "node1-E")
 	actual, _ = testStrat.CreatePath("log", "node1", "executors")
 	if expected != actual {
-		t.Errorf("\nERROR: returned path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
+		t.Errorf("\nERROR: SSH executor path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
+	}
+
+	// SSH mode — fileType "kubernetes" never gets a suffix regardless of IsK8s
+	expected = filepath.Join(tmpDir, testStrat.BaseDir, "kubernetes", "node1")
+	actual, _ = testStrat.CreatePath("kubernetes", "node1", "coordinator")
+	if expected != actual {
+		t.Errorf("\nERROR: kubernetes fileType path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
+	}
+
+	// K8s mode (IsK8s=true) — coordinator: no suffix
+	k8sStrat := NewHCCopyStrategy(ddcfs, &MockTimeService{Time: time.Now()}, tmpDir)
+	k8sStrat.IsK8s = true
+
+	expected = filepath.Join(tmpDir, k8sStrat.BaseDir, "log", "dremio-master-0")
+	actual, _ = k8sStrat.CreatePath("log", "dremio-master-0", "coordinator")
+	if expected != actual {
+		t.Errorf("\nERROR: K8s coordinator path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
+	}
+
+	// K8s mode — executor: no suffix
+	expected = filepath.Join(tmpDir, k8sStrat.BaseDir, "log", "dremio-executor-0")
+	actual, _ = k8sStrat.CreatePath("log", "dremio-executor-0", "executors")
+	if expected != actual {
+		t.Errorf("\nERROR: K8s executor path: \nexpected:\t%v\nactual:\t\t%v\n", expected, actual)
 	}
 }
 

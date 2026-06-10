@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/output"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/output"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 )
 
 var (
@@ -103,11 +103,10 @@ func TestExecuteAndStreamOutput_WithInvalidCommand(t *testing.T) {
 	setupTestCLI()
 	err := c.ExecuteAndStreamOutput(false, outputHandler, "", "22JIDJMJMHHF")
 	if err == nil {
-		t.Errorf("Expected error but got nil")
+		t.Fatal("Expected error but got nil")
 	}
-	expectedErr := "executable file not found in $PATH"
-	if !strings.Contains(err.Error(), expectedErr) {
-		t.Errorf("Expected error message to contain '%s', but it was %v", expectedErr, err)
+	if !strings.Contains(err.Error(), "executable file not found") {
+		t.Errorf("Expected error message to contain 'executable file not found', but it was %v", err)
 	}
 }
 
@@ -155,10 +154,9 @@ func TestExecute_WhenCommandIsInvalid(t *testing.T) {
 	setupTestCLI()
 	_, err := c.Execute(false, "22JIDJMJMHHF")
 	if err == nil {
-		t.Errorf("Expected error but got nil")
+		t.Fatal("Expected error but got nil")
 	}
-	expectedErr := "executable file not found in $PATH"
-	if !strings.Contains(err.Error(), expectedErr) {
-		t.Errorf("Expected error message to contain '%s', but it was %v", expectedErr, err)
+	if !strings.Contains(err.Error(), "executable file not found") {
+		t.Errorf("Expected error message to contain 'executable file not found', but it was %v", err)
 	}
 }

@@ -17,10 +17,13 @@ package versions
 import "fmt"
 
 var (
-	Version string
+	Version = "4.0.0-beta1"
 	GitSha  string
 )
 
 func GetCLIVersion() string {
-	return fmt.Sprintf("ddc %v-%v\n", Version, GitSha)
+	if GitSha == "" {
+		return fmt.Sprintf("ddc %v", Version)
+	}
+	return fmt.Sprintf("ddc %v-%v", Version, GitSha)
 }

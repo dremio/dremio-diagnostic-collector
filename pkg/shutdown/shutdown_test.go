@@ -16,8 +16,9 @@ package shutdown_test
 
 import (
 	"testing"
+	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 )
 
 func TestShutdownRunsAllTasksInOrder(t *testing.T) {
@@ -41,5 +42,37 @@ func TestShutdownRunsAllTasksInOrder(t *testing.T) {
 	}
 	if items[2] != 3 {
 		t.Errorf("expected 3 but was %v", items[2])
+	}
+}
+
+func TestCleanupDoesNotHangOnBlockingTask(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping timeout test in short mode (requires ~30s)")
+	}
+	hook := shutdown.NewHook()
+	completed := false
+	// Add a task that blocks forever.
+	hook.Add(func() {
+		select {} // block indefinitely
+	}, "blocking task")
+	// Add a task after the blocking one to verify it still runs.
+	hook.AddFinalSteps(func() {
+		completed = true
+	}, "final task")
+
+	done := make(chan struct{})
+	go func() {
+		hook.Cleanup()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		// Cleanup returned — the timeout worked.
+	case <-time.After(65 * time.Second):
+		t.Fatal("Cleanup did not return within 65s; timeout on blocking task is broken")
+	}
+	if !completed {
+		t.Error("final task did not run after blocking task timed out")
 	}
 }

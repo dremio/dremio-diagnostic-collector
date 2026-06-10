@@ -25,8 +25,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TarGzDir(srcDir, dest string) error {
@@ -34,6 +35,10 @@ func TarGzDir(srcDir, dest string) error {
 }
 
 func TarDDC(srcDir, dest, baseDDC string) error {
+	return TarDDCWithProgress(srcDir, dest, baseDDC, nil)
+}
+
+func TarDDCWithProgress(srcDir, dest, baseDDC string, progressFn func(bytesRead, totalBytes int64)) error {
 	summaryJSON := filepath.Join(srcDir, "summary.json")
 	ddcFolder := filepath.Join(srcDir, baseDDC)
 	simplelog.Debug("copying log to archive for diagnostics")
@@ -42,19 +47,56 @@ func TarDDC(srcDir, dest, baseDDC string) error {
 		fmt.Printf("unable to copy ddc.log: \n%v", err)
 	}
 
-	return TarGzDirFiltered(srcDir, dest, func(name string) bool {
+	filterList := func(name string) bool {
 		switch name {
 		case summaryJSON, ddcFolder:
 			return true
 		}
-
-		// Check if it's a file under tarballDir
 		if strings.HasPrefix(name, ddcFolder) {
 			return true
 		}
 		simplelog.Infof("skipping %v", name)
 		return false
+	}
+
+	if progressFn != nil {
+		return TarGzDirFilteredWithProgress(srcDir, dest, filterList, progressFn)
+	}
+	return TarGzDirFiltered(srcDir, dest, filterList)
+}
+
+// TarGzDirFilteredWithProgress creates a .tgz archive, calling progressFn with
+// (bytesRead, totalBytes) as input files are streamed into the tar.
+func TarGzDirFilteredWithProgress(srcDir, dest string, filterList func(string) bool, progressFn func(bytesRead, totalBytes int64)) error {
+	// First pass: calculate total input size.
+	var totalBytes int64
+	_ = filepath.Walk(srcDir, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil || !filterList(filePath) || !info.Mode().IsRegular() {
+			return nil
+		}
+		totalBytes += info.Size()
+		return nil
 	})
+	if progressFn != nil {
+		progressFn(0, totalBytes)
+	}
+
+	tarGzFile, err := os.Create(filepath.Clean(dest))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := tarGzFile.Close(); err != nil {
+			simplelog.Debugf("failed extra close to tgz file %v", err)
+		}
+	}()
+	if err := TarGzDirFilteredStreamWithProgress(srcDir, tarGzFile, filterList, totalBytes, progressFn); err != nil {
+		return err
+	}
+	if err := tarGzFile.Close(); err != nil {
+		return fmt.Errorf("failed close to tgz file %w", err)
+	}
+	return nil
 }
 
 func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
@@ -77,6 +119,19 @@ func TarGzDirFiltered(srcDir, dest string, filterList func(string) bool) error {
 }
 
 func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) bool) error {
+	return tarGzDirFilteredStreamImpl(srcDir, w, filterList, 0, nil)
+}
+
+// TarGzDirFilteredStreamWithProgress is like TarGzDirFilteredStream but reports
+// progress via progressFn as input bytes are read into the archive.
+func TarGzDirFilteredStreamWithProgress(srcDir string, w io.Writer, filterList func(string) bool, totalBytes int64, progressFn func(bytesRead, totalBytes int64)) error {
+	return tarGzDirFilteredStreamImpl(srcDir, w, filterList, totalBytes, progressFn)
+}
+
+// tarGzDirFilteredStreamImpl is the shared implementation for TarGzDirFilteredStream
+// and TarGzDirFilteredStreamWithProgress. When progressFn is nil, no progress
+// tracking overhead is incurred.
+func tarGzDirFilteredStreamImpl(srcDir string, w io.Writer, filterList func(string) bool, totalBytes int64, progressFn func(bytesRead, totalBytes int64)) error {
 	gzWriter := gzip.NewWriter(w)
 	defer func() {
 		if err := gzWriter.Close(); err != nil {
@@ -92,21 +147,16 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 	}()
 
 	srcDir = strings.TrimSuffix(srcDir, string(os.PathSeparator))
+	var bytesRead int64
 
 	if err := filepath.Walk(srcDir, func(filePath string, fileInfo os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		// don't try and archive the tarball itself
-		// if filePath == dest {
-		//		return nil
-		//	}
-
 		if !filterList(filePath) {
 			return nil
 		}
 
-		// Get the relative path of the file
 		relativePath, err := filepath.Rel(srcDir, filePath)
 		if err != nil {
 			return err
@@ -116,37 +166,35 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 		if err != nil {
 			return err
 		}
-
-		// Convert path to use forward slashes
 		header.Name = filepath.ToSlash(relativePath)
-
 		header.Size = fileInfo.Size()
 
 		if err := tarWriter.WriteHeader(header); err != nil {
 			return err
 		}
 
-		if !fileInfo.Mode().IsRegular() { // nothing more to do for non-regular
+		if !fileInfo.Mode().IsRegular() {
 			return nil
 		}
 
 		if !fileInfo.IsDir() {
-			file, err := os.Open(filepath.Clean(filePath))
+			file, err := os.Open(filepath.Clean(filePath)) // #nosec G122 -- filePath is from WalkDir over controlled output dir
 			if err != nil {
 				return err
 			}
-
 			defer func() {
 				if err := file.Close(); err != nil {
 					simplelog.Debugf("optional file close for file %v failed %v", filePath, err)
 				}
 			}()
-			if _, err := io.Copy(tarWriter, file); err != nil {
+
+			var reader io.Reader = file
+			if progressFn != nil {
+				reader = &progressReader{r: file, bytesRead: &bytesRead, totalBytes: totalBytes, progressFn: progressFn}
+			}
+			if _, err := io.Copy(tarWriter, reader); err != nil {
 				return fmt.Errorf("unable to copy file %v to tar: %w", filePath, err)
 			}
-			// if err := file.Close(); err != nil {
-			// 	return fmt.Errorf("failed closing file %v: %v", filePath, err)
-			// }
 			return nil
 		}
 
@@ -160,8 +208,31 @@ func TarGzDirFilteredStream(srcDir string, w io.Writer, filterList func(string) 
 	if err := gzWriter.Close(); err != nil {
 		return fmt.Errorf("failed close to gz file %w", err)
 	}
-
+	// Signal 100% completion.
+	if progressFn != nil {
+		progressFn(totalBytes, totalBytes)
+	}
 	return nil
+}
+
+// progressReader wraps an io.Reader and reports cumulative bytes read.
+// It throttles progress callbacks to avoid excessive mutex contention.
+type progressReader struct {
+	r              io.Reader
+	bytesRead      *int64
+	totalBytes     int64
+	progressFn     func(bytesRead, totalBytes int64)
+	lastReportTime time.Time
+}
+
+func (pr *progressReader) Read(p []byte) (n int, err error) {
+	n, err = pr.r.Read(p)
+	*pr.bytesRead += int64(n)
+	if pr.progressFn != nil && time.Since(pr.lastReportTime) > 200*time.Millisecond {
+		pr.progressFn(*pr.bytesRead, pr.totalBytes)
+		pr.lastReportTime = time.Now()
+	}
+	return n, err
 }
 
 // sizeTrackingWriter wraps an io.Writer and tracks the total bytes written
@@ -288,7 +359,7 @@ func TarGzDirFilteredWithSizeLimit(srcDir, destPrefix string, maxSizeBytes int64
 		}
 
 		if !fileInfo.IsDir() {
-			file, err := os.Open(filepath.Clean(filePath))
+			file, err := os.Open(filepath.Clean(filePath)) // #nosec G122 -- filePath is from WalkDir over controlled output dir
 			if err != nil {
 				return err
 			}
@@ -341,12 +412,13 @@ func createNewArchiveWithSizeTracking(archivePath string) (*os.File, *gzip.Write
 
 // Sanitize archive file pathing from "G305: Zip Slip vulnerability"
 func SanitizeArchivePath(destination, header string) (v string, err error) {
-	v = filepath.ToSlash(filepath.Join(destination, header))
-	// tars use forward slash so we use path.Clean
-	if strings.HasPrefix(v, path.Clean(filepath.ToSlash(destination))) {
-		return v, nil
+	// Tar headers use forward slashes; validate in forward-slash space to
+	// prevent zip-slip, but return an OS-native path for filesystem operations.
+	fwdSlash := filepath.ToSlash(filepath.Join(destination, header))
+	if strings.HasPrefix(fwdSlash, path.Clean(filepath.ToSlash(destination))) {
+		return filepath.Join(destination, header), nil
 	}
-	return "", fmt.Errorf("header %v with destination %v is tainted and resolves to full path %v", destination, header, v)
+	return "", fmt.Errorf("header %v with destination %v is tainted and resolves to full path %v", destination, header, fwdSlash)
 }
 
 func ExtractTarGz(gzFilePath, dest string) error {
@@ -354,7 +426,7 @@ func ExtractTarGz(gzFilePath, dest string) error {
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer reader.Close() //nolint:errcheck // read-only file; close error is non-fatal
 	return ExtractTarGzStream(reader, dest, "")
 }
 
@@ -386,7 +458,7 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if _, err := os.Stat(target); err != nil {
-				if err := os.MkdirAll(path.Clean(target), 0o750); err != nil {
+				if err := os.MkdirAll(filepath.Clean(target), 0o750); err != nil {
 					return err
 				}
 			}
@@ -394,14 +466,14 @@ func ExtractTarStream(reader io.Reader, dest, pathToStrip string) error {
 			if header.Mode < 0 || header.Mode > math.MaxUint32 {
 				return fmt.Errorf("invalid header '%v' it must be positive and less than uint32", header.Mode)
 			}
-			file, err := os.OpenFile(path.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			file, err := os.OpenFile(filepath.Clean(target), os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				simplelog.Errorf("skipping file %v: %v", file, err)
 				// any error here should fail
 				return err
 			}
 			// just in case we get an early exit
-			defer file.Close()
+			defer file.Close() //nolint:errcheck // explicit Close below; deferred as safety net
 			for {
 				copied, err := io.CopyN(file, tarReader, 1024)
 				if err != nil {
@@ -430,6 +502,6 @@ func ExtractTarGzStream(reader io.Reader, dest, pathToStrip string) error {
 	if err != nil {
 		return err
 	}
-	defer gzReader.Close()
+	defer gzReader.Close() //nolint:errcheck // gzip reader close error is non-fatal
 	return ExtractTarStream(gzReader, dest, pathToStrip)
 }

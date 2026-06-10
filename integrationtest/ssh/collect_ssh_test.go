@@ -26,12 +26,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/tests"
 )
 
 type SSHTestConf struct {
@@ -113,21 +113,7 @@ func TestSSHBasedRemoteCollect(t *testing.T) {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
-	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
-		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
-	}
-	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
-	yamlText := fmt.Sprintf(`verbose: vvvv
-dremio-log-dir: %v
-dremio-conf-dir: %v
-dremio-rocksdb-dir: %v
-`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
-		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
-	}
-
-	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "light", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "collect", "ssh", "standard", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--output-file", tgzFile}
 	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -225,21 +211,7 @@ func TestSSHBasedRemoteCollectPlusJstack(t *testing.T) {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
-	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
-		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
-	}
-	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
-	yamlText := fmt.Sprintf(`verbose: vvvv
-dremio-log-dir: %v
-dremio-conf-dir: %v
-dremio-rocksdb-dir: %v
-`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
-		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
-	}
-
-	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "standard+jstack", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "collect", "ssh", "diagnosis", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--output-file", tgzFile}
 	err := cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -345,28 +317,6 @@ func TestSSHBasedRemoteCollectWithPAT(t *testing.T) {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
 	tgzFile := filepath.Join(t.TempDir(), "diag.tgz")
-	localYamlFileDir := filepath.Join(t.TempDir(), "ddc-conf")
-	if err := os.Mkdir(localYamlFileDir, 0o700); err != nil {
-		t.Fatalf("cannot make yaml dir %v: %v", localYamlFileDir, err)
-	}
-	localYamlFile := filepath.Join(localYamlFileDir, "ddc.yaml")
-	yamlText := fmt.Sprintf(`verbose: vvvv
-dremio-log-dir: %v
-dremio-conf-dir: %v
-dremio-rocksdb-dir: %v
-number-threads: 2
-dremio-endpoint: '%v'
-dremio-username: %v
-collect-dremio-configuration: true
-number-job-profiles: 25
-collect-jstack: true
-dremio-jstack-time-seconds: 10
-dremio-jfr-time-seconds: 10
-`, sshConf.DremioLogDir, sshConf.DremioConfDir, sshConf.DremioRocksDBDir, sshConf.DremioEndpoint, sshConf.DremioUsername)
-	if err := os.WriteFile(localYamlFile, []byte(yamlText), 0o600); err != nil {
-		t.Fatalf("not able to write yaml %v: %v", localYamlFile, err)
-	}
-
 	// set original stdin since we are going to overwrite it for now
 	org := os.Stdin
 	defer func() {
@@ -401,7 +351,7 @@ dremio-jfr-time-seconds: 10
 	}
 	os.Stdin = tmpfile
 
-	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", localYamlFile, "--output-file", tgzFile, "--collect", "health-check", "--min-free-space-gb", "5"}
+	args := []string{"ddc", "collect", "ssh", "diagnosis", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--output-file", tgzFile}
 	err = cmd.Execute(args)
 	if err != nil {
 		t.Fatalf("unable to run collect: %v", err)
@@ -482,9 +432,9 @@ dremio-jfr-time-seconds: 10
 	// kvstore report
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "kvstore", coordinator, "kvstore-report.zip"))
 
-	// ttop files
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", coordinator, "ttop.txt"))
-	tests.AssertFileHasContent(t, filepath.Join(hcDir, "ttop", executor, "ttop.txt"))
+	// top files
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "top", coordinator, "top.txt"))
+	tests.AssertFileHasContent(t, filepath.Join(hcDir, "top", executor, "top.txt"))
 
 	// jfr files
 	tests.AssertFileHasContent(t, filepath.Join(hcDir, "jfr", coordinator+".jfr"))
@@ -618,16 +568,12 @@ func TestValidateBadCollectFlag(t *testing.T) {
 		t.Errorf("failed unmarshalling string: %v", err)
 	}
 
-	ddcYaml := filepath.Join(t.TempDir(), "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte("#comment"), 0o600); err != nil {
-		t.Fatalf("unable to write ddc yaml: %v", err)
-	}
-	args := []string{"ddc", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--ddc-yaml", ddcYaml, "--collect", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}
+	args := []string{"ddc", "collect", "ssh", "standard", "-u", sshConf.User, "--sudo-user", sshConf.SudoUser, "-c", sshConf.Coordinator, "-e", sshConf.Executor, "--mode", "wrong", "--" + conf.KeyDisableFreeSpaceCheck}
 	err = cmd.Execute(args)
 	if err == nil {
-		t.Error("collect should fail")
+		t.Fatal("collect should fail")
 	}
-	expected := "invalid --collect option"
+	expected := "--mode flag has been removed"
 	if !strings.Contains(err.Error(), expected) {
 		t.Errorf("expected to contain '%v' in '%v'", expected, err.Error())
 	}

@@ -19,6 +19,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 )
 
 // CheckDirectory checks if a directory exists and contains files.
@@ -76,11 +80,45 @@ func CheckFreeSpace(folder string, minGB uint64) error {
 
 // FormatFreeSpaceError formats an error message for free space issues based on the collection mode.
 // It provides a more specific error message suggesting to try a lighter collection mode if appropriate.
-func FormatFreeSpaceError(nonDefaultFreeSpace bool, err error, collectionMode, fallbackMode string) error {
+func FormatFreeSpaceError(nonDefaultFreeSpace bool, err error, collectionMode, fallbackMode collects.CollectionMode) error {
 	if collectionMode == fallbackMode || nonDefaultFreeSpace {
 		// If already using the lightest mode, just return the original error
 		return fmt.Errorf("%w", err)
 	}
 	// Suggest trying a lighter collection mode
 	return fmt.Errorf("%w for %v mode, try %v mode instead", err, collectionMode, fallbackMode)
+}
+
+// ExpandTilde replaces a leading "~" or "~/" / "~\" token in path with
+// the current user's home directory. Returns the input unchanged when
+// no leading tilde token is present, when the home directory cannot be
+// determined, or for "~user" forms (we don't resolve other users' homes).
+//
+// Examples:
+//
+//	ExpandTilde("~/.kube/config")  -> "/Users/foo/.kube/config"
+//	ExpandTilde(`~\.kube\config`)  -> "C:\\Users\\foo\\.kube\\config"
+//	ExpandTilde("~")               -> "/Users/foo"
+//	ExpandTilde("/etc/passwd")     -> "/etc/passwd"
+//	ExpandTilde("~someone/file")   -> "~someone/file"   (untouched)
+func ExpandTilde(path string) string {
+	if path == "" || path[0] != '~' {
+		return path
+	}
+	// "~" alone or "~/..." or "~\..."
+	if len(path) == 1 || path[1] == '/' || path[1] == '\\' {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		if len(path) == 1 {
+			return home
+		}
+		// Strip the leading "~" then join. Normalise backslashes to slashes
+		// so windows-style paths resolve correctly on non-Windows hosts too;
+		// filepath.Join converts to the native separator when running on Windows.
+		return filepath.Join(home, strings.ReplaceAll(path[2:], `\`, "/"))
+	}
+	// "~user/..." — leave alone.
+	return path
 }

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/tests"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/tests"
 )
 
 func TestSSHExec(t *testing.T) {
@@ -47,39 +47,7 @@ func TestSSHExec(t *testing.T) {
 	if len(calls) != 1 {
 		t.Errorf("expected 1 call but got %v", len(calls))
 	}
-	expectedCall := []string{"ssh", "-i", "id_rsa", "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v", sshUser, hostName), "ls -l"}
-	if !reflect.DeepEqual(calls[0], expectedCall) {
-		t.Errorf("expected %v call but got %v", expectedCall, calls[0])
-	}
-}
-
-func TestSCP(t *testing.T) {
-	hostName := "pod"
-	source := "/podroot/test.log"
-	destination := "/mydir/test.log"
-	cli := &tests.MockCli{
-		StoredResponse: []string{"success"},
-		StoredErrors:   []error{nil},
-	}
-	sshUser := "root"
-	k := &CmdSSHActions{
-		cli:     cli,
-		sshKey:  "id_rsa",
-		sshUser: sshUser,
-	}
-	out, err := k.CopyFromHost(hostName, source, destination)
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-
-	if out != "success" {
-		t.Errorf("expected success but got %v", out)
-	}
-	calls := cli.Calls
-	if len(calls) != 1 {
-		t.Errorf("expected 1 call but got %v", len(calls))
-	}
-	expectedCall := []string{"scp", "-i", "id_rsa", "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("%v@%v:%v", sshUser, hostName, source), destination}
+	expectedCall := []string{"ssh", "-i", "id_rsa", "-o", "LogLevel=error", "-o", "UserKnownHostsFile=/dev/null", "-o", "StrictHostKeyChecking=no", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=3", fmt.Sprintf("%v@%v", sshUser, hostName), "ls -l"}
 	if !reflect.DeepEqual(calls[0], expectedCall) {
 		t.Errorf("expected %v call but got %v", expectedCall, calls[0])
 	}

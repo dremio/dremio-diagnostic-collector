@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 )
 
 func TestAPIRequest(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.WriteHeader(http.StatusOK)
-		fmt.Fprintln(rw, `{"message":"success"}`)
+		_, _ = fmt.Fprintln(rw, `{"message":"success"}`)
 	}))
 	defer server.Close()
 
@@ -47,7 +47,7 @@ func TestPostQuery(t *testing.T) {
 			t.Fatalf("Expected 'POST', got '%v'", req.Method)
 		}
 		rw.WriteHeader(http.StatusOK)
-		fmt.Fprintln(rw, `{"id":"123"}`)
+		_, _ = fmt.Fprintln(rw, `{"id":"123"}`)
 	}))
 	defer server.Close()
 
@@ -87,7 +87,7 @@ func TestClientTimeout(t *testing.T) {
 		// Delay the response
 		time.Sleep(1200 * time.Millisecond)
 		rw.WriteHeader(http.StatusOK)
-		fmt.Fprintln(rw, `{"message":"success"}`)
+		_, _ = fmt.Fprintln(rw, `{"message":"success"}`)
 	}))
 	defer server.Close()
 

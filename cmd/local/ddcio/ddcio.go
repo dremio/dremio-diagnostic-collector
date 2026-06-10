@@ -24,8 +24,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func DeleteDirContents(dir string) error {
@@ -40,7 +40,7 @@ func DeleteDirContents(dir string) error {
 		}
 
 		// Delete the file or directory
-		err = os.RemoveAll(path)
+		err = os.RemoveAll(path) // #nosec G122 -- path is from WalkDir over controlled DDC output dir
 		if err != nil {
 			return err
 		}
@@ -133,22 +133,10 @@ func CopyFile(srcPath, dstPath string) error {
 	return nil
 }
 
-// GetFilesInDir retrieves a list of directory entries for the given directory.
-// It returns a slice of os.DirEntry representing the files and subdirectories in the directory.
-// An error is returned if there is a problem reading the directory.
-func GetFilesInDir(dir string) ([]os.DirEntry, error) {
-	dirEntries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	return dirEntries, nil
-}
-
 // Shell executes a shell command with shell expansion and appends its output to the provided io.Writer.
 func Shell(hook shutdown.CancelHook, writer io.Writer, commandLine string) error {
-	// this is a hack before we can do a longer term improvement of separating local-collect
-	// and the ddc command into different clis
+	// this is a hack before we can do a longer term improvement of separating
+	// the ddc command into different clis
 	shell := "bash"
 	fileArg := "-c"
 	if runtime.GOOS == "windows" {

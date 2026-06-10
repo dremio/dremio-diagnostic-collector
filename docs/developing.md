@@ -10,7 +10,7 @@
 * install dremio enterprise (version 24 ideally)
 * setup ssh public key auth
 * setup a pat
-* setup this file ./integration_test/ssh/testdata/ssh.json with a template like this (only use real values for all the fields)
+* setup this file ./integrationtest/ssh/testdata/ssh.json with a template like this (only use real values for all the fields)
 {   
     "sudo_user": "dremio",
     "user": "myuser", 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 var secretK8sKeywords = []string{
@@ -29,40 +29,114 @@ var secretK8sKeywords = []string{
 	"sas_url",
 }
 
+var supportedTypesForMasking = map[string]bool{
+	"cronjob":     true,
+	"job":         true,
+	"statefulset": true,
+	"pod":         true,
+}
+
+// safeMap extracts a nested map value by key, returning an error if the key is missing or not a map.
+func safeMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
+	raw, ok := m[key]
+	if !ok {
+		return nil, fmt.Errorf("key %q not found", key)
+	}
+	result, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("key %q is %T, not map[string]interface{}", key, raw)
+	}
+	return result, nil
+}
+
+// safeSlice extracts a nested slice value by key, returning an error if the key is missing or not a slice.
+func safeSlice(m map[string]interface{}, key string) ([]interface{}, error) {
+	raw, ok := m[key]
+	if !ok {
+		return nil, fmt.Errorf("key %q not found", key)
+	}
+	result, ok := raw.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("key %q is %T, not []interface{}", key, raw)
+	}
+	return result, nil
+}
+
 func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
-	var containers []interface{}
-	kindRaw, valid := k8sItem["kind"]
-	if !valid {
-		return containers, fmt.Errorf("unable to read kind %#v", k8sItem)
+	kindRaw, ok := k8sItem["kind"]
+	if !ok {
+		return nil, fmt.Errorf("unable to read kind %#v", k8sItem)
 	}
-	kind := strings.ToLower(kindRaw.(string))
+	kindStr, ok := kindRaw.(string)
+	if !ok {
+		return nil, fmt.Errorf("kind is %T, expected string", kindRaw)
+	}
+	kind := strings.ToLower(kindStr)
 
-	supported := false
-	supportedTypesForMasking := []string{"cronjob", "job", "statefulset", "pod"}
-	for _, k := range supportedTypesForMasking {
-		if k == kind {
-			supported = true
-		}
-	}
-	if !supported {
+	if !supportedTypesForMasking[kind] {
 		simplelog.Debugf("There is no password masking for kubernetes type %s", kind)
-		return containers, nil
+		return nil, nil
 	}
 
-	specRaw, valid := k8sItem["spec"]
-	if !valid {
-		return containers, fmt.Errorf("unable to read spec")
+	spec, err := safeMap(k8sItem, "spec")
+	if err != nil {
+		return nil, fmt.Errorf("unable to read spec: %w", err)
 	}
-	spec := specRaw.(map[string]interface{})
-	switch strings.ToLower(kind) {
+
+	var containers []interface{}
+	switch kind {
 	case "cronjob":
-		containers = spec["jobTemplate"].(map[string]interface{})["spec"].(map[string]interface{})["template"].(map[string]interface{})["spec"].(map[string]interface{})["containers"].([]interface{})
+		jobTemplate, err := safeMap(spec, "jobTemplate")
+		if err != nil {
+			return nil, fmt.Errorf("cronjob spec: %w", err)
+		}
+		jtSpec, err := safeMap(jobTemplate, "spec")
+		if err != nil {
+			return nil, fmt.Errorf("cronjob jobTemplate: %w", err)
+		}
+		template, err := safeMap(jtSpec, "template")
+		if err != nil {
+			return nil, fmt.Errorf("cronjob jobTemplate.spec: %w", err)
+		}
+		tSpec, err := safeMap(template, "spec")
+		if err != nil {
+			return nil, fmt.Errorf("cronjob template: %w", err)
+		}
+		containers, err = safeSlice(tSpec, "containers")
+		if err != nil {
+			return nil, fmt.Errorf("cronjob containers: %w", err)
+		}
 	case "job":
-		containers = spec["template"].(map[string]interface{})["spec"].(map[string]interface{})["containers"].([]interface{})
+		template, err := safeMap(spec, "template")
+		if err != nil {
+			return nil, fmt.Errorf("job spec: %w", err)
+		}
+		tSpec, err := safeMap(template, "spec")
+		if err != nil {
+			return nil, fmt.Errorf("job template: %w", err)
+		}
+		containers, err = safeSlice(tSpec, "containers")
+		if err != nil {
+			return nil, fmt.Errorf("job containers: %w", err)
+		}
 	case "pod":
-		containers = spec["containers"].([]interface{})
+		containers, err = safeSlice(spec, "containers")
+		if err != nil {
+			return nil, fmt.Errorf("pod containers: %w", err)
+		}
 	case "statefulset":
-		containers = spec["template"].(map[string]interface{})["spec"].(map[string]interface{})["containers"].([]interface{})
+		template, err := safeMap(spec, "template")
+		if err != nil {
+			return nil, fmt.Errorf("statefulset spec: %w", err)
+		}
+		tSpec, err := safeMap(template, "spec")
+		if err != nil {
+			return nil, fmt.Errorf("statefulset template: %w", err)
+		}
+		containers, err = safeSlice(tSpec, "containers")
+		if err != nil {
+			return nil, fmt.Errorf("statefulset containers: %w", err)
+		}
 	default:
 		simplelog.Errorf("Unsupported kind %v file a bug", kind)
 	}
@@ -72,20 +146,33 @@ func getContainers(k8sItem map[string]interface{}) ([]interface{}, error) {
 
 func maskDictSecrets(containers []interface{}) {
 	for _, container := range containers {
-		envVarsRaw, valid := container.(map[string]interface{})["env"]
-		if !valid {
-			return
+		containerMap, ok := container.(map[string]interface{})
+		if !ok {
+			continue
 		}
-		envVars := envVarsRaw.([]interface{})
+		envVarsRaw, ok := containerMap["env"]
+		if !ok {
+			continue
+		}
+		envVars, ok := envVarsRaw.([]interface{})
+		if !ok {
+			continue
+		}
 		for _, envVar := range envVars {
-			nameRaw, valid := envVar.(map[string]interface{})["name"]
-			if !valid {
-				// skipping
+			envVarMap, ok := envVar.(map[string]interface{})
+			if !ok {
 				continue
 			}
-			name := strings.ToLower(nameRaw.(string))
-			if checkK8sStringForSecret(name) {
-				envVar.(map[string]interface{})["value"] = "REMOVED_POTENTIAL_SECRET"
+			nameRaw, ok := envVarMap["name"]
+			if !ok {
+				continue
+			}
+			name, ok := nameRaw.(string)
+			if !ok {
+				continue
+			}
+			if checkK8sStringForSecret(strings.ToLower(name)) {
+				envVarMap["value"] = "REMOVED_POTENTIAL_SECRET"
 			}
 		}
 	}
@@ -101,16 +188,23 @@ func checkK8sStringForSecret(s string) bool {
 }
 
 func maskLastAppliedConfig(k8sObject map[string]interface{}) {
-	metadata, valid := k8sObject["metadata"]
-	if !valid {
+	metadataRaw, ok := k8sObject["metadata"]
+	if !ok {
 		return
 	}
-	annotationsRaw, valid := metadata.(map[string]interface{})["annotations"]
-	if !valid {
+	metadataMap, ok := metadataRaw.(map[string]interface{})
+	if !ok {
 		return
 	}
-	annotations := annotationsRaw.(map[string]interface{})
-	if _, valid := annotations["kubectl.kubernetes.io/last-applied-configuration"]; valid {
+	annotationsRaw, ok := metadataMap["annotations"]
+	if !ok {
+		return
+	}
+	annotations, ok := annotationsRaw.(map[string]interface{})
+	if !ok {
+		return
+	}
+	if _, ok := annotations["kubectl.kubernetes.io/last-applied-configuration"]; ok {
 		annotations["kubectl.kubernetes.io/last-applied-configuration"] = "REMOVED_POTENTIAL_SECRET"
 	}
 }
@@ -135,10 +229,14 @@ func RemoveSecretsFromK8sJSON(k8sJSON []byte) (string, error) {
 	}
 
 	for _, item := range items {
-		maskLastAppliedConfig(item.(map[string]interface{}))
-		containerList, err := getContainers(item.(map[string]interface{}))
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("item is %T, expected map[string]interface{}", item)
+		}
+		maskLastAppliedConfig(itemMap)
+		containerList, err := getContainers(itemMap)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("getContainers: %w", err)
 		}
 		maskDictSecrets(containerList)
 	}

@@ -1,5 +1,72 @@
 # Changelog
 
+## [4.0.0] - 2026-06-10
+
+- Documentation accuracy fixes (README, FAQ): corrected JVM tool opt-in wording, added local/local-k8s examples to help text.
+
+## [4.0.0-rc.6] - 2026-06-01
+
+- Diagnosis mode now enables five log types by default that were previously off: tracker.json, vacuum log, acceleration log, access log, and hive-deprecated log. Standard mode defaults are unchanged.
+- `metadata_refresh.log` is now a toggleable log type in both modes: disabled by default in standard, enabled by default in diagnosis. New `--collect-meta-refresh-log` flag on both command loops.
+- New `--collect-hive-deprecated-log` flag (diagnosis-only); collection was previously wired up end-to-end but the flag and TUI option were missing.
+
+## [4.0.0-rc.5] - 2026-05-26
+
+### Breaking changes
+
+* `--label-selector` has been split into two flags with single, distinct purposes:
+  * `--detect-label-selector` (no short form, default `role=dremio-cluster-pod`) — identifies Dremio coordinator/executor pods for file streaming.
+  * `-l, --container-log-label-selector` (default empty) — filters which pods' container logs end up in `kubernetes/container-logs/`. Empty means all pods in the namespace, restoring the v3 behavior of capturing ecosystem pods (catalog-server, opensearch, mongodb, nats, operators) that issue #335 reported missing.
+
+  Anyone passing `--label-selector` will see cobra's unknown-flag error. Migration:
+  * To scope which Dremio pods get their files streamed: `--detect-label-selector <selector>`.
+  * To scope which pods' container logs are collected: `-l <selector>` (same short form as before, but new semantics).
+  * For the v3-style "scope everything to one pod" behavior, pass both flags with the same value.
+
+- Container logs are now collected from all pods in the namespace (restores v3 behavior); the `--detect-label-selector` flag continues to scope only Dremio pod file streaming.
+- Fixed rocksdb-viewer collection silently skipping cluster-stats, WLM, system-tables, and queries-perf when `--dremio-rocksdb-dir` was not set; now falls back to the per-node autodetected path.
+
+## [4.0.0-rc.4] - 2026-05-21
+
+- Fixed TUI log-path autodetection to respect JVM last-value-wins semantics when the same `-D` flag appears multiple times in the Dremio process arguments.
+
+## [4.0.0-rc.3] - 2026-05-18
+
+- Reverted WLM output filenames to the v3 layout (`queues.json`, `rules.json`, `engines.json`, `cluster_usage.json`).
+
+## [4.0.0-rc.2] - 2026-05-15
+
+- Diagnosis mode is now gated behind a support password in the TUI. Entering `standard` mode remains open to everyone; entering `diagnosis` prompts for the password.
+- Refined TUI screen labels and descriptions for clarity.
+
+## [4.0.0-rc.1] - 2026-05-07
+
+- TUI prompts for kubeconfig path when none is auto-detected; new --kubeconfig flag on k8s and local-k8s subcommands.
+- Downgraded UPX 4.2.4 because of WSL issues.
+
+## [4.0.0-beta2] - 2026-04-27
+
+- Fixed queries-perf day filter to correctly scope collected files to the configured date range.
+- Reduced K8s SPDY streaming overhead for faster file transfer.
+- TUI always emits `--system-tables` in the generated CLI command so the list is explicit and reproducible.
+- Never collect keystores, certificates, or private keys from configuration directories.
+- Fixed flaky JVM flag capture test by polling for JVM process registration.
+
+## [4.0.0-beta1] - 2026-04-16
+
+DDC v4 is a full redesign of the Dremio Diagnostic Collector.
+
+1. **Streaming architecture** — Files stream directly from remote nodes to the DDC host. No intermediate tarballs on pods/nodes, eliminating disk pressure and `kubectl cp` timeouts.
+2. **Two collection modes** — `standard` (lightweight logs) and `diagnosis` (full JVM diagnostics). Replaces the previous five overlapping collection profiles.
+3. **Three transports** — SSH, Kubernetes, and new Local mode for single-node collection without SSH/K8s overhead. A Local-K8s hybrid mode is also available.
+4. **Interactive TUI overhaul** — Rebuilt with `charmbracelet/huh` forms. Node discovery and selection, live CLI command preview, and transport-specific configuration screens.
+5. **No YAML configuration** — `ddc.yaml` is removed entirely. All settings are CLI flags. The TUI generates a reproducible one-liner via "Show CLI command".
+6. **SPDY-based K8s executor** — Kubernetes commands use the SPDY protocol for reliable streaming execution on clusters.
+7. **PAT-token-less collection** — System tables, WLM configuration, cluster stats, and queries-perf are collected directly from the coordinator node, removing the REST API and PAT token dependency for these data types.
+8. **Query performance data** — Collects per-query performance metrics, split into daily files (`queries-perf.YYYY-MM-DD.json`) for easier analysis.
+9. **Diagnosis tooling** — Async profiler, JFR, jstack, top, and heap dump collection with synchronized start across all nodes for consistent diagnostics.
+10. **Real-time progress reporting** — Per-node status with file-level progress (name, size, percentage), thread utilization, and per-tool error reporting in the TUI status screen.
+
 ## [3.5.7] - 2026-02-20
 
 ### Changed
@@ -969,6 +1036,14 @@ someone has added the PAT which is always available
 
 - able to capture logs, configuration and diagnostic data from Dremio clusters deployed on Kubernetes and on-prem
 
+[4.0.0-rc.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-rc.5...v4.0.0-rc.6
+[4.0.0-rc.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-rc.4...v4.0.0-rc.5
+[4.0.0-rc.4]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-rc.3...v4.0.0-rc.4
+[4.0.0-rc.3]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-rc.2...v4.0.0-rc.3
+[4.0.0-rc.2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-rc.1...v4.0.0-rc.2
+[4.0.0-rc.1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-beta2...v4.0.0-rc.1
+[4.0.0-beta2]: https://github.com/dremio/dremio-diagnostic-collector/compare/v4.0.0-beta1...v4.0.0-beta2
+[4.0.0-beta1]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.7...v4.0.0-beta1
 [3.5.7]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.6...v3.5.7
 [3.5.6]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.5...v3.5.6
 [3.5.5]: https://github.com/dremio/dremio-diagnostic-collector/compare/v3.5.4...v3.5.5

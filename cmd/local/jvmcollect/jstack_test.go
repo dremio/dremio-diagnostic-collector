@@ -20,14 +20,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/jvmcollect"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/jvmcollect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
 )
 
 func TestJStackCapture(t *testing.T) {
@@ -49,35 +48,21 @@ func TestJStackCapture(t *testing.T) {
 		}
 	}()
 	overrides := make(map[string]string)
-	confDir := filepath.Join(t.TempDir(), "ddcyaml")
-	if err := os.Mkdir(confDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
 	tmpOutDir := filepath.Join(t.TempDir(), "ddcout")
 	if err := os.Mkdir(tmpOutDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	nodeName := "node1"
 
-	ddcYamlString := fmt.Sprintf(`
-dremio-log-dir: %v
-dremio-conf-dir: %v
-tarball-out-dir: %v
-node-name: %v
-dremio-pid: %v
-dremio-jstack-time-seconds: 2
-dremio-jstack-freq-seconds: 1
-`, filepath.Join("testdata", "logs"), filepath.Join("testdata", "conf"), strings.ReplaceAll(tmpOutDir, "\\", "\\\\"),
-		nodeName,
-		cmd.Process.Pid,
-	)
-	ddcYaml := filepath.Join(confDir, "ddc.yaml")
-	if err := os.WriteFile(ddcYaml, []byte(ddcYamlString), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	overrides["dremio-log-dir"] = filepath.Join("testdata", "logs")
+	overrides["dremio-conf-dir"] = filepath.Join("testdata", "conf")
+	overrides["output-file"] = tmpOutDir
+	overrides["node-name"] = nodeName
+	overrides["dremio-pid"] = fmt.Sprintf("%v", cmd.Process.Pid)
+	overrides["diag-time-seconds"] = "2"
 	hook := shutdown.NewHook()
 	defer hook.Cleanup()
-	c, err := conf.ReadConf(hook, overrides, ddcYaml, collects.StandardCollection)
+	c, err := conf.ReadConf(hook, overrides, collects.StandardCollection)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +73,7 @@ dremio-jstack-freq-seconds: 1
 	now := time.Now()
 	counter := 0
 	var times []time.Time
-	err = jvmcollect.RunCollectJStacksWithTimeService(c, hook, func() time.Time {
+	err = jvmcollect.RunJStacksWithTimeService(c, hook, func() time.Time {
 		counter++
 		current := now.Add(time.Duration(counter) * time.Second)
 		times = append(times, current)
@@ -101,23 +86,18 @@ dremio-jstack-freq-seconds: 1
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("expected 2 but got %v", len(entries))
+	if len(entries) < 2 {
+		t.Fatalf("expected at least 2 thread dumps but got %v", len(entries))
 	}
 
-	f, err := os.Stat(filepath.Join(threadDumpsOutDir, fmt.Sprintf("threadDump-%s-%s.txt", nodeName, times[0].Format("2006-01-02_15_04_05"))))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f.Size() == 0 {
-		t.Errorf("expected a non empty file for the hprof but we got one")
-	}
-
-	f, err = os.Stat(filepath.Join(threadDumpsOutDir, fmt.Sprintf("threadDump-%s-%s.txt", nodeName, times[1].Format("2006-01-02_15_04_05"))))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if f.Size() == 0 {
-		t.Errorf("expected a non empty file for the hprof but we got one")
+	// Verify first two thread dump files exist and are non-empty
+	for i := 0; i < 2; i++ {
+		f, err := os.Stat(filepath.Join(threadDumpsOutDir, fmt.Sprintf("threadDump-%s-%s-%d.txt", nodeName, times[i].Format("2006-01-02_15_04_05"), i)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f.Size() == 0 {
+			t.Errorf("expected a non empty file for thread dump %d but we got one", i)
+		}
 	}
 }

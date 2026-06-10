@@ -25,9 +25,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/masking"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/masking"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 type CmdExecutor interface {
@@ -51,6 +51,21 @@ type ExecuteCliErr struct {
 
 // OutputHandler is a function type that processes lines of output
 type OutputHandler func(line string)
+
+// StreamExecuteFn is the signature for HostExecuteAndStream methods on transports.
+type StreamExecuteFn func(mask bool, host string, output OutputHandler, pat string, args ...string) error
+
+// CollectOutput calls a StreamExecuteFn and collects its output into a string.
+// This is the shared implementation behind HostExecute for all transports.
+func CollectOutput(fn StreamExecuteFn, mask bool, host string, args ...string) (string, error) {
+	var out strings.Builder
+	writer := func(line string) {
+		out.WriteString(line)
+		out.WriteString("\n")
+	}
+	err := fn(mask, host, writer, "", args...)
+	return strings.TrimRight(out.String(), "\n"), err
+}
 
 func NewCli(hook shutdown.CancelHook) CmdExecutor {
 	return &cli{

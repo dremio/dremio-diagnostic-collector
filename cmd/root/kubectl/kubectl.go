@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -26,11 +27,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/cli"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/root/kubernetes"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/collection"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/kubernetes"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 type KubeArgs struct {
@@ -47,7 +49,12 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 	cliInstance := cli.NewCli(hook)
 	k8sContext := kubeArgs.K8SContext
 	if k8sContext == "" {
-		k8sContextRaw, err := cliInstance.Execute(false, kubectl, "config", "current-context")
+		ctxArgs := []string{kubectl}
+		if kubeArgs.KubeconfigPath != "" {
+			ctxArgs = append(ctxArgs, "--kubeconfig", kubeArgs.KubeconfigPath)
+		}
+		ctxArgs = append(ctxArgs, "config", "current-context")
+		k8sContextRaw, err := cliInstance.Execute(false, ctxArgs...)
 		if err != nil {
 			return &CliK8sActions{}, fmt.Errorf("unable to retrieve context: %w", err)
 		}
@@ -60,9 +67,10 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 	return &CliK8sActions{
 		cli:            cliInstance,
 		kubectlPath:    kubectl,
-		labelSelector:  kubeArgs.LabelSelector,
+		detectLabelSelector:  kubeArgs.DetectLabelSelector,
 		namespace:      kubeArgs.Namespace,
 		k8sContext:     k8sContext,
+		kubeconfigPath: kubeArgs.KubeconfigPath,
 		pidHosts:       make(map[string]string),
 		retriesEnabled: retriesEnabled,
 	}, nil
@@ -70,18 +78,35 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 
 // CliK8sActions provides a way to collect and copy files using kubectl
 type CliK8sActions struct {
-	cli            cli.CmdExecutor
-	labelSelector  string
+	cli                  cli.CmdExecutor
+	detectLabelSelector  string
 	kubectlPath    string
 	namespace      string
 	k8sContext     string
+	kubeconfigPath string
 	pidHosts       map[string]string
 	m              sync.Mutex
 	retriesEnabled bool
 }
 
+// k8sFlags returns the cluster-routing flags (--kubeconfig, --context)
+// that must precede any kubectl subcommand. Empty values are omitted.
+// Order matches kubectl convention: global flags before subcommand.
+func (c *CliK8sActions) k8sFlags() []string {
+	var flags []string
+	if c.kubeconfigPath != "" {
+		flags = append(flags, "--kubeconfig", c.kubeconfigPath)
+	}
+	if c.k8sContext != "" {
+		flags = append(flags, "--context", c.k8sContext)
+	}
+	return flags
+}
+
 func CanRetryTransfers(kubectlPath string) (bool, error) {
-	kubectlExec := exec.Command(kubectlPath, "version", "-o", "json")
+	// Use --client so the call doesn't depend on cluster reachability or
+	// a valid kubeconfig — we only parse ClientVersion from the JSON.
+	kubectlExec := exec.Command(kubectlPath, "version", "--client", "-o", "json")
 	out, err := kubectlExec.Output()
 	if err != nil {
 		return false, err
@@ -125,7 +150,10 @@ func (c *CliK8sActions) cleanLocal(rawDest string) string {
 
 func (c *CliK8sActions) getContainerName(podName string) (string, error) {
 	// Get all container names from the pod
-	conts, err := c.cli.Execute(false, c.kubectlPath, "-n", c.namespace, "--context", c.k8sContext, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[*].name}`)
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "-n", c.namespace, "get", "pods", string(podName), "-o", `jsonpath={.spec.containers[*].name}`)
+	conts, err := c.cli.Execute(false, args...)
 	if err != nil {
 		return "", err
 	}
@@ -168,46 +196,27 @@ func (c *CliK8sActions) Name() string {
 	return "Kubectl"
 }
 
+func (c *CliK8sActions) Protocol() string {
+	return "Kubectl"
+}
+
 func (c *CliK8sActions) HostExecuteAndStream(mask bool, hostString string, output cli.OutputHandler, pat string, args ...string) (err error) {
 	container, err := c.getContainerName(hostString)
 	if err != nil {
 		return fmt.Errorf("unable to get container name: %w", err)
 	}
-	var kubectlArgs []string
-	if pat == "" {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
-	} else {
-		kubectlArgs = []string{c.kubectlPath, "exec", "-i", "-n", c.namespace, "--context", c.k8sContext, "-c", container, hostString, "--"}
+	kubectlArgs := []string{c.kubectlPath}
+	kubectlArgs = append(kubectlArgs, c.k8sFlags()...)
+	kubectlArgs = append(kubectlArgs, "exec")
+	if pat != "" {
+		kubectlArgs = append(kubectlArgs, "-i")
 	}
-
-	kubectlArgs = append(kubectlArgs, args...)
+	kubectlArgs = append(kubectlArgs, "-n", c.namespace, "-c", container, hostString, "--", "sh", "-c", strings.Join(args, " "))
 	return c.cli.ExecuteAndStreamOutput(mask, output, pat, kubectlArgs...)
 }
 
-func (c *CliK8sActions) HostExecute(mask bool, hostString string, args ...string) (out string, err error) {
-	var outBuilder strings.Builder
-	writer := func(line string) {
-		outBuilder.WriteString(line)
-	}
-	err = c.HostExecuteAndStream(mask, hostString, writer, "", args...)
-	out = outBuilder.String()
-	return
-}
-
-func (c *CliK8sActions) CopyFromHost(hostString string, source, destination string) (out string, err error) {
-	if strings.HasPrefix(destination, `C:`) {
-		// Fix problem seen in https://github.com/kubernetes/kubernetes/issues/77310
-		// only replace once because more doesn't make sense
-		destination = strings.Replace(destination, `C:`, ``, 1)
-	}
-	container, err := c.getContainerName(hostString)
-	if err != nil {
-		return "", fmt.Errorf("unable to get container name: %w", err)
-	}
-	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
-	args = c.addRetries(args)
-	args = append(args, fmt.Sprintf("%v:%v", hostString, source), c.cleanLocal(destination))
-	return c.cli.Execute(false, args...)
+func (c *CliK8sActions) HostExecute(mask bool, hostString string, args ...string) (string, error) {
+	return cli.CollectOutput(c.HostExecuteAndStream, mask, hostString, args...)
 }
 
 func (c *CliK8sActions) addRetries(args []string) []string {
@@ -227,7 +236,9 @@ func (c *CliK8sActions) CopyToHost(hostString string, source, destination string
 	if err != nil {
 		return "", fmt.Errorf("unable to get container name: %w", err)
 	}
-	args := []string{c.kubectlPath, "cp", "-n", c.namespace, "--context", c.k8sContext, "-c", container}
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "cp", "-n", c.namespace, "-c", container)
 	args = c.addRetries(args)
 	args = append(args, c.cleanLocal(source), fmt.Sprintf("%v:%v", hostString, destination))
 	return c.cli.Execute(false, args...)
@@ -240,7 +251,10 @@ func (c *CliK8sActions) GetCoordinators() (podName []string, err error) {
 }
 
 func (c *CliK8sActions) SearchPods(compare func(container string) bool) (podName []string, err error) {
-	out, err := c.cli.Execute(false, c.kubectlPath, "get", "pods", "-n", c.namespace, "--context", c.k8sContext, "-l", c.labelSelector, "-o", "name")
+	args := []string{c.kubectlPath}
+	args = append(args, c.k8sFlags()...)
+	args = append(args, "get", "pods", "-n", c.namespace, "-l", c.detectLabelSelector, "--field-selector", "status.phase=Running", "-o", "name")
+	out, err := c.cli.Execute(false, args...)
 	if err != nil {
 		return []string{}, err
 	}
@@ -302,7 +316,8 @@ func (c *CliK8sActions) CleanupRemote() error {
 			simplelog.Warningf("output of container for host %v: %v", host, err)
 			return
 		}
-		kubectlArgs := []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
+		kubectlArgs := append([]string{}, c.k8sFlags()...)
+		kubectlArgs = append(kubectlArgs, "exec", "-n", c.namespace, "-c", container, host, "--")
 		kubectlArgs = append(kubectlArgs, "cat")
 		kubectlArgs = append(kubectlArgs, pidFile)
 		ctx, timeoutPid := context.WithTimeout(context.Background(), time.Second*time.Duration(30))
@@ -315,7 +330,8 @@ func (c *CliK8sActions) CleanupRemote() error {
 			return
 		}
 		simplelog.Infof("pid for host %v is %v", host, string(out[:]))
-		kubectlArgs = []string{"exec", "-n", c.namespace, "--context", c.k8sContext, "-c", container, host, "--"}
+		kubectlArgs = append([]string{}, c.k8sFlags()...)
+		kubectlArgs = append(kubectlArgs, "exec", "-n", c.namespace, "-c", container, host, "--")
 		kubectlArgs = append(kubectlArgs, "kill")
 		kubectlArgs = append(kubectlArgs, "-15")
 		kubectlArgs = append(kubectlArgs, string(out[:]))
@@ -386,4 +402,63 @@ func (c *CliK8sActions) CleanupRemote() error {
 		return fmt.Errorf("critical errors trying to cleanup pods %v", strings.Join(criticalErrors, ", "))
 	}
 	return nil
+}
+
+// StreamFromHost streams the raw bytes of a remote file to writer by executing
+// "kubectl exec ... <cmd> '<path>'" as a subprocess where <cmd> is "cat" or
+// "gzip -c" depending on useGzip. Binary data integrity is preserved — stdout
+// goes directly to writer with no line splitting or encoding.
+func (c *CliK8sActions) StreamFromHost(host, remotePath string, writer io.Writer, useGzip bool) error {
+	if remotePath == "" {
+		return fmt.Errorf("StreamFromHost: remotePath is empty for host %v", host)
+	}
+
+	streamCmd := "cat"
+	if useGzip {
+		streamCmd = "gzip -c"
+	}
+	simplelog.Infof("StreamFromHost: streaming %v:%v via kubectl exec (cmd=%s)", host, remotePath, streamCmd)
+
+	containerName, err := c.getContainerName(host)
+	if err != nil {
+		return fmt.Errorf("StreamFromHost: failed to get container for pod %v: %w", host, err)
+	}
+
+	escapedPath := strings.ReplaceAll(remotePath, "'", "'\\''")
+	args := append([]string{}, c.k8sFlags()...)
+	args = append(args, "exec", host, "-n", c.namespace, "-c", containerName, "--", "sh", "-c", fmt.Sprintf("%s '%s'", streamCmd, escapedPath))
+
+	// #nosec G204 -- arguments are controlled by the caller
+	cmd := exec.Command(c.kubectlPath, args...)
+	cmd.Stdout = writer
+
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("StreamFromHost: failed to create stderr pipe for %v:%v: %w", host, remotePath, err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("StreamFromHost: failed to start kubectl for %v:%v: %w", host, remotePath, err)
+	}
+
+	stderrBytes, _ := io.ReadAll(stderrPipe)
+
+	if err := cmd.Wait(); err != nil {
+		stderrMsg := strings.TrimSpace(string(stderrBytes))
+		if stderrMsg != "" {
+			return fmt.Errorf("StreamFromHost: %s failed on %v:%v: %w (stderr: %s)", streamCmd, host, remotePath, err, stderrMsg)
+		}
+		return fmt.Errorf("StreamFromHost: %s failed on %v:%v: %w", streamCmd, host, remotePath, err)
+	}
+
+	simplelog.Infof("StreamFromHost: completed streaming %v:%v", host, remotePath)
+	return nil
+}
+
+// DiscoverFiles runs remote discovery shell commands on a K8s pod (via kubectl exec)
+// to enumerate log files, config files, GC logs, and the Dremio PID.
+func (c *CliK8sActions) DiscoverFiles(host, logDir, confDir string) (*collection.RemoteNodeInfo, error) {
+	return collection.RunDiscovery(func(h string, args ...string) (string, error) {
+		return c.HostExecute(false, h, args...)
+	}, host, logDir, confDir)
 }

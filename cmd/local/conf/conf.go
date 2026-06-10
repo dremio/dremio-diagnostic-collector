@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// package conf provides configuration for the local-collect command
+// package conf provides configuration for the collect command
 package conf
 
 import (
@@ -26,14 +26,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf/autodetect"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/ddcio"
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/restclient"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/collects"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/consoleprint"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/dirs"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf/autodetect"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/ddcio"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/consoleprint"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/dirs"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 	"github.com/google/uuid"
 	"github.com/spf13/cast"
 )
@@ -81,123 +80,52 @@ func SanitiseURL(url string) string {
 
 type CollectConf struct {
 	// flags that are configurable by env or configuration
-	disableFreeSpaceCheck      bool
-	numberThreads              int
-	gcLogsDir                  string
-	dremioLogDir               string
-	dremioConfDir              string
-	dremioEndpoint             string
-	dremioUsername             string
-	dremioPATToken             string
-	dremioRocksDBDir           string
-	numberJobProfilesToCollect int
-	dremioPIDDetection         bool
-	collectAccelerationLogs    bool
-	collectAccessLogs          bool
-	collectAuditLogs           bool
-	collectJVMFlags            bool
-	captureHeapDump            bool
-	isRESTCollect              bool
-	restCollectDailyJobsLimit  int
-	isDremioCloud              bool
-	dremioCloudProjectID       string
-	dremioCloudAppEndpoint     string
-
+	disableFreeSpaceCheck   bool
+	numberThreads           int
+	gcLogsDir               string
+	dremioLogDir            string
+	dremioConfDir           string
+	dremioRocksDBDir        string
+	dremioPIDDetection      bool
+	collectAccelerationLogs bool
+	collectAccessLogs       bool
+	collectJVMFlags         bool
+	captureHeapDump         bool
 	// advanced variables settable by configuration or environment variable
-	outputDir                         string
-	tarballOutDir                     string
-	dremioTtopTimeSeconds             int
-	dremioTtopFreqSeconds             int
-	dremioJFRTimeSeconds              int
-	dremioJStackFreqSeconds           int
-	dremioJStackTimeSeconds           int
-	dremioLogsNumDays                 int
-	dremioGCFilePattern               string
-	dremioQueriesJSONNumDays          int
-	jobProfilesNumSlowExec            int
-	jobProfilesNumHighQueryCost       int
-	jobProfilesNumSlowPlanning        int
-	jobProfilesNumRecentErrors        int
-	allowInsecureSSL                  bool
-	collectJFR                        bool
-	collectJStack                     bool
-	collectKVStoreReport              bool
-	collectServerLogs                 bool
-	collectMetaRefreshLogs            bool
-	collectQueriesJSON                bool
-	collectDremioConfiguration        bool
-	collectReflectionLogs             bool
-	collectVacuumLogs                 bool
-	collectSystemTablesExport         bool
-	collectSystemTablesTimeoutSeconds int
-	systemTablesRowLimit              int
-	collectClusterIDTimeoutSeconds    int
-	collectOSConfig                   bool
-	collectDiskUsage                  bool
-	collectGCLogs                     bool
-	collectHSErrFiles                 bool
-	collectTtop                       bool
-	collectWLM                        bool
-	nodeName                          string
-	restHTTPTimeout                   int
-	minFreeSpaceCheckGB               uint64
-	noLogDir                          bool
-	isMasterCoordinator               bool
+	outputDir                  string
+	tarballOutDir              string
+	diagTimeSeconds            int
+	dremioLogsNumDays          int
+	dremioGCFilePattern        string
+	dremioQueriesJSONNumDays   int
+	collectJFR                 bool
+	collectJStack              bool
+	collectServerLogs          bool
+	collectMetaRefreshLogs     bool
+	collectQueriesJSON         bool
+	collectDremioConfiguration bool
+	collectReflectionLogs      bool
+	collectVacuumLogs          bool
+	collectOSConfig            bool
+	collectDiskUsage           bool
+	collectGCLogs              bool
+	collectHSErrFiles          bool
+	collectTop                 bool
+	nodeName                   string
+	// new v4 fields
+	collectTrackerJSON       bool
+	collectHiveDeprecatedLog bool
+	collectAsyncProfiler     bool
+	serverLogsNumDays        int
+	metaRefreshLogNumDays    int
+	reflectionLogNumDays     int
+	trackerJSONNumDays       int
+	vacuumLogNumDays         int
+	diskBandwidthLimitPct    int
+	startDate                time.Time
 
 	// variables
-	systemTables            []string
-	systemtablesdremiocloud []string
-	dremioPID               int
-	archiveSizeLimitMB      int
-	disableArchiveSplitting bool
-}
-
-func ValidateAPICredentials(c *CollectConf, hook shutdown.Hook) error {
-	simplelog.Debugf("Validating REST API user credentials...")
-
-	// Build list of endpoints to try
-	endpoints := []string{c.DremioEndpoint()}
-
-	// If using default http://localhost:9047 for non-cloud deployments, also try https
-	// (Dremio Cloud is always HTTPS, so no retry needed)
-	if !c.IsDremioCloud() && c.DremioEndpoint() == "http://localhost:9047" {
-		endpoints = append(endpoints, "https://localhost:9047")
-		simplelog.Debugf("Default endpoint detected, will also try HTTPS if HTTP fails")
-	}
-
-	headers := map[string]string{"Content-Type": "application/json"}
-	var lastErr error
-
-	// Try each endpoint
-	for i, endpoint := range endpoints {
-		var url string
-		if !c.IsDremioCloud() {
-			url = endpoint + "/apiv2/login"
-		} else {
-			url = endpoint + "/v0/projects/" + c.DremioCloudProjectID()
-		}
-
-		simplelog.Debugf("Attempting to validate credentials with endpoint: %s", endpoint)
-		_, err := restclient.APIRequest(hook, url, c.DremioPATToken(), "GET", headers)
-
-		if err == nil {
-			// Success! Update the endpoint if we used an alternate one
-			if i > 0 {
-				simplelog.Infof("Successfully connected using %s (original endpoint %s failed)", endpoint, endpoints[0])
-				c.dremioEndpoint = endpoint
-			} else {
-				simplelog.Debugf("Successfully validated credentials with %s", endpoint)
-			}
-			return nil
-		}
-
-		// Store the error and try next endpoint if available
-		lastErr = err
-		simplelog.Debugf("Failed to connect to %s: %v", endpoint, err)
-	}
-
-	// All endpoints failed
-	return lastErr
+	dremioPID int
 }
 
 func DetectRocksDB(dremioHome string, dremioConfDir string) string {
@@ -214,96 +142,34 @@ func DetectRocksDB(dremioHome string, dremioConfDir string) string {
 	simplelog.Infof("Using default RocksDB path")
 	return filepath.Join(dremioHome, "data", "db")
 }
-func SystemTableListWaf() []string {
-	return []string{
-		"copy_errors_history",
-		"fragments",
-		"materializations",
-		"membership",
-		"memory",
-		"nodes",
-		"options",
-		"reflection_dependencies",
-		"reflections",
-		"refreshes",
-		"roles",
-		"services",
-		"slicing_threads",
-		"threads",
-		"user_defined_functions",
-		"version",
-		"cache.datasets",
-		"cache.mount_points",
-		"cache.storage_plugins",
-	}
-}
 
+// SystemTableList returns the default system tables to collect.
+// This excludes expensive tables (tables, views, jobs_recent) which must be
+// explicitly opted-in via the TUI or --system-tables flag.
 func SystemTableList() []string {
 	return []string{
-		"\\\"tables\\\"",
-		"copy_errors_history",
-		"fragments",
-		"jobs",
-		"materializations",
-		"membership",
-		"memory",
-		"nodes",
-		"options",
-		"privileges",
-		"reflection_dependencies",
-		"reflections",
-		"refreshes",
-		"roles",
-		"services",
-		"slicing_threads",
-		"table_statistics",
-		"threads",
-		"user_defined_functions",
 		"version",
-		"views",
-		"cache.datasets",
-		"cache.mount_points",
-		"cache.storage_plugins",
-		// "jobs_recent", // Only collected for REST-only collections
+		"options",
+		"roles",
+		"membership",
+		"privileges",
+		"reflections",
+		"materializations",
+		"refreshes",
+		"reflection_dependencies",
 	}
 }
 
-func SystemTableListCloud() []string {
-	return []string{
-		"organization.clouds",
-		"organization.privileges",
-		"organization.projects",
-		"organization.roles",
-		"organization.usage",
-		"project.engines",
-		"project.jobs",
-		"project.materializations",
-		"project.privileges",
-		"project.reflection_dependencies",
-		"project.reflections",
-		"project.\\\"tables\\\"",
-		"project.views",
-		// "project.history.events",
-		"project.history.jobs",
-	}
-}
-
-func LogConfData(confData map[string]string) {
-	for k, v := range confData {
-		if k == KeyDremioPatToken && v != "" {
-			simplelog.Debugf("conf key '%v':'REDACTED'", k)
+func ReadConf(hook shutdown.Hook, overrides map[string]string, collectionMode collects.CollectionMode) (*CollectConf, error) {
+	confData := make(map[string]interface{})
+	for k, v := range overrides {
+		if v == "\"\"" {
+			confData[k] = ""
 		} else {
-			simplelog.Debugf("conf key '%v':'%v'", k, v)
+			confData[k] = v
 		}
 	}
-}
-
-func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, collectionMode string) (*CollectConf, error) {
-	confData, err := ParseConfig(ddcYamlLoc, overrides)
-	if err != nil {
-		return &CollectConf{}, fmt.Errorf("config failed: %w", err)
-	}
-	simplelog.Debugf("logging parsed configuration from ddc.yaml")
+	simplelog.Debugf("logging parsed configuration from overrides")
 	defaultCaptureSeconds := 60
 	// set node name
 	hostName, err := os.Hostname()
@@ -314,31 +180,15 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	SetViperDefaults(confData, hostName, defaultCaptureSeconds, collectionMode)
 	c := &CollectConf{}
 	for k, v := range confData {
-		if k == KeyDremioPatToken && v != "" {
+		if k == KeyDremioPatToken {
 			simplelog.Debugf("conf key '%v':'REDACTED'", k)
 		} else {
 			simplelog.Debugf("conf key '%v':'%v'", k, v)
 		}
 	}
-	// now we can setup verbosity as we are parsing it in the ParseConfig function
-	// TODO REMOVE OR CHANGE MEANING
-	// verboseString := GetString(confData, "verbose")
-	// verbose := strings.Count(verboseString, "v")
-	// simplelog.InitLogger(verbose)
-	// we use dremio cloud option here to know if we should validate the log and conf dirs or not
-	c.isDremioCloud = GetBool(confData, KeyIsDremioCloud)
-	if c.isDremioCloud {
-		// Dremio Cloud is a type of REST API collect, so this is flipped to true
-		c.isRESTCollect = true
-	} else {
-		c.isRESTCollect = GetBool(confData, KeyIsRESTCollect)
-	}
-	c.restCollectDailyJobsLimit = GetInt(confData, KeyRESTCollectDailyJobsLimit)
 	c.dremioPIDDetection = GetBool(confData, KeyDremioPidDetection)
-	c.dremioCloudProjectID = GetString(confData, KeyDremioCloudProjectID)
 	c.collectAccelerationLogs = GetBool(confData, KeyCollectAccelerationLog)
 	c.collectAccessLogs = GetBool(confData, KeyCollectAccessLog)
-	c.collectAuditLogs = GetBool(confData, KeyCollectAuditLog)
 	c.nodeName = GetString(confData, KeyNodeName)
 	c.numberThreads = GetInt(confData, KeyNumberThreads)
 	// log collect
@@ -353,7 +203,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 			}
 		} else {
 			// all other errors exit
-			return &CollectConf{}, err
+			return &CollectConf{}, fmt.Errorf("failed checking tarball out dir: %w", err)
 		}
 	}
 	dirEntries, err := os.ReadDir(c.tarballOutDir)
@@ -362,7 +212,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	}
 	var entryNames []string
 	var entryCount int
-	allowedList := []string{"ddc", "ddc.log", "ddc.yaml", fmt.Sprintf("%v.tar.gz", c.nodeName)}
+	allowedList := []string{"ddc", "ddc.log", fmt.Sprintf("%v.tar.gz", c.nodeName)}
 	pidFile := GetString(confData, "pid")
 	if pidFile != "" {
 		allowedList = append(allowedList, filepath.Base(pidFile))
@@ -386,7 +236,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	}
 
 	c.dremioLogsNumDays = GetInt(confData, KeyDremioLogsNumDays)
-	c.dremioQueriesJSONNumDays = GetInt(confData, KeyDremioQueriesJSONNumDays)
+	c.dremioQueriesJSONNumDays = GetInt(confData, KeyQueriesJSONNumDays)
 	c.collectQueriesJSON = GetBool(confData, KeyCollectQueriesJSON)
 	c.collectServerLogs = GetBool(confData, KeyCollectServerLogs)
 	c.collectMetaRefreshLogs = GetBool(confData, KeyCollectMetaRefreshLog)
@@ -394,31 +244,39 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	c.collectVacuumLogs = GetBool(confData, KeyCollectVacuumLog)
 	c.collectGCLogs = GetBool(confData, KeyCollectGCLogs)
 	c.collectHSErrFiles = GetBool(confData, KeyCollectHSErrFiles)
-	c.dremioUsername = GetString(confData, KeyDremioUsername)
 	c.disableFreeSpaceCheck = GetBool(confData, KeyDisableFreeSpaceCheck)
-	c.minFreeSpaceCheckGB = GetUint64(confData, KeyMinFreeSpaceGB)
-	c.noLogDir = GetBool(confData, KeyNoLogDir)
-	c.isMasterCoordinator = GetBool(confData, KeyIsMaster)
-
-	c.dremioPATToken = GetString(confData, KeyDremioPatToken)
 	c.collectDremioConfiguration = GetBool(confData, KeyCollectDremioConfiguration)
-	c.numberJobProfilesToCollect = GetInt(confData, KeyNumberJobProfiles)
+
+	// v4 new fields
+	c.collectTrackerJSON = GetBool(confData, KeyCollectTrackerJSON)
+	c.collectHiveDeprecatedLog = GetBool(confData, KeyCollectHiveDeprecatedLog)
+	c.collectAsyncProfiler = GetBool(confData, KeyCollectAsyncProfiler)
+	c.serverLogsNumDays = GetInt(confData, KeyServerLogsNumDays)
+	c.metaRefreshLogNumDays = GetInt(confData, KeyMetaRefreshLogNumDays)
+	c.reflectionLogNumDays = GetInt(confData, KeyReflectionLogNumDays)
+	c.trackerJSONNumDays = GetInt(confData, KeyTrackerJSONNumDays)
+	c.vacuumLogNumDays = GetInt(confData, KeyVacuumLogNumDays)
+	c.diskBandwidthLimitPct = GetInt(confData, KeyDiskBandwidthLimitPct)
+
+	// date-range filtering
+	if startDateStr := GetString(confData, KeyStartDate); startDateStr != "" {
+		t, err := parseDateString(startDateStr)
+		if err != nil {
+			return &CollectConf{}, fmt.Errorf("invalid %v value %q: %w", KeyStartDate, startDateStr, err)
+		}
+		c.startDate = t
+	}
 
 	// system diag
 	c.collectOSConfig = GetBool(confData, KeyCollectOSConfig)
 	c.collectDiskUsage = GetBool(confData, KeyCollectDiskUsage)
 	c.collectJVMFlags = GetBool(confData, KeyCollectJVMFlags)
 
-	// jfr config
-	c.dremioJFRTimeSeconds = GetInt(confData, KeyDremioJFRTimeSeconds)
-	// jstack config
-	c.dremioJStackTimeSeconds = GetInt(confData, KeyDremioJStackTimeSeconds)
-	c.dremioJStackFreqSeconds = GetInt(confData, KeyDremioJStackFreqSeconds)
+	// diagnostic tools timing
+	c.diagTimeSeconds = GetInt(confData, KeyDiagTimeSeconds)
 
-	// ttop
-	c.collectTtop = GetBool(confData, KeyCollectTtop)
-	c.dremioTtopFreqSeconds = GetInt(confData, KeyDremioTtopFreqSeconds)
-	c.dremioTtopTimeSeconds = GetInt(confData, KeyDremioTtopTimeSeconds)
+	// top
+	c.collectTop = GetBool(confData, KeyCollectTop)
 
 	c.dremioPID = GetInt(confData, KeyDremioPid)
 	if c.dremioPID < 1 && c.dremioPIDDetection {
@@ -433,36 +291,43 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 	if dremioPIDIsValid {
 		gcLogPattern, logDir, err := autodetect.FindGCLogLocation(hook, c.dremioPID)
 		if err != nil {
-			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
+			msg := fmt.Sprintf("GC LOG DETECTION DISABLED: will rely on autodetection fallback as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 			consoleprint.ErrorPrint(msg)
 			simplelog.Error(msg)
-			c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 			c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
 		} else {
 			c.gcLogsDir = logDir
 			c.dremioGCFilePattern = gcLogPattern
 		}
 	} else {
-		c.gcLogsDir = GetString(confData, KeyDremioGCLogsDir)
 		c.dremioGCFilePattern = GetString(confData, KeyDremioGCFilePattern)
+	}
+	// Fallback: if GC log dir is still empty, scan common paths
+	if c.gcLogsDir == "" {
+		fallbackDirs := []string{"/var/log/dremio", "/opt/dremio/log", "/opt/dremio/data/log", "/opt/dremio/data/gclog"}
+		pattern, dir := autodetect.FindGCLogsFallback(c.dremioLogDir, fallbackDirs, c.dremioLogsNumDays)
+		if dir != "" {
+			c.gcLogsDir = dir
+			c.dremioGCFilePattern = pattern
+			simplelog.Infof("GC log fallback detected directory: %v with pattern: %v", dir, pattern)
+		}
 	}
 	// captures that wont work if the dremioPID is invalid
 	c.captureHeapDump = GetBool(confData, KeyCaptureHeapDump) && dremioPIDIsValid
 	c.collectJFR = GetBool(confData, KeyCollectJFR) && dremioPIDIsValid
 	c.collectJStack = GetBool(confData, KeyCollectJStack) && dremioPIDIsValid
 
-	// we do not want to validate configuration of logs for dremio cloud
-	if !c.isRESTCollect {
+	{
 		var detectedConfig DremioConfig
-		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectAuditLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs || c.collectQueriesJSON
-		// because so few people would change the ddc.yaml to skip log capture when they didn't want it we have added this flag
-		if capturesATypeOfLog && !c.noLogDir {
+		capturesATypeOfLog := c.collectServerLogs || c.collectAccelerationLogs || c.collectAccessLogs || c.collectMetaRefreshLogs || c.collectReflectionLogs || c.collectQueriesJSON
+		// because so few people would change the config to skip log capture when they didn't want it we have added this flag
+		if capturesATypeOfLog {
 			// enable some autodetected directories
 			if dremioPIDIsValid {
 				var err error
 				detectedConfig, err = GetConfiguredDremioValuesFromPID(hook, c.dremioPID)
 				if err != nil {
-					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
+					msg := fmt.Sprintf("AUTODETECTION DISABLED: will rely on CLI flag configuration as ddc is unable to retrieve configuration from pid %v: %v", c.dremioPID, err)
 					consoleprint.ErrorPrint(msg)
 					simplelog.Error(msg)
 				} else {
@@ -471,7 +336,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 					c.dremioConfDir = detectedConfig.ConfDir
 				}
 			} else {
-				consoleprint.ErrorPrint("AUTODETECTION DISABLED: will rely on ddc.yaml configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resolve this")
+				consoleprint.ErrorPrint("AUTODETECTION DISABLED: will rely on CLI flag configuration as the ddc user does not have permissions to the dremio process consider using --sudo-user to resolve this")
 				simplelog.Warning("no valid pid found therefor the log and configuration autodetection will not function")
 			}
 
@@ -490,19 +355,19 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 
 			// configure log dir
 			configuredLogDir := GetString(confData, KeyDremioLogDir)
-			fmt.Printf("ddc.yaml log dir is: %v, detected log dir is: %v\n", configuredLogDir, detectedConfig.LogDir)
+			simplelog.Debugf("configured log dir is: %v, detected log dir is: %v", configuredLogDir, detectedConfig.LogDir)
 			// see if the configured dir is valid
 			if err := dirs.CheckDirectory(configuredLogDir, containsValidLog); err != nil {
-				msg := fmt.Sprintf("the ddc.yaml configured log directory %v is not usable (%v), therefore we are using autodetected value of %v for log collection", configuredLogDir, err, detectedConfig.LogDir)
+				msg := fmt.Sprintf("the configured log directory %v is not usable (%v), therefore we are using autodetected value of %v for log collection", configuredLogDir, err, detectedConfig.LogDir)
 				consoleprint.ErrorPrint(msg)
 				simplelog.Warning(msg)
 			} else {
 				// if the configured directory is valid ALWAYS pick that
-				simplelog.Infof("using ddc.yaml configured log directory for log collection: %v", configuredLogDir)
+				simplelog.Infof("using configured log directory for log collection: %v", configuredLogDir)
 				c.dremioLogDir = configuredLogDir
 			}
 			if err := dirs.CheckDirectory(c.dremioLogDir, containsValidLog); err != nil {
-				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', set dremio-log-dir in ddc.yaml or if you want to skip log dir collection run --no-log-dir: %w", c.dremioLogDir, err)
+				return &CollectConf{}, fmt.Errorf("invalid dremio log dir '%v', set --dremio-log-dir flag: %w", c.dremioLogDir, err)
 			}
 
 		}
@@ -517,12 +382,12 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 					return errors.New("configuration directory is empty")
 				}
 			}); err != nil {
-				msg := fmt.Sprintf("the ddc.yaml configured configuration directory %v is not usable (%v), therefore we are using autodetected value of %v for configuration collection", configuredConfDir, err, detectedConfig.ConfDir)
-				fmt.Println(msg)
+				msg := fmt.Sprintf("the configured configuration directory %v is not usable (%v), therefore we are using autodetected value of %v for configuration collection", configuredConfDir, err, detectedConfig.ConfDir)
+				consoleprint.WarningPrint(msg)
 				simplelog.Warning(msg)
 			} else {
 				// if the configured directory is valid ALWAYS pick that
-				simplelog.Infof("using ddc.yaml configured configuration directory for configuration collection: %v", configuredConfDir)
+				simplelog.Infof("using configured configuration directory for configuration collection: %v", configuredConfDir)
 				c.dremioConfDir = configuredConfDir
 			}
 			if err := dirs.CheckDirectory(c.dremioConfDir, func(de []fs.DirEntry) error {
@@ -532,7 +397,7 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 					return errors.New("configuration directory is empty")
 				}
 			}); err != nil {
-				return &CollectConf{}, fmt.Errorf("invalid dremio conf dir '%v', update ddc.yaml and fix it: %w", c.dremioConfDir, err)
+				return &CollectConf{}, fmt.Errorf("invalid dremio conf dir '%v', update --dremio-conf-dir flag and fix it: %w", c.dremioConfDir, err)
 			}
 		}
 		// now try and configure rocksdb
@@ -550,135 +415,28 @@ func ReadConf(hook shutdown.Hook, overrides map[string]string, ddcYamlLoc, colle
 		configuredRocksDb := GetString(confData, KeyDremioRocksdbDir)
 		if err := dirs.CheckDirectory(configuredRocksDb, validateRocks); err != nil {
 			msg := fmt.Sprintf("configured rocks '%v' is invalid %v", configuredRocksDb, err)
-			fmt.Println(msg)
+			consoleprint.WarningPrint(msg)
 			simplelog.Warning(msg)
 			// detected value
 			c.dremioRocksDBDir = DetectRocksDB(detectedConfig.Home, c.dremioConfDir)
 		} else {
 			c.dremioRocksDBDir = configuredRocksDb
 		}
-		msg := fmt.Sprintf("using rocks db dir %v", c.dremioRocksDBDir)
-		fmt.Println(msg)
-		simplelog.Info(msg)
+		simplelog.Infof("using rocks db dir %v", c.dremioRocksDBDir)
 		if err := dirs.CheckDirectory(c.dremioRocksDBDir, validateRocks); err != nil {
-			simplelog.Warningf("only applies to coordinators - invalid rocksdb dir '%v', update ddc.yaml and fix it: %v", c.dremioConfDir, err)
-		}
-
-		// Check if this node is a master coordinator
-		// Skip detection if --is-master flag is already set
-		if c.isMasterCoordinator {
-			simplelog.Infof("Node forced to be treated as master coordinator via --is-master flag")
-		} else if detectedConfig.IsMasterCoordinator {
-			c.isMasterCoordinator = true
-			simplelog.Infof("Detected node as a master coordinator from JVM arguments")
-		} else {
-			// If not set in JVM arguments, check the HOCON config
-			dremioConfFile := filepath.Join(c.dremioConfDir, "dremio.conf")
-			hoconConfig, err := ParseDremioConf(dremioConfFile, detectedConfig.Home)
-			if err == nil {
-				c.isMasterCoordinator = hoconConfig.IsCoordinatorMaster()
-				if c.isMasterCoordinator {
-					simplelog.Infof("Detected node as a master coordinator from dremio.conf")
-				} else {
-					simplelog.Infof("Node is not a master coordinator (checked both JVM arguments and dremio.conf)")
-				}
-			} else {
-				simplelog.Warningf("Failed to detect if node is a master coordinator from dremio.conf: %v", err)
-			}
+			simplelog.Warningf("only applies to coordinators - invalid rocksdb dir '%v', update --dremio-rocksdb-dir flag and fix it: %v", c.dremioConfDir, err)
 		}
 
 	}
 
-	// Only require PAT for health-check and WAF modes if this is a master coordinator
-	if c.dremioPATToken == "" && (collectionMode == collects.HealthCheckCollection || collectionMode == collects.WAFCollection) && c.isMasterCoordinator {
-		return &CollectConf{}, errors.New("INVALID CONFIGURATION: the pat is not set and --collect health-check or waf mode requires one for master coordinators")
-	}
-
-	c.dremioEndpoint = GetString(confData, KeyDremioEndpoint)
-	if c.isDremioCloud {
-		if len(c.dremioCloudProjectID) != 36 {
-			simplelog.Warningf("dremio cloud project id is expected to have 36 characters - the following provided id may be incorrect: %v", c.dremioCloudProjectID)
-		}
-		if strings.Contains(c.dremioEndpoint, "eu.dremio.cloud") {
-			c.dremioEndpoint = "https://api.eu.dremio.cloud"
-			c.dremioCloudAppEndpoint = "https://app.eu.dremio.cloud"
-		} else if strings.Contains(c.dremioEndpoint, "dremio.cloud") {
-			c.dremioEndpoint = "https://api.dremio.cloud"
-			c.dremioCloudAppEndpoint = "https://app.dremio.cloud"
-		} else {
-			simplelog.Warningf("unexpected dremio cloud endpoint: %v - Known endpoints are https://app.dremio.cloud and https://app.eu.dremio.cloud", c.dremioEndpoint)
-		}
-	}
-
-	c.allowInsecureSSL = GetBool(confData, KeyAllowInsecureSSL)
-	c.restHTTPTimeout = GetInt(confData, KeyRestHTTPTimeout)
-	c.collectClusterIDTimeoutSeconds = GetInt(confData, KeyCollectClusterIDTimeoutSeconds)
-	c.collectSystemTablesTimeoutSeconds = GetInt(confData, KeyCollectSystemTablesTimeoutSeconds)
-	c.archiveSizeLimitMB = GetInt(confData, KeyArchiveSizeLimitMB)
-	c.disableArchiveSplitting = GetBool(confData, KeyDisableArchiveSplitting)
-	// collect rest apis
-	disableRESTAPI := c.dremioPATToken == "" || !c.isMasterCoordinator
-	if disableRESTAPI {
-		if !c.isMasterCoordinator && c.dremioPATToken != "" {
-			simplelog.Infof("Disabling REST API collection because this node is not a master coordinator")
-		} else {
-			simplelog.Debugf("disabling all Workload Manager, System Table, KV Store, and Job Profile collection since the --dremio-pat-token is not set")
-		}
-		c.numberJobProfilesToCollect = 0
-		c.jobProfilesNumHighQueryCost = 0
-		c.jobProfilesNumSlowExec = 0
-		c.jobProfilesNumRecentErrors = 0
-		c.jobProfilesNumSlowPlanning = 0
-		c.collectWLM = false
-		c.collectSystemTablesExport = false
-		c.systemTablesRowLimit = 0
-		c.collectKVStoreReport = false
-	} else {
-		numberJobProfilesToCollect, jobProfilesNumHighQueryCost, jobProfilesNumSlowExec, jobProfilesNumRecentErrors, jobProfilesNumSlowPlanning := CalculateJobProfileSettingsWithViperConfig(c)
-		c.numberJobProfilesToCollect = numberJobProfilesToCollect
-		c.jobProfilesNumHighQueryCost = jobProfilesNumHighQueryCost
-		c.jobProfilesNumSlowExec = jobProfilesNumSlowExec
-		c.jobProfilesNumRecentErrors = jobProfilesNumRecentErrors
-		c.jobProfilesNumSlowPlanning = jobProfilesNumSlowPlanning
-		c.collectWLM = GetBool(confData, KeyCollectWLM)
-		c.collectSystemTablesExport = GetBool(confData, KeyCollectSystemTablesExport)
-		c.systemTablesRowLimit = GetInt(confData, KeySystemTablesRowLimit)
-		c.systemTables = GetStringArray(confData, KeySysTables)
-		c.systemtablesdremiocloud = GetStringArray(confData, KeySysTablesCloud)
-		c.collectKVStoreReport = GetBool(confData, KeyCollectKVStoreReport)
-		restclient.InitClient(c.allowInsecureSSL, c.restHTTPTimeout)
-		// validate rest api configuration
-		if err := ValidateAPICredentials(c, hook); err != nil {
-			return &CollectConf{}, fmt.Errorf("CRITICAL ERROR invalid Dremio API configuration: (url: %v, user: %v) %w", c.dremioEndpoint, c.dremioUsername, err)
-		}
-	}
-
-	// TODO figure out if this makes any sense as nothing changed these values
-	// this is just logging logic and not actually useful for anything but reporting
-	IsAWSEfromLogDirs, err := autodetect.IsAWSEfromLogDirs()
-	if err != nil {
-		simplelog.Warningf("unable to determine if node is AWSE or not: %v", err)
-	}
-	if IsAWSEfromLogDirs {
-		isCoord, logPath, err := autodetect.IsAWSECoordinator()
-		if err != nil {
-			simplelog.Errorf("unable to detect if this node %v was a coordinator so will not apply AWSE log path fix this may mean no log collection %v", c.nodeName, err)
-		}
-		if isCoord {
-			simplelog.Debugf("AWSE coordinator node detected, using log dir %v, symlinked to %v", c.dremioLogDir, logPath)
-		} else {
-			simplelog.Debugf("AWSE executor node detected, using log dir %v, symlinked to %v", c.dremioLogDir, logPath)
-		}
-	}
 	return c, nil
 }
 
 // DremioConfig represents the configuration details for Dremio.
 type DremioConfig struct {
-	Home                string
-	LogDir              string
-	ConfDir             string
-	IsMasterCoordinator bool
+	Home    string
+	LogDir  string
+	ConfDir string
 }
 
 func GetConfiguredDremioValuesFromPID(hook shutdown.CancelHook, dremioPID int) (DremioConfig, error) {
@@ -695,7 +453,7 @@ type ReadPSEnvFunc func(hook shutdown.CancelHook, dremioPID int) (string, error)
 // DefaultReadPSEnv is the default implementation for reading process environment
 var DefaultReadPSEnv ReadPSEnvFunc = func(hook shutdown.CancelHook, dremioPID int) (string, error) {
 	var w bytes.Buffer
-	// grep -v /etc/dremio/preview filters out the AWSE discount preview engine
+	// grep -v /etc/dremio/preview filters out the preview engine
 	err := ddcio.Shell(hook, &w, fmt.Sprintf("ps eww %v | grep dremio | grep -v /etc/dremio/preview | awk '{$1=$2=$3=$4=\"\"; print $0}'", dremioPID))
 	if err != nil {
 		return "", err
@@ -714,8 +472,6 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 	dremioLogDirKey := "-Ddremio.log.path="
 	dremioConfDirKey := "DREMIO_CONF_DIR="
 	dremioLogDirKeyBackup := "DREMIO_LOG_DIR="
-	dremioMasterCoordinatorKey := "-Dservices.coordinator.master.enabled="
-
 	// Find and extract the values
 	dremioHome, err := extractValue(ps, dremioHomeKey)
 	if err != nil {
@@ -738,20 +494,10 @@ func ParsePSForConfig(ps string) (DremioConfig, error) {
 		return DremioConfig{}, err
 	}
 
-	// Check if master coordinator flag is set in JVM arguments
-	isMasterCoordinator := false
-	masterCoordinatorValue, err := extractValue(ps, dremioMasterCoordinatorKey)
-	if err == nil {
-		// If we found the flag, check its value
-		isMasterCoordinator = strings.ToLower(masterCoordinatorValue) == "true"
-		simplelog.Infof("Found master coordinator flag in JVM arguments: %v", isMasterCoordinator)
-	}
-
 	return DremioConfig{
-		Home:                dremioHome,
-		LogDir:              dremioLogDir,
-		ConfDir:             dremioConfDir,
-		IsMasterCoordinator: isMasterCoordinator,
+		Home:    dremioHome,
+		LogDir:  dremioLogDir,
+		ConfDir: dremioConfDir,
 	}, nil
 }
 
@@ -802,10 +548,6 @@ func (c *CollectConf) CaptureHeapDump() bool {
 	return c.captureHeapDump
 }
 
-func (c *CollectConf) CollectWLM() bool {
-	return c.collectWLM
-}
-
 func (c *CollectConf) CollectGCLogs() bool {
 	return c.collectGCLogs
 }
@@ -824,26 +566,6 @@ func (c *CollectConf) CollectDiskUsage() bool {
 
 func (c *CollectConf) CollectDremioConfiguration() bool {
 	return c.collectDremioConfiguration
-}
-
-func (c *CollectConf) CollectSystemTablesExport() bool {
-	return c.collectSystemTablesExport
-}
-
-func (c *CollectConf) SystemTablesRowLimit() int {
-	return c.systemTablesRowLimit
-}
-
-func (c *CollectConf) CollectKVStoreReport() bool {
-	return c.collectKVStoreReport
-}
-
-func (c *CollectConf) Systemtables() []string {
-	return c.systemTables
-}
-
-func (c *CollectConf) SystemtablesDremioCloud() []string {
-	return c.systemtablesdremiocloud
 }
 
 func (c *CollectConf) CollectServerLogs() bool {
@@ -870,10 +592,6 @@ func (c *CollectConf) CollectAccelerationLogs() bool {
 	return c.collectAccelerationLogs
 }
 
-func (c *CollectConf) NumberJobProfilesToCollect() int {
-	return c.numberJobProfilesToCollect
-}
-
 func (c *CollectConf) CollectAccessLogs() bool {
 	return c.collectAccessLogs
 }
@@ -882,33 +600,17 @@ func (c *CollectConf) CollectJVMFlags() bool {
 	return c.collectJVMFlags
 }
 
-func (c *CollectConf) CollectAuditLogs() bool {
-	return c.collectAuditLogs
-}
-
-func (c *CollectConf) TtopOutDir() string {
-	return filepath.Join(c.outputDir, "ttop", c.nodeName)
+func (c *CollectConf) TopOutDir() string {
+	return filepath.Join(c.outputDir, "top")
 }
 
 func (c *CollectConf) HeapDumpsOutDir() string { return filepath.Join(c.outputDir, "heap-dumps") }
 
-func (c *CollectConf) JobProfilesOutDir() string {
-	return filepath.Join(c.outputDir, "job-profiles", c.nodeName)
-}
 func (c *CollectConf) KubernetesOutDir() string { return filepath.Join(c.outputDir, "kubernetes") }
-func (c *CollectConf) KVstoreOutDir() string {
-	return filepath.Join(c.outputDir, "kvstore", c.nodeName)
-}
-
-func (c *CollectConf) SystemTablesOutDir() string {
-	return filepath.Join(c.outputDir, "system-tables", c.nodeName)
-}
 
 func (c *CollectConf) ClusterStatsOutDir() string {
 	return filepath.Join(c.outputDir, "cluster-stats", c.nodeName)
 }
-
-func (c *CollectConf) WLMOutDir() string { return filepath.Join(c.outputDir, "wlm", c.nodeName) }
 
 // works on all nodes but includes node name in file name
 func (c *CollectConf) JFROutDir() string { return filepath.Join(c.outputDir, "jfr") }
@@ -930,34 +632,6 @@ func (c *CollectConf) ThreadDumpsOutDir() string {
 	return filepath.Join(c.outputDir, "jfr", "thread-dumps", c.nodeName)
 }
 
-func (c *CollectConf) DremioEndpoint() string {
-	return SanitiseURL(c.dremioEndpoint)
-}
-
-func (c *CollectConf) DremioPATToken() string {
-	return c.dremioPATToken
-}
-
-func (c *CollectConf) IsRESTCollect() bool {
-	return c.isRESTCollect
-}
-
-func (c *CollectConf) RestCollectDailyJobsLimit() int {
-	return c.restCollectDailyJobsLimit
-}
-
-func (c *CollectConf) IsDremioCloud() bool {
-	return c.isDremioCloud
-}
-
-func (c *CollectConf) DremioCloudProjectID() string {
-	return c.dremioCloudProjectID
-}
-
-func (c *CollectConf) DremioCloudAppEndpoint() string {
-	return c.dremioCloudAppEndpoint
-}
-
 func (c *CollectConf) NodeName() string {
 	return c.nodeName
 }
@@ -974,22 +648,6 @@ func (c *CollectConf) NumberThreads() int {
 	return c.numberThreads
 }
 
-func (c *CollectConf) JobProfilesNumSlowPlanning() int {
-	return c.jobProfilesNumSlowPlanning
-}
-
-func (c *CollectConf) JobProfilesNumSlowExec() int {
-	return c.jobProfilesNumSlowExec
-}
-
-func (c *CollectConf) JobProfilesNumHighQueryCost() int {
-	return c.jobProfilesNumHighQueryCost
-}
-
-func (c *CollectConf) JobProfilesNumRecentErrors() int {
-	return c.jobProfilesNumRecentErrors
-}
-
 func (c *CollectConf) DremioPID() int {
 	return c.dremioPID
 }
@@ -1002,28 +660,12 @@ func (c *CollectConf) DremioConfDir() string {
 	return c.dremioConfDir
 }
 
-func (c *CollectConf) DremioJFRTimeSeconds() int {
-	return c.dremioJFRTimeSeconds
+func (c *CollectConf) DiagTimeSeconds() int {
+	return c.diagTimeSeconds
 }
 
-func (c *CollectConf) DremioTtopTimeSeconds() int {
-	return c.dremioTtopTimeSeconds
-}
-
-func (c *CollectConf) DremioTtopFreqSeconds() int {
-	return c.dremioTtopFreqSeconds
-}
-
-func (c *CollectConf) CollectTtop() bool {
-	return c.collectTtop
-}
-
-func (c *CollectConf) DremioJStackTimeSeconds() int {
-	return c.dremioJStackTimeSeconds
-}
-
-func (c *CollectConf) DremioJStackFreqSeconds() int {
-	return c.dremioJStackFreqSeconds
+func (c *CollectConf) CollectTop() bool {
+	return c.collectTop
 }
 
 func (c *CollectConf) DremioLogDir() string {
@@ -1042,37 +684,55 @@ func (c *CollectConf) DremioLogsNumDays() int {
 	return c.dremioLogsNumDays
 }
 
-func (c *CollectConf) RestHTTPTimeout() int {
-	return c.restHTTPTimeout
-}
-
 func (c *CollectConf) DremioRocksDBDir() string {
 	return c.dremioRocksDBDir
 }
 
-func (c *CollectConf) MinFreeSpaceGB() uint64 {
-	return c.minFreeSpaceCheckGB
+func (c *CollectConf) CollectTrackerJSON() bool {
+	return c.collectTrackerJSON
 }
 
-func (c *CollectConf) CollectSystemTablesTimeoutSeconds() int {
-	return c.collectSystemTablesTimeoutSeconds
+func (c *CollectConf) CollectHiveDeprecatedLog() bool {
+	return c.collectHiveDeprecatedLog
 }
 
-func (c *CollectConf) CollectClusterIDTimeoutSeconds() int {
-	return c.collectClusterIDTimeoutSeconds
+func (c *CollectConf) CollectAsyncProfiler() bool {
+	return c.collectAsyncProfiler
 }
 
-// IsMasterCoordinator returns whether this node is a master coordinator
-func (c *CollectConf) IsMasterCoordinator() bool {
-	return c.isMasterCoordinator
+// DiskBandwidthLimitPct returns the disk bandwidth limit percentage for standard mode.
+func (c *CollectConf) DiskBandwidthLimitPct() int {
+	return c.diskBandwidthLimitPct
 }
 
-// ArchiveSizeLimitMB returns the archive size limit in MB
-func (c *CollectConf) ArchiveSizeLimitMB() int {
-	return c.archiveSizeLimitMB
+func (c *CollectConf) ServerLogsNumDays() int {
+	return c.serverLogsNumDays
 }
 
-// EnableArchiveSplitting returns whether archive splitting is enabled
-func (c *CollectConf) EnableArchiveSplitting() bool {
-	return !c.disableArchiveSplitting
+func (c *CollectConf) MetaRefreshLogNumDays() int {
+	return c.metaRefreshLogNumDays
+}
+
+func (c *CollectConf) ReflectionLogNumDays() int {
+	return c.reflectionLogNumDays
+}
+
+func (c *CollectConf) TrackerJSONNumDays() int {
+	return c.trackerJSONNumDays
+}
+
+func (c *CollectConf) VacuumLogNumDays() int {
+	return c.vacuumLogNumDays
+}
+
+// StartDate returns the configured start date for date-range filtering.
+func (c *CollectConf) StartDate() time.Time {
+	return c.startDate
+}
+
+func parseDateString(s string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("unsupported date format, expected 2006-01-02")
 }

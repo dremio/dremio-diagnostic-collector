@@ -22,7 +22,7 @@ import (
 	"os"
 	"path"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func GzipFile(src, dst string) error {
@@ -47,7 +47,7 @@ func GzipFile(src, dst string) error {
 	}()
 
 	gzipWriter := gzip.NewWriter(destFile)
-	defer gzipWriter.Close()
+	defer gzipWriter.Close() //nolint:errcheck // explicit close after io.Copy; deferred as safety net
 
 	_, err = io.Copy(gzipWriter, sourceFile)
 	if err != nil {

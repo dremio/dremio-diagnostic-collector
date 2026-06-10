@@ -20,14 +20,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/cmd/local/conf"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/jps"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/shutdown"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/jps"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
-// RunCollectJVM collects JVM flags from a java process
-func RunCollectJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
+// RunJVMFlags collects JVM flags from a java process
+func RunJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	txt, err := jps.CaptureFlagsFromPID(hook, c.DremioPID())
 	if err != nil {
 		return err
@@ -44,12 +44,6 @@ func RunCollectJVMFlags(c *conf.CollectConf, hook shutdown.CancelHook) error {
 	}()
 	if _, err := jvmSettingsFileWriter.WriteString(txt); err != nil {
 		return fmt.Errorf("unable to write to file %v: %w", filepath.Clean(jvmSettingsFile), err)
-	}
-	if err := jvmSettingsFileWriter.Sync(); err != nil {
-		return fmt.Errorf("unable to sync the jvm_settings.txt file: %w", err)
-	}
-	if err := jvmSettingsFileWriter.Close(); err != nil {
-		return fmt.Errorf("unable to close the jvm_settings.txt file: %w", err)
 	}
 	return nil
 }

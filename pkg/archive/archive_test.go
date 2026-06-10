@@ -27,8 +27,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/archive"
-	"github.com/dremio/dremio-diagnostic-collector/v3/pkg/simplelog"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/archive"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TestTarGzDir(t *testing.T) {
@@ -261,7 +261,7 @@ func TestTarDDC(t *testing.T) {
 func TestCopyLog(t *testing.T) {
 	tempDir := t.TempDir()
 	simplelog.InitLoggerWithOutputDir(tempDir)
-	defer simplelog.InitLoggerWithOutputDir(tempDir)
+	defer simplelog.Close()
 	simplelog.Infof("test for copy")
 	currLog := simplelog.GetLogLoc()
 	destLog := filepath.Join("testdata", "ddc.log")
@@ -289,7 +289,7 @@ func TestTarGzDirWithSizeLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test source directory
 	srcDir := filepath.Join(tempDir, "source")
@@ -396,7 +396,7 @@ func TestTarGzDirWithSizeLimitSingleFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test source directory
 	srcDir := filepath.Join(tempDir, "source")
@@ -456,7 +456,7 @@ func TestTarGzDirWithSizeLimitInvalidInput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	srcDir := filepath.Join(tempDir, "source")
 	destPrefix := filepath.Join(tempDir, "archive")
@@ -479,7 +479,7 @@ func TestTarGzDirWithSizeLimitMB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test source directory
 	srcDir := filepath.Join(tempDir, "source")
@@ -520,7 +520,7 @@ func TestTarGzDirWithSizeLimitLargeFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test source directory
 	srcDir := filepath.Join(tempDir, "source")
