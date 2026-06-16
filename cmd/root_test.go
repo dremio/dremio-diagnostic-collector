@@ -223,12 +223,16 @@ func TestDiagnosisSubcommandSetsMode(t *testing.T) {
 	defer func() { collectionMode = oldMode }()
 	collectionMode = ""
 
-	err := Execute([]string{"ddc", "collect", "k8s", "diagnosis"})
+	// Use the SSH transport here: it short-circuits on the "--coordinator is
+	// required" validation, letting us verify the diagnosis subcommand sets the
+	// mode without falling through into real K8s collection. (K8s no longer
+	// errors on a missing --namespace — it defaults to "default".)
+	err := Execute([]string{"ddc", "collect", "ssh", "diagnosis"})
 	if collectionMode != collects.DiagnosisCollection {
-		t.Errorf("expected collectionMode=%q after 'collect k8s diagnosis', got %q", collects.DiagnosisCollection, collectionMode)
+		t.Errorf("expected collectionMode=%q after 'collect ssh diagnosis', got %q", collects.DiagnosisCollection, collectionMode)
 	}
-	if err == nil || !strings.Contains(err.Error(), "--namespace is required") {
-		t.Errorf("expected K8s transport validation error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "--coordinator is required") {
+		t.Errorf("expected SSH transport validation error, got: %v", err)
 	}
 }
 
