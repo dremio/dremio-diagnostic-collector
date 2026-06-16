@@ -1,0 +1,54 @@
+name: release-dremio-ddc-image
+
+on:
+  workflow_dispatch:
+    inputs:
+      ddc_version:
+        description: 'DDC version (e.g. v4.0.1)'
+        required: true
+        type: string
+
+jobs:
+  build-and-push:
+    name: Build And Push
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Debug registry config
+        run: |
+          echo "REGISTRY_URL=${{ vars.REGISTRY_URL }}"
+          echo "REGISTRY_USERNAME=${{ secrets.REGISTRY_USERNAME }}"
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ vars.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push dremio-ddc-image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: DDC_VERSION=${{ inputs.ddc_version }}
+          tags: ${{ vars.REGISTRY_URL }}/dremio-ddc:${{ inputs.ddc_version }}
+
+      - name: Create git tag
+        run: |
+          git tag -f ${{ inputs.ddc_version }}
+          git push origin ${{ inputs.ddc_version }} --force
+
