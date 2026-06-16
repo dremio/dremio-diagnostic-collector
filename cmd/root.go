@@ -782,7 +782,8 @@ func Execute(args []string) error {
 				return fmt.Errorf("--coordinator is required for SSH transport. Example: ddc collect ssh standard --coordinator 10.0.0.1 --ssh-user myuser --ssh-key ~/.ssh/id_rsa")
 			}
 			if transportFromCmd == "k8s" && namespace == "" {
-				return fmt.Errorf("--namespace is required for K8s transport. Example: ddc collect k8s standard --namespace mynamespace")
+				// --namespace is optional; default to the "default" namespace when omitted.
+				namespace = "default"
 			}
 			// local transport is zero-config — no required flags
 		}
@@ -1330,7 +1331,7 @@ func init() {
 	SSHCmd.PersistentFlags().BoolVar(&sshStrictHostKeys, "ssh-strict-host-keys", false, "enable strict host key checking (default: false for backward compatibility)")
 
 	// ── K8s transport flags — on K8sCmd.PersistentFlags() ──
-	K8sCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to use for kubernetes pods")
+	K8sCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "namespace to use for kubernetes pods (default: default)")
 	K8sCmd.PersistentFlags().StringVarP(&k8sContext, "context", "x", "", "context to use for kubernetes pods")
 	K8sCmd.PersistentFlags().StringVar(&kubeconfigPath, "kubeconfig", "", "path to kubeconfig file (overrides $KUBECONFIG and ~/.kube/config)")
 	K8sCmd.PersistentFlags().StringVar(&detectLabelSelector, "detect-label-selector", "role=dremio-cluster-pod", "label selector used to identify Dremio coordinator/executor pods for file streaming; follows kubernetes label syntax (https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)")

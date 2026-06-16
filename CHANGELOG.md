@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.0.1] - 2026-06-16
+
+- `--namespace` is now optional for the K8s transport and defaults to `default`. Previously `ddc collect k8s standard|diagnosis` errored with "--namespace is required" when the flag was omitted.
+
 ## [4.0.0] - 2026-06-10
 
 - Documentation accuracy fixes (README, FAQ): corrected JVM tool opt-in wording, added local/local-k8s examples to help text.
