@@ -968,7 +968,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 			nodeCollected, nodeSkipped = streamNodeFiles(c, host, info, s, nodeType, collectionMode, collectionArgs.CollectGCLogs, collectionArgs)
 		}
 
-		// --- RocksDB viewer collection (coordinator only) ---
+		// --- RocksDB viewer collection (coordinators; skipped per-node when no catalog) ---
 		// Prefer the per-node autodetected RocksDB dir; fall back to the CLI flag.
 		// Mirrors the resolution used by the rocksdb-disk-allocation block above so
 		// queries-perf / cluster-stats / WLM / system-tables aren't silently skipped

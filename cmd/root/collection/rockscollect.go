@@ -142,6 +142,15 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 	dbPath := args.RocksDBDir + "/catalog"
 	var collected []helpers.CollectedFile
 
+	// The RocksDB catalog (KV store) lives only on the master coordinator.
+	// Scale-out coordinators connect to it remotely and have no local catalog,
+	// so rocksdb-viewer cannot read it there — skip them silently.
+	catalogCurrent := dbPath + "/CURRENT"
+	if out, err := c.HostExecute(false, host, "test", "-f", catalogCurrent, "&&", "echo", "exists"); err != nil || !strings.Contains(out, "exists") {
+		simplelog.Infof("rocksdb: no catalog at %s on %s — skipping RocksDB-viewer collection (not a master coordinator)", catalogCurrent, host)
+		return nil, nil
+	}
+
 	// Upload binary
 	consoleprint.UpdateNodeState(consoleprint.NodeState{
 		Node:     host,

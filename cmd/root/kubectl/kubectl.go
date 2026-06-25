@@ -65,28 +65,30 @@ func NewKubectlK8sActions(hook shutdown.CancelHook, kubeArgs kubernetes.KubeArgs
 		return &CliK8sActions{}, fmt.Errorf("unable to run kubectl version so disabling kubectl: %w", err)
 	}
 	return &CliK8sActions{
-		cli:            cliInstance,
-		kubectlPath:    kubectl,
-		detectLabelSelector:  kubeArgs.DetectLabelSelector,
-		namespace:      kubeArgs.Namespace,
-		k8sContext:     k8sContext,
-		kubeconfigPath: kubeArgs.KubeconfigPath,
-		pidHosts:       make(map[string]string),
-		retriesEnabled: retriesEnabled,
+		cli:                 cliInstance,
+		kubectlPath:         kubectl,
+		detectLabelSelector: kubeArgs.DetectLabelSelector,
+		namespace:           kubeArgs.Namespace,
+		k8sContext:          k8sContext,
+		kubeconfigPath:      kubeArgs.KubeconfigPath,
+		pidHosts:            make(map[string]string),
+		containerNames:      make(map[string]string),
+		retriesEnabled:      retriesEnabled,
 	}, nil
 }
 
 // CliK8sActions provides a way to collect and copy files using kubectl
 type CliK8sActions struct {
-	cli                  cli.CmdExecutor
-	detectLabelSelector  string
-	kubectlPath    string
-	namespace      string
-	k8sContext     string
-	kubeconfigPath string
-	pidHosts       map[string]string
-	m              sync.Mutex
-	retriesEnabled bool
+	cli                 cli.CmdExecutor
+	detectLabelSelector string
+	kubectlPath         string
+	namespace           string
+	k8sContext          string
+	kubeconfigPath      string
+	pidHosts            map[string]string
+	containerNames      map[string]string
+	m                   sync.Mutex
+	retriesEnabled      bool
 }
 
 // k8sFlags returns the cluster-routing flags (--kubeconfig, --context)
@@ -148,7 +150,7 @@ func (c *CliK8sActions) cleanLocal(rawDest string) string {
 	return strings.TrimPrefix(rawDest, "C:")
 }
 
-func (c *CliK8sActions) getContainerName(podName string) (string, error) {
+func (c *CliK8sActions) resolveContainerName(podName string) (string, error) {
 	// Get all container names from the pod
 	args := []string{c.kubectlPath}
 	args = append(args, c.k8sFlags()...)
@@ -190,6 +192,42 @@ func (c *CliK8sActions) getContainerName(podName string) (string, error) {
 
 	// If still no match, fall back to the first container (original behavior)
 	return containerNames[0], nil
+}
+
+// getContainerName returns the Dremio container for a pod, resolving it once and
+// caching the result. Resolution is the only kubectl call that previously ran on
+// every HostExecute; memoizing it removes exposure to transient `get pods`
+// failures mid-collection. A small retry guards the single cold-miss resolution.
+func (c *CliK8sActions) getContainerName(podName string) (string, error) {
+	c.m.Lock()
+	if c.containerNames == nil {
+		c.containerNames = make(map[string]string)
+	}
+	if name, ok := c.containerNames[podName]; ok {
+		c.m.Unlock()
+		return name, nil
+	}
+	c.m.Unlock()
+
+	attempts := 1
+	if c.retriesEnabled {
+		attempts = 3
+	}
+	var name string
+	var err error
+	for i := 0; i < attempts; i++ {
+		if name, err = c.resolveContainerName(podName); err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return "", err
+	}
+
+	c.m.Lock()
+	c.containerNames[podName] = name
+	c.m.Unlock()
+	return name, nil
 }
 
 func (c *CliK8sActions) Name() string {

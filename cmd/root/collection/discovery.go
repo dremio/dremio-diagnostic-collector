@@ -80,12 +80,20 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 	info := &RemoteNodeInfo{}
 	var anySuccess bool
 
-	// 1. Find the log directory — user-provided path overrides probing.
-	if logDir != "" {
-		info.LogDir = logDir
+	// 1. Find Dremio PID — must run before log-dir resolution so resolveLogDir
+	// can inspect the process environment.
+	pid, err := discoverPID(executor, host)
+	if err != nil {
+		simplelog.Warningf("DiscoverFiles: failed to find Dremio PID on %v: %v", host, err)
 	} else {
-		info.LogDir = probeDir(executor, host, logDirCandidates)
+		info.DremioPID = pid
+		if pid > 0 {
+			anySuccess = true
+		}
 	}
+
+	// 2. Find the log directory: explicit flag > -Ddremio.log.path > DREMIO_LOG_DIR > probe.
+	info.LogDir = resolveLogDir(executor, host, logDir, info.DremioPID)
 	if info.LogDir != "" {
 		anySuccess = true
 		files, err := listFiles(executor, host, info.LogDir, "log", "2")
@@ -109,7 +117,7 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		}
 	}
 
-	// 2. Find the config directory — user-provided path overrides probing.
+	// 3. Find the config directory — user-provided path overrides probing.
 	if confDir != "" {
 		info.ConfDir = confDir
 	} else {
@@ -125,20 +133,9 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		}
 	}
 
-	// 3. Detect RocksDB path from dremio.conf (paths.local + /db).
+	// 4. Detect RocksDB path from dremio.conf (paths.local + /db).
 	if info.ConfDir != "" {
 		info.RocksDBDir = detectRocksDBDir(executor, host, info.ConfDir)
-	}
-
-	// 4. Find Dremio PID.
-	pid, err := discoverPID(executor, host)
-	if err != nil {
-		simplelog.Warningf("DiscoverFiles: failed to find Dremio PID on %v: %v", host, err)
-	} else {
-		info.DremioPID = pid
-		if pid > 0 {
-			anySuccess = true
-		}
 	}
 
 	// 5. Probe for a checksum tool (sha256sum preferred, md5sum fallback).
@@ -163,21 +160,45 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 	return info, nil
 }
 
-// probeDir checks candidate directories and returns the first that exists
-// and contains at least one regular file. Empty directories are skipped.
+// ExtractEnvValue returns the value following key in a `ps eww` / cmdline+environ
+// blob. LastIndex matches JVM semantics: when -Dfoo= appears multiple times, the
+// JVM resolves the last one (Dremio launchers derive -Ddremio.log.path= from
+// DREMIO_LOG_DIR and then let DREMIO_JAVA_SERVER_EXTRA_OPTS override it).
+func ExtractEnvValue(ps, key string) string {
+	idx := strings.LastIndex(ps, key)
+	if idx < 0 {
+		return ""
+	}
+	rest := ps[idx+len(key):]
+	end := strings.IndexAny(rest, " \t\n\x00")
+	value := rest
+	if end >= 0 {
+		value = rest[:end]
+	}
+	return strings.TrimRight(strings.TrimSpace(value), ",")
+}
+
+// dirHasFiles reports whether dir exists on host and contains at least one
+// regular file. An existing-but-empty directory is logged and treated as unusable.
+func dirHasFiles(executor HostExecutor, host, dir string) bool {
+	out, err := executor(host, "test", "-d", dir, "&&", "echo", "exists")
+	if err != nil || !strings.Contains(out, "exists") {
+		return false
+	}
+	filesOut, err := executor(host, "find", "-L", dir, "-maxdepth", "1", "-type", "f", "-print", "-quit")
+	if err != nil || strings.TrimSpace(filesOut) == "" {
+		simplelog.Infof("dirHasFiles: %v exists but is empty on %v, skipping", dir, host)
+		return false
+	}
+	return true
+}
+
+// probeDir returns the first candidate that exists and contains a file.
 func probeDir(executor HostExecutor, host string, candidates []string) string {
 	for _, dir := range candidates {
-		out, err := executor(host, "test", "-d", dir, "&&", "echo", "exists")
-		if err != nil || !strings.Contains(out, "exists") {
-			continue
+		if dirHasFiles(executor, host, dir) {
+			return dir
 		}
-		// Dir exists — check it contains at least one file.
-		filesOut, err := executor(host, "find", "-L", dir, "-maxdepth", "1", "-type", "f", "-print", "-quit")
-		if err != nil || strings.TrimSpace(filesOut) == "" {
-			simplelog.Infof("probeDir: %v exists but is empty on %v, skipping", dir, host)
-			continue
-		}
-		return dir
 	}
 	return ""
 }
@@ -476,6 +497,57 @@ func detectRocksDBDir(executor HostExecutor, host, confDir string) string {
 		simplelog.Infof("detectRocksDBDir: detected RocksDB dir on %s: %s", host, rocksDir)
 	}
 	return rocksDir
+}
+
+// readProcessInfo returns the Dremio process command line and environment as a
+// single text blob (for ExtractEnvValue). Pipe-free so it is transport-safe.
+// Returns "" if process info cannot be read.
+func readProcessInfo(executor HostExecutor, host string, pid int) string {
+	if pid <= 0 {
+		return ""
+	}
+	pidStr := strconv.Itoa(pid)
+	// Primary: ps eww shows both JVM args and environment in one blob.
+	if out, err := executor(host, "ps", "eww", pidStr); err == nil && strings.TrimSpace(out) != "" {
+		return out
+	}
+	// Fallback for minimal images without ps: read /proc and translate the NUL
+	// separators in Go (no shell pipe needed).
+	var b strings.Builder
+	if out, err := executor(host, "cat", "/proc/"+pidStr+"/cmdline"); err == nil {
+		b.WriteString(strings.ReplaceAll(out, "\x00", " "))
+		b.WriteString(" ")
+	}
+	if out, err := executor(host, "cat", "/proc/"+pidStr+"/environ"); err == nil {
+		b.WriteString(strings.ReplaceAll(out, "\x00", " "))
+	}
+	result := b.String()
+	if strings.TrimSpace(result) == "" {
+		return ""
+	}
+	return result
+}
+
+// resolveLogDir determines the Dremio log directory using, in order:
+//  1. an explicit operator path (logDir), used as-is;
+//  2. -Ddremio.log.path= from the process, if that dir has files;
+//  3. DREMIO_LOG_DIR= from the process env, if that dir has files;
+//  4. probing the well-known candidate directories.
+func resolveLogDir(executor HostExecutor, host, logDir string, pid int) string {
+	if logDir != "" {
+		return logDir
+	}
+	if procInfo := readProcessInfo(executor, host, pid); procInfo != "" {
+		if d := ExtractEnvValue(procInfo, "-Ddremio.log.path="); d != "" && dirHasFiles(executor, host, d) {
+			simplelog.Infof("resolveLogDir: using -Ddremio.log.path=%v on %v", d, host)
+			return d
+		}
+		if d := ExtractEnvValue(procInfo, "DREMIO_LOG_DIR="); d != "" && dirHasFiles(executor, host, d) {
+			simplelog.Infof("resolveLogDir: using DREMIO_LOG_DIR=%v on %v", d, host)
+			return d
+		}
+	}
+	return probeDir(executor, host, logDirCandidates)
 }
 
 // baseName returns the last component of a /-separated path.

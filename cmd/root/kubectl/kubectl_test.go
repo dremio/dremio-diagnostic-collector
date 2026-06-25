@@ -291,6 +291,34 @@ func TestCliK8sActions_k8sFlags(t *testing.T) {
 	}
 }
 
+func TestGetContainerNameCached(t *testing.T) {
+	cli := &tests.MockCli{
+		// call 1: get pods -> container; call 2: exec -> ok; call 3: exec -> ok
+		StoredResponse: []string{"dremio-coordinator", "ok", "ok"},
+		StoredErrors:   []error{nil, nil, nil},
+	}
+	k := CliK8sActions{cli: cli, kubectlPath: "kubectl", namespace: "ns", k8sContext: "ctx"}
+
+	if _, err := k.HostExecute(false, "pod1", "ls"); err != nil {
+		t.Fatalf("first exec: %v", err)
+	}
+	if _, err := k.HostExecute(false, "pod1", "ls"); err != nil {
+		t.Fatalf("second exec: %v", err)
+	}
+
+	getPods := 0
+	for _, call := range cli.Calls {
+		for _, a := range call {
+			if a == "pods" {
+				getPods++
+			}
+		}
+	}
+	if getPods != 1 {
+		t.Errorf("expected container name resolved once, got %d get-pods calls", getPods)
+	}
+}
+
 func TestSearchPods_FieldSelectorFiltersRunningPods(t *testing.T) {
 	cli := &tests.MockCli{
 		// First call: get pods returns one pod; second call: getContainerName returns container name

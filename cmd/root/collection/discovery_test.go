@@ -1063,6 +1063,159 @@ func TestRunDiscovery_ChecksumProbe(t *testing.T) {
 	}
 }
 
+// TestExtractEnvValue verifies LastIndex semantics (default set first, user
+// java-opts override wins) and edge cases.
+func TestExtractEnvValue(t *testing.T) {
+	ps := "java -DREMIO_LOG_DIR=/opt/dremio/log -Ddremio.log.path=/opt/dremio/log " +
+		"-Ddremio.log.path=/opt/dremio/data/log DREMIO_LOG_DIR=/opt/dremio/log"
+	if got := ExtractEnvValue(ps, "-Ddremio.log.path="); got != "/opt/dremio/data/log" {
+		t.Errorf("dremio.log.path: want /opt/dremio/data/log, got %q", got)
+	}
+	if got := ExtractEnvValue(ps, "DREMIO_LOG_DIR="); got != "/opt/dremio/log" {
+		t.Errorf("DREMIO_LOG_DIR: want /opt/dremio/log, got %q", got)
+	}
+	if got := ExtractEnvValue(ps, "-Dmissing="); got != "" {
+		t.Errorf("missing key: want empty, got %q", got)
+	}
+}
+
+func TestResolveLogDir(t *testing.T) {
+	const psBlob = "java -Ddremio.log.path=/opt/dremio/data/log DREMIO_LOG_DIR=/opt/dremio/log"
+
+	// Helper to build a responder: ps eww returns psBlob; dir checks per map.
+	build := func(nonEmpty map[string]bool) HostExecutor {
+		return func(_ string, args ...string) (string, error) {
+			joined := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(joined, "ps eww"):
+				return psBlob, nil
+			case strings.HasPrefix(joined, "test -d"):
+				dir := args[2]
+				if nonEmpty[dir] {
+					return "exists", nil
+				}
+				return "", nil
+			case strings.HasPrefix(joined, "find -L"):
+				dir := args[2]
+				if nonEmpty[dir] {
+					return dir + "/server.log", nil
+				}
+				return "", nil
+			}
+			return "", nil
+		}
+	}
+
+	// Explicit flag wins outright — ps must not even be consulted.
+	called := false
+	exec1 := func(_ string, args ...string) (string, error) {
+		if strings.HasPrefix(strings.Join(args, " "), "ps eww") {
+			called = true
+		}
+		return "", nil
+	}
+	if got := resolveLogDir(exec1, "h", "/explicit/path", 123); got != "/explicit/path" {
+		t.Errorf("explicit: want /explicit/path, got %q", got)
+	}
+	if called {
+		t.Errorf("explicit flag must skip process inspection")
+	}
+
+	// -Ddremio.log.path used when its dir has files.
+	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/data/log": true}), "h", "", 123); got != "/opt/dremio/data/log" {
+		t.Errorf("logpath: want /opt/dremio/data/log, got %q", got)
+	}
+
+	// Detected dir empty -> fall through to DREMIO_LOG_DIR (which has files).
+	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/log": true}), "h", "", 123); got != "/opt/dremio/log" {
+		t.Errorf("fallthrough to DREMIO_LOG_DIR: want /opt/dremio/log, got %q", got)
+	}
+
+	// Nothing detected, nothing on disk -> probe returns "".
+	if got := resolveLogDir(build(map[string]bool{}), "h", "", 123); got != "" {
+		t.Errorf("none: want empty, got %q", got)
+	}
+
+	// PID 0 -> skip process inspection; probe candidate that has files.
+	if got := resolveLogDir(build(map[string]bool{"/var/log/dremio": true}), "h", "", 0); got != "/var/log/dremio" {
+		t.Errorf("pid0 probe: want /var/log/dremio, got %q", got)
+	}
+}
+
+func TestReadProcessInfo(t *testing.T) {
+	t.Run("pid_zero_returns_empty", func(t *testing.T) {
+		// pid <= 0 → returns "" immediately, no executor calls.
+		called := false
+		exec := func(_ string, _ ...string) (string, error) {
+			called = true
+			return "", nil
+		}
+		if got := readProcessInfo(exec, "node1", 0); got != "" {
+			t.Errorf("pid=0: want \"\", got %q", got)
+		}
+		if called {
+			t.Error("executor should not be called when pid <= 0")
+		}
+	})
+
+	t.Run("primary_ps_success", func(t *testing.T) {
+		const blob = "java -Ddremio.log.path=/logs/dremio DREMIO_LOG_DIR=/logs/dremio"
+		exec := func(_ string, args ...string) (string, error) {
+			if strings.HasPrefix(strings.Join(args, " "), "ps eww 123") {
+				return blob, nil
+			}
+			return "", fmt.Errorf("unexpected")
+		}
+		if got := readProcessInfo(exec, "node1", 123); got != blob {
+			t.Errorf("primary: want %q, got %q", blob, got)
+		}
+	})
+
+	t.Run("fallback_empty_returns_empty_string", func(t *testing.T) {
+		// ps eww returns empty + no error; both /proc reads return empty + no error.
+		// Bug being fixed: previously returned " " (space) instead of "".
+		exec := func(_ string, args ...string) (string, error) {
+			joined := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(joined, "ps eww 123"):
+				return "", nil // empty, no error → triggers fallback
+			case strings.HasPrefix(joined, "cat /proc/123/cmdline"):
+				return "", nil
+			case strings.HasPrefix(joined, "cat /proc/123/environ"):
+				return "", nil
+			}
+			return "", fmt.Errorf("unexpected: %s", joined)
+		}
+		got := readProcessInfo(exec, "node1", 123)
+		if got != "" {
+			t.Errorf("fallback-empty: want \"\", got %q (len=%d)", got, len(got))
+		}
+	})
+
+	t.Run("fallback_with_content", func(t *testing.T) {
+		// ps eww fails; /proc reads return NUL-delimited content.
+		exec := func(_ string, args ...string) (string, error) {
+			joined := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(joined, "ps eww 123"):
+				return "", fmt.Errorf("ps not found")
+			case strings.HasPrefix(joined, "cat /proc/123/cmdline"):
+				return "java\x00-Ddremio.log.path=/x\x00", nil
+			case strings.HasPrefix(joined, "cat /proc/123/environ"):
+				return "DREMIO_LOG_DIR=/y\x00", nil
+			}
+			return "", fmt.Errorf("unexpected: %s", joined)
+		}
+		got := readProcessInfo(exec, "node1", 123)
+		if !strings.Contains(got, "-Ddremio.log.path=/x") {
+			t.Errorf("fallback-content: want -Ddremio.log.path=/x in result, got %q", got)
+		}
+		if !strings.Contains(got, "DREMIO_LOG_DIR=/y") {
+			t.Errorf("fallback-content: want DREMIO_LOG_DIR=/y in result, got %q", got)
+		}
+	})
+}
+
 // filePaths is a test helper that extracts paths from a slice of RemoteFileInfo.
 func filePaths(files []RemoteFileInfo) []string {
 	paths := make([]string, len(files))

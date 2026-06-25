@@ -1,5 +1,11 @@
 # Changelog
 
+## [4.0.2] - 2026-06-25
+
+- Log directory is now autodetected from the running Dremio process (`-Ddremio.log.path`, then `DREMIO_LOG_DIR`) in CLI mode as well as the TUI, before falling back to probing. Fixes server logs and `queries.json` being missed when Dremio logs to a non-default path.
+- RocksDB-viewer collections (cluster-stats, system-tables, WLM, queries-perf) are now skipped on coordinators that have no local catalog, instead of erroring.
+- Kubernetes container-name lookup is now cached per pod, avoiding repeated `kubectl get pods` calls that could fail under transient API load.
+
 ## [4.0.1] - 2026-06-16
 
 - `--namespace` is now optional for the K8s transport and defaults to `default`. Previously `ddc collect k8s standard|diagnosis` errored with "--namespace is required" when the flag was omitted.

@@ -364,6 +364,8 @@ func TestStreamingCollect_RocksDBViewer_UsesAutodetectedDir(t *testing.T) {
 		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
 			cmd := strings.Join(args, " ")
 			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
 			case strings.Contains(cmd, "uname -m"):
 				unameCalled.Store(true)
 				return "x86_64\n", nil

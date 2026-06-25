@@ -506,9 +506,9 @@ func TestExtractEnvValue(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := extractEnvValue(tc.ps, tc.key)
+			got := collection.ExtractEnvValue(tc.ps, tc.key)
 			if got != tc.want {
-				t.Errorf("extractEnvValue(%q, %q) = %q, want %q", tc.ps, tc.key, got, tc.want)
+				t.Errorf("collection.ExtractEnvValue(%q, %q) = %q, want %q", tc.ps, tc.key, got, tc.want)
 			}
 		})
 	}
@@ -549,7 +549,7 @@ func TestExtractEnvValue_RegressionDiagBundle(t *testing.T) {
 		t.Errorf("control: old strings.Index-based code should have produced the buggy %q, got %q — input may not faithfully reproduce the bundle", "/opt/dremio/log,", oldGot)
 	}
 
-	newGot := extractEnvValue(cmdline, "-Ddremio.log.path=")
+	newGot := collection.ExtractEnvValue(cmdline, "-Ddremio.log.path=")
 	if newGot != "/opt/dremio/data/log" {
 		t.Errorf("fix: new code should return JVM-resolved %q, got %q", "/opt/dremio/data/log", newGot)
 	}

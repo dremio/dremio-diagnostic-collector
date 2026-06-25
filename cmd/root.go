@@ -1757,11 +1757,11 @@ func runLocalPathDiscovery() *configui.DetectedPaths {
 			psStr := string(psOut)
 
 			// Parse paths
-			coordinatorLog := extractEnvValue(psStr, "-Ddremio.log.path=")
+			coordinatorLog := collection.ExtractEnvValue(psStr, "-Ddremio.log.path=")
 			if coordinatorLog == "" {
-				coordinatorLog = extractEnvValue(psStr, "DREMIO_LOG_DIR=")
+				coordinatorLog = collection.ExtractEnvValue(psStr, "DREMIO_LOG_DIR=")
 			}
-			confDir := extractEnvValue(psStr, "DREMIO_CONF_DIR=")
+			confDir := collection.ExtractEnvValue(psStr, "DREMIO_CONF_DIR=")
 
 			if coordinatorLog == "" && confDir == "" {
 				simplelog.Warningf("local path autodetection: no Dremio paths found in process info")
@@ -1906,9 +1906,9 @@ func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx, kubeconfig string
 			return ""
 		}
 		psStr := string(psOut)
-		logDir := extractEnvValue(psStr, "-Ddremio.log.path=")
+		logDir := collection.ExtractEnvValue(psStr, "-Ddremio.log.path=")
 		if logDir == "" {
-			logDir = extractEnvValue(psStr, "DREMIO_LOG_DIR=")
+			logDir = collection.ExtractEnvValue(psStr, "DREMIO_LOG_DIR=")
 		}
 		return logDir
 	}
@@ -1941,11 +1941,11 @@ func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx, kubeconfig string
 			psStr := string(psOut)
 
 			// Parse paths from the process output (same keys as main branch)
-			coordinatorLog := extractEnvValue(psStr, "-Ddremio.log.path=")
+			coordinatorLog := collection.ExtractEnvValue(psStr, "-Ddremio.log.path=")
 			if coordinatorLog == "" {
-				coordinatorLog = extractEnvValue(psStr, "DREMIO_LOG_DIR=")
+				coordinatorLog = collection.ExtractEnvValue(psStr, "DREMIO_LOG_DIR=")
 			}
-			confDir := extractEnvValue(psStr, "DREMIO_CONF_DIR=")
+			confDir := collection.ExtractEnvValue(psStr, "DREMIO_CONF_DIR=")
 
 			if coordinatorLog == "" && confDir == "" {
 				simplelog.Warningf("path autodetection: no Dremio paths found in process info on %s", targetHost)
@@ -1973,8 +1973,8 @@ func runPathDiscovery(ns, coordinator, sshUsr, sshKey, k8sCtx, kubeconfig string
 				}
 			}
 			if detectedEndpoint == "" {
-				webAddr := extractEnvValue(psStr, "DREMIO_CLIENT_PORT_9047_TCP_ADDR=")
-				webPort := extractEnvValue(psStr, "DREMIO_CLIENT_PORT_9047_TCP_PORT=")
+				webAddr := collection.ExtractEnvValue(psStr, "DREMIO_CLIENT_PORT_9047_TCP_ADDR=")
+				webPort := collection.ExtractEnvValue(psStr, "DREMIO_CLIENT_PORT_9047_TCP_PORT=")
 				if webAddr != "" {
 					if webPort == "" {
 						webPort = "9047"
@@ -2065,27 +2065,6 @@ func findExecutorPod(podListOutput string) string {
 		}
 	}
 	return ""
-}
-
-// extractEnvValue extracts a value from a process string for a given key.
-// Handles both "KEY=value " and "KEY=value\0" formats.
-func extractEnvValue(ps, key string) string {
-	// LastIndex matches JVM semantics: when -Dfoo= appears multiple times on
-	// the java command line, the JVM resolves the LAST one. Dremio launcher
-	// scripts that derive -Ddremio.log.path= from DREMIO_LOG_DIR and then let
-	// DREMIO_JAVA_SERVER_EXTRA_OPTS override it produce exactly this case.
-	idx := strings.LastIndex(ps, key)
-	if idx < 0 {
-		return ""
-	}
-	rest := ps[idx+len(key):]
-	// Value ends at space, null byte, or end of string
-	end := strings.IndexAny(rest, " \t\n\x00")
-	value := rest
-	if end >= 0 {
-		value = rest[:end]
-	}
-	return strings.TrimRight(strings.TrimSpace(value), ",")
 }
 
 // promptKubeconfigPath shows a TUI input step asking the user for a

@@ -130,6 +130,81 @@ func countLines(data []byte) int {
 	return n
 }
 
+func TestRunRocksDBCollectionSkipsWhenNoCatalog(t *testing.T) {
+	var calls []string
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			joined := strings.Join(args, " ")
+			calls = append(calls, joined)
+			// Catalog check: return empty (no catalog present)
+			if strings.HasPrefix(joined, "test -f") && strings.Contains(joined, "/catalog/CURRENT") {
+				return "", nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", joined)
+		},
+	}
+	args := RocksCollectArgs{
+		Collector:  mc,
+		Host:       "dremio-coordinator-0",
+		RocksDBDir: "/opt/dremio/data/db",
+	}
+
+	files, err := RunRocksDBCollection(args)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if files != nil {
+		t.Errorf("expected no files, got %v", files)
+	}
+	// Only the catalog check should have run — no binary upload (uname -m).
+	for _, c := range calls {
+		if strings.Contains(c, "uname") {
+			t.Errorf("binary upload attempted despite missing catalog: %q", c)
+		}
+	}
+}
+
+func TestRunRocksDBCollectionCollectsWhenCatalogPresent(t *testing.T) {
+	var calls []string
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			joined := strings.Join(args, " ")
+			calls = append(calls, joined)
+			// Catalog check: return "exists" (catalog is present)
+			if strings.HasPrefix(joined, "test -f") && strings.Contains(joined, "/catalog/CURRENT") {
+				return "exists", nil
+			}
+			// uname -m: return an error to stop execution — we only care that it was reached.
+			if strings.Contains(joined, "uname -m") {
+				return "", fmt.Errorf("stop here: uname reached")
+			}
+			return "", fmt.Errorf("unexpected host command: %s", joined)
+		},
+	}
+	args := RocksCollectArgs{
+		Collector:  mc,
+		Host:       "dremio-coordinator-0",
+		RocksDBDir: "/opt/dremio/data/db",
+	}
+
+	// We expect an error (from the uname stub), but NOT a silent nil/nil skip.
+	_, err := RunRocksDBCollection(args)
+	if err == nil {
+		t.Fatal("expected an error propagated from uname stub, got nil — catalog gate may have skipped incorrectly")
+	}
+	// The uname command must have been attempted, proving the gate was passed.
+	unameAttempted := false
+	for _, c := range calls {
+		if strings.Contains(c, "uname") {
+			unameAttempted = true
+			break
+		}
+	}
+	if !unameAttempted {
+		t.Errorf("uname -m was never called despite catalog being present; gate may have incorrectly skipped. calls: %v", calls)
+	}
+}
+
 func TestWLMFileLayout(t *testing.T) {
 	tmpDir := t.TempDir()
 	cs := &mockCopyStrategy{tmpDir: tmpDir}
@@ -146,6 +221,8 @@ func TestWLMFileLayout(t *testing.T) {
 		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
 			cmd := strings.Join(args, " ")
 			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
 			case strings.Contains(cmd, "uname -m"):
 				return "x86_64\n", nil
 			case strings.Contains(cmd, "chmod +x"):
