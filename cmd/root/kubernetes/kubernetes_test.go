@@ -244,9 +244,9 @@ func TestSearchPods_FiltersNonRunningPods(t *testing.T) {
 	)
 
 	actions := &KubeCtlAPIActions{
-		namespace:     "dremio",
+		namespace:           "dremio",
 		detectLabelSelector: "app=dremio",
-		client:        fakeClient,
+		client:              fakeClient,
 	}
 
 	// Search for coordinators — should return only the Running one

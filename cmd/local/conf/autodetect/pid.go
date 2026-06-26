@@ -26,7 +26,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
-// GetDremioPIDFromText takes the ouput from
+// GetDremioPIDFromText takes the output from
 // "ps aux | grep DremioDaemon | grep -v grep | grep -v /etc/dremio/preview"
 // and retrieves the pid
 func GetDremioPIDFromText(psOutput string) (int, error) {

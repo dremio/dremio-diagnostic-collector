@@ -25,7 +25,7 @@ import (
 )
 
 func TestK8SMasking_WhenJsonItemsAreEmpty(t *testing.T) {
-	// we should not acutally do anything in this case
+	// we should not actually do anything in this case
 
 	input := `{
 		"items": null

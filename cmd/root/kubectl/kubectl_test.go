@@ -74,11 +74,11 @@ func TestKubectlSearch(t *testing.T) {
 		StoredErrors:   []error{nil, nil, nil, nil},
 	}
 	k := CliK8sActions{
-		cli:           cli,
+		cli:                 cli,
 		detectLabelSelector: "role=dremio-pods",
-		kubectlPath:   "kubectl",
-		namespace:     namespace,
-		k8sContext:    k8sContext,
+		kubectlPath:         "kubectl",
+		namespace:           namespace,
+		k8sContext:          k8sContext,
 	}
 	podNames, err := k.GetCoordinators()
 	if err != nil {
@@ -326,10 +326,10 @@ func TestSearchPods_FieldSelectorFiltersRunningPods(t *testing.T) {
 		StoredErrors:   []error{nil, nil},
 	}
 	k := CliK8sActions{
-		cli:           cli,
-		kubectlPath:   "kubectl",
-		namespace:     "testns",
-		k8sContext:    "west-f1",
+		cli:                 cli,
+		kubectlPath:         "kubectl",
+		namespace:           "testns",
+		k8sContext:          "west-f1",
 		detectLabelSelector: "app=dremio",
 	}
 	pods, err := k.SearchPods(func(container string) bool {

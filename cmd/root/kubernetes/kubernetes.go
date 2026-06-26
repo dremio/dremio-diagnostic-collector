@@ -49,10 +49,10 @@ import (
 )
 
 type KubeArgs struct {
-	Namespace      string
-	K8SContext     string
-	DetectLabelSelector  string
-	KubeconfigPath string
+	Namespace           string
+	K8SContext          string
+	DetectLabelSelector string
+	KubeconfigPath      string
 }
 
 // NewK8sAPI is the only supported way to initialize the NewK8sAPI struct
@@ -63,15 +63,15 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 		return &KubeCtlAPIActions{}, err
 	}
 	return &KubeCtlAPIActions{
-		namespace:      kubeArgs.Namespace,
-		client:         clientset,
-		config:         config,
-		detectLabelSelector:  kubeArgs.DetectLabelSelector,
-		hook:           hook,
-		pidHosts:       make(map[string]string),
-		containerCache: make(map[string]string),
-		timeoutMinutes: 30,
-		protocol:       "SPDY",
+		namespace:           kubeArgs.Namespace,
+		client:              clientset,
+		config:              config,
+		detectLabelSelector: kubeArgs.DetectLabelSelector,
+		hook:                hook,
+		pidHosts:            make(map[string]string),
+		containerCache:      make(map[string]string),
+		timeoutMinutes:      30,
+		protocol:            "SPDY",
 		spdyExecutorFn: func(config *rest.Config, method string, u *url.URL) (remotecommand.Executor, error) {
 			return remotecommand.NewSPDYExecutor(config, method, u)
 		},
@@ -131,17 +131,17 @@ type ExecutorFactory func(config *rest.Config, method string, url *url.URL) (rem
 
 // KubeCtlAPIActions provides a way to collect and copy files using kubectl
 type KubeCtlAPIActions struct {
-	namespace      string
-	detectLabelSelector  string
-	client               kubernetes.Interface
-	config         *rest.Config
-	hook           shutdown.CancelHook
-	pidHosts       map[string]string
-	containerCache map[string]string // cached pod→container name lookups
-	timeoutMinutes int
-	m              sync.Mutex
-	spdyExecutorFn ExecutorFactory
-	protocol       string // "SPDY"
+	namespace           string
+	detectLabelSelector string
+	client              kubernetes.Interface
+	config              *rest.Config
+	hook                shutdown.CancelHook
+	pidHosts            map[string]string
+	containerCache      map[string]string // cached pod→container name lookups
+	timeoutMinutes      int
+	m                   sync.Mutex
+	spdyExecutorFn      ExecutorFactory
+	protocol            string // "SPDY"
 }
 
 // newExecutor creates a SPDY executor for remote command execution.

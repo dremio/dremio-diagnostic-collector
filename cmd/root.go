@@ -59,12 +59,12 @@ import (
 )
 
 var (
-	coordinatorStr              string
-	executorsStr                string
-	detectLabelSelector         string
-	containerLogLabelSelector   string
-	sshKeyLoc                   string
-	sshUser                     string
+	coordinatorStr            string
+	executorsStr              string
+	detectLabelSelector       string
+	containerLogLabelSelector string
+	sshKeyLoc                 string
+	sshUser                   string
 )
 
 var outputLoc string
@@ -1251,10 +1251,10 @@ func Execute(args []string) error {
 			CoordinatorStr: coordinatorStr,
 		}
 		kubeArgs := kubernetes.KubeArgs{
-			Namespace:      namespace,
-			DetectLabelSelector:  detectLabelSelector,
-			K8SContext:     k8sContext,
-			KubeconfigPath: kubeconfigPath,
+			Namespace:           namespace,
+			DetectLabelSelector: detectLabelSelector,
+			K8SContext:          k8sContext,
+			KubeconfigPath:      kubeconfigPath,
 		}
 		// Local transport uses the fallback (local collector) path in RemoteCollect.
 		if transportCmd == "local" {
