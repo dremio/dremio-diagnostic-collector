@@ -11,8 +11,28 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-# If a GitHub App key will be used to mint the release token later, validate it now
-# so a bad/unreadable key fails in seconds instead of after the ~60-minute build.
+# Prints a signed GitHub App JWT (RS256) for GH_APP_ID to stdout, or returns non-zero.
+# tr -d '\n' guards against openssl builds that wrap base64 (embedded newlines would
+# corrupt the JWT). Requires GH_APP_ID and GH_APP_PRIVATE_KEY_PATH.
+make_app_jwt() {
+    _now=$(date +%s)
+    _iat=$((_now - 60))    # back-dated 60s to allow for clock drift
+    _exp=$((_now + 570))   # 9.5 minutes, under GitHub's 10 minute JWT limit
+    _b64() { openssl base64 -A | tr -d '\n' | tr '+/' '-_' | tr -d '='; }
+    _hdr=$(printf '{"alg":"RS256","typ":"JWT"}' | _b64)
+    _pl=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$_iat" "$_exp" "$GH_APP_ID" | _b64)
+    _unsigned="${_hdr}.${_pl}"
+    _sig=$(printf '%s' "$_unsigned" | openssl dgst -sha256 -sign "$GH_APP_PRIVATE_KEY_PATH" | _b64)
+    if [ -z "$_sig" ]; then
+        echo "openssl produced an empty JWT signature — GH_APP_PRIVATE_KEY_PATH is not a usable RSA key." >&2
+        return 1
+    fi
+    printf '%s.%s' "$_unsigned" "$_sig"
+}
+
+# GitHub App preflight: if the release token will be minted from a private key,
+# validate the key AND confirm it can actually mint a token NOW — before the
+# ~60-minute build — so bad credentials fail in seconds instead of after the build.
 if [ -z "$GH_TOKEN" ] && [ -n "$GH_APP_ID" ] && [ -n "$GH_APP_INSTALLATION_ID" ] && [ -n "$GH_APP_PRIVATE_KEY_PATH" ]; then
     if [ ! -f "$GH_APP_PRIVATE_KEY_PATH" ]; then
         echo "Private key not found at: $GH_APP_PRIVATE_KEY_PATH" >&2
@@ -22,6 +42,21 @@ if [ -z "$GH_TOKEN" ] && [ -n "$GH_APP_ID" ] && [ -n "$GH_APP_INSTALLATION_ID" ]
         echo "GH_APP_PRIVATE_KEY_PATH is not a private key openssl can load (check PEM format / encryption)." >&2
         exit 1
     fi
+    echo "GitHub App key public fingerprint: $(openssl pkey -in "$GH_APP_PRIVATE_KEY_PATH" -pubout -outform DER 2>/dev/null | openssl sha256 | awk '{print $NF}')"
+    echo "Preflight: verifying the key can mint an installation token for App ${GH_APP_ID}…"
+    preflight_jwt=$(make_app_jwt) || exit 1
+    preflight_code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+        -H "Authorization: Bearer ${preflight_jwt}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/app/installations/${GH_APP_INSTALLATION_ID}/access_tokens")
+    unset preflight_jwt
+    if [ "$preflight_code" != "201" ]; then
+        echo "Preflight FAILED (HTTP ${preflight_code}): the private key does not match App ${GH_APP_ID}, or the installation ID is wrong." >&2
+        echo "The signed JWT is well-formed, so this is a credential mismatch — compare the fingerprint above against the known-good key." >&2
+        exit 1
+    fi
+    echo "Preflight OK — GitHub App credentials are valid."
 fi
 
 echo "Running bootstrap to install build tools (upx, linters, …)"
@@ -89,45 +124,11 @@ if [ -z "$GH_TOKEN" ]; then
         exit 1
     fi
 
-    if ! type "openssl" > /dev/null 2>&1; then
-        echo "Required command not found: openssl" >&2
-        exit 1
-    fi
-
-    if [ ! -f "$GH_APP_PRIVATE_KEY_PATH" ]; then
-        echo "Private key not found at: $GH_APP_PRIVATE_KEY_PATH" >&2
-        exit 1
-    fi
-
     echo "Generating installation token from GitHub App…"
     date "+%H:%M:%S"
 
-    now=$(date +%s)
-    iat=$((now - 60))    # back-dated 60s to allow for clock drift
-    exp=$((now + 570))   # 9.5 minutes, under GitHub's 10 minute JWT limit
-
-    # tr -d '\n' guards against openssl builds that ignore -A and wrap base64 at
-    # 64 chars — embedded newlines would corrupt the JWT ("could not be decoded").
-    b64enc() {
-        openssl base64 -A | tr -d '\n' | tr '+/' '-_' | tr -d '='
-    }
-
-    jwt_header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64enc)
-    jwt_payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$iat" "$exp" "$GH_APP_ID" | b64enc)
-    jwt_unsigned="${jwt_header}.${jwt_payload}"
-    jwt_signature=$(printf '%s' "$jwt_unsigned" | openssl dgst -sha256 -sign "$GH_APP_PRIVATE_KEY_PATH" | b64enc)
-    if [ -z "$jwt_signature" ]; then
-        echo "openssl produced an empty JWT signature — GH_APP_PRIVATE_KEY_PATH is not a usable RSA key." >&2
-        exit 1
-    fi
-    APP_JWT="${jwt_unsigned}.${jwt_signature}"
-
-    # Safe diagnostic (no secrets): segment lengths and newline count. A well-formed
-    # JWT has 0 newlines and a non-empty signature (~342 chars for a 2048-bit key).
-    echo "JWT header/payload/sig chars: ${#jwt_header}/${#jwt_payload}/${#jwt_signature}; newlines: $(printf '%s' "$APP_JWT" | tr -cd '\n' | wc -c | tr -d ' ')"
-
-    # Use gh itself (authenticated via the App JWT) to request the installation token,
-    # and extract it with gh's built-in --jq so no external jq dependency is needed.
+    APP_JWT=$(make_app_jwt) || exit 1
+    # Extract the token with gh's built-in --jq so no external jq dependency is needed.
     GH_TOKEN=$(GH_TOKEN="$APP_JWT" gh api \
         --method POST \
         -H "Accept: application/vnd.github+json" \
