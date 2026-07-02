@@ -11,6 +11,19 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+# If a GitHub App key will be used to mint the release token later, validate it now
+# so a bad/unreadable key fails in seconds instead of after the ~60-minute build.
+if [ -z "$GH_TOKEN" ] && [ -n "$GH_APP_ID" ] && [ -n "$GH_APP_INSTALLATION_ID" ] && [ -n "$GH_APP_PRIVATE_KEY_PATH" ]; then
+    if [ ! -f "$GH_APP_PRIVATE_KEY_PATH" ]; then
+        echo "Private key not found at: $GH_APP_PRIVATE_KEY_PATH" >&2
+        exit 1
+    fi
+    if ! openssl pkey -in "$GH_APP_PRIVATE_KEY_PATH" -noout 2>/dev/null; then
+        echo "GH_APP_PRIVATE_KEY_PATH is not a private key openssl can load (check PEM format / encryption)." >&2
+        exit 1
+    fi
+fi
+
 echo "Running bootstrap to install build tools (upx, linters, …)"
 date "+%H:%M:%S"
 ./script/bootstrap
@@ -93,15 +106,25 @@ if [ -z "$GH_TOKEN" ]; then
     iat=$((now - 60))    # back-dated 60s to allow for clock drift
     exp=$((now + 570))   # 9.5 minutes, under GitHub's 10 minute JWT limit
 
+    # tr -d '\n' guards against openssl builds that ignore -A and wrap base64 at
+    # 64 chars — embedded newlines would corrupt the JWT ("could not be decoded").
     b64enc() {
-        openssl base64 -A | tr '+/' '-_' | tr -d '='
+        openssl base64 -A | tr -d '\n' | tr '+/' '-_' | tr -d '='
     }
 
     jwt_header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64enc)
     jwt_payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$iat" "$exp" "$GH_APP_ID" | b64enc)
     jwt_unsigned="${jwt_header}.${jwt_payload}"
     jwt_signature=$(printf '%s' "$jwt_unsigned" | openssl dgst -sha256 -sign "$GH_APP_PRIVATE_KEY_PATH" | b64enc)
+    if [ -z "$jwt_signature" ]; then
+        echo "openssl produced an empty JWT signature — GH_APP_PRIVATE_KEY_PATH is not a usable RSA key." >&2
+        exit 1
+    fi
     APP_JWT="${jwt_unsigned}.${jwt_signature}"
+
+    # Safe diagnostic (no secrets): segment lengths and newline count. A well-formed
+    # JWT has 0 newlines and a non-empty signature (~342 chars for a 2048-bit key).
+    echo "JWT header/payload/sig chars: ${#jwt_header}/${#jwt_payload}/${#jwt_signature}; newlines: $(printf '%s' "$APP_JWT" | tr -cd '\n' | wc -c | tr -d ' ')"
 
     # Use gh itself (authenticated via the App JWT) to request the installation token,
     # and extract it with gh's built-in --jq so no external jq dependency is needed.
