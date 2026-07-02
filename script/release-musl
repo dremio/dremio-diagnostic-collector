@@ -6,6 +6,11 @@ set -e
 
 cd "$(dirname "$0")/.."
 
+if [ -z "$1" ]; then
+    echo "Usage: $0 <version>"
+    exit 1
+fi
+
 echo "Running bootstrap to install build tools (upx, linters, …)"
 date "+%H:%M:%S"
 ./script/bootstrap
@@ -55,6 +60,66 @@ VERSION=$1
 
 ./script/release-build-musl $VERSION
 
+# Authenticate AFTER the build. The build takes ~60+ minutes, and a GitHub App
+# installation token is only valid for 1 hour, so a token minted before the build
+# would expire before the upload. Mint it here, seconds before it is used.
+#
+# If GH_TOKEN is already set (e.g. a long-lived PAT) it is used as-is. Otherwise a
+# fresh installation token is generated from the GitHub App private key. In Jenkins,
+# provide GH_APP_PRIVATE_KEY_PATH via a "Secret file" credential binding, and
+# GH_APP_ID / GH_APP_INSTALLATION_ID as secret text — do NOT bind the "GitHub App"
+# credential to GH_TOKEN (that token is minted at step start and expires mid-build).
+if [ -z "$GH_TOKEN" ]; then
+    if [ -z "$GH_APP_ID" ] || [ -z "$GH_APP_INSTALLATION_ID" ] || [ -z "$GH_APP_PRIVATE_KEY_PATH" ]; then
+        echo "GH_TOKEN not set and GitHub App credentials not provided." >&2
+        echo "Set GH_TOKEN, or set GH_APP_ID, GH_APP_INSTALLATION_ID, and GH_APP_PRIVATE_KEY_PATH." >&2
+        exit 1
+    fi
 
-gh release create $VERSION --title $VERSION --generate-notes  ./bin/ddc-windows-amd64.zip ./bin/ddc-windows-arm64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip 
- 
+    if ! type "openssl" > /dev/null 2>&1; then
+        echo "Required command not found: openssl" >&2
+        exit 1
+    fi
+
+    if [ ! -f "$GH_APP_PRIVATE_KEY_PATH" ]; then
+        echo "Private key not found at: $GH_APP_PRIVATE_KEY_PATH" >&2
+        exit 1
+    fi
+
+    echo "Generating installation token from GitHub App…"
+    date "+%H:%M:%S"
+
+    now=$(date +%s)
+    iat=$((now - 60))    # back-dated 60s to allow for clock drift
+    exp=$((now + 570))   # 9.5 minutes, under GitHub's 10 minute JWT limit
+
+    b64enc() {
+        openssl base64 -A | tr '+/' '-_' | tr -d '='
+    }
+
+    jwt_header=$(printf '{"alg":"RS256","typ":"JWT"}' | b64enc)
+    jwt_payload=$(printf '{"iat":%s,"exp":%s,"iss":"%s"}' "$iat" "$exp" "$GH_APP_ID" | b64enc)
+    jwt_unsigned="${jwt_header}.${jwt_payload}"
+    jwt_signature=$(printf '%s' "$jwt_unsigned" | openssl dgst -sha256 -sign "$GH_APP_PRIVATE_KEY_PATH" | b64enc)
+    APP_JWT="${jwt_unsigned}.${jwt_signature}"
+
+    # Use gh itself (authenticated via the App JWT) to request the installation token,
+    # and extract it with gh's built-in --jq so no external jq dependency is needed.
+    GH_TOKEN=$(GH_TOKEN="$APP_JWT" gh api \
+        --method POST \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        --jq '.token' \
+        "/app/installations/${GH_APP_INSTALLATION_ID}/access_tokens")
+    unset APP_JWT
+
+    if [ -z "$GH_TOKEN" ]; then
+        echo "Failed to obtain installation token." >&2
+        exit 1
+    fi
+
+    export GH_TOKEN
+fi
+
+gh release create $VERSION --title $VERSION --generate-notes  ./bin/ddc-windows-amd64.zip ./bin/ddc-windows-arm64.zip ./bin/ddc-mac-m-series.zip ./bin/ddc-mac-intel.zip ./bin/ddc-linux-arm64.zip ./bin/ddc-linux-amd64.zip
+
