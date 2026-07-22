@@ -127,6 +127,7 @@ type Args struct {
 	AllowInsecureSSL           bool
 	RestHTTPTimeout            int
 	CollectWLM                 bool
+	CollectWLMClusterUsage     bool
 	CollectKVStoreReport       bool
 	CollectProblematicProfiles bool
 	CollectSystemTables        bool

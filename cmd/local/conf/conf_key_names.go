@@ -55,6 +55,7 @@ const (
 	KeyCollectSystemTablesExport   = "collect-system-tables-export"
 	KeySystemTablesRowLimit        = "system-tables-row-limit"
 	KeyCollectWLM                  = "collect-wlm"
+	KeyCollectWLMClusterUsage      = "collect-wlm-cluster-usage"
 	KeyCollectKVStoreReport        = "collect-kvstore-report"
 	KeyDiagTimeSeconds             = "diag-time-seconds"
 	KeyNodeName                    = "node-name"

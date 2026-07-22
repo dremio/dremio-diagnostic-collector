@@ -71,6 +71,7 @@ func TestSetViperDefaultsWithDiagnosis(t *testing.T) {
 
 		// API collection
 		{conf.KeyCollectWLM, true},
+		{conf.KeyCollectWLMClusterUsage, false},
 		{conf.KeyCollectKVStoreReport, false},
 		{conf.KeyCollectProblematicProfiles, false},
 		{conf.KeyCollectSystemTablesExport, true},
@@ -141,6 +142,7 @@ func TestSetViperDefaultsWithStandard(t *testing.T) {
 
 		// WLM enabled (via RocksDB viewer), KV store disabled
 		{conf.KeyCollectWLM, true},
+		{conf.KeyCollectWLMClusterUsage, false},
 		{conf.KeyCollectKVStoreReport, false},
 
 		// Transfer rate limiting

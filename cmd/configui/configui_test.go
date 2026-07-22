@@ -83,6 +83,9 @@ func TestBuildStandardCLICommand_QueriesPerfEnabled(t *testing.T) {
 	if !strings.Contains(cmd, "--collect-wlm=true") {
 		t.Errorf("expected --collect-wlm=true, got:\n%s", cmd)
 	}
+	if !strings.Contains(cmd, "--collect-wlm-cluster-usage=false") {
+		t.Errorf("expected --collect-wlm-cluster-usage=false (default off), got:\n%s", cmd)
+	}
 	if !strings.Contains(cmd, "--system-tables=options,roles") {
 		t.Errorf("expected --system-tables=options,roles, got:\n%s", cmd)
 	}
@@ -207,7 +210,11 @@ func TestBuildDiagnosisCLICommand_NoSystemTables(t *testing.T) {
 		CollectWLM:        true,
 		SystemTables:      nil, // user deselected all tables
 	}
+	cfg.CollectWLMClusterUsage = true
 	cmd := buildDiagnosisCLICommand(cfg, &allTools, nil, &days, &dur, new(string))
+	if !strings.Contains(cmd, "--collect-wlm-cluster-usage=true") {
+		t.Errorf("expected --collect-wlm-cluster-usage=true when enabled, got:\n%s", cmd)
+	}
 	if !strings.Contains(cmd, "--system-tables=") {
 		t.Errorf("expected --system-tables= flag to be emitted even when SystemTables is empty, got:\n%s", cmd)
 	}

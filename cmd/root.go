@@ -131,6 +131,7 @@ var (
 	collectTop                 bool
 	collectAsyncProfiler       bool
 	collectWLM                 bool
+	collectWLMClusterUsage     bool
 	collectKVStoreReport       bool
 	collectProblematicProfiles bool
 )
@@ -1214,6 +1215,7 @@ func Execute(args []string) error {
 			AllowInsecureSSL:           allowInsecureSSL,
 			RestHTTPTimeout:            30,
 			CollectWLM:                 collectWLM,
+			CollectWLMClusterUsage:     collectWLMClusterUsage,
 			CollectKVStoreReport:       collectKVStoreReport,
 			CollectProblematicProfiles: collectProblematicProfiles && collectionMode == collects.DiagnosisCollection,
 			CollectSystemTables:        len(systemTablesList) > 0,
@@ -1380,6 +1382,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectVacuumLog, "collect-vacuum-log", conf.GetBoolDefault(stdDef, conf.KeyCollectVacuumLog), "collect vacuum.json files")
 		cmd.Flags().BoolVar(&collectMetaRefresh, "collect-meta-refresh-log", conf.GetBoolDefault(stdDef, conf.KeyCollectMetaRefreshLog), "collect metadata_refresh.log files")
 		cmd.Flags().BoolVar(&collectWLM, "collect-wlm", conf.GetBoolDefault(stdDef, conf.KeyCollectWLM), "collect WLM configuration")
+		cmd.Flags().BoolVar(&collectWLMClusterUsage, "collect-wlm-cluster-usage", conf.GetBoolDefault(stdDef, conf.KeyCollectWLMClusterUsage), "collect WLM cluster usage data (can be slow on large catalogs)")
 		cmd.Flags().StringVar(&systemTables, "system-tables", strings.Join(conf.SystemTableList(), ","), "comma-separated list of system tables to collect")
 		cmd.Flags().IntVar(&queriesPerfNumDays, conf.KeyQueriesPerfNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays), "number of days of queries performance data to collect")
 	}
@@ -1392,6 +1395,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectVacuumLog, "collect-vacuum-log", conf.GetBoolDefault(diagDef, conf.KeyCollectVacuumLog), "collect vacuum.json files")
 		cmd.Flags().BoolVar(&collectMetaRefresh, "collect-meta-refresh-log", conf.GetBoolDefault(diagDef, conf.KeyCollectMetaRefreshLog), "collect metadata_refresh.log files")
 		cmd.Flags().BoolVar(&collectWLM, "collect-wlm", conf.GetBoolDefault(diagDef, conf.KeyCollectWLM), "collect WLM configuration")
+		cmd.Flags().BoolVar(&collectWLMClusterUsage, "collect-wlm-cluster-usage", conf.GetBoolDefault(diagDef, conf.KeyCollectWLMClusterUsage), "collect WLM cluster usage data (can be slow on large catalogs)")
 		cmd.Flags().StringVar(&systemTables, "system-tables", strings.Join(conf.SystemTableList(), ","), "comma-separated list of system tables to collect")
 	}
 
@@ -1611,6 +1615,7 @@ func runStandardConfigScreen(detected *configui.DetectedPaths) error {
 	collectQueriesPerf = cfg.CollectQueriesPerf
 	queriesPerfNumDays = cfg.QueriesPerfDays
 	collectWLM = cfg.CollectWLM
+	collectWLMClusterUsage = cfg.CollectWLMClusterUsage
 	collectContainerLogs = cfg.CollectContainerLogs
 	systemTables = strings.Join(cfg.SystemTables, ",")
 
@@ -1715,6 +1720,7 @@ func runDiagnosisConfigScreen(detected *configui.DetectedPaths) error {
 		cliAuthToken = cfg.PATToken
 	}
 	collectWLM = cfg.CollectWLM
+	collectWLMClusterUsage = cfg.CollectWLMClusterUsage
 	collectKVStoreReport = cfg.CollectKVStore
 	collectProblematicProfiles = cfg.CollectProblematicProfiles
 	collectContainerLogs = cfg.CollectContainerLogs

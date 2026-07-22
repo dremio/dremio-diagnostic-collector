@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -244,14 +245,15 @@ func TestWLMFileLayout(t *testing.T) {
 	}
 
 	args := RocksCollectArgs{
-		Collector:           mc,
-		CopyStrategy:        cs,
-		Host:                "dremio-master-0",
-		NodeType:            "coordinator",
-		RocksDBDir:          "/opt/dremio/data/db",
-		CollectSystemTables: false,
-		CollectWLM:          true,
-		CollectQueriesPerf:  false,
+		Collector:              mc,
+		CopyStrategy:           cs,
+		Host:                   "dremio-master-0",
+		NodeType:               "coordinator",
+		RocksDBDir:             "/opt/dremio/data/db",
+		CollectSystemTables:    false,
+		CollectWLM:             true,
+		CollectWLMClusterUsage: true,
+		CollectQueriesPerf:     false,
 	}
 
 	got, err := RunRocksDBCollection(args)
@@ -301,5 +303,86 @@ func TestWLMFileLayout(t *testing.T) {
 	}
 	if len(leaks) != 0 {
 		t.Errorf("unexpected v4-style filenames present: %v", leaks)
+	}
+}
+
+// TestWLMClusterUsageSkippedByDefault verifies that wlm_cluster_usage is NOT
+// exported unless CollectWLMClusterUsage is set (default false), while the
+// other three WLM types are still collected under CollectWLM.
+func TestWLMClusterUsageSkippedByDefault(t *testing.T) {
+	tmpDir := t.TempDir()
+	cs := &mockCopyStrategy{tmpDir: tmpDir}
+
+	wlmPayloads := map[string]string{
+		"wlm_queues":        `{"queues":[]}`,
+		"wlm_rules":         `{"rules":[]}`,
+		"wlm_engines":       `{"engines":[]}`,
+		"wlm_cluster_usage": `{"cluster_usage":[]}`,
+	}
+
+	var mu sync.Mutex
+	var calls []string
+	mc := &mockStreamCollector{
+		coordinators: []string{"dremio-master-0"},
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			mu.Lock()
+			calls = append(calls, cmd)
+			mu.Unlock()
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64\n", nil
+			case strings.Contains(cmd, "chmod +x"):
+				return "", nil
+			case strings.Contains(cmd, "rm -f"):
+				return "", nil
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			for wt, payload := range wlmPayloads {
+				if strings.Contains(cmd, "-type "+wt) {
+					return payload, nil
+				}
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+		copyToHostFunc: func(_, _, _ string) (string, error) { return "", nil },
+	}
+
+	args := RocksCollectArgs{
+		Collector:           mc,
+		CopyStrategy:        cs,
+		Host:                "dremio-master-0",
+		NodeType:            "coordinator",
+		RocksDBDir:          "/opt/dremio/data/db",
+		CollectSystemTables: false,
+		CollectWLM:          true,
+		// CollectWLMClusterUsage deliberately left false (the default)
+		CollectQueriesPerf: false,
+	}
+
+	got, err := RunRocksDBCollection(args)
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+
+	seen := map[string]bool{}
+	for _, cf := range got {
+		seen[filepath.Base(cf.Path)] = true
+	}
+	for _, want := range []string{"queues.json", "rules.json", "engines.json"} {
+		if !seen[want] {
+			t.Errorf("expected WLM file %s to be collected, but it was not", want)
+		}
+	}
+	if seen["cluster_usage.json"] {
+		t.Error("cluster_usage.json was collected despite CollectWLMClusterUsage=false")
+	}
+	for _, c := range calls {
+		if strings.Contains(c, "-type wlm_cluster_usage") {
+			t.Errorf("rocksdb-viewer was invoked with -type wlm_cluster_usage despite CollectWLMClusterUsage=false: %s", c)
+		}
 	}
 }

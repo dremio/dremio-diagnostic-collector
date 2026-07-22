@@ -264,11 +264,12 @@ All `--diag-*` tools are **opt-in** (default `false`) in both CLI and TUI.
 
 ### Workload, System Tables & API Collection
 
-WLM, system tables, queries-performance data, and cluster stats are read from the coordinator's RocksDB store and need **no** PAT. Only the KV store report and problematic job profiles use the REST API and require a PAT (diagnosis mode only).
+WLM, system tables, queries-performance data, and cluster stats are read from the coordinator's RocksDB store and need **no** PAT. Only the KV store report and problematic job profiles use the REST API and require a PAT (diagnosis mode only). Note: WLM cluster-usage export is opt-in via `--collect-wlm-cluster-usage` because it scans every job profile and can be slow on large catalogs (#338).
 
 | Flag | Default (standard) | Default (diagnosis) | Needs PAT |
 |------|--------------------|--------------------|-----------|
 | `--collect-wlm` | true | true | no |
+| `--collect-wlm-cluster-usage` | false | false | no |
 | `--system-tables` | default list | default list | no |
 | `--collect-kvstore-report` | N/A | false | yes |
 | `--collect-problematic-profiles` | N/A | false | yes |

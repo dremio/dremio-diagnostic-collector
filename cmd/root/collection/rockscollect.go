@@ -126,10 +126,13 @@ type RocksCollectArgs struct {
 	CollectSystemTables bool
 	SystemTables        []string
 	CollectWLM          bool
-	CollectQueriesPerf  bool
-	QueriesPerfDays     int    // standard mode: from --queries-perf-num-days
-	Days                int    // diagnosis mode: from --days
-	StartDate           string // diagnosis mode (date-only, e.g. 2026-04-07)
+	// CollectWLMClusterUsage gates the wlm_cluster_usage export separately —
+	// it scans every profile in the catalog and can take hours on large KV stores (#338).
+	CollectWLMClusterUsage bool
+	CollectQueriesPerf     bool
+	QueriesPerfDays        int    // standard mode: from --queries-perf-num-days
+	Days                   int    // diagnosis mode: from --days
+	StartDate              string // diagnosis mode (date-only, e.g. 2026-04-07)
 }
 
 var wlmTypes = []string{"wlm_queues", "wlm_rules", "wlm_engines", "wlm_cluster_usage"}
@@ -232,6 +235,10 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 	// Collect WLM
 	if args.CollectWLM {
 		for _, wt := range wlmTypes {
+			if wt == "wlm_cluster_usage" && !args.CollectWLMClusterUsage {
+				simplelog.Infof("rocksdb: skipping wlm_cluster_usage on %s (collect-wlm-cluster-usage=false)", host)
+				continue
+			}
 			consoleprint.UpdateNodeState(consoleprint.NodeState{
 				Node:     host,
 				StatusUX: fmt.Sprintf("Collecting WLM: %s", wt),

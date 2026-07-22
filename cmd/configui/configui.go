@@ -82,10 +82,11 @@ type StandardConfig struct {
 	CollectQueriesPerf bool
 	QueriesPerfDays    int
 
-	CollectWLM           bool
-	CollectSystemTables  bool
-	SystemTables         []string
-	CollectContainerLogs bool
+	CollectWLM             bool
+	CollectWLMClusterUsage bool
+	CollectSystemTables    bool
+	SystemTables           []string
+	CollectContainerLogs   bool
 
 	Cancelled        bool
 	ShowCLICmd       bool
@@ -135,6 +136,7 @@ type DiagnosisConfig struct {
 	DremioEndpoint             string
 	PATToken                   string
 	CollectWLM                 bool
+	CollectWLMClusterUsage     bool
 	CollectKVStore             bool
 	CollectProblematicProfiles bool
 	CollectSystemTables        bool
@@ -271,24 +273,25 @@ func RunStandardConfigScreen(detected *DetectedPaths, _ string) (*StandardConfig
 	}
 
 	cfg := &StandardConfig{
-		CoordinatorLogDir:  coordinatorLogDir,
-		ExecutorLogDir:     executorLogDir,
-		DremioConfDir:      confDir,
-		DremioRocksDBDir:   rocksDir,
-		AllowInsecureSSL:   conf.GetBoolDefault(stdDef, conf.KeyAllowInsecureSSL),
-		CollectServerLogs:  conf.GetBoolDefault(stdDef, conf.KeyCollectServerLogs),
-		ServerLogsDays:     conf.GetIntDefault(stdDef, conf.KeyServerLogsNumDays),
-		CollectTrackerJSON: conf.GetBoolDefault(stdDef, conf.KeyCollectTrackerJSON),
-		TrackerJSONDays:    conf.GetIntDefault(stdDef, conf.KeyTrackerJSONNumDays),
-		CollectVacuumLog:   conf.GetBoolDefault(stdDef, conf.KeyCollectVacuumLog),
-		VacuumLogDays:      conf.GetIntDefault(stdDef, conf.KeyVacuumLogNumDays),
-		CollectMetaRefresh: conf.GetBoolDefault(stdDef, conf.KeyCollectMetaRefreshLog),
-		CollectQueriesJSON: conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesJSON),
-		QueriesJSONDays:    conf.GetIntDefault(stdDef, conf.KeyQueriesJSONNumDays),
-		CollectQueriesPerf: conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesPerfJSON),
-		QueriesPerfDays:    conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays),
-		CollectWLM:         conf.GetBoolDefault(stdDef, conf.KeyCollectWLM),
-		Cancelled:          true,
+		CoordinatorLogDir:      coordinatorLogDir,
+		ExecutorLogDir:         executorLogDir,
+		DremioConfDir:          confDir,
+		DremioRocksDBDir:       rocksDir,
+		AllowInsecureSSL:       conf.GetBoolDefault(stdDef, conf.KeyAllowInsecureSSL),
+		CollectServerLogs:      conf.GetBoolDefault(stdDef, conf.KeyCollectServerLogs),
+		ServerLogsDays:         conf.GetIntDefault(stdDef, conf.KeyServerLogsNumDays),
+		CollectTrackerJSON:     conf.GetBoolDefault(stdDef, conf.KeyCollectTrackerJSON),
+		TrackerJSONDays:        conf.GetIntDefault(stdDef, conf.KeyTrackerJSONNumDays),
+		CollectVacuumLog:       conf.GetBoolDefault(stdDef, conf.KeyCollectVacuumLog),
+		VacuumLogDays:          conf.GetIntDefault(stdDef, conf.KeyVacuumLogNumDays),
+		CollectMetaRefresh:     conf.GetBoolDefault(stdDef, conf.KeyCollectMetaRefreshLog),
+		CollectQueriesJSON:     conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesJSON),
+		QueriesJSONDays:        conf.GetIntDefault(stdDef, conf.KeyQueriesJSONNumDays),
+		CollectQueriesPerf:     conf.GetBoolDefault(stdDef, conf.KeyCollectQueriesPerfJSON),
+		QueriesPerfDays:        conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays),
+		CollectWLM:             conf.GetBoolDefault(stdDef, conf.KeyCollectWLM),
+		CollectWLMClusterUsage: conf.GetBoolDefault(stdDef, conf.KeyCollectWLMClusterUsage),
+		Cancelled:              true,
 	}
 	// Set transport info for CLI command generation.
 	if detected != nil {
@@ -333,6 +336,7 @@ func RunStandardConfigScreen(detected *DetectedPaths, _ string) (*StandardConfig
 
 		huh.NewGroup(
 			huh.NewConfirm().Title("Collect WLM configuration").Value(&cfg.CollectWLM).Inline(true),
+			huh.NewConfirm().Title("Collect WLM cluster usage").Value(&cfg.CollectWLMClusterUsage).Inline(true),
 			buildSystemTablesMultiSelect(&cfg.SystemTables),
 		).Title("Additional collections").Description(" "),
 
@@ -432,6 +436,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 		CollectContainerLogs:       true, // K8s diagnosis always collects container logs by default
 		DremioEndpoint:             endpoint,
 		CollectWLM:                 conf.GetBoolDefault(diagDef, conf.KeyCollectWLM),
+		CollectWLMClusterUsage:     conf.GetBoolDefault(diagDef, conf.KeyCollectWLMClusterUsage),
 		CollectKVStore:             conf.GetBoolDefault(diagDef, conf.KeyCollectKVStoreReport),
 		CollectProblematicProfiles: conf.GetBoolDefault(diagDef, conf.KeyCollectProblematicProfiles),
 		CollectSystemTables:        conf.GetBoolDefault(diagDef, conf.KeyCollectSystemTablesExport),
@@ -568,6 +573,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 		// Group 5: Dremio System Tables & WLM (always shown)
 		huh.NewGroup(
 			huh.NewConfirm().Title("Collect WLM configuration").Value(&cfg.CollectWLM).Inline(true),
+			huh.NewConfirm().Title("Collect WLM cluster usage").Value(&cfg.CollectWLMClusterUsage).Inline(true),
 			buildSystemTablesMultiSelect(&cfg.SystemTables),
 		).Title("Dremio System Tables & WLM").Description(" "),
 
@@ -715,7 +721,7 @@ func buildStandardLogGroup(cfg *StandardConfig, queriesDayChoice, queriesPerfDay
 	}
 	fields = append(fields, huh.NewConfirm().Title("Collect metadata refresh log").Value(&cfg.CollectMetaRefresh).Inline(true).Affirmative("Yes").Negative("No"))
 	if cfg.Transport == "k8s" {
-		fields = append(fields, huh.NewConfirm().Title("Collect K8s container logs").Value(&cfg.CollectContainerLogs).Inline(true).Affirmative("Yes").Negative("No"))
+		fields = append(fields, huh.NewConfirm().Title("Collect K8s container logs  ").Value(&cfg.CollectContainerLogs).Inline(true).Affirmative("Yes").Negative("No"))
 	}
 	return huh.NewGroup(fields...).Title("Log collection").Description(" ")
 }
@@ -840,7 +846,7 @@ func buildStandardCLICommand(cfg *StandardConfig, queryDays, queriesPerfDays, se
 
 	// WLM and system tables — always emit --system-tables, even when empty,
 	// so the user's deselection overrides the non-empty package default.
-	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t"+cont, cfg.CollectWLM))
+	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t --collect-wlm-cluster-usage=%t"+cont, cfg.CollectWLM, cfg.CollectWLMClusterUsage))
 	parts = append(parts, fmt.Sprintf("  --system-tables=%s", strings.Join(cfg.SystemTables, ",")))
 
 	return strings.Join(parts, "\n")
@@ -919,7 +925,7 @@ func buildDiagnosisCLICommand(cfg *DiagnosisConfig, tools *[]string, nodes *[]st
 
 	// PAT-dependent collections — always emit --system-tables, even when empty,
 	// so the user's deselection overrides the non-empty package default.
-	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t --collect-kvstore-report=%t --collect-problematic-profiles=%t"+cont, cfg.CollectWLM, cfg.CollectKVStore, cfg.CollectProblematicProfiles))
+	parts = append(parts, fmt.Sprintf("  --collect-wlm=%t --collect-wlm-cluster-usage=%t --collect-kvstore-report=%t --collect-problematic-profiles=%t"+cont, cfg.CollectWLM, cfg.CollectWLMClusterUsage, cfg.CollectKVStore, cfg.CollectProblematicProfiles))
 	parts = append(parts, fmt.Sprintf("  --system-tables=%s"+cont, strings.Join(cfg.SystemTables, ",")))
 
 	// Endpoint and PAT

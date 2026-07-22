@@ -980,18 +980,19 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 			}
 			if rocksDBDir != "" {
 				rocksArgs := RocksCollectArgs{
-					Collector:           c,
-					CopyStrategy:        s,
-					Host:                host,
-					NodeType:            nodeType,
-					RocksDBDir:          rocksDBDir,
-					CollectSystemTables: collectionArgs.CollectSystemTables,
-					SystemTables:        collectionArgs.SystemTables,
-					CollectWLM:          collectionArgs.CollectWLM,
-					CollectQueriesPerf:  collectionArgs.CollectQueriesPerf,
-					QueriesPerfDays:     collectionArgs.QueriesPerfNumDays,
-					Days:                collectionArgs.DiagLogDays,
-					StartDate:           collectionArgs.StartDate,
+					Collector:              c,
+					CopyStrategy:           s,
+					Host:                   host,
+					NodeType:               nodeType,
+					RocksDBDir:             rocksDBDir,
+					CollectSystemTables:    collectionArgs.CollectSystemTables,
+					SystemTables:           collectionArgs.SystemTables,
+					CollectWLM:             collectionArgs.CollectWLM,
+					CollectWLMClusterUsage: collectionArgs.CollectWLMClusterUsage,
+					CollectQueriesPerf:     collectionArgs.CollectQueriesPerf,
+					QueriesPerfDays:        collectionArgs.QueriesPerfNumDays,
+					Days:                   collectionArgs.DiagLogDays,
+					StartDate:              collectionArgs.StartDate,
 				}
 				if rocksFiles, err := RunRocksDBCollection(rocksArgs); err != nil {
 					simplelog.Errorf("RocksDB collection failed on %s: %v", host, err)

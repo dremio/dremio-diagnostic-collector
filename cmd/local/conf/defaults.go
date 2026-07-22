@@ -64,6 +64,8 @@ func DiagnosisCollectionProfile(confData map[string]interface{}, hostName string
 	setDefault(confData, KeySysTables, SystemTableList())
 	setDefault(confData, KeyCollectKVStoreReport, false)
 	setDefault(confData, KeyCollectWLM, true)
+	// wlm_cluster_usage is expensive on large catalogs (#338) — opt-in only
+	setDefault(confData, KeyCollectWLMClusterUsage, false)
 	setDefault(confData, KeyCollectProblematicProfiles, false)
 
 	// JVM diagnostic tools — all opt-in; user enables via TUI checkboxes or CLI flags
@@ -143,8 +145,10 @@ func StandardCollectionProfile(confData map[string]interface{}, hostName string,
 	// No job profile collection in standard mode
 	setDefault(confData, KeyNumberJobProfiles, 0)
 
-	// WLM enabled in standard mode (collected via dremio-rocksdb-viewer)
+	// WLM enabled in standard mode (collected via dremio-rocksdb-viewer);
+	// wlm_cluster_usage is expensive on large catalogs (#338) — opt-in only
 	setDefault(confData, KeyCollectWLM, true)
+	setDefault(confData, KeyCollectWLMClusterUsage, false)
 
 	// Transfer rate limiting
 	setDefault(confData, KeyDiskBandwidthLimitPct, 20)
