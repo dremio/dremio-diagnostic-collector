@@ -1,5 +1,26 @@
 # Changelog
 
+## [4.0.5] - 2026-07-23
+
+- `server.out` is now collected as part of server logs (#337). It follows the existing server-log rules, is exempt from the date-range filter (its mtime reflects the last restart, not content age), and is also discovered from `DREMIO_LOG_DIR` when that differs from the resolved log directory. TUI label renamed to "Server logs & out".
+- `wlm_cluster_usage` collection is now disabled by default in both modes (#338). It scans every profile in the RocksDB catalog and can dominate collection time on large KV stores. Enable it with the new `--collect-wlm-cluster-usage` flag (also a TUI toggle); the cheap WLM exports (queues, rules, engines) remain on by default under `--collect-wlm`.
+- Re-vendored dremio-rocksdb-viewer binaries with #338 performance fixes: `wlm_cluster_usage` uses a single-pass extractor (78.9s → ~46s on a 430k-profile catalog), and `queries_perf` with a date range skips out-of-range records before the full parse (up to 7x faster depending on window size). Output is byte-identical to the previous binaries.
+
+## [4.0.4] - 2026-07-06
+
+- Updated dremio-rocksdb-viewer binaries with queries-perf metric extraction fixes, validated against Dremio 24.3/25.0/26.1 catalogs. **Value changes in `queries-perf.*.json` — downstream dashboards and thresholds need re-baselining:**
+  - ~82 previously always-zero operator-metric columns now populate (I/O read/cache, network volume, spill, OOB, pruning, join detail, expressions, small-files).
+  - ~20 duration columns were 1,000,000x too small and are now correct (`cpu_sleeping_*`, `cpu_run_duration_*`, `cpu_efficiency_ratio`, `mem_blocked_*`, `net_blocked_*`, `blocked_*`, `setup_duration_sum_ms`, `setup_finish_duration_sum_ms`). Historical exports of these columns are invalid; do not trend old vs new values.
+  - `query_output_records`/`query_output_bytes` now report the root (SCREEN) operator instead of a possibly intermediate one; `io_read_time_avg_ms` is now a read-count-weighted average; `io_total_bytes_read`/`io_local_bytes_read` now populate on Dremio 26.1+.
+  - New `query_attempt` column: reattempted queries emit one row per attempt — aggregate by query_id prefix or filter on the final attempt to avoid double-counting.
+  - Other fixes: corrupt/partial records no longer abort the export; `sys.roles` role_type, `sys.privileges` unknown bits, `sys.reflection_dependencies` phantom rows, `sys.refreshes` partitions, and `wlm_engines` auto-start/stop and stateChangeTime fields corrected.
+
+## [4.0.3] - 2026-07-06
+
+- Rebuilt dremio-rocksdb-viewer binaries with a metrics-map extraction fix: ~82 ordinal-keyed performance metric columns in queries-perf (I/O, network, spill, join, pruning) were always zero because the per-operator metric-name map was never decoded.
+- Fixed the release pipeline's GitHub App authentication: the installation token is now minted right before `gh release create` (the ~60-minute build outlived the 1-hour token TTL), with a fail-fast credential preflight before the build.
+- README restructured: standard (safe, passive) mode now precedes diagnosis everywhere, with a prominent warning not to use diagnosis unless Dremio Support asks.
+
 ## [4.0.2] - 2026-06-25
 
 - Log directory is now autodetected from the running Dremio process (`-Ddremio.log.path`, then `DREMIO_LOG_DIR`) in CLI mode as well as the TUI, before falling back to probing. Fixes server logs and `queries.json` being missed when Dremio logs to a non-default path.
