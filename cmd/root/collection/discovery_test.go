@@ -1082,13 +1082,11 @@ func TestExtractEnvValue(t *testing.T) {
 func TestResolveLogDir(t *testing.T) {
 	const psBlob = "java -Ddremio.log.path=/opt/dremio/data/log DREMIO_LOG_DIR=/opt/dremio/log"
 
-	// Helper to build a responder: ps eww returns psBlob; dir checks per map.
+	// Helper to build a responder: dir existence/content checks per map.
 	build := func(nonEmpty map[string]bool) HostExecutor {
 		return func(_ string, args ...string) (string, error) {
 			joined := strings.Join(args, " ")
 			switch {
-			case strings.HasPrefix(joined, "ps eww"):
-				return psBlob, nil
 			case strings.HasPrefix(joined, "test -d"):
 				dir := args[2]
 				if nonEmpty[dir] {
@@ -1106,39 +1104,37 @@ func TestResolveLogDir(t *testing.T) {
 		}
 	}
 
-	// Explicit flag wins outright — ps must not even be consulted.
+	// Explicit flag wins outright — no host commands at all.
 	called := false
-	exec1 := func(_ string, args ...string) (string, error) {
-		if strings.HasPrefix(strings.Join(args, " "), "ps eww") {
-			called = true
-		}
+	exec1 := func(_ string, _ ...string) (string, error) {
+		called = true
 		return "", nil
 	}
-	if got := resolveLogDir(exec1, "h", "/explicit/path", 123); got != "/explicit/path" {
+	if got := resolveLogDir(exec1, "h", "/explicit/path", psBlob); got != "/explicit/path" {
 		t.Errorf("explicit: want /explicit/path, got %q", got)
 	}
 	if called {
-		t.Errorf("explicit flag must skip process inspection")
+		t.Errorf("explicit flag must not touch the host")
 	}
 
 	// -Ddremio.log.path used when its dir has files.
-	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/data/log": true}), "h", "", 123); got != "/opt/dremio/data/log" {
+	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/data/log": true}), "h", "", psBlob); got != "/opt/dremio/data/log" {
 		t.Errorf("logpath: want /opt/dremio/data/log, got %q", got)
 	}
 
 	// Detected dir empty -> fall through to DREMIO_LOG_DIR (which has files).
-	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/log": true}), "h", "", 123); got != "/opt/dremio/log" {
+	if got := resolveLogDir(build(map[string]bool{"/opt/dremio/log": true}), "h", "", psBlob); got != "/opt/dremio/log" {
 		t.Errorf("fallthrough to DREMIO_LOG_DIR: want /opt/dremio/log, got %q", got)
 	}
 
 	// Nothing detected, nothing on disk -> probe returns "".
-	if got := resolveLogDir(build(map[string]bool{}), "h", "", 123); got != "" {
+	if got := resolveLogDir(build(map[string]bool{}), "h", "", psBlob); got != "" {
 		t.Errorf("none: want empty, got %q", got)
 	}
 
-	// PID 0 -> skip process inspection; probe candidate that has files.
-	if got := resolveLogDir(build(map[string]bool{"/var/log/dremio": true}), "h", "", 0); got != "/var/log/dremio" {
-		t.Errorf("pid0 probe: want /var/log/dremio, got %q", got)
+	// Empty procInfo (PID unknown upstream) -> straight to probe.
+	if got := resolveLogDir(build(map[string]bool{"/var/log/dremio": true}), "h", "", ""); got != "/var/log/dremio" {
+		t.Errorf("empty procInfo probe: want /var/log/dremio, got %q", got)
 	}
 }
 
@@ -1214,6 +1210,146 @@ func TestReadProcessInfo(t *testing.T) {
 			t.Errorf("fallback-content: want DREMIO_LOG_DIR=/y in result, got %q", got)
 		}
 	})
+}
+
+// TestRunDiscovery_SecondaryLogDir covers the split-dir cluster case:
+// server.log follows -Ddremio.log.path while server.out and GC logs follow
+// DREMIO_LOG_DIR. When the two differ, discovery must pick up server.out and
+// GC logs (and nothing else) from the DREMIO_LOG_DIR directory.
+func TestRunDiscovery_SecondaryLogDir(t *testing.T) {
+	responses := map[string]struct {
+		out string
+		err error
+	}{
+		// PID cascade → PID 42.
+		"jcmd -l":               {out: "", err: fmt.Errorf("not found")},
+		"pgrep -x java":         {out: "", err: fmt.Errorf("exit status 1")},
+		"pgrep -f dremio.*java": {out: "42\n", err: nil},
+		// Process info: log.path and DREMIO_LOG_DIR diverge.
+		"ps eww 42": {out: "java -Ddremio.log.path=/opt/dremio/data/log DREMIO_LOG_DIR=/opt/dremio/log", err: nil},
+		// Primary dir (from -Ddremio.log.path) exists with files.
+		"test -d /opt/dremio/data/log": {out: "exists", err: nil},
+		"find -L /opt/dremio/data/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/data/log/server.log\n", err: nil},
+		"find -L /opt/dremio/data/log -maxdepth 2 -type f -exec stat": {
+			out: "1711929600 1000 /opt/dremio/data/log/server.log\n",
+			err: nil,
+		},
+		// Secondary dir (DREMIO_LOG_DIR) exists with a mix of files.
+		"test -d /opt/dremio/log": {out: "exists", err: nil},
+		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
+		"find -L /opt/dremio/log -maxdepth 1 -type f -exec stat": {
+			out: "1711929600 2000 /opt/dremio/log/server.out\n" +
+				"1711929600 3000 /opt/dremio/log/gc.log.0\n" +
+				"1711929600 4000 /opt/dremio/log/access.log\n" +
+				"1711929600 5000 /opt/dremio/log/hs_err_pid42.log\n",
+			err: nil,
+		},
+		// Conf dir not found.
+		"test -d /opt/dremio/conf": {out: "", err: fmt.Errorf("not found")},
+		"test -d /etc/dremio":      {out: "", err: fmt.Errorf("not found")},
+	}
+
+	info, err := RunDiscovery(mockExecutor(responses), "node1", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.LogDir != "/opt/dremio/data/log" {
+		t.Errorf("LogDir = %q, want /opt/dremio/data/log", info.LogDir)
+	}
+
+	typeByPath := make(map[string]string)
+	for _, f := range info.Files {
+		typeByPath[f.Path] = f.FileType
+	}
+	if ft := typeByPath["/opt/dremio/data/log/server.log"]; ft != "log" {
+		t.Errorf("server.log FileType = %q, want log", ft)
+	}
+	if ft := typeByPath["/opt/dremio/log/server.out"]; ft != "log" {
+		t.Errorf("server.out FileType = %q, want log", ft)
+	}
+	if ft := typeByPath["/opt/dremio/log/gc.log.0"]; ft != "gc-log" {
+		t.Errorf("gc.log.0 FileType = %q, want gc-log", ft)
+	}
+	// access.log and hs_err live outside the launcher's writes — the secondary
+	// pass must NOT vacuum them up from DREMIO_LOG_DIR.
+	if _, ok := typeByPath["/opt/dremio/log/access.log"]; ok {
+		t.Error("access.log from secondary dir must not be collected")
+	}
+	if _, ok := typeByPath["/opt/dremio/log/hs_err_pid42.log"]; ok {
+		t.Error("hs_err from secondary dir must not be collected")
+	}
+	if len(info.Files) != 3 {
+		t.Errorf("len(Files) = %d, want 3; files: %+v", len(info.Files), info.Files)
+	}
+}
+
+// TestRunDiscovery_SecondaryLogDir_SameDir: when DREMIO_LOG_DIR equals the
+// resolved log dir, no secondary listing runs.
+func TestRunDiscovery_SecondaryLogDir_SameDir(t *testing.T) {
+	responses := map[string]struct {
+		out string
+		err error
+	}{
+		"jcmd -l":               {out: "", err: fmt.Errorf("not found")},
+		"pgrep -x java":         {out: "", err: fmt.Errorf("exit status 1")},
+		"pgrep -f dremio.*java": {out: "42\n", err: nil},
+		"ps eww 42":             {out: "java -Ddremio.log.path=/opt/dremio/log DREMIO_LOG_DIR=/opt/dremio/log", err: nil},
+		"test -d /opt/dremio/log": {out: "exists", err: nil},
+		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
+		"find -L /opt/dremio/log -maxdepth 2 -type f -exec stat": {
+			out: "1711929600 1000 /opt/dremio/log/server.log\n" +
+				"1711929600 2000 /opt/dremio/log/server.out\n",
+			err: nil,
+		},
+		"test -d /opt/dremio/conf": {out: "", err: fmt.Errorf("not found")},
+		"test -d /etc/dremio":      {out: "", err: fmt.Errorf("not found")},
+	}
+
+	// Wrap the mock to record any secondary (maxdepth 1 stat) listing.
+	var secondaryListings int
+	inner := mockExecutor(responses)
+	recorder := func(host string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-maxdepth 1 -type f -exec stat") {
+			secondaryListings++
+		}
+		return inner(host, args...)
+	}
+
+	info, err := RunDiscovery(recorder, "node1", "", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if secondaryListings != 0 {
+		t.Errorf("secondary listing ran %d times, want 0 (dirs are identical)", secondaryListings)
+	}
+	if len(info.Files) != 2 {
+		t.Errorf("len(Files) = %d, want 2; files: %+v", len(info.Files), info.Files)
+	}
+}
+
+// TestDiscoverSecondaryLogFiles_Dedup: paths already discovered (e.g. via a
+// nested primary listing) are not returned twice.
+func TestDiscoverSecondaryLogFiles_Dedup(t *testing.T) {
+	responses := map[string]struct {
+		out string
+		err error
+	}{
+		"test -d /opt/dremio/log": {out: "exists", err: nil},
+		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
+		"find -L /opt/dremio/log -maxdepth 1 -type f -exec stat": {
+			out: "1711929600 2000 /opt/dremio/log/server.out\n" +
+				"1711929600 3000 /opt/dremio/log/gc.log.0\n",
+			err: nil,
+		},
+	}
+	existing := []RemoteFileInfo{{Path: "/opt/dremio/log/server.out", Size: 2000, FileType: "log"}}
+	got := discoverSecondaryLogFiles(mockExecutor(responses), "node1", "/opt/dremio/log", existing)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 file after dedup, got %d: %v", len(got), filePaths(got))
+	}
+	if got[0].Path != "/opt/dremio/log/gc.log.0" || got[0].FileType != "gc-log" {
+		t.Errorf("got %+v, want gc.log.0 classified as gc-log", got[0])
+	}
 }
 
 // filePaths is a test helper that extracts paths from a slice of RemoteFileInfo.

@@ -436,7 +436,6 @@ var alwaysExcludedPrefixes = []string{
 	"admin_backup",
 	"audit.",
 	"server.json",
-	"server.out",
 }
 
 // alwaysExcludedSuffixes are file extensions that hold secrets (keystores,
@@ -512,6 +511,12 @@ func isLogTypeEnabled(baseName string, args Args) bool {
 }
 
 func logDayLimit(base string, args Args) int {
+	// server.out is one small file whose mtime reflects the last restart; its
+	// startup/ulimit content is valuable regardless of age, so it is never
+	// date-filtered in any mode.
+	if strings.HasPrefix(base, "server.out") {
+		return -1
+	}
 	// Diagnosis mode: all log types use the unified day limit.
 	if args.CollectionMode == collects.DiagnosisCollection && args.DiagLogDays > 0 {
 		return args.DiagLogDays

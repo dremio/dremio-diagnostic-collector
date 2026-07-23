@@ -92,8 +92,12 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		}
 	}
 
-	// 2. Find the log directory: explicit flag > -Ddremio.log.path > DREMIO_LOG_DIR > probe.
-	info.LogDir = resolveLogDir(executor, host, logDir, info.DremioPID)
+	// 2. Read process info once — feeds log-dir resolution and the secondary
+	// DREMIO_LOG_DIR pass below.
+	procInfo := readProcessInfo(executor, host, info.DremioPID)
+
+	// 3. Find the log directory: explicit flag > -Ddremio.log.path > DREMIO_LOG_DIR > probe.
+	info.LogDir = resolveLogDir(executor, host, logDir, procInfo)
 	if info.LogDir != "" {
 		anySuccess = true
 		files, err := listFiles(executor, host, info.LogDir, "log", "2")
@@ -102,22 +106,19 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		} else {
 			// Reclassify well-known log files into specific types so they
 			// are routed to the correct output directories.
-			for i := range files {
-				base := baseName(files[i].Path)
-				switch {
-				case strings.HasPrefix(base, "gc") && strings.Contains(base, ".log"):
-					files[i].FileType = "gc-log"
-				case strings.Contains(base, ".gc") || strings.HasSuffix(base, ".gc"):
-					files[i].FileType = "gc-log"
-				case strings.HasPrefix(base, "queries."):
-					files[i].FileType = "queries"
-				}
-			}
+			reclassifyLogFiles(files)
 			info.Files = append(info.Files, files...)
 		}
 	}
 
-	// 3. Find the config directory — user-provided path overrides probing.
+	// server.out and GC logs follow DREMIO_LOG_DIR (bin/dremio redirects
+	// stdout there), while server.log/queries.json follow -Ddremio.log.path.
+	// When the two differ, pick up the launcher-written files as well.
+	if secondaryDir := ExtractEnvValue(procInfo, "DREMIO_LOG_DIR="); secondaryDir != "" && secondaryDir != info.LogDir {
+		info.Files = append(info.Files, discoverSecondaryLogFiles(executor, host, secondaryDir, info.Files)...)
+	}
+
+	// 4. Find the config directory — user-provided path overrides probing.
 	if confDir != "" {
 		info.ConfDir = confDir
 	} else {
@@ -133,12 +134,12 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		}
 	}
 
-	// 4. Detect RocksDB path from dremio.conf (paths.local + /db).
+	// 5. Detect RocksDB path from dremio.conf (paths.local + /db).
 	if info.ConfDir != "" {
 		info.RocksDBDir = detectRocksDBDir(executor, host, info.ConfDir)
 	}
 
-	// 5. Probe for a checksum tool (sha256sum preferred, md5sum fallback).
+	// 6. Probe for a checksum tool (sha256sum preferred, md5sum fallback).
 	info.ChecksumTool = probeChecksumTool(executor, host)
 	if info.ChecksumTool != "" {
 		simplelog.Infof("RunDiscovery: checksum tool on %v: %v", host, info.ChecksumTool)
@@ -146,7 +147,7 @@ func RunDiscovery(executor HostExecutor, host, logDir, confDir string) (*RemoteN
 		simplelog.Infof("RunDiscovery: no checksum tool found on %v", host)
 	}
 
-	// 6. Probe for gzip availability (used for compressed streaming).
+	// 7. Probe for gzip availability (used for compressed streaming).
 	info.GzipAvailable = probeGzip(executor, host)
 	if info.GzipAvailable {
 		simplelog.Infof("RunDiscovery: gzip available on %v", host)
@@ -416,6 +417,59 @@ func discoverPID(executor HostExecutor, host string) (int, error) {
 	return 0, nil
 }
 
+// reclassifyLogFiles rewrites the FileType of well-known log files so they
+// are routed to the correct output directories.
+func reclassifyLogFiles(files []RemoteFileInfo) {
+	for i := range files {
+		base := baseName(files[i].Path)
+		switch {
+		case strings.HasPrefix(base, "gc") && strings.Contains(base, ".log"):
+			files[i].FileType = "gc-log"
+		case strings.Contains(base, ".gc") || strings.HasSuffix(base, ".gc"):
+			files[i].FileType = "gc-log"
+		case strings.HasPrefix(base, "queries."):
+			files[i].FileType = "queries"
+		}
+	}
+}
+
+// discoverSecondaryLogFiles lists a DREMIO_LOG_DIR that differs from the
+// resolved log dir and returns only the files the Dremio launcher writes
+// there: server.out* (stdout redirect, bin/dremio) and GC logs. Everything
+// else in that directory is ignored, and already-discovered paths are
+// skipped. Failures are advisory — discovery continues without the dir.
+func discoverSecondaryLogFiles(executor HostExecutor, host, dir string, existing []RemoteFileInfo) []RemoteFileInfo {
+	if !dirHasFiles(executor, host, dir) {
+		return nil
+	}
+	files, err := listFiles(executor, host, dir, "log", "1")
+	if err != nil {
+		simplelog.Warningf("discoverSecondaryLogFiles: failed to list %v on %v: %v", dir, host, err)
+		return nil
+	}
+	reclassifyLogFiles(files)
+
+	seen := make(map[string]bool, len(existing))
+	for _, f := range existing {
+		seen[f.Path] = true
+	}
+	var result []RemoteFileInfo
+	for _, f := range files {
+		base := baseName(f.Path)
+		if !strings.HasPrefix(base, "server.out") && f.FileType != "gc-log" {
+			continue
+		}
+		if seen[f.Path] {
+			continue
+		}
+		result = append(result, f)
+	}
+	if len(result) > 0 {
+		simplelog.Infof("discoverSecondaryLogFiles: %d file(s) from DREMIO_LOG_DIR %v on %v", len(result), dir, host)
+	}
+	return result
+}
+
 // filterFiles applies fileType-specific filters to a list of RemoteFileInfo.
 // For "config" files, only allowlisted base names are kept and paths with
 // double-dot components (e.g. ..data/) are excluded.
@@ -530,14 +584,17 @@ func readProcessInfo(executor HostExecutor, host string, pid int) string {
 
 // resolveLogDir determines the Dremio log directory using, in order:
 //  1. an explicit operator path (logDir), used as-is;
-//  2. -Ddremio.log.path= from the process, if that dir has files;
-//  3. DREMIO_LOG_DIR= from the process env, if that dir has files;
+//  2. -Ddremio.log.path= from procInfo, if that dir has files;
+//  3. DREMIO_LOG_DIR= from procInfo, if that dir has files;
 //  4. probing the well-known candidate directories.
-func resolveLogDir(executor HostExecutor, host, logDir string, pid int) string {
+//
+// procInfo is the process cmdline+env blob from readProcessInfo ("" when the
+// Dremio PID is unknown).
+func resolveLogDir(executor HostExecutor, host, logDir, procInfo string) string {
 	if logDir != "" {
 		return logDir
 	}
-	if procInfo := readProcessInfo(executor, host, pid); procInfo != "" {
+	if procInfo != "" {
 		if d := ExtractEnvValue(procInfo, "-Ddremio.log.path="); d != "" && dirHasFiles(executor, host, d) {
 			simplelog.Infof("resolveLogDir: using -Ddremio.log.path=%v on %v", d, host)
 			return d

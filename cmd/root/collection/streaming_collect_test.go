@@ -588,10 +588,11 @@ func TestIsAlwaysExcluded(t *testing.T) {
 		{"admin backup", "admin_backup-2024-01-01.tar", true},
 		{"audit log", "audit.log", true},
 		{"server.json", "server.json", true},
-		{"server.out", "server.out", true},
 		// Should NOT be blocked.
 		{"dremio.conf", "dremio.conf", false},
 		{"dremio-env", "dremio-env", false},
+		{"server.out", "server.out", false},
+		{"rotated server.out", "server.out.1", false},
 		{"server.log", "server.log", false},
 		{"queries.json", "queries.json", false},
 		{"logback.xml", "logback.xml", false},
@@ -606,6 +607,46 @@ func TestIsAlwaysExcluded(t *testing.T) {
 				t.Errorf("isAlwaysExcluded(%q) = %v, want %v", tt.baseName, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestLogDayLimit_ServerOut verifies server.out is never date-filtered:
+// its mtime reflects the last restart, and its startup/ulimit content is
+// valuable regardless of age.
+func TestLogDayLimit_ServerOut(t *testing.T) {
+	standard := Args{CollectionMode: collects.StandardCollection, ServerLogsNumDays: 3}
+	if got := logDayLimit("server.out", standard); got != -1 {
+		t.Errorf("standard server.out = %d, want -1", got)
+	}
+	if got := logDayLimit("server.out.1", standard); got != -1 {
+		t.Errorf("standard server.out.1 = %d, want -1", got)
+	}
+	// server.log must keep its per-log day count.
+	if got := logDayLimit("server.log", standard); got != 3 {
+		t.Errorf("standard server.log = %d, want 3", got)
+	}
+
+	diagnosis := Args{CollectionMode: collects.DiagnosisCollection, DiagLogDays: 3}
+	if got := logDayLimit("server.out", diagnosis); got != -1 {
+		t.Errorf("diagnosis server.out = %d, want -1", got)
+	}
+	// Other logs must keep the unified diagnosis day limit.
+	if got := logDayLimit("server.log", diagnosis); got != 3 {
+		t.Errorf("diagnosis server.log = %d, want 3", got)
+	}
+}
+
+// TestServerOut_StandardAllowlistAndGating verifies server.out inherits the
+// existing "server." prefix rules once un-blocked.
+func TestServerOut_StandardAllowlistAndGating(t *testing.T) {
+	if !isLogAllowedInStandardMode("server.out") {
+		t.Error("server.out should be allowed in standard mode")
+	}
+	if !isLogTypeEnabled("server.out", Args{CollectServerLogs: true}) {
+		t.Error("server.out should be collected when CollectServerLogs is true")
+	}
+	if isLogTypeEnabled("server.out", Args{CollectServerLogs: false}) {
+		t.Error("server.out should be skipped when CollectServerLogs is false")
 	}
 }
 

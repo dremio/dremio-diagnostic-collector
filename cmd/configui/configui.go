@@ -503,7 +503,7 @@ func RunDiagnosisConfigScreen(detected *DetectedPaths, version string, discovere
 	logsAndDataOptions := []huh.Option[string]{
 		huh.NewOption("queries.json", "queries").Selected(cfg.CollectQueriesJSON),
 		huh.NewOption("Queries Performance Data", "queries-perf").Selected(cfg.CollectQueriesPerf),
-		huh.NewOption("Server logs", "server").Selected(cfg.CollectServerLogs),
+		huh.NewOption("Server logs & out", "server").Selected(cfg.CollectServerLogs),
 		huh.NewOption("GC logs", "gc").Selected(cfg.CollectGCLogs),
 		huh.NewOption("hs_err crash dumps", "hserr").Selected(cfg.CollectHSErr),
 	}
@@ -691,7 +691,7 @@ func buildStandardLogGroup(cfg *StandardConfig, queriesDayChoice, queriesPerfDay
 				huh.NewOption("Collect (1 day)", 1).Selected(*queriesPerfDayChoice == 1),
 				huh.NewOption("Skip", 0).Selected(*queriesPerfDayChoice == 0),
 			).Value(queriesPerfDayChoice),
-		huh.NewSelect[int]().Title("Server logs").Height(4).
+		huh.NewSelect[int]().Title("Server logs & out").Height(4).
 			Options(
 				huh.NewOption("Collect (30 days)", 30).Selected(*serverDayChoice == 30),
 				huh.NewOption("Collect (14 days)", 14).Selected(*serverDayChoice == 14),
