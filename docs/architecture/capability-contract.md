@@ -30,7 +30,7 @@ For architectural decisions behind these capabilities, see [decisions.md](decisi
 | R073 | core | Falls back to uncompressed `cat` when gzip unavailable | Not all nodes have gzip; fallback must work seamlessly |
 | R074 | quality | Progress UI shows uncompressed file size and decompressed bytes percentage | Users expect actual file size, not compressed transfer size |
 | R075 | core | Hash computed in background goroutine after streaming (not inline via io.MultiWriter) | Background hashing unblocks the streaming pipeline for the next file |
-| R076 | core | NewSPDYExecutor replaced with NewFallbackExecutor(WebSocket, SPDY, shouldFallback) | WebSocket is modern K8s exec transport (GA since 1.29); SPDY is deprecated |
+| R076 | core | ~~NewSPDYExecutor replaced with NewFallbackExecutor(WebSocket, SPDY, shouldFallback)~~ Superseded: SPDY-only; streaming execs are keepalive-free (D077) | WebSocket fallback was removed during v4 development; see D077 for the streaming executor |
 
 ## CLI Flags and Structure
 

@@ -20,6 +20,7 @@ import (
 	"crypto/md5" // #nosec G501 -- MD5 used as checksum fallback, not for security
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -45,6 +46,23 @@ import (
 
 // maxRetries is the number of retry attempts for transient streaming errors.
 const maxRetries = 3
+
+// streamBackoffSleep waits between stream retries; tests replace it to stay fast.
+var streamBackoffSleep = time.Sleep
+
+// ErrStreamTruncated means a stream that reported success delivered fewer bytes
+// than the remote file holds (#339).
+var ErrStreamTruncated = errors.New("stream truncated")
+
+// fileRotatedError reports a short stream of a file that was rotated (shrank)
+// since discovery; the retry must expect Size bytes, not the stale discovery size.
+type fileRotatedError struct {
+	Size int64
+	err  error
+}
+
+func (e *fileRotatedError) Error() string { return e.err.Error() }
+func (e *fileRotatedError) Unwrap() error { return e.err }
 
 // Buffer and threshold constants for the streaming pipeline.
 const (
@@ -123,6 +141,9 @@ func isTransientError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, ErrStreamTruncated) {
+		return true
+	}
 	msg := strings.ToLower(err.Error())
 	// Permanent errors — skip immediately.
 	permanentPatterns := []string{
@@ -190,6 +211,12 @@ func streamFile(c Collector, host, remotePath, destPath string, retries int, exp
 		}
 		lastErr = err
 
+		// A rotated file only grows from its fresh size: expect that next time.
+		var rot *fileRotatedError
+		if errors.As(err, &rot) {
+			expectedSize = rot.Size
+		}
+
 		if !isTransientError(err) {
 			return 0, nil, fmt.Errorf("permanent error streaming %v:%v: %w", host, remotePath, err)
 		}
@@ -203,7 +230,7 @@ func streamFile(c Collector, host, remotePath, destPath string, retries int, exp
 		if backoff > 2*time.Second {
 			backoff = 2 * time.Second
 		}
-		time.Sleep(backoff)
+		streamBackoffSleep(backoff)
 	}
 	return 0, nil, fmt.Errorf("exhausted %d retries streaming %v:%v: %w", retries, host, remotePath, lastErr)
 }
@@ -293,9 +320,32 @@ func streamFileOnce(c Collector, host, remotePath, destPath string, expectedSize
 		return 0, nil, fmt.Errorf("close failed for %v: %w", destPath, closeErr)
 	}
 
+	if err := checkStreamComplete(c, host, remotePath, pw.n, expectedSize); err != nil {
+		_ = os.Remove(destPath)
+		return 0, nil, err
+	}
+
 	// Kick off background hash of the written file.
 	hashCh := hashFileInBackground(destPath, checksumTool)
 	return pw.n, hashCh, nil
+}
+
+// checkStreamComplete verifies that a stream reported as successful delivered
+// the whole remote file. Active files may have grown (got > expected); a file
+// rotated between discovery and streaming may have shrunk, which a fresh stat
+// confirms. Anything else — including a failed probe — is a truncated transfer.
+func checkStreamComplete(c Collector, host, remotePath string, got, expected int64) error {
+	if expected <= 0 || got >= expected {
+		return nil
+	}
+	if cur, ok := probeRemoteFileSizeOK(c, host, remotePath); ok && cur < expected {
+		if got >= cur {
+			simplelog.Infof("stream: %v:%v shrank %d→%d (rotated), accepted", host, remotePath, expected, cur)
+			return nil
+		}
+		return &fileRotatedError{Size: cur, err: fmt.Errorf("%w for %v:%v: got %d of %d bytes (file rotated to %d bytes)", ErrStreamTruncated, host, remotePath, got, expected, cur)}
+	}
+	return fmt.Errorf("%w for %v:%v: got %d of %d bytes", ErrStreamTruncated, host, remotePath, got, expected)
 }
 
 // progressWriter wraps an io.Writer, counts bytes written, and reports
@@ -691,6 +741,27 @@ func streamNodeFiles(c Collector, host string, info *RemoteNodeInfo, cs CopyStra
 	return collected, skipped
 }
 
+// nodeDoneStatus renders a node's completion line: collected files, skipped
+// files (base names) and incomplete collections.
+func nodeDoneStatus(collected int, bytes int64, skipped []string, incomplete []*IncompleteCollectionError) string {
+	s := fmt.Sprintf("Done: %d files (%s), %d skipped", collected, humanizeBytes(bytes), len(skipped))
+	if len(skipped) > 0 {
+		names := make([]string, len(skipped))
+		for i, p := range skipped {
+			names[i] = filepath.Base(p)
+		}
+		s += fmt.Sprintf(" (%s)", strings.Join(names, ", "))
+	}
+	if len(incomplete) > 0 {
+		parts := make([]string, len(incomplete))
+		for i, inc := range incomplete {
+			parts[i] = fmt.Sprintf("%s (%d records)", inc.Item, inc.Records)
+		}
+		s += ", INCOMPLETE: " + strings.Join(parts, ", ")
+	}
+	return s
+}
+
 // ExecuteStreamingCollect implements streaming collection: discover files on
 // each remote node, stream them individually via cat, and archive the result.
 // No binary deployment to remote nodes is required.
@@ -774,6 +845,8 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 	var collectedFiles []helpers.CollectedFile
 	var totalFailedNodes []string
 	var totalSkippedFiles []string
+	var totalSkippedLog []string                       // host:path, for the ddc.log summary only
+	var totalIncomplete []string                       // "<host>: <item> incomplete after N records (...)"
 	pidByHost := make(map[string]int)                  // DremioPID per host, populated during discovery
 	nodeTypeByHost := make(map[string]string)          // "coordinator" or "executor" per host
 	nodeInfoByHost := make(map[string]*RemoteNodeInfo) // discovery results per host, used by log streaming phase
@@ -969,6 +1042,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 		// --- Stream log/config files ---
 		var nodeCollected []helpers.CollectedFile
 		var nodeSkipped []string
+		var nodeIncomplete []*IncompleteCollectionError
 		if len(info.Files) > 0 {
 			nodeCollected, nodeSkipped = streamNodeFiles(c, host, info, s, nodeType, collectionMode, collectionArgs.CollectGCLogs, collectionArgs)
 		}
@@ -999,10 +1073,11 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 					Days:                   collectionArgs.DiagLogDays,
 					StartDate:              collectionArgs.StartDate,
 				}
-				if rocksFiles, err := RunRocksDBCollection(rocksArgs); err != nil {
+				if rocksFiles, inc, err := RunRocksDBCollection(rocksArgs); err != nil {
 					simplelog.Errorf("RocksDB collection failed on %s: %v", host, err)
 				} else {
 					nodeCollected = append(nodeCollected, rocksFiles...)
+					nodeIncomplete = inc
 				}
 			} else {
 				simplelog.Warningf("RocksDB collection skipped on %s: no RocksDB dir detected and --dremio-rocksdb-dir not set", host)
@@ -1017,6 +1092,12 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 		mu.Lock()
 		collectedFiles = append(collectedFiles, nodeCollected...)
 		totalSkippedFiles = append(totalSkippedFiles, nodeSkipped...)
+		for _, p := range nodeSkipped {
+			totalSkippedLog = append(totalSkippedLog, host+":"+p)
+		}
+		for _, inc := range nodeIncomplete {
+			totalIncomplete = append(totalIncomplete, fmt.Sprintf("%s: %v", host, inc))
+		}
 		if len(nodeCollected) == 0 && len(info.Files) > 0 {
 			totalFailedNodes = append(totalFailedNodes, host)
 		}
@@ -1027,14 +1108,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 			nodeBytes += f.Size
 		}
 
-		statusUX := fmt.Sprintf("Done: %d files (%s), %d skipped", len(nodeCollected), humanizeBytes(nodeBytes), len(nodeSkipped))
-		if len(nodeSkipped) > 0 {
-			names := make([]string, len(nodeSkipped))
-			for i, p := range nodeSkipped {
-				names[i] = filepath.Base(p)
-			}
-			statusUX = fmt.Sprintf("Done: %d files (%s), %d skipped (%s)", len(nodeCollected), humanizeBytes(nodeBytes), len(nodeSkipped), strings.Join(names, ", "))
-		}
+		statusUX := nodeDoneStatus(len(nodeCollected), nodeBytes, nodeSkipped, nodeIncomplete)
 		if niToolsFailed > 0 {
 			failedTools := make([]string, 0, len(nodeInfoToolErrors))
 			for _, te := range nodeInfoToolErrors {
@@ -1139,6 +1213,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 	summaryInfo.ClusterInfo.NumberNodesContacted = totalNodes - len(totalFailedNodes)
 	summaryInfo.CollectedFiles = collectedFiles
 	summaryInfo.SkippedFiles = totalSkippedFiles
+	summaryInfo.IncompleteCollections = totalIncomplete
 	var totalBytes int64
 	for _, f := range collectedFiles {
 		totalBytes += f.Size
@@ -1161,7 +1236,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 
 	logDistributedCollectionSummary(
 		collectionMode, coordinators, executors, collectedFiles,
-		nil, totalFailedNodes, totalSkippedFiles,
+		nil, totalFailedNodes, totalSkippedLog, totalIncomplete,
 		totalNodes-len(totalFailedNodes), time.Since(start),
 	)
 

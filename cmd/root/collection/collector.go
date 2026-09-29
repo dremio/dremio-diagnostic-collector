@@ -17,6 +17,7 @@ package collection
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -65,6 +66,16 @@ type Collector interface {
 	// When logDir or confDir are non-empty, they override probing for that path.
 	DiscoverFiles(host, logDir, confDir string) (*RemoteNodeInfo, error)
 }
+
+// KeepaliveFreeStreamer is implemented by transports that can run a long,
+// continuously streaming command without keepalive pings and prove that it
+// completed (#339). Only the Kubernetes API transport implements it.
+type KeepaliveFreeStreamer interface {
+	HostExecuteAndStreamNoKeepalive(host string, output cli.OutputHandler, args ...string) error
+}
+
+// ErrStreamIncomplete means a remote stream ended before its end-of-stream marker.
+var ErrStreamIncomplete = errors.New("remote stream ended before end-of-stream marker")
 
 type Args struct {
 	DDCfs                 helpers.Filesystem
@@ -246,8 +257,18 @@ func FindClusterID(outputDir string) (clusterStatsList []clusterstats.ClusterSta
 	return
 }
 
+// successRate returns the share of collected files among attempted ones.
+// Skipped files count as attempts, so skips cannot hide behind 100% (#339).
+func successRate(collected, failed, skipped int) (float64, int) {
+	attempts := collected + failed + skipped
+	if attempts == 0 {
+		return 0, 0
+	}
+	return float64(collected) / float64(attempts) * 100, attempts
+}
+
 // logDistributedCollectionSummary logs a comprehensive summary of the distributed collection
-func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles []string, nodesConnectedTo int, duration time.Duration) {
+func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles, incomplete []string, nodesConnectedTo int, duration time.Duration) {
 	simplelog.Info("=== DISTRIBUTED COLLECTION SUMMARY ===")
 
 	// Basic collection info
@@ -273,6 +294,7 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	simplelog.Infof("  Successful Collections: %d", len(files))
 	simplelog.Infof("  Failed Collections: %d", totalFailures)
 	simplelog.Infof("  Skipped Collections: %d", len(totalSkippedFiles))
+	simplelog.Infof("  Incomplete Collections: %d", len(incomplete))
 
 	// File details
 	if len(files) > 0 {
@@ -307,11 +329,17 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 		}
 	}
 
+	// Incomplete collections: partial data was kept and is flagged (#339)
+	if len(incomplete) > 0 {
+		simplelog.Warning("INCOMPLETE COLLECTIONS:")
+		for _, item := range incomplete {
+			simplelog.Warningf("  - %s", item)
+		}
+	}
+
 	// Success rate
-	totalAttempts := len(files) + totalFailures
-	if totalAttempts > 0 {
-		successRate := float64(len(files)) / float64(totalAttempts) * 100
-		simplelog.Infof("Success Rate: %.1f%% (%d/%d)", successRate, len(files), totalAttempts)
+	if rate, attempts := successRate(len(files), totalFailures, len(totalSkippedFiles)); attempts > 0 {
+		simplelog.Infof("Success Rate: %.1f%% (%d/%d)", rate, len(files), attempts)
 	}
 
 	simplelog.Info("=== END DISTRIBUTED COLLECTION SUMMARY ===")

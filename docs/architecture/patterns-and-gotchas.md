@@ -14,11 +14,19 @@ Chain order: `RateLimitedWriter` -> `MultiWriter` -> `progressWriter` wraps the 
 
 Integrity verification (checksums) should be advisory: log a warning on mismatch but don't fail the operation. Failing on checksum mismatch would block the entire collection for a non-critical integrity issue — the user still wants whatever data they can get. This applies to all non-critical verification steps in diagnostic collection.
 
+**Scope:** only checksum verification is advisory. Byte-count completeness is enforced: a stream shorter than the remote file is retried and, if still short, skipped — the same outcome the gzip path already had for a truncated stream (`unexpected EOF`).
+
 ### K8SWriter line-buffering for chunked streaming
 
 When consuming output from Kubernetes SPDY streaming APIs (or any API that delivers data in arbitrary byte chunks), the `io.Writer` receiving the data must buffer partial lines across `Write()` calls and emit complete lines only on newline boundaries. A final `Flush()` call after the stream completes emits any trailing partial line.
 
 **Gotcha:** Naive `strings.Split(chunk, "\n")` on each `Write()` corrupts data at chunk boundaries — the last field of one chunk gets concatenated with the first field of the next.
+
+### client-go SPDY keepalive truncates slow streams
+
+client-go's SPDY transport sends a PING every 5 s. When a remote command exits while its output is still draining to a slow client, the server side closes its socket; a later PING reaching that socket makes the Linux kernel reset the connection (`TCPAbortOnData`), discarding the queued output tail and the exit status. client-go's `watchErrorStream` treats "no status" as success, so `StreamWithContext` returns `nil` on truncated output (#339).
+
+Use `newStreamExecutor` (keepalive-free) for execs that stream continuously, and never trust a `nil` error alone: check the byte count against the remote size, or append an end-of-stream marker. OS-level TCP keepalive (Go dialer default) remains on and carries no payload, so it cannot trigger the reset.
 
 ### Post-stream masking preserves checksum integrity
 

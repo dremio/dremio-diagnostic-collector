@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.6] - Unreleased
+
+- Kubernetes collections over slow links no longer skip `queries.*.json.gz` archives and server logs (#339). File streams now use a SPDY exec connection without keepalive pings: client-go's 5 s ping reaching the API server after the remote `gzip`/`cat` had exited made the Linux kernel reset the connection and drop the file's tail, which client-go reported as success.
+- Truncated file transfers are no longer accepted silently on any transport: a stream shorter than the remote file is retried (a file rotated between discovery and streaming is still accepted), and JFR, heap-dump and async-profiler artifacts are retried up to 3 times before their remote temp file is removed.
+- queries-perf on Kubernetes streams without keepalive pings and ends with an end-of-stream marker. An export cut short keeps its records and is reported as INCOMPLETE on the node status line, in ddc.log and in `summary.json` (`incompleteCollections`). The viewer's stderr now goes to ddc.log instead of into the queries-perf files.
+- The collection summary's success rate now counts skipped files, and skipped entries in ddc.log name their pod/host.
+
 ## [4.0.5] - 2026-07-23
 
 - `server.out` is now collected as part of server logs (#337). It follows the existing server-log rules, is exempt from the date-range filter (its mtime reflects the last restart, not content age), and is also discovered from `DREMIO_LOG_DIR` when that differs from the resolved log directory. TUI label renamed to "Server logs & out".

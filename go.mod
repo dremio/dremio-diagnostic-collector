@@ -19,6 +19,7 @@ require (
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/kubectl v0.32.3
+	k8s.io/kubelet v0.32.3
 )
 
 require (
@@ -48,6 +49,7 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/apiserver v0.32.3 // indirect
 )
 
 require (
