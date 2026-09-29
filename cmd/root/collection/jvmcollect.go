@@ -323,39 +323,40 @@ func CollectAsyncProfiler(c Collector, host string, pid int, durationSeconds int
 // It tries GNU stat first (-c %s), then BSD stat (-f %z) as a fallback.
 // Returns 0 if the size cannot be determined (best-effort, never fatal).
 func probeRemoteFileSize(c Collector, host, remotePath string) int64 {
-	out, err := c.HostExecute(false, host, "stat", "-c", "%s", remotePath)
-	if err != nil {
-		out, err = c.HostExecute(false, host, "stat", "-f", "%z", remotePath)
-	}
-	if err != nil {
-		return 0
-	}
-	n, err := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
-	if err != nil {
-		return 0
-	}
+	n, _ := probeRemoteFileSizeOK(c, host, remotePath)
 	return n
 }
 
-// streamRemoteFile streams a remote file to a local path via the collector's
-// StreamFromHost method, reporting transfer progress (including percentage
-// when the remote file size can be probed) to the TUI.
+// probeRemoteFileSizeOK is probeRemoteFileSize but reports whether the probe
+// succeeded, so an empty file (0, true) is distinguishable from a failed probe
+// (0, false).
+func probeRemoteFileSizeOK(c Collector, host, remotePath string) (int64, bool) {
+	out, err := c.HostExecute(false, host, "stat", "-L", "-c", "%s", remotePath)
+	if err != nil {
+		out, err = c.HostExecute(false, host, "stat", "-L", "-f", "%z", remotePath)
+	}
+	if err != nil {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(out), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// streamRemoteFile streams a remote JVM artifact (JFR, heap dump,
+// async-profiler output) to localPath through streamFile, so a truncated
+// transfer is retried (up to maxRetries) before callers delete the remote
+// temp file (#339). Progress is reported to the TUI by streamFile.
 func streamRemoteFile(c Collector, host, remotePath, localPath string) error {
 	expectedSize := probeRemoteFileSize(c, host, remotePath)
-
-	f, err := os.Create(localPath) // #nosec G304 -- localPath is derived from controlled output dir
+	_, hashCh, err := streamFile(c, host, remotePath, localPath, maxRetries, expectedSize, filepath.Base(localPath), "", false)
 	if err != nil {
-		return fmt.Errorf("failed to create local file %s: %w", localPath, err)
-	}
-	defer f.Close()
-
-	filename := filepath.Base(localPath)
-	pw := &progressWriter{w: f, expectedSize: expectedSize, host: host, filename: filename}
-
-	if err := c.StreamFromHost(host, remotePath, pw, false); err != nil {
 		_ = os.Remove(localPath)
 		return fmt.Errorf("StreamFromHost %s: %w", remotePath, err)
 	}
+	<-hashCh
 	return nil
 }
 

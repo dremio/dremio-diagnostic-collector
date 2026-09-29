@@ -372,6 +372,7 @@ func TestCollectJFR_StartFailure(t *testing.T) {
 }
 
 func TestCollectJFR_StreamFailure(t *testing.T) {
+	withNoStreamBackoff(t)
 	outDir := t.TempDir()
 	mock := &mockJVMCollector{
 		hostExecuteFn: func(_ bool, _ string, _ ...string) (string, error) {
@@ -599,6 +600,7 @@ func TestCollectAsyncProfiler_ExecutionFailure(t *testing.T) {
 }
 
 func TestCollectAsyncProfiler_StreamFailure(t *testing.T) {
+	withNoStreamBackoff(t)
 	outDir := t.TempDir()
 	rmCalled := false
 	mock := &mockJVMCollector{
@@ -761,7 +763,7 @@ func TestParseXmxBytes_MultipleFlags(t *testing.T) {
 func TestProbeRemoteFileSize_GNUStatSuccess(t *testing.T) {
 	mock := &mockJVMCollector{
 		hostExecuteFn: func(_ bool, _ string, args ...string) (string, error) {
-			if len(args) >= 3 && args[0] == "stat" && args[1] == "-c" {
+			if len(args) >= 4 && args[0] == "stat" && args[1] == "-L" && args[2] == "-c" {
 				return "1048576\n", nil // 1MB
 			}
 			return "", nil
@@ -782,10 +784,10 @@ func TestProbeRemoteFileSize_GNUStatSuccess(t *testing.T) {
 func TestProbeRemoteFileSize_BSDFallback(t *testing.T) {
 	mock := &mockJVMCollector{
 		hostExecuteFn: func(_ bool, _ string, args ...string) (string, error) {
-			if len(args) >= 3 && args[0] == "stat" && args[1] == "-c" {
+			if len(args) >= 4 && args[0] == "stat" && args[1] == "-L" && args[2] == "-c" {
 				return "", errors.New("stat: illegal option -- c")
 			}
-			if len(args) >= 3 && args[0] == "stat" && args[1] == "-f" {
+			if len(args) >= 4 && args[0] == "stat" && args[1] == "-L" && args[2] == "-f" {
 				return "2097152\n", nil // 2MB
 			}
 			return "", nil
@@ -829,5 +831,58 @@ func TestProbeRemoteFileSize_UnparseableOutput(t *testing.T) {
 	size := probeRemoteFileSize(mock, "node-1", "/tmp/test.hprof.gz")
 	if size != 0 {
 		t.Errorf("expected 0 for unparseable output, got %d", size)
+	}
+}
+
+func TestStreamRemoteFile_RetriesTruncatedArtifact(t *testing.T) {
+	withNoStreamBackoff(t)
+	calls := 0
+	mock := &mockJVMCollector{
+		hostExecuteFn: func(_ bool, _ string, args ...string) (string, error) {
+			if len(args) > 0 && args[0] == "stat" {
+				return "10", nil
+			}
+			return "", nil
+		},
+		streamFromHostFn: func(_ string, _ string, w io.Writer) error {
+			calls++
+			if calls == 1 {
+				_, err := w.Write([]byte("0123"))
+				return err
+			}
+			_, err := w.Write([]byte("0123456789"))
+			return err
+		},
+	}
+	local := filepath.Join(t.TempDir(), "recording.jfr")
+	if err := streamRemoteFile(mock, "node-1", "/tmp/recording.jfr", local); err != nil {
+		t.Fatalf("streamRemoteFile: %v", err)
+	}
+	if data, _ := os.ReadFile(local); string(data) != "0123456789" || calls != 2 {
+		t.Fatalf("file=%q calls=%d, want the full artifact after 2 calls", data, calls)
+	}
+}
+
+func TestStreamRemoteFile_PersistentTruncationRemovesFile(t *testing.T) {
+	withNoStreamBackoff(t)
+	mock := &mockJVMCollector{
+		hostExecuteFn: func(_ bool, _ string, args ...string) (string, error) {
+			if len(args) > 0 && args[0] == "stat" {
+				return "10", nil
+			}
+			return "", nil
+		},
+		streamFromHostFn: func(_ string, _ string, w io.Writer) error {
+			_, err := w.Write([]byte("0123"))
+			return err
+		},
+	}
+	local := filepath.Join(t.TempDir(), "heap.hprof")
+	err := streamRemoteFile(mock, "node-1", "/tmp/heap.hprof", local)
+	if !errors.Is(err, ErrStreamTruncated) {
+		t.Fatalf("err = %v, want ErrStreamTruncated", err)
+	}
+	if _, statErr := os.Stat(local); !os.IsNotExist(statErr) {
+		t.Error("a truncated artifact must not be kept")
 	}
 }

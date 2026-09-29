@@ -16,6 +16,7 @@ package collection
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,6 +33,21 @@ import (
 )
 
 const rocksdbViewerRemotePath = "/tmp/dremio-rocksdb-viewer"
+
+// IncompleteCollectionError reports a collection that returned usable but
+// partial data (e.g. a queries-perf stream cut short). Callers keep the data
+// and flag the item instead of treating it as a failure (#339).
+type IncompleteCollectionError struct {
+	Item    string // e.g. "queries-perf"
+	Records int
+	Cause   error
+}
+
+func (e *IncompleteCollectionError) Error() string {
+	return fmt.Sprintf("%s incomplete after %d records (%v)", e.Item, e.Records, e.Cause)
+}
+
+func (e *IncompleteCollectionError) Unwrap() error { return e.Cause }
 
 // dateSplitWriter routes JSON lines to per-day files based on the start_time field.
 // Records must arrive sorted by date (rocksdb-viewer guarantees this).
@@ -139,7 +155,7 @@ var wlmTypes = []string{"wlm_queues", "wlm_rules", "wlm_engines", "wlm_cluster_u
 
 // RunRocksDBCollection runs the rocksdb-viewer on the coordinator node and returns
 // the list of files collected (for inclusion in per-node file counts and byte totals).
-func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error) {
+func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*IncompleteCollectionError, error) {
 	c := args.Collector
 	host := args.Host
 	dbPath := args.RocksDBDir + "/catalog"
@@ -151,7 +167,7 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 	catalogCurrent := dbPath + "/CURRENT"
 	if out, err := c.HostExecute(false, host, "test", "-f", catalogCurrent, "&&", "echo", "exists"); err != nil || !strings.Contains(out, "exists") {
 		simplelog.Infof("rocksdb: no catalog at %s on %s — skipping RocksDB-viewer collection (not a master coordinator)", catalogCurrent, host)
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Upload binary
@@ -162,31 +178,31 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 
 	archStr, err := c.HostExecute(false, host, "uname -m")
 	if err != nil {
-		return nil, fmt.Errorf("uname -m on %s: %w", host, err)
+		return nil, nil, fmt.Errorf("uname -m on %s: %w", host, err)
 	}
 	archStr = strings.TrimSpace(archStr)
 
 	bin, err := rockscollect.GetRocksDBViewerBinary(archStr)
 	if err != nil {
-		return nil, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
+		return nil, nil, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
 	}
 
 	localTmp, err := os.MkdirTemp("", "ddc-rocksdb-dist-*")
 	if err != nil {
-		return nil, fmt.Errorf("temp dir: %w", err)
+		return nil, nil, fmt.Errorf("temp dir: %w", err)
 	}
 	defer os.RemoveAll(localTmp)
 
 	localBin := filepath.Join(localTmp, "dremio-rocksdb-viewer")
 	if err := os.WriteFile(localBin, bin, 0o600); err != nil {
-		return nil, fmt.Errorf("write local binary: %w", err)
+		return nil, nil, fmt.Errorf("write local binary: %w", err)
 	}
 
 	if _, err := c.CopyToHost(host, localBin, rocksdbViewerRemotePath); err != nil {
-		return nil, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
+		return nil, nil, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
 	}
 	if _, err := c.HostExecute(false, host, "chmod +x "+rocksdbViewerRemotePath); err != nil {
-		return nil, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
+		return nil, nil, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
 	}
 
 	consoleprint.UpdateNodeState(consoleprint.NodeState{
@@ -253,19 +269,27 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, error
 	}
 
 	// Collect queries-perf
+	var incomplete []*IncompleteCollectionError
 	if args.CollectQueriesPerf {
 		consoleprint.UpdateNodeState(consoleprint.NodeState{
 			Node:     host,
 			StatusUX: "Collecting queries-perf from RocksDB",
 		})
-		if files, err := collectQueriesPerf(c, args.CopyStrategy, host, args.NodeType, dbPath, args); err != nil {
+		files, err := collectQueriesPerf(c, args.CopyStrategy, host, args.NodeType, dbPath, args)
+		var inc *IncompleteCollectionError
+		switch {
+		case errors.As(err, &inc):
+			simplelog.Warningf("rocksdb queries_perf on %s: %v", host, err)
+			collected = append(collected, files...)
+			incomplete = append(incomplete, inc)
+		case err != nil:
 			simplelog.Errorf("rocksdb queries_perf on %s: %v", host, err)
-		} else {
+		default:
 			collected = append(collected, files...)
 		}
 	}
 
-	return collected, nil
+	return collected, incomplete, nil
 }
 
 func collectRocksType(c Collector, cs CopyStrategy, host, nodeType, dbPath, dataType, strategyType, filename string) (*helpers.CollectedFile, error) {
@@ -394,8 +418,19 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	}
 
 	dataCmd := fmt.Sprintf("%s -db %s -type queries_perf%s", rocksdbViewerRemotePath, dbPath, filterArgs)
-	if err := c.HostExecuteAndStream(false, host, cli.OutputHandler(handler), "", dataCmd); err != nil {
-		return nil, fmt.Errorf("execute rocksdb-viewer queries_perf: %w", err)
+	var streamErr error
+	if kf, ok := c.(KeepaliveFreeStreamer); ok {
+		// Keepalive-free and end-of-stream-checked on Kubernetes (#339).
+		streamErr = kf.HostExecuteAndStreamNoKeepalive(host, cli.OutputHandler(handler), dataCmd)
+	} else {
+		streamErr = c.HostExecuteAndStream(false, host, cli.OutputHandler(handler), "", dataCmd)
+	}
+	mu.Lock()
+	streamed := lineCount
+	mu.Unlock()
+	simplelog.Infof("rocksdb-viewer queries_perf on %s: streamed %d records (pre-flight count %d)", host, streamed, totalRecords)
+	if streamErr != nil && streamed == 0 {
+		return nil, fmt.Errorf("execute rocksdb-viewer queries_perf: %w", streamErr)
 	}
 	if writeErr != nil {
 		return nil, writeErr
@@ -423,6 +458,9 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 		}
 	}
 
+	if streamErr != nil {
+		return collected, &IncompleteCollectionError{Item: "queries-perf", Records: streamed, Cause: streamErr}
+	}
 	simplelog.Infof("rocksdb-viewer: collected queries_perf -> %s (%d files, %d records)", destDir, len(dw.dates), lineCount)
 	return collected, nil
 }

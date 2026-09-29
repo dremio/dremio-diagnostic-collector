@@ -85,7 +85,7 @@ Mode constants live in `pkg/collects/`. Some CLI flags are mode-specific: per-lo
 - **`cmd/local/conf/`** -- Config parsing, key constants (`conf_key_names.go`), defaults per mode (`defaults.go`), HOCON parser
 - **`cmd/local/jvmcollect/`** -- JVM diagnostics: JFR, jstack, async-profiler, heap dumps
 - **`cmd/root/kubectl/`** -- kubectl CLI transport
-- **`cmd/root/kubernetes/`** -- K8s API client transport (WebSocket primary, SPDY fallback)
+- **`cmd/root/kubernetes/`** -- K8s API client transport (SPDY exec; file streams and the queries-perf stream run without keepalive pings, see D077)
 - **`cmd/root/ssh/`** -- SSH transport
 - **`cmd/root/local/`** -- Local transport: streams files via `os.Open`/`io.Copy`, auto-detects node role from dremio.conf
 - **`cmd/remotecollect/`** -- REST API-based collection (job profiles, system tables, WLM, KV store)

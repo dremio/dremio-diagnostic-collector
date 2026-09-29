@@ -1228,14 +1228,14 @@ func TestRunDiscovery_SecondaryLogDir(t *testing.T) {
 		// Process info: log.path and DREMIO_LOG_DIR diverge.
 		"ps eww 42": {out: "java -Ddremio.log.path=/opt/dremio/data/log DREMIO_LOG_DIR=/opt/dremio/log", err: nil},
 		// Primary dir (from -Ddremio.log.path) exists with files.
-		"test -d /opt/dremio/data/log": {out: "exists", err: nil},
+		"test -d /opt/dremio/data/log":                                  {out: "exists", err: nil},
 		"find -L /opt/dremio/data/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/data/log/server.log\n", err: nil},
 		"find -L /opt/dremio/data/log -maxdepth 2 -type f -exec stat": {
 			out: "1711929600 1000 /opt/dremio/data/log/server.log\n",
 			err: nil,
 		},
 		// Secondary dir (DREMIO_LOG_DIR) exists with a mix of files.
-		"test -d /opt/dremio/log": {out: "exists", err: nil},
+		"test -d /opt/dremio/log":                                  {out: "exists", err: nil},
 		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
 		"find -L /opt/dremio/log -maxdepth 1 -type f -exec stat": {
 			out: "1711929600 2000 /opt/dremio/log/server.out\n" +
@@ -1290,10 +1290,10 @@ func TestRunDiscovery_SecondaryLogDir_SameDir(t *testing.T) {
 		out string
 		err error
 	}{
-		"jcmd -l":               {out: "", err: fmt.Errorf("not found")},
-		"pgrep -x java":         {out: "", err: fmt.Errorf("exit status 1")},
-		"pgrep -f dremio.*java": {out: "42\n", err: nil},
-		"ps eww 42":             {out: "java -Ddremio.log.path=/opt/dremio/log DREMIO_LOG_DIR=/opt/dremio/log", err: nil},
+		"jcmd -l":                 {out: "", err: fmt.Errorf("not found")},
+		"pgrep -x java":           {out: "", err: fmt.Errorf("exit status 1")},
+		"pgrep -f dremio.*java":   {out: "42\n", err: nil},
+		"ps eww 42":               {out: "java -Ddremio.log.path=/opt/dremio/log DREMIO_LOG_DIR=/opt/dremio/log", err: nil},
 		"test -d /opt/dremio/log": {out: "exists", err: nil},
 		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
 		"find -L /opt/dremio/log -maxdepth 2 -type f -exec stat": {
@@ -1334,7 +1334,7 @@ func TestDiscoverSecondaryLogFiles_Dedup(t *testing.T) {
 		out string
 		err error
 	}{
-		"test -d /opt/dremio/log": {out: "exists", err: nil},
+		"test -d /opt/dremio/log":                                  {out: "exists", err: nil},
 		"find -L /opt/dremio/log -maxdepth 1 -type f -print -quit": {out: "/opt/dremio/log/server.out\n", err: nil},
 		"find -L /opt/dremio/log -maxdepth 1 -type f -exec stat": {
 			out: "1711929600 2000 /opt/dremio/log/server.out\n" +

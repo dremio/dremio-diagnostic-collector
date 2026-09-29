@@ -125,9 +125,9 @@ func TestStreamingCollect_EndToEnd(t *testing.T) {
 				LogDir:  "/var/log/dremio",
 				ConfDir: "/opt/dremio/conf",
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 100, FileType: "log"},
-					{Path: "/opt/dremio/conf/dremio.conf", Size: 50, FileType: "config"},
-					{Path: "/var/log/dremio/gc.log.0", Size: 30, FileType: "gc-log"},
+					{Path: "/var/log/dremio/server.log", Size: 20, FileType: "log"}, // ≤ streamed length; the completeness guard accepts growth
+					{Path: "/opt/dremio/conf/dremio.conf", Size: 20, FileType: "config"},
+					{Path: "/var/log/dremio/gc.log.0", Size: 20, FileType: "gc-log"},
 				},
 			}, nil
 		},
@@ -197,7 +197,7 @@ func TestStreamingCollect_RetryOnTransientError(t *testing.T) {
 		discoverFunc: func(host string) (*RemoteNodeInfo, error) {
 			return &RemoteNodeInfo{
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 100, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 12, FileType: "log"},
 				},
 			}, nil
 		},
@@ -253,7 +253,7 @@ func TestStreamingCollect_SkipOnPermissionDenied(t *testing.T) {
 			return &RemoteNodeInfo{
 				Files: []RemoteFileInfo{
 					{Path: "/secret/file.log", Size: 100, FileType: "log"},
-					{Path: "/var/log/dremio/server.log", Size: 200, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 2, FileType: "log"},
 				},
 			}, nil
 		},
@@ -306,7 +306,7 @@ func TestStreamingCollect_SkipNodeOnDiscoveryFailure(t *testing.T) {
 			}
 			return &RemoteNodeInfo{
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 100, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 4, FileType: "log"},
 				},
 			}, nil
 		},
@@ -357,7 +357,7 @@ func TestStreamingCollect_RocksDBViewer_UsesAutodetectedDir(t *testing.T) {
 				ConfDir:    "/opt/dremio/conf",
 				RocksDBDir: "/opt/dremio/data/db",
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 10, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 4, FileType: "log"},
 				},
 			}, nil
 		},
@@ -424,7 +424,7 @@ func TestStreamingCollect_RocksDBViewer_SkippedWhenNoDir(t *testing.T) {
 				LogDir:     "/var/log/dremio",
 				RocksDBDir: "",
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 10, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 4, FileType: "log"},
 				},
 			}, nil
 		},
@@ -500,7 +500,7 @@ func TestStreamingCollect_AllFilesFailMeansNodeFailed(t *testing.T) {
 		discoverFunc: func(host string) (*RemoteNodeInfo, error) {
 			return &RemoteNodeInfo{
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 100, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 2, FileType: "log"},
 				},
 			}, nil
 		},
@@ -1180,7 +1180,7 @@ func newJVMTestCollector(coordinators, executors []string, pidByHost map[string]
 			return &RemoteNodeInfo{
 				DremioPID: pid,
 				Files: []RemoteFileInfo{
-					{Path: "/var/log/dremio/server.log", Size: 10, FileType: "log"},
+					{Path: "/var/log/dremio/server.log", Size: 8, FileType: "log"},
 				},
 			}, nil
 		},

@@ -24,21 +24,22 @@ import (
 )
 
 type SummaryInfo struct {
-	ClusterInfo         ClusterInfo             `json:"clusterInfo"`
-	CollectedFiles      []helpers.CollectedFile `json:"collectedFiles"`
-	FailedFiles         []string                `json:"failedFiles"`
-	SkippedFiles        []string                `json:"skippedFiles"`
-	StartTimeUTC        time.Time               `json:"startTimeUTC"`
-	EndTimeUTC          time.Time               `json:"endTimeUTC"`
-	TotalRuntimeSeconds int64                   `json:"totalRuntimeSeconds"`
-	TotalBytesCollected int64                   `json:"totalBytesCollected"`
-	Executors           []string                `json:"executors"`
-	Coordinators        []string                `json:"coordinators"`
-	DremioVersion       map[string]string       `json:"dremioVersion"`
-	ClusterID           map[string]string       `json:"clusterID"`
-	DDCVersion          string                  `json:"ddcVersion"`
-	CollectionsEnabled  []string                `json:"collectionsEnabled"`
-	CollectionsDisabled []string                `json:"collectionsDisabled"`
+	ClusterInfo           ClusterInfo             `json:"clusterInfo"`
+	CollectedFiles        []helpers.CollectedFile `json:"collectedFiles"`
+	FailedFiles           []string                `json:"failedFiles"`
+	SkippedFiles          []string                `json:"skippedFiles"`
+	IncompleteCollections []string                `json:"incompleteCollections,omitempty"`
+	StartTimeUTC          time.Time               `json:"startTimeUTC"`
+	EndTimeUTC            time.Time               `json:"endTimeUTC"`
+	TotalRuntimeSeconds   int64                   `json:"totalRuntimeSeconds"`
+	TotalBytesCollected   int64                   `json:"totalBytesCollected"`
+	Executors             []string                `json:"executors"`
+	Coordinators          []string                `json:"coordinators"`
+	DremioVersion         map[string]string       `json:"dremioVersion"`
+	ClusterID             map[string]string       `json:"clusterID"`
+	DDCVersion            string                  `json:"ddcVersion"`
+	CollectionsEnabled    []string                `json:"collectionsEnabled"`
+	CollectionsDisabled   []string                `json:"collectionsDisabled"`
 }
 
 type ClusterInfo struct {

@@ -15,12 +15,17 @@
 package collection
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
 )
 
 func TestDateSplitWriter_SingleDay(t *testing.T) {
@@ -150,7 +155,7 @@ func TestRunRocksDBCollectionSkipsWhenNoCatalog(t *testing.T) {
 		RocksDBDir: "/opt/dremio/data/db",
 	}
 
-	files, err := RunRocksDBCollection(args)
+	files, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -189,7 +194,7 @@ func TestRunRocksDBCollectionCollectsWhenCatalogPresent(t *testing.T) {
 	}
 
 	// We expect an error (from the uname stub), but NOT a silent nil/nil skip.
-	_, err := RunRocksDBCollection(args)
+	_, _, err := RunRocksDBCollection(args)
 	if err == nil {
 		t.Fatal("expected an error propagated from uname stub, got nil — catalog gate may have skipped incorrectly")
 	}
@@ -256,7 +261,7 @@ func TestWLMFileLayout(t *testing.T) {
 		CollectQueriesPerf:     false,
 	}
 
-	got, err := RunRocksDBCollection(args)
+	got, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
@@ -363,7 +368,7 @@ func TestWLMClusterUsageSkippedByDefault(t *testing.T) {
 		CollectQueriesPerf: false,
 	}
 
-	got, err := RunRocksDBCollection(args)
+	got, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
@@ -384,5 +389,171 @@ func TestWLMClusterUsageSkippedByDefault(t *testing.T) {
 		if strings.Contains(c, "-type wlm_cluster_usage") {
 			t.Errorf("rocksdb-viewer was invoked with -type wlm_cluster_usage despite CollectWLMClusterUsage=false: %s", c)
 		}
+	}
+}
+
+// perfLine is one queries_perf record dated 2026-04-16 (UTC).
+func perfLine(i int) string {
+	return fmt.Sprintf(`{"query_id":"q%d","query_start_epoch_ms":1776352188426}`, i)
+}
+
+// queriesPerfCollector streams fixed lines through HostExecuteAndStream, the
+// path used by transports without KeepaliveFreeStreamer (SSH, local, kubectl).
+// mockStreamCollector holds an atomic.Bool, so it is embedded by pointer.
+type queriesPerfCollector struct {
+	*mockStreamCollector
+	lines     []string
+	streamErr error
+	calls     int
+}
+
+func (q *queriesPerfCollector) HostExecuteAndStream(_ bool, _ string, out cli.OutputHandler, _ string, _ ...string) error {
+	q.calls++
+	for _, l := range q.lines {
+		out(l)
+	}
+	return q.streamErr
+}
+
+// keepaliveFreeCollector also implements KeepaliveFreeStreamer, like the
+// Kubernetes API transport.
+type keepaliveFreeCollector struct {
+	*queriesPerfCollector
+	noKeepaliveCalls int
+}
+
+func (k *keepaliveFreeCollector) HostExecuteAndStreamNoKeepalive(_ string, out cli.OutputHandler, _ ...string) error {
+	k.noKeepaliveCalls++
+	for _, l := range k.lines {
+		out(l)
+	}
+	return k.streamErr
+}
+
+// newQueriesPerfCollector answers the pre-flight -count with len(lines).
+func newQueriesPerfCollector(lines []string, streamErr error) *queriesPerfCollector {
+	return &queriesPerfCollector{
+		mockStreamCollector: &mockStreamCollector{
+			hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+				if strings.Contains(strings.Join(args, " "), "-count") {
+					return strconv.Itoa(len(lines)), nil
+				}
+				return "", fmt.Errorf("unexpected host command: %v", args)
+			},
+		},
+		lines:     lines,
+		streamErr: streamErr,
+	}
+}
+
+// runQueriesPerf calls collectQueriesPerf and returns its results plus the
+// copy-strategy root directory.
+func runQueriesPerf(t *testing.T, c Collector) ([]helpers.CollectedFile, string, error) {
+	t.Helper()
+	dir := t.TempDir()
+	files, err := collectQueriesPerf(c, &mockCopyStrategy{tmpDir: dir}, "dremio-master-0", "coordinator",
+		"/opt/dremio/data/db/catalog", RocksCollectArgs{QueriesPerfDays: 7})
+	return files, dir, err
+}
+
+func TestCollectQueriesPerf_UsesKeepaliveFreeStreamer(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, nil)}
+	files, _, err := runQueriesPerf(t, k)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if k.noKeepaliveCalls != 1 || k.calls != 0 {
+		t.Fatalf("noKeepaliveCalls=%d fallbackCalls=%d, want 1 and 0", k.noKeepaliveCalls, k.calls)
+	}
+	if len(files) != 1 {
+		t.Fatalf("files = %d, want 1", len(files))
+	}
+}
+
+func TestCollectQueriesPerf_IncompleteKeepsRecords(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, ErrStreamIncomplete)}
+	files, dir, err := runQueriesPerf(t, k)
+	var inc *IncompleteCollectionError
+	if !errors.As(err, &inc) {
+		t.Fatalf("err = %v, want *IncompleteCollectionError", err)
+	}
+	if inc.Item != "queries-perf" || inc.Records != 2 || !errors.Is(err, ErrStreamIncomplete) {
+		t.Errorf("got %+v, want queries-perf / 2 records / ErrStreamIncomplete", inc)
+	}
+	want := "queries-perf incomplete after 2 records (remote stream ended before end-of-stream marker)"
+	if err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
+	if len(files) != 1 {
+		t.Fatalf("files = %d, want 1 (partial data kept)", len(files))
+	}
+	data, readErr := os.ReadFile(filepath.Join(dir, "queries-perf", "dremio-master-0", "queries-perf.2026-04-16.json"))
+	if readErr != nil || countLines(data) != 2 {
+		t.Errorf("kept file: err=%v lines=%d, want 2 lines", readErr, countLines(data))
+	}
+}
+
+func TestCollectQueriesPerf_ErrorBeforeFirstRecordFails(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector(nil, errors.New("exec failed"))}
+	files, _, err := runQueriesPerf(t, k)
+	var inc *IncompleteCollectionError
+	if err == nil || errors.As(err, &inc) {
+		t.Fatalf("err = %v, want a plain failure", err)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+}
+
+func TestCollectQueriesPerf_FallbackTransportIncomplete(t *testing.T) {
+	q := newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, errors.New("ssh: connection lost"))
+	files, _, err := runQueriesPerf(t, q)
+	var inc *IncompleteCollectionError
+	if !errors.As(err, &inc) || inc.Records != 2 {
+		t.Fatalf("err = %v, want *IncompleteCollectionError with 2 records", err)
+	}
+	if q.calls != 1 || len(files) != 1 {
+		t.Fatalf("fallbackCalls=%d files=%d, want 1 and 1", q.calls, len(files))
+	}
+}
+
+func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
+	q := newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, ErrStreamIncomplete)
+	q.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+			return "exists", nil
+		case strings.Contains(cmd, "uname -m"):
+			return "x86_64\n", nil
+		case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"):
+			return "", nil
+		case strings.Contains(cmd, "-type cluster_stats"):
+			return `{"cluster":"stub"}`, nil
+		case strings.Contains(cmd, "-count"):
+			return "2", nil
+		}
+		return "", fmt.Errorf("unexpected host command: %s", cmd)
+	}
+	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
+	k := &keepaliveFreeCollector{queriesPerfCollector: q}
+
+	files, incomplete, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:          k,
+		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:               "dremio-master-0",
+		NodeType:           "coordinator",
+		RocksDBDir:         "/opt/dremio/data/db",
+		CollectQueriesPerf: true,
+		QueriesPerfDays:    7,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(incomplete) != 1 || incomplete[0].Item != "queries-perf" || incomplete[0].Records != 2 {
+		t.Fatalf("incomplete = %+v, want one queries-perf item with 2 records", incomplete)
+	}
+	if len(files) != 2 {
+		t.Errorf("files = %d, want 2 (cluster-stats + partial queries-perf)", len(files))
 	}
 }

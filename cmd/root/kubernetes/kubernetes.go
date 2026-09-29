@@ -75,6 +75,7 @@ func NewK8sAPI(kubeArgs KubeArgs, hook shutdown.CancelHook) (*KubeCtlAPIActions,
 		spdyExecutorFn: func(config *rest.Config, method string, u *url.URL) (remotecommand.Executor, error) {
 			return remotecommand.NewSPDYExecutor(config, method, u)
 		},
+		streamExecutorFn: newKeepaliveFreeSPDYExecutor,
 	}, nil
 }
 
@@ -141,12 +142,19 @@ type KubeCtlAPIActions struct {
 	timeoutMinutes      int
 	m                   sync.Mutex
 	spdyExecutorFn      ExecutorFactory
-	protocol            string // "SPDY"
+	streamExecutorFn    ExecutorFactory // keepalive-free, for streaming execs (#339)
+	protocol            string          // "SPDY"
 }
 
 // newExecutor creates a SPDY executor for remote command execution.
 func (c *KubeCtlAPIActions) newExecutor(method string, u *url.URL) (remotecommand.Executor, error) {
 	return c.spdyExecutorFn(c.config, method, u)
+}
+
+// newStreamExecutor creates a keepalive-free SPDY executor for long streaming
+// execs (file streams, queries-perf); see newKeepaliveFreeSPDYExecutor.
+func (c *KubeCtlAPIActions) newStreamExecutor(method string, u *url.URL) (remotecommand.Executor, error) {
+	return c.streamExecutorFn(c.config, method, u)
 }
 
 func (c *KubeCtlAPIActions) Protocol() string {
@@ -672,7 +680,7 @@ func (c *KubeCtlAPIActions) StreamFromHost(host, remotePath string, writer io.Wr
 	}
 	req = req.VersionedParams(option, scheme.ParameterCodec)
 
-	executor, err := c.newExecutor("POST", req.URL())
+	executor, err := c.newStreamExecutor("POST", req.URL())
 	if err != nil {
 		return fmt.Errorf("StreamFromHost: executor creation failed for %v:%v: %w", host, remotePath, err)
 	}
