@@ -1,7 +1,5 @@
 # Dremio Diagnostic Collector (DDC)
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/dremio/dremio-diagnostic-collector/v4)](https://goreportcard.com/report/github.com/dremio/dremio-diagnostic-collector/v4)
-
 Dremio Diagnostic Collector (DDC) is a command-line tool that gathers logs, configuration, and runtime diagnostics from a Dremio cluster and packages them into a single archive you can hand to Dremio Support or analyze yourself.
 
 DDC connects to each Dremio node over **Kubernetes**, **SSH**, or **locally**, and streams files directly to your machine — nothing is staged on the remote nodes. It offers two collection modes: **`standard`**, a safe and passive collection of logs and configuration for routine reviews, and **`diagnosis`**, a deep, active JVM investigation for incident response. The result is a timestamped `.tar.gz` containing server logs, queries, configuration, system tables, and OS/JVM info — plus, in diagnosis mode, JVM diagnostics such as JFR recordings and thread dumps.

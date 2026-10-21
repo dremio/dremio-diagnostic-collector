@@ -1,6 +1,17 @@
 # Changelog
 
-## [4.0.6] - Unreleased
+## [4.0.7] - 2026-10-21
+
+- Re-vendored dremio-rocksdb-viewer 1.1.0. Every `sys.*` export now streams instead of holding all rows in memory. Before, `sys.jobs_recent` on a large catalog could grow the viewer inside the Dremio coordinator container until Kubernetes OOM-killed the pod. Output is byte-identical to the previous binaries.
+- `sys.jobs_recent` is now collected for a time window instead of every retained job (30 days by default in Dremio):
+  - standard mode passes `-days` equal to the queries-perf day count, capped at 7 (7 when queries-perf is off);
+  - diagnosis mode passes `--start-date`/`--days` unchanged.
+- The viewer's new memory guard stops it with exit code 3 before the coordinator container nears its memory limit. DDC then discards that export, including partial queries-perf files, logs the guard's message, and continues with the next item. It never retries. Guard skips are reported in a new `summary.json` field (`memoryGuardSkips`), in a `MEMORY GUARD SKIPS:` section of the ddc.log summary, and on the node status line (`MEMORY GUARD:`).
+- Viewer exports (cluster-stats, system tables, WLM) now stream to disk instead of being buffered in DDC's memory, and a file is only kept once its export completes. On Kubernetes they run without keepalive pings and end with an end-of-stream marker, so a cut-off export is detected. The exception is `wlm_cluster_usage`, which can be silent for hours and keeps the pings. **Output changes:** these files now end with a newline, and on Kubernetes the viewer's stderr goes to ddc.log instead of into the files.
+- SSH, local and kubectl collections no longer hang on output lines longer than 64 KiB, such as very long SQL in `sys.views` or `sys.jobs_recent`. Lines up to 64 MiB are accepted, and longer ones fail with an error.
+- ddc.log records which dremio-rocksdb-viewer version the collection used.
+
+## [4.0.6] - 2026-09-29
 
 - Kubernetes collections over slow links no longer skip `queries.*.json.gz` archives and server logs (#339). File streams now use a SPDY exec connection without keepalive pings: client-go's 5 s ping reaching the API server after the remote `gzip`/`cat` had exited made the Linux kernel reset the connection and drop the file's tail, which client-go reported as success.
 - Truncated file transfers are no longer accepted silently on any transport: a stream shorter than the remote file is retried (a file rotated between discovery and streaming is still accepted), and JFR, heap-dump and async-profiler artifacts are retried up to 3 times before their remote temp file is removed.
