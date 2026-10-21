@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"sync"
@@ -44,10 +45,18 @@ func (u UnableToStartErr) Error() string {
 	return fmt.Sprintf("cmd '%v' failed: '%v'", u.Cmd, u.Err)
 }
 
+// Unwrap exposes the underlying error (e.g. *exec.ExitError) to errors.Is/As.
+func (u UnableToStartErr) Unwrap() error {
+	return u.Err
+}
+
 type ExecuteCliErr struct {
 	Err error
 	Cmd string
 }
+
+// maxOutputLineBytes is the longest single output line that will be read.
+const maxOutputLineBytes = 64 << 20
 
 // OutputHandler is a function type that processes lines of output
 type OutputHandler func(line string)
@@ -98,6 +107,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
 	stdOutScanner := bufio.NewScanner(stdout)
+	stdOutScanner.Buffer(make([]byte, 0, 64*1024), maxOutputLineBytes)
 
 	// Create a pipe to get the error output from the command
 	stderr, err := cmd.StderrPipe()
@@ -105,6 +115,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
 	stdErrScanner := bufio.NewScanner(stderr)
+	stdErrScanner.Buffer(make([]byte, 0, 64*1024), maxOutputLineBytes)
 
 	if pat != "" {
 		buff := bytes.Buffer{}
@@ -119,6 +130,7 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
 	}
 	var mut sync.Mutex
+	var readErr error
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(1)
 	// Asynchronously read the output from the command line by line
@@ -129,6 +141,15 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 			mut.Lock()
 			outputHandler(stdOutScanner.Text())
 			mut.Unlock()
+		}
+		if scanErr := stdOutScanner.Err(); scanErr != nil {
+			mut.Lock()
+			if readErr == nil {
+				readErr = scanErr
+			}
+			mut.Unlock()
+			// drain so the process can finish instead of blocking on a full pipe
+			_, _ = io.Copy(io.Discard, stdout)
 		}
 		waitGroup.Done()
 	}()
@@ -142,6 +163,14 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 			outputHandler(stdErrScanner.Text())
 			mut.Unlock()
 		}
+		if scanErr := stdErrScanner.Err(); scanErr != nil {
+			mut.Lock()
+			if readErr == nil {
+				readErr = scanErr
+			}
+			mut.Unlock()
+			_, _ = io.Copy(io.Discard, stderr)
+		}
 		waitGroup.Done()
 	}()
 
@@ -149,8 +178,16 @@ func (c *cli) ExecuteAndStreamOutput(mask bool, outputHandler OutputHandler, pat
 	waitGroup.Wait()
 	// Wait for the command to finish apparently should be called AFTER the capturing is done.
 	// this seems counterintuitive to me but we will go with it
-	if err := cmd.Wait(); err != nil {
-		return UnableToStartErr{Err: err, Cmd: strings.Join(args, " ")}
+	waitErr := cmd.Wait()
+	if readErr != nil {
+		var wrapped error
+		if waitErr != nil {
+			wrapped = UnableToStartErr{Err: waitErr, Cmd: strings.Join(args, " ")}
+		}
+		return fmt.Errorf("cmd '%s' output: %w", strings.Join(args, " "), errors.Join(readErr, wrapped))
+	}
+	if waitErr != nil {
+		return UnableToStartErr{Err: waitErr, Cmd: strings.Join(args, " ")}
 	}
 
 	// If there was no error, return nil

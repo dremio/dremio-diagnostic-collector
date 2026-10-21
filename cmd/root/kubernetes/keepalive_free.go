@@ -15,6 +15,7 @@
 package kubernetes
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -96,7 +97,9 @@ func (c *KubeCtlAPIActions) HostExecuteAndStreamNoKeepalive(hostString string, o
 		return err
 	}
 	stdout := &eosLineWriter{output: output}
+	var lastStderr string
 	stderr := &K8SWriter{Output: func(line string) {
+		lastStderr = line
 		simplelog.Warningf("%v stderr: %v", hostString, line)
 	}}
 	err = executor.StreamWithContext(c.hook.GetContext(), remotecommand.StreamOptions{
@@ -105,6 +108,10 @@ func (c *KubeCtlAPIActions) HostExecuteAndStreamNoKeepalive(hostString string, o
 	})
 	stderr.Flush()
 	complete := stdout.finish() // always runs: delivers the last complete line
+	var rexit *collection.RemoteExitError
+	if errors.As(complete, &rexit) {
+		rexit.Stderr = lastStderr
+	}
 	if err != nil {
 		return err
 	}
@@ -170,7 +177,7 @@ func (w *eosLineWriter) finish() error {
 		return collection.ErrStreamIncomplete
 	}
 	if w.rc != 0 {
-		return fmt.Errorf("remote command exited with code %d", w.rc)
+		return &collection.RemoteExitError{Code: w.rc}
 	}
 	return nil
 }

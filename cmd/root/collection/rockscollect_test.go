@@ -17,12 +17,15 @@ package collection
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
@@ -155,7 +158,7 @@ func TestRunRocksDBCollectionSkipsWhenNoCatalog(t *testing.T) {
 		RocksDBDir: "/opt/dremio/data/db",
 	}
 
-	files, _, err := RunRocksDBCollection(args)
+	files, _, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -194,7 +197,7 @@ func TestRunRocksDBCollectionCollectsWhenCatalogPresent(t *testing.T) {
 	}
 
 	// We expect an error (from the uname stub), but NOT a silent nil/nil skip.
-	_, _, err := RunRocksDBCollection(args)
+	_, _, _, err := RunRocksDBCollection(args)
 	if err == nil {
 		t.Fatal("expected an error propagated from uname stub, got nil — catalog gate may have skipped incorrectly")
 	}
@@ -261,16 +264,16 @@ func TestWLMFileLayout(t *testing.T) {
 		CollectQueriesPerf:     false,
 	}
 
-	got, _, err := RunRocksDBCollection(args)
+	got, _, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
 
 	wantContent := map[string]string{
-		"queues.json":        `{"queues":[]}`,
-		"rules.json":         `{"rules":[]}`,
-		"engines.json":       `{"engines":[]}`,
-		"cluster_usage.json": `{"cluster_usage":[]}`,
+		"queues.json":        `{"queues":[]}` + "\n",
+		"rules.json":         `{"rules":[]}` + "\n",
+		"engines.json":       `{"engines":[]}` + "\n",
+		"cluster_usage.json": `{"cluster_usage":[]}` + "\n",
 	}
 
 	var wlmDir string
@@ -368,7 +371,7 @@ func TestWLMClusterUsageSkippedByDefault(t *testing.T) {
 		CollectQueriesPerf: false,
 	}
 
-	got, _, err := RunRocksDBCollection(args)
+	got, _, _, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
@@ -399,15 +402,23 @@ func perfLine(i int) string {
 
 // queriesPerfCollector streams fixed lines through HostExecuteAndStream, the
 // path used by transports without KeepaliveFreeStreamer (SSH, local, kubectl).
+// Only -type queries_perf is served from lines/streamErr; every other command
+// goes to mockStreamCollector.HostExecuteAndStream.
 // mockStreamCollector holds an atomic.Bool, so it is embedded by pointer.
 type queriesPerfCollector struct {
 	*mockStreamCollector
-	lines     []string
-	streamErr error
-	calls     int
+	lines      []string
+	streamErr  error
+	calls      int
+	streamCmds []string // every command served by HostExecuteAndStream
 }
 
-func (q *queriesPerfCollector) HostExecuteAndStream(_ bool, _ string, out cli.OutputHandler, _ string, _ ...string) error {
+func (q *queriesPerfCollector) HostExecuteAndStream(mask bool, host string, out cli.OutputHandler, pat string, args ...string) error {
+	cmd := strings.Join(args, " ")
+	q.streamCmds = append(q.streamCmds, cmd)
+	if !strings.Contains(cmd, "-type queries_perf") {
+		return q.mockStreamCollector.HostExecuteAndStream(mask, host, out, pat, args...)
+	}
 	q.calls++
 	for _, l := range q.lines {
 		out(l)
@@ -420,9 +431,15 @@ func (q *queriesPerfCollector) HostExecuteAndStream(_ bool, _ string, out cli.Ou
 type keepaliveFreeCollector struct {
 	*queriesPerfCollector
 	noKeepaliveCalls int
+	noKeepaliveCmds  []string // every command served by HostExecuteAndStreamNoKeepalive
 }
 
-func (k *keepaliveFreeCollector) HostExecuteAndStreamNoKeepalive(_ string, out cli.OutputHandler, _ ...string) error {
+func (k *keepaliveFreeCollector) HostExecuteAndStreamNoKeepalive(host string, out cli.OutputHandler, args ...string) error {
+	cmd := strings.Join(args, " ")
+	k.noKeepaliveCmds = append(k.noKeepaliveCmds, cmd)
+	if !strings.Contains(cmd, "-type queries_perf") {
+		return k.mockStreamCollector.HostExecuteAndStream(false, host, out, "", args...)
+	}
 	k.noKeepaliveCalls++
 	for _, l := range k.lines {
 		out(l)
@@ -517,6 +534,134 @@ func TestCollectQueriesPerf_FallbackTransportIncomplete(t *testing.T) {
 	}
 }
 
+func TestCollectQueriesPerf_CountGuardSkipsStream(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1)}, nil)}
+	k.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-count") {
+			return guardRefuseLine, &RemoteExitError{Code: 3}
+		}
+		return "", fmt.Errorf("unexpected host command: %v", args)
+	}
+	files, _, err := runQueriesPerf(t, k)
+	var mg *MemoryGuardError
+	if !errors.As(err, &mg) {
+		t.Fatalf("err = %v, want *MemoryGuardError", err)
+	}
+	if mg.Item != "queries-perf" || mg.Detail != refuseDetail {
+		t.Errorf("got %+v, want queries-perf / %q", mg, refuseDetail)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	if k.noKeepaliveCalls != 0 || k.calls != 0 {
+		t.Errorf("noKeepaliveCalls=%d calls=%d, want 0 and 0 (stream must not start)", k.noKeepaliveCalls, k.calls)
+	}
+}
+
+func TestCollectQueriesPerf_CountFailureNonGuardStillStreams(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, nil)}
+	k.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-count") {
+			return "", errors.New("boom")
+		}
+		return "", fmt.Errorf("unexpected host command: %v", args)
+	}
+	files, _, err := runQueriesPerf(t, k)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(files) != 1 || k.noKeepaliveCalls != 1 {
+		t.Fatalf("files=%d noKeepaliveCalls=%d, want 1 and 1", len(files), k.noKeepaliveCalls)
+	}
+}
+
+func TestCollectQueriesPerf_StreamGuardDiscardsFiles(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector(
+		[]string{perfLine(1), perfLine(2)}, &RemoteExitError{Code: 3, Stderr: guardAbortLine})}
+	files, dir, err := runQueriesPerf(t, k)
+	var mg *MemoryGuardError
+	var inc *IncompleteCollectionError
+	if !errors.As(err, &mg) || errors.As(err, &inc) {
+		t.Fatalf("err = %v, want *MemoryGuardError and not *IncompleteCollectionError", err)
+	}
+	if mg.Item != "queries-perf" || mg.Detail != abortDetail {
+		t.Errorf("got %+v, want queries-perf / %q", mg, abortDetail)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	left, _ := filepath.Glob(filepath.Join(dir, "queries-perf", "dremio-master-0", "*.json"))
+	if len(left) != 0 {
+		t.Errorf("leftover files: %v", left)
+	}
+}
+
+func TestCollectQueriesPerf_FallbackGuardLineNotWritten(t *testing.T) {
+	q := newQueriesPerfCollector([]string{perfLine(1), guardAbortLine}, &RemoteExitError{Code: 3})
+	files, dir, err := runQueriesPerf(t, q)
+	var mg *MemoryGuardError
+	if !errors.As(err, &mg) || mg.Detail != abortDetail {
+		t.Fatalf("err = %v, want *MemoryGuardError with abort detail", err)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	var jsons []string
+	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, _ error) error {
+		if d != nil && !d.IsDir() && strings.HasSuffix(p, ".json") {
+			jsons = append(jsons, p)
+		}
+		return nil
+	})
+	if len(jsons) != 0 {
+		t.Errorf("leftover json files: %v", jsons)
+	}
+}
+
+func TestRunRocksDBCollection_QueriesPerfGuardSkip(t *testing.T) {
+	q := newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, &RemoteExitError{Code: 3, Stderr: guardAbortLine})
+	q.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+			return "exists", nil
+		case strings.Contains(cmd, "uname -m"):
+			return "x86_64\n", nil
+		case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"):
+			return "", nil
+		case strings.Contains(cmd, "-type cluster_stats"):
+			return `{"cluster":"stub"}`, nil
+		case strings.Contains(cmd, "-count"):
+			return "2", nil
+		}
+		return "", fmt.Errorf("unexpected host command: %s", cmd)
+	}
+	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
+	k := &keepaliveFreeCollector{queriesPerfCollector: q}
+
+	files, incomplete, guardSkips, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:          k,
+		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:               "dremio-master-0",
+		NodeType:           "coordinator",
+		RocksDBDir:         "/opt/dremio/data/db",
+		CollectQueriesPerf: true,
+		QueriesPerfDays:    7,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(incomplete) != 0 {
+		t.Errorf("incomplete = %+v, want none", incomplete)
+	}
+	if len(guardSkips) != 1 || guardSkips[0].Item != "queries-perf" || guardSkips[0].Detail != abortDetail {
+		t.Fatalf("guardSkips = %+v, want one queries-perf item", guardSkips)
+	}
+	if len(files) != 1 || filepath.Base(files[0].Path) != "cluster-stats.json" {
+		t.Errorf("files = %+v, want only cluster-stats.json", files)
+	}
+}
+
 func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
 	q := newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, ErrStreamIncomplete)
 	q.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
@@ -538,7 +683,7 @@ func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
 	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
 	k := &keepaliveFreeCollector{queriesPerfCollector: q}
 
-	files, incomplete, err := RunRocksDBCollection(RocksCollectArgs{
+	files, incomplete, _, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:          k,
 		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:               "dremio-master-0",
@@ -555,5 +700,437 @@ func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
 	}
 	if len(files) != 2 {
 		t.Errorf("files = %d, want 2 (cluster-stats + partial queries-perf)", len(files))
+	}
+}
+
+// viewerVersionCollector stubs the host commands needed to reach cluster_stats,
+// recording every command and answering the -version call with versionOut/versionErr.
+func viewerVersionCollector(calls *[]string, versionOut string, versionErr error) *mockStreamCollector {
+	return &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			*calls = append(*calls, cmd)
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64", nil
+			case strings.Contains(cmd, "chmod"), strings.Contains(cmd, "rm -f"):
+				return "", nil
+			case strings.HasSuffix(cmd, " -version"):
+				return versionOut, versionErr
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+	}
+}
+
+func TestRunRocksDBCollection_LogsViewerVersion(t *testing.T) {
+	var calls []string
+	mc := viewerVersionCollector(&calls, "dremio-rocksdb-viewer v1.1.0", nil)
+	_, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:    mc,
+		CopyStrategy: &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:         "dremio-master-0",
+		NodeType:     "coordinator",
+		RocksDBDir:   "/opt/dremio/data/db",
+	})
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+	chmodIdx, versionIdx, firstTypeIdx := -1, -1, -1
+	for i, c := range calls {
+		switch {
+		case c == "chmod +x /tmp/dremio-rocksdb-viewer":
+			chmodIdx = i
+		case c == "/tmp/dremio-rocksdb-viewer -version":
+			versionIdx = i
+		case strings.Contains(c, " -type ") && firstTypeIdx == -1:
+			firstTypeIdx = i
+		}
+	}
+	if versionIdx == -1 {
+		t.Fatalf("-version command was never issued; calls: %v", calls)
+	}
+	if chmodIdx == -1 || versionIdx < chmodIdx {
+		t.Errorf("-version (idx %d) must run after chmod (idx %d)", versionIdx, chmodIdx)
+	}
+	if firstTypeIdx == -1 || versionIdx > firstTypeIdx {
+		t.Errorf("-version (idx %d) must run before the first -type command (idx %d)", versionIdx, firstTypeIdx)
+	}
+}
+
+func TestRunRocksDBCollection_VersionFailureNonFatal(t *testing.T) {
+	var calls []string
+	mc := viewerVersionCollector(&calls, "", errors.New("exec failed"))
+	got, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:    mc,
+		CopyStrategy: &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:         "dremio-master-0",
+		NodeType:     "coordinator",
+		RocksDBDir:   "/opt/dremio/data/db",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error when -version fails, got %v", err)
+	}
+	found := false
+	for _, cf := range got {
+		if filepath.Base(cf.Path) == "cluster-stats.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected cluster-stats.json to be collected, got %v", got)
+	}
+}
+
+func TestBuildJobsRecentFilterArgs(t *testing.T) {
+	tests := []struct {
+		name string
+		args RocksCollectArgs
+		want string
+	}{
+		{"perf days 30 capped to 7", RocksCollectArgs{QueriesPerfDays: 30}, " -days 7"},
+		{"perf days 7", RocksCollectArgs{QueriesPerfDays: 7}, " -days 7"},
+		{"perf days 3", RocksCollectArgs{QueriesPerfDays: 3}, " -days 3"},
+		{"perf days 0 defaults to 7", RocksCollectArgs{QueriesPerfDays: 0}, " -days 7"},
+		{"days 3", RocksCollectArgs{Days: 3}, " -days 3"},
+		{"days 30 uncapped", RocksCollectArgs{Days: 30, QueriesPerfDays: 30}, " -days 30"},
+		{"start date and days", RocksCollectArgs{StartDate: "2026-10-01", Days: 5}, " -start-date 2026-10-01 -days 5"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := buildJobsRecentFilterArgs(tt.args); got != tt.want {
+				t.Errorf("buildJobsRecentFilterArgs(%+v) = %q, want %q", tt.args, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunRocksDBCollection_JobsRecentWindow(t *testing.T) {
+	var calls []string
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			calls = append(calls, cmd)
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64", nil
+			case strings.Contains(cmd, "chmod"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+				return "", nil
+			case strings.Contains(cmd, " -type "):
+				return `{"a":1}`, nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+	}
+	_, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:           mc,
+		CopyStrategy:        &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:                "dremio-master-0",
+		NodeType:            "coordinator",
+		RocksDBDir:          "/opt/dremio/data/db",
+		CollectSystemTables: true,
+		SystemTables:        []string{"jobs_recent", "views"},
+		QueriesPerfDays:     30,
+	})
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+	var jobs, views string
+	for _, c := range calls {
+		switch {
+		case strings.Contains(c, "-type sys.jobs_recent"):
+			jobs = c
+		case strings.Contains(c, "-type sys.views"):
+			views = c
+		}
+	}
+	if !strings.HasSuffix(jobs, "-type sys.jobs_recent -days 7") {
+		t.Errorf("jobs_recent command = %q, want suffix %q", jobs, "-type sys.jobs_recent -days 7")
+	}
+	if views == "" || strings.Contains(views, "-days") {
+		t.Errorf("views command = %q, want present and without -days", views)
+	}
+}
+
+// regularFiles lists every regular file under dir.
+func regularFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", dir, err)
+	}
+	return files
+}
+
+// streamCollector answers every command with out and err; viewer streams go
+// through the mock's merged-output HostExecuteAndStream.
+func streamCollector(out string, err error) *mockStreamCollector {
+	return &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, _ ...string) (string, error) { return out, err },
+	}
+}
+
+// runRocksType runs collectRocksType for item into a fresh copy-strategy dir and
+// returns its results plus that dir.
+func runRocksType(t *testing.T, c Collector, item, filename string) (*helpers.CollectedFile, string, error) {
+	t.Helper()
+	dir := t.TempDir()
+	cf, err := collectRocksType(c, &mockCopyStrategy{tmpDir: dir}, "dremio-master-0", "coordinator",
+		"/opt/dremio/data/db/catalog", item, "", "system-tables", filename)
+	return cf, dir, err
+}
+
+func TestCollectRocksType_StreamsExactBytes(t *testing.T) {
+	cf, dir, err := runRocksType(t, streamCollector("{\"a\":1}\n{\"a\":2}", nil), "sys.views", "sys.views.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cf == nil {
+		t.Fatal("expected a collected file, got nil")
+	}
+	if filepath.Base(cf.Path) != "sys.views.json" {
+		t.Errorf("path = %s, want sys.views.json", cf.Path)
+	}
+	data, err := os.ReadFile(cf.Path)
+	if err != nil {
+		t.Fatalf("read %s: %v", cf.Path, err)
+	}
+	if want := "{\"a\":1}\n{\"a\":2}\n"; string(data) != want {
+		t.Errorf("content = %q, want %q", string(data), want)
+	}
+	if cf.Size != 16 {
+		t.Errorf("Size = %d, want 16", cf.Size)
+	}
+	files := regularFiles(t, dir)
+	for _, f := range files {
+		if strings.HasSuffix(f, ".partial") {
+			t.Errorf("temp file left behind: %s", f)
+		}
+	}
+	if len(files) != 1 {
+		t.Errorf("files = %v, want only %s", files, cf.Path)
+	}
+}
+
+func TestCollectRocksType_EmptyOutputNoFile(t *testing.T) {
+	cf, dir, err := runRocksType(t, streamCollector("", nil), "sys.views", "sys.views.json")
+	if cf != nil || err != nil {
+		t.Fatalf("got (%v, %v), want (nil, nil)", cf, err)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_ErrorLeavesNoFile(t *testing.T) {
+	cf, dir, err := runRocksType(t, streamCollector("{\"a\":1}\n{\"a\":2}", errors.New("connection reset")), "sys.views", "sys.views.json")
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	var mg *MemoryGuardError
+	if errors.As(err, &mg) {
+		t.Errorf("err = %v, want a plain error, not a memory guard skip", err)
+	}
+	if cf != nil {
+		t.Errorf("cf = %v, want nil", cf)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_Exit137IsPlainError(t *testing.T) {
+	_, dir, err := runRocksType(t, streamCollector(`{"a":1}`, &RemoteExitError{Code: 137}), "sys.views", "sys.views.json")
+	if err == nil {
+		t.Fatal("expected an error, got nil")
+	}
+	var mg *MemoryGuardError
+	if errors.As(err, &mg) {
+		t.Errorf("err = %v, want a plain error for exit 137", err)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_GuardOnMergedOutput(t *testing.T) {
+	c := streamCollector("{\"a\":1}\n"+guardRefuseLine, &RemoteExitError{Code: 3})
+	cf, dir, err := runRocksType(t, c, "sys.jobs_recent", "sys.jobs_recent.json")
+	var mg *MemoryGuardError
+	if !errors.As(err, &mg) {
+		t.Fatalf("err = %v, want *MemoryGuardError", err)
+	}
+	if mg.Item != "sys.jobs_recent" || mg.Detail != refuseDetail {
+		t.Errorf("got %+v, want sys.jobs_recent / %q", mg, refuseDetail)
+	}
+	if cf != nil {
+		t.Errorf("cf = %v, want nil", cf)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_GuardOnKeepaliveFree(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: &queriesPerfCollector{
+		mockStreamCollector: streamCollector("", &RemoteExitError{Code: 3, Stderr: guardAbortLine}),
+	}}
+	_, dir, err := runRocksType(t, k, "sys.views", "sys.views.json")
+	var mg *MemoryGuardError
+	if !errors.As(err, &mg) {
+		t.Fatalf("err = %v, want *MemoryGuardError", err)
+	}
+	if mg.Item != "sys.views" || mg.Detail != abortDetail {
+		t.Errorf("got %+v, want sys.views / %q", mg, abortDetail)
+	}
+	if len(k.noKeepaliveCmds) != 1 || len(k.streamCmds) != 0 {
+		t.Errorf("noKeepaliveCmds=%v streamCmds=%v, want one keepalive-free call", k.noKeepaliveCmds, k.streamCmds)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestRunViewerStream_ExecutorPerType(t *testing.T) {
+	cmdFor := func(dataType string) string {
+		return rocksdbViewerRemotePath + " -db /opt/dremio/data/db/catalog -type " + dataType
+	}
+	types := []string{"wlm_cluster_usage", "sys.views", "cluster_stats", "wlm_queues"}
+	run := func(c Collector) {
+		t.Helper()
+		for _, dt := range types {
+			if err := runViewerStream(c, "dremio-master-0", dt, cmdFor(dt), func(string) {}); err != nil {
+				t.Fatalf("runViewerStream(%s): %v", dt, err)
+			}
+		}
+	}
+
+	k := &keepaliveFreeCollector{queriesPerfCollector: &queriesPerfCollector{mockStreamCollector: streamCollector("", nil)}}
+	run(k)
+	if want := []string{cmdFor("wlm_cluster_usage")}; !slices.Equal(k.streamCmds, want) {
+		t.Errorf("keepalive-capable: HostExecuteAndStream served %v, want %v", k.streamCmds, want)
+	}
+	if want := []string{cmdFor("sys.views"), cmdFor("cluster_stats"), cmdFor("wlm_queues")}; !slices.Equal(k.noKeepaliveCmds, want) {
+		t.Errorf("keepalive-capable: HostExecuteAndStreamNoKeepalive served %v, want %v", k.noKeepaliveCmds, want)
+	}
+
+	q := &queriesPerfCollector{mockStreamCollector: streamCollector("", nil)}
+	run(q)
+	var want []string
+	for _, dt := range types {
+		want = append(want, cmdFor(dt))
+	}
+	if !slices.Equal(q.streamCmds, want) {
+		t.Errorf("plain: HostExecuteAndStream served %v, want %v", q.streamCmds, want)
+	}
+}
+
+func TestRunRocksDBCollection_GuardSkipsContinue(t *testing.T) {
+	var calls []string
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			calls = append(calls, cmd)
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64", nil
+			case strings.Contains(cmd, "chmod"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+				return "", nil
+			case strings.Contains(cmd, "-type sys.jobs_recent"), strings.Contains(cmd, "-type sys.views"):
+				return guardRefuseLine, &RemoteExitError{Code: 3}
+			case strings.Contains(cmd, "-type sys.tables"):
+				return `{"t":1}`, nil
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+	}
+	files, _, guards, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:           mc,
+		CopyStrategy:        &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:                "dremio-master-0",
+		NodeType:            "coordinator",
+		RocksDBDir:          "/opt/dremio/data/db",
+		CollectSystemTables: true,
+		SystemTables:        []string{"jobs_recent", "views", "tables"},
+	})
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+	var items []string
+	for _, g := range guards {
+		items = append(items, g.Item)
+		if g.Detail != refuseDetail {
+			t.Errorf("%s: Detail = %q, want %q", g.Item, g.Detail, refuseDetail)
+		}
+	}
+	if want := []string{"sys.jobs_recent", "sys.views"}; !slices.Equal(items, want) {
+		t.Errorf("guard skips = %v, want %v", items, want)
+	}
+	found := false
+	for _, cf := range files {
+		if filepath.Base(cf.Path) == "sys.tables.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("sys.tables.json not collected; files = %v", files)
+	}
+	if !slices.Contains(calls, "rm -f "+rocksdbViewerRemotePath) {
+		t.Errorf("viewer cleanup not issued; calls = %v", calls)
+	}
+}
+
+func stubRename(t *testing.T, failures int) *int {
+	t.Helper()
+	origRename, origSleep := renameFile, renameSleep
+	t.Cleanup(func() { renameFile, renameSleep = origRename, origSleep })
+	calls := 0
+	renameFile = func(_, _ string) error {
+		calls++
+		if calls <= failures {
+			return errors.New("access is denied")
+		}
+		return nil
+	}
+	renameSleep = func(time.Duration) {}
+	return &calls
+}
+
+func TestRenameWithRetry_SucceedsAfterTransientFailures(t *testing.T) {
+	calls := stubRename(t, 2)
+	if err := renameWithRetry("a.partial", "a"); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if *calls != 3 {
+		t.Fatalf("expected 3 rename calls, got %d", *calls)
+	}
+}
+
+func TestRenameWithRetry_GivesUpAfterFiveAttempts(t *testing.T) {
+	calls := stubRename(t, 1000)
+	if err := renameWithRetry("a.partial", "a"); err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if *calls != 5 {
+		t.Fatalf("expected 5 rename calls, got %d", *calls)
 	}
 }

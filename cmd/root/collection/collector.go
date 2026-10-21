@@ -77,6 +77,16 @@ type KeepaliveFreeStreamer interface {
 // ErrStreamIncomplete means a remote stream ended before its end-of-stream marker.
 var ErrStreamIncomplete = errors.New("remote stream ended before end-of-stream marker")
 
+// RemoteExitError: a remote command ran to completion with a non-zero exit code.
+type RemoteExitError struct {
+	Code   int
+	Stderr string // last stderr line, when the transport captured it
+}
+
+func (e *RemoteExitError) Error() string {
+	return fmt.Sprintf("remote command exited with code %d", e.Code)
+}
+
 type Args struct {
 	DDCfs                 helpers.Filesystem
 	OutputLoc             string
@@ -268,7 +278,7 @@ func successRate(collected, failed, skipped int) (float64, int) {
 }
 
 // logDistributedCollectionSummary logs a comprehensive summary of the distributed collection
-func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles, incomplete []string, nodesConnectedTo int, duration time.Duration) {
+func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles, incomplete, guardSkips []string, nodesConnectedTo int, duration time.Duration) {
 	simplelog.Info("=== DISTRIBUTED COLLECTION SUMMARY ===")
 
 	// Basic collection info
@@ -295,6 +305,9 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	simplelog.Infof("  Failed Collections: %d", totalFailures)
 	simplelog.Infof("  Skipped Collections: %d", len(totalSkippedFiles))
 	simplelog.Infof("  Incomplete Collections: %d", len(incomplete))
+	if len(guardSkips) > 0 {
+		simplelog.Infof("  Memory Guard Skips: %d", len(guardSkips))
+	}
 
 	// File details
 	if len(files) > 0 {
@@ -333,6 +346,14 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	if len(incomplete) > 0 {
 		simplelog.Warning("INCOMPLETE COLLECTIONS:")
 		for _, item := range incomplete {
+			simplelog.Warningf("  - %s", item)
+		}
+	}
+
+	// Exports skipped by the RocksDB viewer's memory guard (exit 3)
+	if len(guardSkips) > 0 {
+		simplelog.Warning("MEMORY GUARD SKIPS:")
+		for _, item := range guardSkips {
 			simplelog.Warningf("  - %s", item)
 		}
 	}

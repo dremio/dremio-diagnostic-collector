@@ -154,12 +154,29 @@ type RocksCollectArgs struct {
 var wlmTypes = []string{"wlm_queues", "wlm_rules", "wlm_engines", "wlm_cluster_usage"}
 
 // RunRocksDBCollection runs the rocksdb-viewer on the coordinator node and returns
-// the list of files collected (for inclusion in per-node file counts and byte totals).
-func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*IncompleteCollectionError, error) {
+// the list of files collected (for inclusion in per-node file counts and byte totals),
+// the incomplete items, and the exports skipped by the viewer's memory guard.
+func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*IncompleteCollectionError, []*MemoryGuardError, error) {
 	c := args.Collector
 	host := args.Host
 	dbPath := args.RocksDBDir + "/catalog"
 	var collected []helpers.CollectedFile
+	var guardSkips []*MemoryGuardError
+
+	// recordRocksType keeps a collectRocksType result: a memory guard stop is
+	// recorded as a skip, any other error is logged, and collection continues.
+	recordRocksType := func(dataType string, cf *helpers.CollectedFile, err error) {
+		var mg *MemoryGuardError
+		switch {
+		case errors.As(err, &mg):
+			guardSkips = append(guardSkips, mg)
+			simplelog.Errorf("rocksdb %s on %s: %v", dataType, host, mg)
+		case err != nil:
+			simplelog.Errorf("rocksdb %s on %s: %v", dataType, host, err)
+		case cf != nil:
+			collected = append(collected, *cf)
+		}
+	}
 
 	// The RocksDB catalog (KV store) lives only on the master coordinator.
 	// Scale-out coordinators connect to it remotely and have no local catalog,
@@ -167,7 +184,7 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 	catalogCurrent := dbPath + "/CURRENT"
 	if out, err := c.HostExecute(false, host, "test", "-f", catalogCurrent, "&&", "echo", "exists"); err != nil || !strings.Contains(out, "exists") {
 		simplelog.Infof("rocksdb: no catalog at %s on %s — skipping RocksDB-viewer collection (not a master coordinator)", catalogCurrent, host)
-		return nil, nil, nil
+		return nil, nil, nil, nil
 	}
 
 	// Upload binary
@@ -178,31 +195,37 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 
 	archStr, err := c.HostExecute(false, host, "uname -m")
 	if err != nil {
-		return nil, nil, fmt.Errorf("uname -m on %s: %w", host, err)
+		return nil, nil, nil, fmt.Errorf("uname -m on %s: %w", host, err)
 	}
 	archStr = strings.TrimSpace(archStr)
 
 	bin, err := rockscollect.GetRocksDBViewerBinary(archStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
+		return nil, nil, nil, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
 	}
 
 	localTmp, err := os.MkdirTemp("", "ddc-rocksdb-dist-*")
 	if err != nil {
-		return nil, nil, fmt.Errorf("temp dir: %w", err)
+		return nil, nil, nil, fmt.Errorf("temp dir: %w", err)
 	}
 	defer os.RemoveAll(localTmp)
 
 	localBin := filepath.Join(localTmp, "dremio-rocksdb-viewer")
 	if err := os.WriteFile(localBin, bin, 0o600); err != nil {
-		return nil, nil, fmt.Errorf("write local binary: %w", err)
+		return nil, nil, nil, fmt.Errorf("write local binary: %w", err)
 	}
 
 	if _, err := c.CopyToHost(host, localBin, rocksdbViewerRemotePath); err != nil {
-		return nil, nil, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
+		return nil, nil, nil, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
 	}
 	if _, err := c.HostExecute(false, host, "chmod +x "+rocksdbViewerRemotePath); err != nil {
-		return nil, nil, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
+		return nil, nil, nil, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
+	}
+	// Record the vendored viewer version for diagnosability; never fatal.
+	if out, err := c.HostExecute(false, host, rocksdbViewerRemotePath+" -version"); err != nil {
+		simplelog.Warningf("rocksdb-viewer -version on %s: %v", host, err)
+	} else {
+		simplelog.Infof("rocksdb-viewer on %s: %s", host, strings.TrimSpace(out))
 	}
 
 	consoleprint.UpdateNodeState(consoleprint.NodeState{
@@ -225,11 +248,8 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 		Node:     host,
 		StatusUX: "Collecting cluster stats from RocksDB",
 	})
-	if cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, "cluster_stats", "cluster-stats", "cluster-stats.json"); err != nil {
-		simplelog.Errorf("rocksdb cluster_stats on %s: %v", host, err)
-	} else if cf != nil {
-		collected = append(collected, *cf)
-	}
+	cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, "cluster_stats", "", "cluster-stats", "cluster-stats.json")
+	recordRocksType("cluster_stats", cf, err)
 
 	// Collect system tables
 	if args.CollectSystemTables {
@@ -240,11 +260,13 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 				StatusUX: fmt.Sprintf("Collecting system table: %s", viewerType),
 			})
 			fname := fmt.Sprintf("sys.%s.json", table)
-			if cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, viewerType, "system-tables", fname); err != nil {
-				simplelog.Errorf("rocksdb %s on %s: %v", viewerType, host, err)
-			} else if cf != nil {
-				collected = append(collected, *cf)
+			extraArgs := ""
+			if table == "jobs_recent" {
+				extraArgs = buildJobsRecentFilterArgs(args)
+				simplelog.Infof("rocksdb-viewer sys.jobs_recent filter: QueriesPerfDays=%d Days=%d StartDate=%q filterArgs=%q", args.QueriesPerfDays, args.Days, args.StartDate, extraArgs)
 			}
+			cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, viewerType, extraArgs, "system-tables", fname)
+			recordRocksType(viewerType, cf, err)
 		}
 	}
 
@@ -260,11 +282,8 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 				StatusUX: fmt.Sprintf("Collecting WLM: %s", wt),
 			})
 			fname := strings.TrimPrefix(wt, "wlm_") + ".json"
-			if cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, wt, "wlm", fname); err != nil {
-				simplelog.Errorf("rocksdb %s on %s: %v", wt, host, err)
-			} else if cf != nil {
-				collected = append(collected, *cf)
-			}
+			cf, err := collectRocksType(c, args.CopyStrategy, host, args.NodeType, dbPath, wt, "", "wlm", fname)
+			recordRocksType(wt, cf, err)
 		}
 	}
 
@@ -277,7 +296,11 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 		})
 		files, err := collectQueriesPerf(c, args.CopyStrategy, host, args.NodeType, dbPath, args)
 		var inc *IncompleteCollectionError
+		var mg *MemoryGuardError
 		switch {
+		case errors.As(err, &mg):
+			simplelog.Errorf("rocksdb queries_perf on %s: %v", host, mg)
+			guardSkips = append(guardSkips, mg)
 		case errors.As(err, &inc):
 			simplelog.Warningf("rocksdb queries_perf on %s: %v", host, err)
 			collected = append(collected, files...)
@@ -289,30 +312,132 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 		}
 	}
 
-	return collected, incomplete, nil
+	return collected, incomplete, guardSkips, nil
 }
 
-func collectRocksType(c Collector, cs CopyStrategy, host, nodeType, dbPath, dataType, strategyType, filename string) (*helpers.CollectedFile, error) {
-	cmdStr := fmt.Sprintf("%s -db %s -type %s", rocksdbViewerRemotePath, dbPath, dataType)
-	out, err := c.HostExecute(false, host, cmdStr)
-	if err != nil {
-		return nil, fmt.Errorf("execute rocksdb-viewer -type %s: %w", dataType, err)
-	}
-	if strings.TrimSpace(out) == "" {
-		simplelog.Infof("rocksdb-viewer -type %s returned empty output on %s", dataType, host)
-		return nil, nil
-	}
+// collectRocksType streams one viewer -type export into <filename>.partial and
+// renames it to <filename> only on success. On any error the temp file is
+// deleted and nothing is kept; an exit 3 is returned as a *MemoryGuardError.
+func collectRocksType(c Collector, cs CopyStrategy, host, nodeType, dbPath, dataType, extraArgs, strategyType, filename string) (*helpers.CollectedFile, error) {
 	destDir, err := cs.CreatePath(strategyType, host, nodeType)
 	if err != nil {
 		return nil, fmt.Errorf("create path for %s: %w", strategyType, err)
 	}
 	destPath := filepath.Join(destDir, filename)
-	if err := os.WriteFile(destPath, []byte(out), 0600); err != nil {
-		return nil, fmt.Errorf("write %s: %w", destPath, err)
+	tmpPath := destPath + ".partial"
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600) // #nosec G304 -- path is derived from controlled internal dir + fixed file name
+	if err != nil {
+		return nil, fmt.Errorf("create %s: %w", tmpPath, err)
 	}
-	size := int64(len(out))
+	// discard closes before removing: Windows cannot remove an open file.
+	discard := func() {
+		_ = f.Close()
+		_ = os.Remove(tmpPath)
+	}
+	bw := bufio.NewWriter(f)
+
+	var mu sync.Mutex
+	var size int64
+	var nonBlank bool
+	var captured string // guard detail seen on a merged-output transport
+	var writeErr error
+	handler := func(line string) {
+		mu.Lock()
+		defer mu.Unlock()
+		if d, ok := memoryGuardDetail(line); ok {
+			captured = d // a stderr line, never part of the export
+			return
+		}
+		if writeErr != nil {
+			return
+		}
+		if _, err := bw.WriteString(line); err != nil {
+			writeErr = err
+			return
+		}
+		if err := bw.WriteByte('\n'); err != nil {
+			writeErr = err
+			return
+		}
+		size += int64(len(line)) + 1
+		if strings.TrimSpace(line) != "" {
+			nonBlank = true
+		}
+	}
+
+	cmdStr := fmt.Sprintf("%s -db %s -type %s%s", rocksdbViewerRemotePath, dbPath, dataType, extraArgs)
+	err = runViewerStream(c, host, dataType, cmdStr, handler)
+	mu.Lock()
+	defer mu.Unlock()
+	if err == nil && writeErr != nil {
+		err = fmt.Errorf("write %s: %w", tmpPath, writeErr)
+	}
+	if err != nil {
+		discard()
+		if mg, ok := asMemoryGuardError(dataType, err, captured); ok {
+			return nil, mg
+		}
+		return nil, fmt.Errorf("execute rocksdb-viewer -type %s: %w", dataType, err)
+	}
+	if !nonBlank {
+		discard()
+		simplelog.Infof("rocksdb-viewer -type %s returned empty output on %s", dataType, host)
+		return nil, nil
+	}
+	if err := bw.Flush(); err != nil {
+		discard()
+		return nil, fmt.Errorf("write %s: %w", tmpPath, err)
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("close %s: %w", tmpPath, err)
+	}
+	if err := renameWithRetry(tmpPath, destPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("rename %s: %w", tmpPath, err)
+	}
 	simplelog.Infof("rocksdb-viewer: collected %s -> %s (%d bytes)", dataType, destPath, size)
 	return &helpers.CollectedFile{Path: destPath, Size: size}, nil
+}
+
+// renameFile and renameSleep are variables so tests can inject failures
+// without waiting.
+var (
+	renameFile  = os.Rename
+	renameSleep = time.Sleep
+)
+
+// renameWithRetry renames src to dst, retrying a few times with a short
+// backoff. On Windows, antivirus or indexer handles on a just-closed file can
+// make the rename fail briefly with "Access is denied".
+func renameWithRetry(src, dst string) error {
+	const attempts = 5
+	delay := 50 * time.Millisecond
+	var err error
+	for i := 0; i < attempts; i++ {
+		if err = renameFile(src, dst); err == nil {
+			return nil
+		}
+		if i < attempts-1 {
+			renameSleep(delay)
+			delay *= 2
+		}
+	}
+	return err
+}
+
+// runViewerStream runs one viewer -type export, streaming its lines to out.
+// wlm_cluster_usage keeps the pinged HostExecuteAndStream: its scan can be
+// silent for hours, so it needs keepalives. Every other type uses the
+// keepalive-free, end-of-stream-checked executor when the transport has one
+// (#339), like queries_perf.
+func runViewerStream(c Collector, host, dataType, cmd string, out cli.OutputHandler) error {
+	if dataType != "wlm_cluster_usage" {
+		if kf, ok := c.(KeepaliveFreeStreamer); ok {
+			return kf.HostExecuteAndStreamNoKeepalive(host, out, cmd)
+		}
+	}
+	return c.HostExecuteAndStream(false, host, out, "", cmd)
 }
 
 // buildQueriesPerfFilterArgs returns the day/date filter portion of the rocksdb-viewer command.
@@ -333,6 +458,20 @@ func buildQueriesPerfFilterArgs(args RocksCollectArgs) string {
 	return ""
 }
 
+// buildJobsRecentFilterArgs returns the window args for sys.jobs_recent. An explicit
+// StartDate/Days window is used as-is (same as queries-perf); otherwise the window is
+// QueriesPerfDays capped at 7 days (7 when unset).
+func buildJobsRecentFilterArgs(args RocksCollectArgs) string {
+	if args.StartDate != "" || args.Days > 0 {
+		return buildQueriesPerfFilterArgs(args)
+	}
+	days := args.QueriesPerfDays
+	if days <= 0 || days > 7 {
+		days = 7
+	}
+	return fmt.Sprintf(" -days %d", days)
+}
+
 func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath string, args RocksCollectArgs) ([]helpers.CollectedFile, error) {
 	filterArgs := buildQueriesPerfFilterArgs(args)
 	simplelog.Infof("rocksdb-viewer queries_perf filter: QueriesPerfDays=%d Days=%d StartDate=%q filterArgs=%q", args.QueriesPerfDays, args.Days, args.StartDate, filterArgs)
@@ -345,6 +484,9 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	countCmd := fmt.Sprintf("%s -db %s -type queries_perf -count%s", rocksdbViewerRemotePath, dbPath, filterArgs)
 	countOut, err := c.HostExecute(false, host, countCmd)
 	if err != nil {
+		if mg, ok := asMemoryGuardError("queries-perf", err, memoryGuardDetailIn(countOut)); ok {
+			return nil, mg
+		}
 		simplelog.Warningf("rocksdb-viewer queries_perf -count failed on %s: %v (continuing without progress)", host, err)
 	}
 	totalRecords, _ := strconv.Atoi(strings.TrimSpace(countOut))
@@ -371,6 +513,7 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 
 	var mu sync.Mutex
 	var writeErr error
+	var captured string // guard detail seen on a merged-output transport
 	lineCount := 0
 	lastUI := time.Now()
 	lastLog := time.Now()
@@ -378,6 +521,10 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	handler := func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
+		if d, ok := memoryGuardDetail(line); ok {
+			captured = d // a stderr line, never part of the export
+			return
+		}
 		if writeErr != nil {
 			return
 		}
@@ -427,8 +574,17 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	}
 	mu.Lock()
 	streamed := lineCount
+	guardDetail := captured
 	mu.Unlock()
 	simplelog.Infof("rocksdb-viewer queries_perf on %s: streamed %d records (pre-flight count %d)", host, streamed, totalRecords)
+	if mg, ok := asMemoryGuardError("queries-perf", streamErr, guardDetail); ok {
+		// Discard partial output; close first, Windows cannot remove open files.
+		_ = dw.Close()
+		for _, date := range dw.dates {
+			_ = os.Remove(filepath.Join(destDir, fmt.Sprintf("queries-perf.%s.json", date)))
+		}
+		return nil, mg
+	}
 	if streamErr != nil && streamed == 0 {
 		return nil, fmt.Errorf("execute rocksdb-viewer queries_perf: %w", streamErr)
 	}

@@ -261,3 +261,19 @@ func TestHostExecuteAndStreamNoKeepalive_TransportError(t *testing.T) {
 		t.Errorf("lines = %q, want %q (complete lines are kept)", lines, want)
 	}
 }
+
+func TestHostExecuteAndStreamNoKeepalive_GuardExitCarriesStderr(t *testing.T) {
+	abort := "error: memory guard: aborting: source=cgroup2 used_mib=1 limit_mib=2 reserve_mib=1"
+	a := newRoutingTestActions(t, failIfCalled(t), func(_ *rest.Config, _ string, _ *url.URL) (remotecommand.Executor, error) {
+		return &scriptedExecutor{stdout: "{\"a\":1}\n\n__DDC_EOS__:3\n", stderr: abort + "\n"}, nil
+	})
+	var lines []string
+	err := a.HostExecuteAndStreamNoKeepalive("pod-0", func(l string) { lines = append(lines, l) }, "viewer")
+	var rexit *collection.RemoteExitError
+	if !errors.As(err, &rexit) || rexit.Code != 3 || rexit.Stderr != abort {
+		t.Fatalf("err = %v, want RemoteExitError{3, %q}", err, abort)
+	}
+	if want := []string{`{"a":1}`}; !reflect.DeepEqual(lines, want) {
+		t.Errorf("lines = %q, want %q", lines, want)
+	}
+}

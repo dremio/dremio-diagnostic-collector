@@ -66,8 +66,20 @@ func (m *mockStreamCollector) HostExecute(mask bool, host string, args ...string
 	}
 	return "", nil
 }
-func (m *mockStreamCollector) HostExecuteAndStream(_ bool, _ string, _ cli.OutputHandler, _ string, _ ...string) error {
-	return nil
+
+// HostExecuteAndStream sends each line of hostExecuteFunc's result to output
+// (none for "") and returns its error, so viewer streams are stubbed like HostExecute.
+func (m *mockStreamCollector) HostExecuteAndStream(mask bool, host string, output cli.OutputHandler, _ string, args ...string) error {
+	if m.hostExecuteFunc == nil {
+		return nil
+	}
+	out, err := m.hostExecuteFunc(mask, host, args...)
+	if out != "" {
+		for _, l := range strings.Split(strings.TrimSuffix(out, "\n"), "\n") {
+			output(l)
+		}
+	}
+	return err
 }
 func (m *mockStreamCollector) HelpText() string { return "mock" }
 func (m *mockStreamCollector) Name() string     { return "mock" }
