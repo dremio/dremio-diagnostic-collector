@@ -254,11 +254,11 @@ All `--diag-*` tools are **opt-in** (default `false`) in both CLI and TUI.
 ### Per-Log Day Counts (Standard Mode Only)
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--server-logs-num-days` | 1 | Days of server logs to collect |
-| `--tracker-json-num-days` | 1 | Days of tracker.json to collect |
-| `--vacuum-log-num-days` | 1 | Days of vacuum.json to collect |
-| `--queries-json-num-days` | 30 | Days of queries.json to collect |
-| `--queries-perf-num-days` | 30 | Days of queries-performance data to collect |
+| `--server-logs-num-days` | 1 | Days of server logs to collect (0 = no limit) |
+| `--tracker-json-num-days` | 1 | Days of tracker.json to collect (0 = no limit) |
+| `--vacuum-log-num-days` | 1 | Days of vacuum.json to collect (0 = no limit) |
+| `--queries-json-num-days` | 30 | Days of queries.json to collect (0 = no limit) |
+| `--queries-perf-num-days` | 30 | Days of queries-performance data to collect (0 = no limit: exports the full job history, which can take hours on large catalogs) |
 
 ### Workload, System Tables & API Collection
 
@@ -287,7 +287,6 @@ The default `--system-tables` list is `version,options,roles,membership,privileg
 |------|-------------|
 | `--output-file` | Name and location of the diagnostic tarball |
 | `--collection-threads` | Concurrent node collection (0 = mode default: 5 standard, 20 diagnosis) |
-| `--collector-timeout` | Per-collector timeout (default: 10m standard, 20m diagnosis) |
 | `--progress=json` | Machine-readable NDJSON progress output for CI/CD |
 | `--skip-version-check` | Skip update check at startup |
 | `--disable-free-space-check` | Skip disk space check |

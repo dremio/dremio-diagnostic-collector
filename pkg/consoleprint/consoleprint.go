@@ -640,13 +640,13 @@ func PrintState() {
 	rendered := make(map[string]bool)
 	for _, name := range failedNodes {
 		s := snaps[name]
-		errLogs.WriteString(fmt.Sprintf("  Node: %v\n", name))
+		fmt.Fprintf(&errLogs, "  Node: %v\n", name)
 		if len(s.toolErrors) > 0 {
 			for _, te := range s.toolErrors {
-				errLogs.WriteString(fmt.Sprintf("    • %v\n", te))
+				fmt.Fprintf(&errLogs, "    • %v\n", te)
 			}
 		} else if s.endError != "" {
-			errLogs.WriteString(fmt.Sprintf("    • %v\n", s.endError))
+			fmt.Fprintf(&errLogs, "    • %v\n", s.endError)
 		}
 		rendered[name] = true
 	}
@@ -655,9 +655,9 @@ func PrintState() {
 			continue
 		}
 		s := snaps[name]
-		errLogs.WriteString(fmt.Sprintf("  Node: %v\n", name))
+		fmt.Fprintf(&errLogs, "  Node: %v\n", name)
 		for _, te := range s.toolErrors {
-			errLogs.WriteString(fmt.Sprintf("    • %v\n", te))
+			fmt.Fprintf(&errLogs, "    • %v\n", te)
 		}
 	}
 
@@ -797,7 +797,7 @@ func PrintState() {
 			if s.protocol != "" {
 				protocolTag = " " + dimStyle.Render("["+s.protocol+"]")
 			}
-			sb.WriteString(fmt.Sprintf("  %s %d. %s%s\n", dot, i+1, nodeNameStyle.Render(key), protocolTag))
+			fmt.Fprintf(&sb, "  %s %d. %s%s\n", dot, i+1, nodeNameStyle.Render(key), protocolTag)
 
 			statusLine := "       " + dimStyle.Render(status)
 			if strings.HasPrefix(status, "Running:") && !s.jvmDeadline.IsZero() {

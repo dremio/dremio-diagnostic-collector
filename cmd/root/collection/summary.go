@@ -30,6 +30,7 @@ type SummaryInfo struct {
 	SkippedFiles          []string                `json:"skippedFiles"`
 	IncompleteCollections []string                `json:"incompleteCollections,omitempty"`
 	MemoryGuardSkips      []string                `json:"memoryGuardSkips,omitempty"`
+	FailedCollections     []string                `json:"failedCollections,omitempty"`
 	StartTimeUTC          time.Time               `json:"startTimeUTC"`
 	EndTimeUTC            time.Time               `json:"endTimeUTC"`
 	TotalRuntimeSeconds   int64                   `json:"totalRuntimeSeconds"`

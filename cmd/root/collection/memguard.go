@@ -57,18 +57,6 @@ func memoryGuardDetail(line string) (detail string, ok bool) {
 	return detail, true
 }
 
-// memoryGuardDetailIn returns the detail of the last guard line in a multi-line
-// output, or "" if there is none.
-func memoryGuardDetailIn(output string) string {
-	lines := strings.Split(output, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		if d, ok := memoryGuardDetail(lines[i]); ok {
-			return d
-		}
-	}
-	return ""
-}
-
 // MemoryGuardError means the viewer refused to run, or aborted, on its memory guard.
 type MemoryGuardError struct {
 	Item   string // viewer item, e.g. "sys.jobs_recent", "queries-perf"

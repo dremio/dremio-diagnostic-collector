@@ -240,6 +240,8 @@ func FilterByNodeSelection(nodes, includeNodes, excludeNodes []string) []string 
 }
 
 func Execute(c Collector, s CopyStrategy, collectionArgs Args, hook shutdown.Hook, clusterCollection func()) error {
+	stop := startKeepAwake()
+	defer stop()
 	return ExecuteStreamingCollect(c, s, collectionArgs, hook, clusterCollection)
 }
 
@@ -277,8 +279,19 @@ func successRate(collected, failed, skipped int) (float64, int) {
 	return float64(collected) / float64(attempts) * 100, attempts
 }
 
+// formatSuccessRate prints collected/attempts truncated to one decimal. It
+// works on integers so 29/50 prints 58.0%, not 57.9% from a float64 just
+// below 0.58.
+func formatSuccessRate(collected, attempts int) string {
+	if attempts == 0 {
+		return "0.0%"
+	}
+	pm := collected * 1000 / attempts
+	return fmt.Sprintf("%d.%d%%", pm/10, pm%10)
+}
+
 // logDistributedCollectionSummary logs a comprehensive summary of the distributed collection
-func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles, incomplete, guardSkips []string, nodesConnectedTo int, duration time.Duration) {
+func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coordinators, executors []string, files []helpers.CollectedFile, totalFailedFiles, totalFailedNodes, totalSkippedFiles, incomplete, guardSkips, failedCollections []string, nodesConnectedTo int, duration time.Duration) {
 	simplelog.Info("=== DISTRIBUTED COLLECTION SUMMARY ===")
 
 	// Basic collection info
@@ -299,7 +312,7 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	simplelog.Infof("  Nodes Connected: %d", nodesConnectedTo)
 
 	// Collection results
-	totalFailures := len(totalFailedFiles) + len(totalFailedNodes)
+	totalFailures := len(totalFailedFiles) + len(totalFailedNodes) + len(failedCollections)
 	simplelog.Info("COLLECTION RESULTS:")
 	simplelog.Infof("  Successful Collections: %d", len(files))
 	simplelog.Infof("  Failed Collections: %d", totalFailures)
@@ -322,7 +335,7 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	}
 
 	// Failed collections
-	if len(totalFailedNodes) > 0 || len(totalFailedFiles) > 0 {
+	if len(totalFailedNodes) > 0 || len(totalFailedFiles) > 0 || len(failedCollections) > 0 {
 		simplelog.Info("FAILED COLLECTIONS:")
 		// Collection failures (nodes that failed during collection)
 		for _, node := range totalFailedNodes {
@@ -331,6 +344,10 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 		// Transfer failures (nodes that collected but failed to transfer)
 		for _, file := range totalFailedFiles {
 			simplelog.Infof("   %s (transfer failed)", file)
+		}
+		// Exports that produced nothing (viewer setup or export failure)
+		for _, item := range failedCollections {
+			simplelog.Infof("   %s", item)
 		}
 	}
 
@@ -359,8 +376,9 @@ func logDistributedCollectionSummary(collectionMode collects.CollectionMode, coo
 	}
 
 	// Success rate
-	if rate, attempts := successRate(len(files), totalFailures, len(totalSkippedFiles)); attempts > 0 {
-		simplelog.Infof("Success Rate: %.1f%% (%d/%d)", rate, len(files), attempts)
+	// Memory-guard skips are failed attempts too, but not "Failed Collections".
+	if _, attempts := successRate(len(files), totalFailures+len(guardSkips), len(totalSkippedFiles)); attempts > 0 {
+		simplelog.Infof("Success Rate: %s (%d/%d)", formatSuccessRate(len(files), attempts), len(files), attempts)
 	}
 
 	simplelog.Info("=== END DISTRIBUTED COLLECTION SUMMARY ===")

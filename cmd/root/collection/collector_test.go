@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
@@ -97,6 +98,7 @@ func TestNodeDoneStatus(t *testing.T) {
 		skipped    []string
 		incomplete []*IncompleteCollectionError
 		guard      []*MemoryGuardError
+		failed     []*FailedCollectionError
 		want       string
 	}{
 		{name: "clean", want: "Done: 3 files (1.0KB), 0 skipped"},
@@ -110,10 +112,15 @@ func TestNodeDoneStatus(t *testing.T) {
 			want: "Done: 3 files (1.0KB), 0 skipped, MEMORY GUARD: sys.jobs_recent"},
 		{name: "incomplete and guard", incomplete: inc, guard: []*MemoryGuardError{g1, g2},
 			want: "Done: 3 files (1.0KB), 0 skipped, INCOMPLETE: queries-perf (187442 records), MEMORY GUARD: sys.jobs_recent, sys.views"},
+		{name: "failed", failed: []*FailedCollectionError{{Item: "queries-perf"}},
+			want: "Done: 3 files (1.0KB), 0 skipped, FAILED: queries-perf"},
+		{name: "incomplete, guard and failed", incomplete: inc, guard: []*MemoryGuardError{g1},
+			failed: []*FailedCollectionError{{Item: "wlm_queues"}},
+			want:   "Done: 3 files (1.0KB), 0 skipped, INCOMPLETE: queries-perf (187442 records), MEMORY GUARD: sys.jobs_recent, FAILED: wlm_queues"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := nodeDoneStatus(3, 1024, tt.skipped, tt.incomplete, tt.guard); got != tt.want {
+			if got := nodeDoneStatus(3, 1024, tt.skipped, tt.incomplete, tt.guard, tt.failed); got != tt.want {
 				t.Errorf("got %q\nwant %q", got, tt.want)
 			}
 		})
@@ -131,6 +138,39 @@ func TestSummaryInfo_IncompleteCollectionsOmittedWhenEmpty(t *testing.T) {
 	s, err = SummaryInfo{IncompleteCollections: []string{"dremio-master-0: queries-perf incomplete after 2 records (x)"}}.String()
 	if err != nil || !strings.Contains(s, `"incompleteCollections"`) {
 		t.Errorf("err=%v, want incompleteCollections in %s", err, s)
+	}
+}
+
+func TestFormatSuccessRate(t *testing.T) {
+	tests := []struct {
+		collected, attempts int
+		want                string
+	}{
+		{1999, 2000, "99.9%"},
+		{10, 10, "100.0%"},
+		{2, 3, "66.6%"},
+		{29, 50, "58.0%"},
+		{0, 4, "0.0%"},
+		{0, 0, "0.0%"},
+	}
+	for _, tt := range tests {
+		if got := formatSuccessRate(tt.collected, tt.attempts); got != tt.want {
+			t.Errorf("formatSuccessRate(%d,%d) = %q want %q", tt.collected, tt.attempts, got, tt.want)
+		}
+	}
+}
+
+func TestSummaryInfo_FailedCollectionsOmittedWhenEmpty(t *testing.T) {
+	s, err := SummaryInfo{}.String()
+	if err != nil {
+		t.Fatalf("String: %v", err)
+	}
+	if strings.Contains(s, "failedCollections") {
+		t.Error("failedCollections must be omitted when empty")
+	}
+	s, err = SummaryInfo{FailedCollections: []string{"dremio-master-0: queries-perf failed (x)"}}.String()
+	if err != nil || !strings.Contains(s, `"failedCollections"`) {
+		t.Errorf("err=%v, want failedCollections in %s", err, s)
 	}
 }
 
@@ -162,7 +202,7 @@ func TestLogDistributedCollectionSummary_GuardSection(t *testing.T) {
 	}
 	call := func(guard []string) {
 		logDistributedCollectionSummary(collects.StandardCollection, []string{"m0"}, nil, nil,
-			nil, nil, nil, []string{"m0: queries-perf incomplete"}, guard, 1, time.Second)
+			nil, nil, nil, []string{"m0: queries-perf incomplete"}, guard, nil, 1, time.Second)
 	}
 
 	call([]string{"m0: sys.jobs_recent (x)"})
@@ -189,6 +229,37 @@ func TestLogDistributedCollectionSummary_GuardSection(t *testing.T) {
 	call(nil)
 	if got := readLog(); strings.Contains(got, "Memory Guard Skips") {
 		t.Errorf("unexpected Memory Guard Skips line:\n%s", got)
+	}
+}
+
+func TestLogDistributedCollectionSummary_FailedSection(t *testing.T) {
+	dir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(dir)
+	t.Cleanup(func() { _ = simplelog.Close(); simplelog.InitLogger() })
+
+	files := make([]helpers.CollectedFile, 8)
+	logDistributedCollectionSummary(collects.StandardCollection, []string{"m0"}, nil, files,
+		nil, nil, nil,
+		[]string{"m0: queries-perf incomplete after 5 records (z)"},
+		[]string{"m0: sys.jobs_recent (y)"},
+		[]string{"m0: queries-perf failed (x)"}, 1, time.Second)
+	if err := simplelog.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "ddc.log"))
+	if err != nil {
+		t.Fatalf("read ddc.log: %v", err)
+	}
+	got := string(b)
+	for _, want := range []string{
+		"Failed Collections: 1",
+		"FAILED COLLECTIONS:",
+		"   m0: queries-perf failed (x)",
+		"Success Rate: 80.0% (8/10)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("ddc.log missing %q:\n%s", want, got)
+		}
 	}
 }
 

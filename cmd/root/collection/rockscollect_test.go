@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/helpers"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 func TestDateSplitWriter_SingleDay(t *testing.T) {
@@ -158,12 +158,15 @@ func TestRunRocksDBCollectionSkipsWhenNoCatalog(t *testing.T) {
 		RocksDBDir: "/opt/dremio/data/db",
 	}
 
-	files, _, _, err := RunRocksDBCollection(args)
+	res, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if files != nil {
-		t.Errorf("expected no files, got %v", files)
+	if res.Files != nil {
+		t.Errorf("expected no files, got %v", res.Files)
+	}
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none (no catalog is not a failure)", res.Failed)
 	}
 	// Only the catalog check should have run — no binary upload (uname -m).
 	for _, c := range calls {
@@ -197,7 +200,7 @@ func TestRunRocksDBCollectionCollectsWhenCatalogPresent(t *testing.T) {
 	}
 
 	// We expect an error (from the uname stub), but NOT a silent nil/nil skip.
-	_, _, _, err := RunRocksDBCollection(args)
+	_, err := RunRocksDBCollection(args)
 	if err == nil {
 		t.Fatal("expected an error propagated from uname stub, got nil — catalog gate may have skipped incorrectly")
 	}
@@ -264,10 +267,11 @@ func TestWLMFileLayout(t *testing.T) {
 		CollectQueriesPerf:     false,
 	}
 
-	got, _, _, err := RunRocksDBCollection(args)
+	res, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
+	got := res.Files
 
 	wantContent := map[string]string{
 		"queues.json":        `{"queues":[]}` + "\n",
@@ -371,10 +375,11 @@ func TestWLMClusterUsageSkippedByDefault(t *testing.T) {
 		CollectQueriesPerf: false,
 	}
 
-	got, _, _, err := RunRocksDBCollection(args)
+	res, err := RunRocksDBCollection(args)
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
+	got := res.Files
 
 	seen := map[string]bool{}
 	for _, cf := range got {
@@ -447,14 +452,12 @@ func (k *keepaliveFreeCollector) HostExecuteAndStreamNoKeepalive(host string, ou
 	return k.streamErr
 }
 
-// newQueriesPerfCollector answers the pre-flight -count with len(lines).
+// newQueriesPerfCollector refuses every HostExecute command: queries-perf
+// issues no pre-flight count, only the streamed export.
 func newQueriesPerfCollector(lines []string, streamErr error) *queriesPerfCollector {
 	return &queriesPerfCollector{
 		mockStreamCollector: &mockStreamCollector{
 			hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
-				if strings.Contains(strings.Join(args, " "), "-count") {
-					return strconv.Itoa(len(lines)), nil
-				}
 				return "", fmt.Errorf("unexpected host command: %v", args)
 			},
 		},
@@ -467,10 +470,61 @@ func newQueriesPerfCollector(lines []string, streamErr error) *queriesPerfCollec
 // copy-strategy root directory.
 func runQueriesPerf(t *testing.T, c Collector) ([]helpers.CollectedFile, string, error) {
 	t.Helper()
+	return runQueriesPerfArgs(t, c, RocksCollectArgs{QueriesPerfDays: 7})
+}
+
+func runQueriesPerfArgs(t *testing.T, c Collector, args RocksCollectArgs) ([]helpers.CollectedFile, string, error) {
+	t.Helper()
 	dir := t.TempDir()
 	files, err := collectQueriesPerf(c, &mockCopyStrategy{tmpDir: dir}, "dremio-master-0", "coordinator",
-		"/opt/dremio/data/db/catalog", RocksCollectArgs{QueriesPerfDays: 7})
+		"/opt/dremio/data/db/catalog", args)
 	return files, dir, err
+}
+
+func TestCollectQueriesPerf_NoPreflightCount(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, nil)}
+	var cmds []string
+	k.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		cmds = append(cmds, strings.Join(args, " "))
+		return "", fmt.Errorf("unexpected host command: %v", args)
+	}
+	files, _, err := runQueriesPerf(t, k)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, cmd := range cmds {
+		if strings.Contains(cmd, "-count") {
+			t.Errorf("pre-flight count issued: %q", cmd)
+		}
+	}
+	if len(files) != 1 || k.noKeepaliveCalls != 1 {
+		t.Fatalf("files=%d noKeepaliveCalls=%d, want 1 and 1", len(files), k.noKeepaliveCalls)
+	}
+}
+
+func TestCollectQueriesPerf_WarnsWithoutDayLimit(t *testing.T) {
+	const warn = "rocksdb-viewer queries_perf on dremio-master-0: no day limit (--queries-perf-num-days 0); exporting the full job history, which can take hours on large catalogs"
+	capture := func(args RocksCollectArgs) string {
+		dir := t.TempDir()
+		simplelog.InitLoggerWithOutputDir(dir)
+		t.Cleanup(simplelog.InitLogger)
+		k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1)}, nil)}
+		if _, _, err := runQueriesPerfArgs(t, k, args); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		_ = simplelog.Close()
+		data, err := os.ReadFile(filepath.Join(dir, "ddc.log"))
+		if err != nil {
+			t.Fatalf("read ddc.log: %v", err)
+		}
+		return string(data)
+	}
+	if log := capture(RocksCollectArgs{}); !strings.Contains(log, warn) {
+		t.Errorf("unfiltered run: ddc.log lacks %q:\n%s", warn, log)
+	}
+	if log := capture(RocksCollectArgs{QueriesPerfDays: 7}); strings.Contains(log, "no day limit") {
+		t.Errorf("filtered run: ddc.log unexpectedly warns:\n%s", log)
+	}
 }
 
 func TestCollectQueriesPerf_UsesKeepaliveFreeStreamer(t *testing.T) {
@@ -534,47 +588,6 @@ func TestCollectQueriesPerf_FallbackTransportIncomplete(t *testing.T) {
 	}
 }
 
-func TestCollectQueriesPerf_CountGuardSkipsStream(t *testing.T) {
-	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1)}, nil)}
-	k.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
-		if strings.Contains(strings.Join(args, " "), "-count") {
-			return guardRefuseLine, &RemoteExitError{Code: 3}
-		}
-		return "", fmt.Errorf("unexpected host command: %v", args)
-	}
-	files, _, err := runQueriesPerf(t, k)
-	var mg *MemoryGuardError
-	if !errors.As(err, &mg) {
-		t.Fatalf("err = %v, want *MemoryGuardError", err)
-	}
-	if mg.Item != "queries-perf" || mg.Detail != refuseDetail {
-		t.Errorf("got %+v, want queries-perf / %q", mg, refuseDetail)
-	}
-	if files != nil {
-		t.Errorf("files = %v, want nil", files)
-	}
-	if k.noKeepaliveCalls != 0 || k.calls != 0 {
-		t.Errorf("noKeepaliveCalls=%d calls=%d, want 0 and 0 (stream must not start)", k.noKeepaliveCalls, k.calls)
-	}
-}
-
-func TestCollectQueriesPerf_CountFailureNonGuardStillStreams(t *testing.T) {
-	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector([]string{perfLine(1), perfLine(2)}, nil)}
-	k.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
-		if strings.Contains(strings.Join(args, " "), "-count") {
-			return "", errors.New("boom")
-		}
-		return "", fmt.Errorf("unexpected host command: %v", args)
-	}
-	files, _, err := runQueriesPerf(t, k)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(files) != 1 || k.noKeepaliveCalls != 1 {
-		t.Fatalf("files=%d noKeepaliveCalls=%d, want 1 and 1", len(files), k.noKeepaliveCalls)
-	}
-}
-
 func TestCollectQueriesPerf_StreamGuardDiscardsFiles(t *testing.T) {
 	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector(
 		[]string{perfLine(1), perfLine(2)}, &RemoteExitError{Code: 3, Stderr: guardAbortLine})}
@@ -631,15 +644,13 @@ func TestRunRocksDBCollection_QueriesPerfGuardSkip(t *testing.T) {
 			return "", nil
 		case strings.Contains(cmd, "-type cluster_stats"):
 			return `{"cluster":"stub"}`, nil
-		case strings.Contains(cmd, "-count"):
-			return "2", nil
 		}
 		return "", fmt.Errorf("unexpected host command: %s", cmd)
 	}
 	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
 	k := &keepaliveFreeCollector{queriesPerfCollector: q}
 
-	files, incomplete, guardSkips, err := RunRocksDBCollection(RocksCollectArgs{
+	res, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:          k,
 		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:               "dremio-master-0",
@@ -650,6 +661,10 @@ func TestRunRocksDBCollection_QueriesPerfGuardSkip(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	files, incomplete, guardSkips := res.Files, res.Incomplete, res.GuardSkips
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none", res.Failed)
 	}
 	if len(incomplete) != 0 {
 		t.Errorf("incomplete = %+v, want none", incomplete)
@@ -675,15 +690,13 @@ func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
 			return "", nil
 		case strings.Contains(cmd, "-type cluster_stats"):
 			return `{"cluster":"stub"}`, nil
-		case strings.Contains(cmd, "-count"):
-			return "2", nil
 		}
 		return "", fmt.Errorf("unexpected host command: %s", cmd)
 	}
 	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
 	k := &keepaliveFreeCollector{queriesPerfCollector: q}
 
-	files, incomplete, _, err := RunRocksDBCollection(RocksCollectArgs{
+	res, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:          k,
 		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:               "dremio-master-0",
@@ -694,6 +707,10 @@ func TestRunRocksDBCollection_ReportsIncompleteQueriesPerf(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	files, incomplete := res.Files, res.Incomplete
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none", res.Failed)
 	}
 	if len(incomplete) != 1 || incomplete[0].Item != "queries-perf" || incomplete[0].Records != 2 {
 		t.Fatalf("incomplete = %+v, want one queries-perf item with 2 records", incomplete)
@@ -730,7 +747,7 @@ func viewerVersionCollector(calls *[]string, versionOut string, versionErr error
 func TestRunRocksDBCollection_LogsViewerVersion(t *testing.T) {
 	var calls []string
 	mc := viewerVersionCollector(&calls, "dremio-rocksdb-viewer v1.1.0", nil)
-	_, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+	_, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:    mc,
 		CopyStrategy: &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:         "dremio-master-0",
@@ -765,7 +782,7 @@ func TestRunRocksDBCollection_LogsViewerVersion(t *testing.T) {
 func TestRunRocksDBCollection_VersionFailureNonFatal(t *testing.T) {
 	var calls []string
 	mc := viewerVersionCollector(&calls, "", errors.New("exec failed"))
-	got, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+	res, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:    mc,
 		CopyStrategy: &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:         "dremio-master-0",
@@ -775,6 +792,7 @@ func TestRunRocksDBCollection_VersionFailureNonFatal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error when -version fails, got %v", err)
 	}
+	got := res.Files
 	found := false
 	for _, cf := range got {
 		if filepath.Base(cf.Path) == "cluster-stats.json" {
@@ -828,7 +846,7 @@ func TestRunRocksDBCollection_JobsRecentWindow(t *testing.T) {
 			return "", fmt.Errorf("unexpected host command: %s", cmd)
 		},
 	}
-	_, _, _, err := RunRocksDBCollection(RocksCollectArgs{
+	_, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:           mc,
 		CopyStrategy:        &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:                "dremio-master-0",
@@ -1063,7 +1081,7 @@ func TestRunRocksDBCollection_GuardSkipsContinue(t *testing.T) {
 			return "", fmt.Errorf("unexpected host command: %s", cmd)
 		},
 	}
-	files, _, guards, err := RunRocksDBCollection(RocksCollectArgs{
+	res, err := RunRocksDBCollection(RocksCollectArgs{
 		Collector:           mc,
 		CopyStrategy:        &mockCopyStrategy{tmpDir: t.TempDir()},
 		Host:                "dremio-master-0",
@@ -1075,8 +1093,12 @@ func TestRunRocksDBCollection_GuardSkipsContinue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunRocksDBCollection failed: %v", err)
 	}
+	files := res.Files
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none (guard stops are not failures)", res.Failed)
+	}
 	var items []string
-	for _, g := range guards {
+	for _, g := range res.GuardSkips {
 		items = append(items, g.Item)
 		if g.Detail != refuseDetail {
 			t.Errorf("%s: Detail = %q, want %q", g.Item, g.Detail, refuseDetail)
@@ -1132,5 +1154,374 @@ func TestRenameWithRetry_GivesUpAfterFiveAttempts(t *testing.T) {
 	}
 	if *calls != 5 {
 		t.Fatalf("expected 5 rename calls, got %d", *calls)
+	}
+}
+
+func TestFailedCollectionError_Format(t *testing.T) {
+	e := &FailedCollectionError{Item: "queries-perf", Cause: errors.New("x")}
+	if got := e.Error(); got != "queries-perf failed (x)" {
+		t.Errorf("Error() = %q, want %q", got, "queries-perf failed (x)")
+	}
+	if got := errors.Unwrap(e); got == nil || got.Error() != "x" {
+		t.Errorf("Unwrap() = %v, want x", got)
+	}
+}
+
+func TestRunRocksDBCollection_ReportsFailedTypeExport(t *testing.T) {
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64", nil
+			case strings.Contains(cmd, "chmod"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+				return "", nil
+			case strings.Contains(cmd, "-type sys.options"):
+				return "", errors.New("connection reset")
+			case strings.Contains(cmd, "-type sys.tables"):
+				return `{"t":1}`, nil
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+	}
+	res, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:           mc,
+		CopyStrategy:        &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:                "dremio-master-0",
+		NodeType:            "coordinator",
+		RocksDBDir:          "/opt/dremio/data/db",
+		CollectSystemTables: true,
+		SystemTables:        []string{"options", "tables"},
+	})
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+	if len(res.Failed) != 1 || res.Failed[0].Item != "sys.options" {
+		t.Fatalf("failed = %+v, want one sys.options item", res.Failed)
+	}
+	if !strings.Contains(res.Failed[0].Error(), "connection reset") {
+		t.Errorf("Error() = %q, want it to contain the cause", res.Failed[0].Error())
+	}
+	found := false
+	for _, cf := range res.Files {
+		if filepath.Base(cf.Path) == "sys.tables.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("sys.tables.json not collected; files = %v", res.Files)
+	}
+}
+
+func TestRunRocksDBCollection_ReportsFailedQueriesPerf(t *testing.T) {
+	q := newQueriesPerfCollector(nil, errors.New("dial tcp: lookup api-server: no such host"))
+	q.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+			return "exists", nil
+		case strings.Contains(cmd, "uname -m"):
+			return "x86_64", nil
+		case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+			return "", nil
+		case strings.Contains(cmd, "-type cluster_stats"):
+			return `{"cluster":"stub"}`, nil
+		}
+		return "", fmt.Errorf("unexpected host command: %s", cmd)
+	}
+	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
+	k := &keepaliveFreeCollector{queriesPerfCollector: q}
+
+	res, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:          k,
+		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:               "dremio-master-0",
+		NodeType:           "coordinator",
+		RocksDBDir:         "/opt/dremio/data/db",
+		CollectQueriesPerf: true,
+		QueriesPerfDays:    7,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Failed) != 1 {
+		t.Fatalf("failed = %+v, want one queries-perf item", res.Failed)
+	}
+	want := "queries-perf failed (execute rocksdb-viewer queries_perf: dial tcp: lookup api-server: no such host)"
+	if got := res.Failed[0].Error(); got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+	if len(res.Incomplete) != 0 || len(res.GuardSkips) != 0 {
+		t.Errorf("incomplete = %+v, guardSkips = %+v, want none", res.Incomplete, res.GuardSkips)
+	}
+}
+
+const storeMissingQueuesLine = "error: 'wlmqueue' column family not found"
+const storeMissingQueuesErr = "not available in this catalog (wlmqueue column family not found)"
+
+func TestCollectRocksType_StoreMissingOnMergedOutput(t *testing.T) {
+	cf, dir, err := runRocksType(t, streamCollector(storeMissingQueuesLine, &RemoteExitError{Code: 1}), "wlm_queues", "queues.json")
+	if !errors.Is(err, ErrStoreNotInCatalog) {
+		t.Fatalf("err = %v, want ErrStoreNotInCatalog", err)
+	}
+	if err.Error() != storeMissingQueuesErr {
+		t.Errorf("err = %q, want %q", err.Error(), storeMissingQueuesErr)
+	}
+	if cf != nil {
+		t.Errorf("cf = %v, want nil", cf)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_StoreMissingOnKeepaliveFree(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: &queriesPerfCollector{
+		mockStreamCollector: streamCollector("", &RemoteExitError{Code: 1, Stderr: storeMissingQueuesLine}),
+	}}
+	cf, dir, err := runRocksType(t, k, "wlm_queues", "queues.json")
+	if !errors.Is(err, ErrStoreNotInCatalog) {
+		t.Fatalf("err = %v, want ErrStoreNotInCatalog", err)
+	}
+	if err.Error() != storeMissingQueuesErr {
+		t.Errorf("err = %q, want %q", err.Error(), storeMissingQueuesErr)
+	}
+	if cf != nil {
+		t.Errorf("cf = %v, want nil", cf)
+	}
+	if len(k.noKeepaliveCmds) != 1 || len(k.streamCmds) != 0 {
+		t.Errorf("noKeepaliveCmds=%v streamCmds=%v, want one keepalive-free call", k.noKeepaliveCmds, k.streamCmds)
+	}
+	if files := regularFiles(t, dir); len(files) != 0 {
+		t.Errorf("files = %v, want none", files)
+	}
+}
+
+func TestCollectRocksType_OtherExit1IsPlainError(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: &queriesPerfCollector{
+		mockStreamCollector: streamCollector("", &RemoteExitError{Code: 1, Stderr: "error: open db: IO error"}),
+	}}
+	_, _, err := runRocksType(t, k, "wlm_queues", "queues.json")
+	if err == nil {
+		t.Fatal("err = nil, want an error")
+	}
+	var mg *MemoryGuardError
+	if errors.Is(err, ErrStoreNotInCatalog) || errors.As(err, &mg) {
+		t.Errorf("err = %v, want a plain error", err)
+	}
+}
+
+func TestCollectRocksType_StoreMissingLineNeverWritten(t *testing.T) {
+	cf, _, err := runRocksType(t, streamCollector("{\"a\":1}\n"+storeMissingQueuesLine, nil), "wlm_queues", "queues.json")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cf == nil {
+		t.Fatal("expected a collected file, got nil")
+	}
+	got, readErr := os.ReadFile(cf.Path)
+	if readErr != nil {
+		t.Fatalf("read export: %v", readErr)
+	}
+	if string(got) != "{\"a\":1}\n" {
+		t.Errorf("file content = %q, want %q", got, "{\"a\":1}\n")
+	}
+}
+
+func TestRunRocksDBCollection_StoreMissingIsNotFailed(t *testing.T) {
+	logDir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(logDir)
+	t.Cleanup(func() { _ = simplelog.Close(); simplelog.InitLogger() })
+
+	mc := &mockStreamCollector{
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64", nil
+			case strings.Contains(cmd, "chmod"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+				return "", nil
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			case strings.Contains(cmd, "-type wlm_queues"):
+				return storeMissingQueuesLine, &RemoteExitError{Code: 1}
+			case strings.Contains(cmd, "-type wlm_rules"):
+				return "error: 'rulesmanager' column family not found", &RemoteExitError{Code: 1}
+			case strings.Contains(cmd, "-type wlm_engines"):
+				return `{"e":1}`, nil
+			}
+			return "", fmt.Errorf("unexpected host command: %s", cmd)
+		},
+	}
+	res, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:    mc,
+		CopyStrategy: &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:         "dremio-master-0",
+		NodeType:     "coordinator",
+		RocksDBDir:   "/opt/dremio/data/db",
+		CollectWLM:   true,
+	})
+	if err != nil {
+		t.Fatalf("RunRocksDBCollection failed: %v", err)
+	}
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none (a missing store is not a failure)", res.Failed)
+	}
+	found := false
+	for _, cf := range res.Files {
+		if filepath.Base(cf.Path) == "engines.json" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("engines.json not collected; files = %v", res.Files)
+	}
+	_ = simplelog.Close()
+	logData, readErr := os.ReadFile(filepath.Join(logDir, "ddc.log"))
+	if readErr != nil {
+		t.Fatalf("read ddc.log: %v", readErr)
+	}
+	want := "rocksdb-viewer -type wlm_queues on dremio-master-0: " + storeMissingQueuesErr
+	if !strings.Contains(string(logData), want) {
+		t.Errorf("ddc.log lacks %q", want)
+	}
+}
+
+func TestCollectQueriesPerf_ErrorLineBeforeFirstRecordFails(t *testing.T) {
+	const sshLine = "ssh: Could not resolve hostname x: Name or service not known"
+	q := newQueriesPerfCollector([]string{sshLine}, errors.New("exit status 255"))
+	files, dir, err := runQueriesPerf(t, q)
+	var inc *IncompleteCollectionError
+	if err == nil || errors.As(err, &inc) {
+		t.Fatalf("err = %v, want a plain failure", err)
+	}
+	want := "execute rocksdb-viewer queries_perf: exit status 255 (" + sshLine + ")"
+	if err.Error() != want {
+		t.Errorf("err = %q, want %q", err.Error(), want)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	if left := regularFiles(t, dir); len(left) != 0 {
+		t.Errorf("files left = %v, want none", left)
+	}
+}
+
+func TestCollectQueriesPerf_NonRecordLinesNotCounted(t *testing.T) {
+	q := newQueriesPerfCollector([]string{
+		"Warning: Permanently added 'h' (ED25519) to the list of known hosts.", perfLine(1), perfLine(2)}, nil)
+	_, dir, err := runQueriesPerf(t, q)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	data, readErr := os.ReadFile(filepath.Join(dir, "queries-perf", "dremio-master-0", "queries-perf.2026-04-16.json"))
+	if readErr != nil || countLines(data) != 2 {
+		t.Errorf("kept file: err=%v lines=%d, want 2 lines", readErr, countLines(data))
+	}
+	if left := regularFiles(t, dir); len(left) != 1 {
+		t.Errorf("files = %v, want only the dated file", left)
+	}
+}
+
+const storeMissingProfilesLine = "error: 'profiles' column family not found"
+const storeMissingProfilesErr = "not available in this catalog (profiles column family not found)"
+
+func TestCollectQueriesPerf_StoreMissingMergedOutput(t *testing.T) {
+	q := newQueriesPerfCollector([]string{storeMissingProfilesLine}, &RemoteExitError{Code: 1})
+	files, dir, err := runQueriesPerf(t, q)
+	if !errors.Is(err, ErrStoreNotInCatalog) {
+		t.Fatalf("err = %v, want ErrStoreNotInCatalog", err)
+	}
+	if err.Error() != storeMissingProfilesErr {
+		t.Errorf("err = %q, want %q", err.Error(), storeMissingProfilesErr)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	if left := regularFiles(t, dir); len(left) != 0 {
+		t.Errorf("files left = %v, want none", left)
+	}
+}
+
+func TestCollectQueriesPerf_StoreMissingKeepaliveFree(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: newQueriesPerfCollector(nil,
+		&RemoteExitError{Code: 1, Stderr: storeMissingProfilesLine})}
+	files, dir, err := runQueriesPerf(t, k)
+	if !errors.Is(err, ErrStoreNotInCatalog) {
+		t.Fatalf("err = %v, want ErrStoreNotInCatalog", err)
+	}
+	if err.Error() != storeMissingProfilesErr {
+		t.Errorf("err = %q, want %q", err.Error(), storeMissingProfilesErr)
+	}
+	if files != nil {
+		t.Errorf("files = %v, want nil", files)
+	}
+	if left := regularFiles(t, dir); len(left) != 0 {
+		t.Errorf("files left = %v, want none", left)
+	}
+}
+
+func TestRunRocksDBCollection_QueriesPerfStoreMissingIsNotFailed(t *testing.T) {
+	logDir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(logDir)
+	t.Cleanup(func() { _ = simplelog.Close(); simplelog.InitLogger() })
+
+	q := newQueriesPerfCollector([]string{storeMissingProfilesLine}, &RemoteExitError{Code: 1})
+	q.hostExecuteFunc = func(_ bool, _ string, args ...string) (string, error) {
+		cmd := strings.Join(args, " ")
+		switch {
+		case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+			return "exists", nil
+		case strings.Contains(cmd, "uname -m"):
+			return "x86_64", nil
+		case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"), strings.HasSuffix(cmd, " -version"):
+			return "", nil
+		case strings.Contains(cmd, "-type cluster_stats"):
+			return `{"cluster":"stub"}`, nil
+		}
+		return "", fmt.Errorf("unexpected host command: %s", cmd)
+	}
+	q.copyToHostFunc = func(_, _, _ string) (string, error) { return "", nil }
+
+	res, err := RunRocksDBCollection(RocksCollectArgs{
+		Collector:          q,
+		CopyStrategy:       &mockCopyStrategy{tmpDir: t.TempDir()},
+		Host:               "dremio-master-0",
+		NodeType:           "coordinator",
+		RocksDBDir:         "/opt/dremio/data/db",
+		CollectQueriesPerf: true,
+		QueriesPerfDays:    7,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Failed) != 0 {
+		t.Errorf("failed = %+v, want none (a missing store is not a failure)", res.Failed)
+	}
+	_ = simplelog.Close()
+	logData, readErr := os.ReadFile(filepath.Join(logDir, "ddc.log"))
+	if readErr != nil {
+		t.Fatalf("read ddc.log: %v", readErr)
+	}
+	want := "rocksdb-viewer -type queries_perf on dremio-master-0: " + storeMissingProfilesErr
+	if !strings.Contains(string(logData), want) {
+		t.Errorf("ddc.log lacks %q", want)
+	}
+}
+
+func TestCollectRocksType_KeepaliveFreeErrorIncludesStderr(t *testing.T) {
+	k := &keepaliveFreeCollector{queriesPerfCollector: &queriesPerfCollector{
+		mockStreamCollector: streamCollector("", &RemoteExitError{Code: 1, Stderr: "error: open db: IO error"}),
+	}}
+	_, _, err := runRocksType(t, k, "sys.views", "sys.views.json")
+	want := "execute rocksdb-viewer -type sys.views: remote command exited with code 1 (error: open db: IO error)"
+	if err == nil || err.Error() != want {
+		t.Errorf("err = %v, want %q", err, want)
 	}
 }

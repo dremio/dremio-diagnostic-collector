@@ -88,15 +88,6 @@ func TestMemoryGuardDetail(t *testing.T) {
 	}
 }
 
-func TestMemoryGuardDetailIn(t *testing.T) {
-	if got := memoryGuardDetailIn("x\n" + guardRefuseLine + "\n"); got != refuseDetail {
-		t.Errorf("got %q", got)
-	}
-	if got := memoryGuardDetailIn("x\ny"); got != "" {
-		t.Errorf("got %q", got)
-	}
-}
-
 func TestAsMemoryGuardError(t *testing.T) {
 	const item = "sys.jobs_recent"
 	tests := []struct {

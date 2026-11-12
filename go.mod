@@ -1,6 +1,8 @@
 module github.com/dremio/dremio-diagnostic-collector/v4
 
-go 1.24.13
+go 1.27.4
+
+godebug default=go1.24
 
 require github.com/spf13/cobra v1.9.1 // direct
 
@@ -10,6 +12,7 @@ require (
 	github.com/charmbracelet/huh/spinner v0.0.0-20260223110133-9dc45e34a40b
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.11.6
+	github.com/crgimenes/native v0.1.18
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/pflag v1.0.6
@@ -35,6 +38,7 @@ require (
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

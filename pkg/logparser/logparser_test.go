@@ -534,9 +534,9 @@ func TestScanReader_LargeInput(t *testing.T) {
 		if i%insertEvery == 0 {
 			idx := (i / insertEvery) - 1
 			if idx < len(knownIDs) {
-				sb.WriteString(fmt.Sprintf(
+				fmt.Fprintf(&sb,
 					"2024-01-01 00:00:00,000 [%s:frag:0:0] ERROR com.dremio.exec - OUT_OF_MEMORY ERROR for query %s\n",
-					knownIDs[idx], knownIDs[idx]))
+					knownIDs[idx], knownIDs[idx])
 				continue
 			}
 		}

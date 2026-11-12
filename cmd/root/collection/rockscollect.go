@@ -49,6 +49,27 @@ func (e *IncompleteCollectionError) Error() string {
 
 func (e *IncompleteCollectionError) Unwrap() error { return e.Cause }
 
+// FailedCollectionError reports an export that failed outright and produced no
+// usable data. Callers surface it instead of leaving it only in the log.
+type FailedCollectionError struct {
+	Item  string // "queries-perf", "cluster_stats", "sys.options", "wlm_queues", "rocksdb-viewer"
+	Cause error
+}
+
+func (e *FailedCollectionError) Error() string {
+	return fmt.Sprintf("%s failed (%v)", e.Item, e.Cause)
+}
+
+func (e *FailedCollectionError) Unwrap() error { return e.Cause }
+
+// RocksDBResult is what RunRocksDBCollection collected and what it could not.
+type RocksDBResult struct {
+	Files      []helpers.CollectedFile
+	Incomplete []*IncompleteCollectionError
+	GuardSkips []*MemoryGuardError
+	Failed     []*FailedCollectionError
+}
+
 // dateSplitWriter routes JSON lines to per-day files based on the start_time field.
 // Records must arrive sorted by date (rocksdb-viewer guarantees this).
 type dateSplitWriter struct {
@@ -154,27 +175,30 @@ type RocksCollectArgs struct {
 var wlmTypes = []string{"wlm_queues", "wlm_rules", "wlm_engines", "wlm_cluster_usage"}
 
 // RunRocksDBCollection runs the rocksdb-viewer on the coordinator node and returns
-// the list of files collected (for inclusion in per-node file counts and byte totals),
-// the incomplete items, and the exports skipped by the viewer's memory guard.
-func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*IncompleteCollectionError, []*MemoryGuardError, error) {
+// the files collected (for inclusion in per-node file counts and byte totals),
+// the incomplete items, the exports skipped by the viewer's memory guard, and the
+// exports that failed. The error return is for setup failures before any export.
+func RunRocksDBCollection(args RocksCollectArgs) (RocksDBResult, error) {
 	c := args.Collector
 	host := args.Host
 	dbPath := args.RocksDBDir + "/catalog"
-	var collected []helpers.CollectedFile
-	var guardSkips []*MemoryGuardError
+	var res RocksDBResult
 
 	// recordRocksType keeps a collectRocksType result: a memory guard stop is
 	// recorded as a skip, any other error is logged, and collection continues.
 	recordRocksType := func(dataType string, cf *helpers.CollectedFile, err error) {
 		var mg *MemoryGuardError
 		switch {
+		case errors.Is(err, ErrStoreNotInCatalog):
+			simplelog.Infof("rocksdb-viewer -type %s on %s: %v", dataType, host, err)
 		case errors.As(err, &mg):
-			guardSkips = append(guardSkips, mg)
+			res.GuardSkips = append(res.GuardSkips, mg)
 			simplelog.Errorf("rocksdb %s on %s: %v", dataType, host, mg)
 		case err != nil:
 			simplelog.Errorf("rocksdb %s on %s: %v", dataType, host, err)
+			res.Failed = append(res.Failed, &FailedCollectionError{Item: dataType, Cause: err})
 		case cf != nil:
-			collected = append(collected, *cf)
+			res.Files = append(res.Files, *cf)
 		}
 	}
 
@@ -184,7 +208,7 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 	catalogCurrent := dbPath + "/CURRENT"
 	if out, err := c.HostExecute(false, host, "test", "-f", catalogCurrent, "&&", "echo", "exists"); err != nil || !strings.Contains(out, "exists") {
 		simplelog.Infof("rocksdb: no catalog at %s on %s — skipping RocksDB-viewer collection (not a master coordinator)", catalogCurrent, host)
-		return nil, nil, nil, nil
+		return res, nil
 	}
 
 	// Upload binary
@@ -195,31 +219,31 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 
 	archStr, err := c.HostExecute(false, host, "uname -m")
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("uname -m on %s: %w", host, err)
+		return RocksDBResult{}, fmt.Errorf("uname -m on %s: %w", host, err)
 	}
 	archStr = strings.TrimSpace(archStr)
 
 	bin, err := rockscollect.GetRocksDBViewerBinary(archStr)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
+		return RocksDBResult{}, fmt.Errorf("rocksdb-viewer binary for %s: %w", archStr, err)
 	}
 
 	localTmp, err := os.MkdirTemp("", "ddc-rocksdb-dist-*")
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("temp dir: %w", err)
+		return RocksDBResult{}, fmt.Errorf("temp dir: %w", err)
 	}
 	defer os.RemoveAll(localTmp)
 
 	localBin := filepath.Join(localTmp, "dremio-rocksdb-viewer")
 	if err := os.WriteFile(localBin, bin, 0o600); err != nil {
-		return nil, nil, nil, fmt.Errorf("write local binary: %w", err)
+		return RocksDBResult{}, fmt.Errorf("write local binary: %w", err)
 	}
 
 	if _, err := c.CopyToHost(host, localBin, rocksdbViewerRemotePath); err != nil {
-		return nil, nil, nil, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
+		return RocksDBResult{}, fmt.Errorf("upload rocksdb-viewer to %s: %w", host, err)
 	}
 	if _, err := c.HostExecute(false, host, "chmod +x "+rocksdbViewerRemotePath); err != nil {
-		return nil, nil, nil, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
+		return RocksDBResult{}, fmt.Errorf("chmod rocksdb-viewer on %s: %w", host, err)
 	}
 	// Record the vendored viewer version for diagnosability; never fatal.
 	if out, err := c.HostExecute(false, host, rocksdbViewerRemotePath+" -version"); err != nil {
@@ -288,7 +312,6 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 	}
 
 	// Collect queries-perf
-	var incomplete []*IncompleteCollectionError
 	if args.CollectQueriesPerf {
 		consoleprint.UpdateNodeState(consoleprint.NodeState{
 			Node:     host,
@@ -300,19 +323,22 @@ func RunRocksDBCollection(args RocksCollectArgs) ([]helpers.CollectedFile, []*In
 		switch {
 		case errors.As(err, &mg):
 			simplelog.Errorf("rocksdb queries_perf on %s: %v", host, mg)
-			guardSkips = append(guardSkips, mg)
+			res.GuardSkips = append(res.GuardSkips, mg)
+		case errors.Is(err, ErrStoreNotInCatalog):
+			simplelog.Infof("rocksdb-viewer -type queries_perf on %s: %v", host, err)
 		case errors.As(err, &inc):
 			simplelog.Warningf("rocksdb queries_perf on %s: %v", host, err)
-			collected = append(collected, files...)
-			incomplete = append(incomplete, inc)
+			res.Files = append(res.Files, files...)
+			res.Incomplete = append(res.Incomplete, inc)
 		case err != nil:
 			simplelog.Errorf("rocksdb queries_perf on %s: %v", host, err)
+			res.Failed = append(res.Failed, &FailedCollectionError{Item: "queries-perf", Cause: err})
 		default:
-			collected = append(collected, files...)
+			res.Files = append(res.Files, files...)
 		}
 	}
 
-	return collected, incomplete, guardSkips, nil
+	return res, nil
 }
 
 // collectRocksType streams one viewer -type export into <filename>.partial and
@@ -339,13 +365,18 @@ func collectRocksType(c Collector, cs CopyStrategy, host, nodeType, dbPath, data
 	var mu sync.Mutex
 	var size int64
 	var nonBlank bool
-	var captured string // guard detail seen on a merged-output transport
+	var captured string  // guard detail seen on a merged-output transport
+	var missingCF string // missing store seen on a merged-output transport
 	var writeErr error
 	handler := func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
 		if d, ok := memoryGuardDetail(line); ok {
 			captured = d // a stderr line, never part of the export
+			return
+		}
+		if cf, ok := storeMissingName(line); ok {
+			missingCF = cf // a stderr line, never part of the export
 			return
 		}
 		if writeErr != nil {
@@ -376,6 +407,19 @@ func collectRocksType(c Collector, cs CopyStrategy, host, nodeType, dbPath, data
 		discard()
 		if mg, ok := asMemoryGuardError(dataType, err, captured); ok {
 			return nil, mg
+		}
+		if missingCF == "" {
+			var rexit *RemoteExitError
+			if errors.As(err, &rexit) {
+				missingCF, _ = storeMissingName(rexit.Stderr)
+			}
+		}
+		if missingCF != "" {
+			return nil, fmt.Errorf("%w (%s column family not found)", ErrStoreNotInCatalog, missingCF)
+		}
+		var rexit *RemoteExitError
+		if errors.As(err, &rexit) && rexit.Stderr != "" {
+			return nil, fmt.Errorf("execute rocksdb-viewer -type %s: %w (%s)", dataType, err, rexit.Stderr)
 		}
 		return nil, fmt.Errorf("execute rocksdb-viewer -type %s: %w", dataType, err)
 	}
@@ -476,32 +520,13 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	filterArgs := buildQueriesPerfFilterArgs(args)
 	simplelog.Infof("rocksdb-viewer queries_perf filter: QueriesPerfDays=%d Days=%d StartDate=%q filterArgs=%q", args.QueriesPerfDays, args.Days, args.StartDate, filterArgs)
 
-	// Pre-flight: get total record count for progress display.
+	if filterArgs == "" {
+		simplelog.Warningf("rocksdb-viewer queries_perf on %s: no day limit (--queries-perf-num-days 0); exporting the full job history, which can take hours on large catalogs", host)
+	}
 	consoleprint.UpdateNodeState(consoleprint.NodeState{
 		Node:     host,
-		StatusUX: "Getting number of queries for queries-perf",
+		StatusUX: "Collecting queries-perf data",
 	})
-	countCmd := fmt.Sprintf("%s -db %s -type queries_perf -count%s", rocksdbViewerRemotePath, dbPath, filterArgs)
-	countOut, err := c.HostExecute(false, host, countCmd)
-	if err != nil {
-		if mg, ok := asMemoryGuardError("queries-perf", err, memoryGuardDetailIn(countOut)); ok {
-			return nil, mg
-		}
-		simplelog.Warningf("rocksdb-viewer queries_perf -count failed on %s: %v (continuing without progress)", host, err)
-	}
-	totalRecords, _ := strconv.Atoi(strings.TrimSpace(countOut))
-
-	if totalRecords == 0 {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
-			Node:     host,
-			StatusUX: "Collecting queries-perf data",
-		})
-	} else {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
-			Node:     host,
-			StatusUX: fmt.Sprintf("Collecting queries-perf data (0 of %d queries)     [0%%]", totalRecords),
-		})
-	}
 
 	destDir, err := cs.CreatePath("queries-perf", host, nodeType)
 	if err != nil {
@@ -514,6 +539,8 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	var mu sync.Mutex
 	var writeErr error
 	var captured string // guard detail seen on a merged-output transport
+	var lastNonRecord string
+	var missingCF string
 	lineCount := 0
 	lastUI := time.Now()
 	lastLog := time.Now()
@@ -523,6 +550,20 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 		defer mu.Unlock()
 		if d, ok := memoryGuardDetail(line); ok {
 			captured = d // a stderr line, never part of the export
+			return
+		}
+		// The viewer writes compact NDJSON: only a line starting with "{" is a
+		// record. Anything else is a merged-in stderr line (ssh, kubectl, viewer).
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			return
+		}
+		if !strings.HasPrefix(trimmed, "{") {
+			simplelog.Warningf("rocksdb-viewer queries_perf on %s: %s", host, trimmed)
+			lastNonRecord = trimmed
+			if cf, ok := storeMissingName(trimmed); ok {
+				missingCF = cf
+			}
 			return
 		}
 		if writeErr != nil {
@@ -536,30 +577,17 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 		// Update UX on first record, every 2s, every 100 records, or on completion —
 		// whichever comes first. Time-based update keeps progress responsive even when
 		// records are large or arrive slowly.
-		if lineCount == 1 || lineCount%100 == 0 || lineCount >= totalRecords || time.Since(lastUI) >= 2*time.Second {
-			if totalRecords > 0 && lineCount >= totalRecords {
-				consoleprint.UpdateNodeState(consoleprint.NodeState{
-					Node:     host,
-					StatusUX: fmt.Sprintf("Finalizing queries-perf data (%d queries)", lineCount),
-				})
-			} else if totalRecords > 0 {
-				pct := lineCount * 100 / totalRecords
-				consoleprint.UpdateNodeState(consoleprint.NodeState{
-					Node:     host,
-					StatusUX: fmt.Sprintf("Collecting queries-perf data (%d of %d)     [%d%%]", lineCount, totalRecords, pct),
-				})
-			} else {
-				consoleprint.UpdateNodeState(consoleprint.NodeState{
-					Node:     host,
-					StatusUX: fmt.Sprintf("Collecting queries-perf data (%d queries)", lineCount),
-				})
-			}
+		if lineCount == 1 || lineCount%100 == 0 || time.Since(lastUI) >= 2*time.Second {
+			consoleprint.UpdateNodeState(consoleprint.NodeState{
+				Node:     host,
+				StatusUX: fmt.Sprintf("Collecting queries-perf data (%d queries)", lineCount),
+			})
 			lastUI = time.Now()
 		}
 		// Per-1000-record / per-10s log so ddc.log records the true streaming rate
 		// independently of UI throttling — useful when triaging "stuck" reports.
 		if lineCount%1000 == 0 || time.Since(lastLog) >= 10*time.Second {
-			simplelog.Infof("rocksdb-viewer queries_perf streaming on %s: %d/%d records", host, lineCount, totalRecords)
+			simplelog.Infof("rocksdb-viewer queries_perf streaming on %s: %d records", host, lineCount)
 			lastLog = time.Now()
 		}
 	}
@@ -575,8 +603,10 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	mu.Lock()
 	streamed := lineCount
 	guardDetail := captured
+	lastLine := lastNonRecord
+	seenCF := missingCF
 	mu.Unlock()
-	simplelog.Infof("rocksdb-viewer queries_perf on %s: streamed %d records (pre-flight count %d)", host, streamed, totalRecords)
+	simplelog.Infof("rocksdb-viewer queries_perf on %s: streamed %d records", host, streamed)
 	if mg, ok := asMemoryGuardError("queries-perf", streamErr, guardDetail); ok {
 		// Discard partial output; close first, Windows cannot remove open files.
 		_ = dw.Close()
@@ -586,6 +616,18 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 		return nil, mg
 	}
 	if streamErr != nil && streamed == 0 {
+		if seenCF == "" {
+			var rexit *RemoteExitError
+			if errors.As(streamErr, &rexit) {
+				seenCF, _ = storeMissingName(rexit.Stderr)
+			}
+		}
+		if seenCF != "" {
+			return nil, fmt.Errorf("%w (%s column family not found)", ErrStoreNotInCatalog, seenCF)
+		}
+		if lastLine != "" {
+			return nil, fmt.Errorf("execute rocksdb-viewer queries_perf: %w (%s)", streamErr, lastLine)
+		}
 		return nil, fmt.Errorf("execute rocksdb-viewer queries_perf: %w", streamErr)
 	}
 	if writeErr != nil {
@@ -593,12 +635,7 @@ func collectQueriesPerf(c Collector, cs CopyStrategy, host, nodeType, dbPath str
 	}
 
 	// Final status update
-	if totalRecords > 0 {
-		consoleprint.UpdateNodeState(consoleprint.NodeState{
-			Node:     host,
-			StatusUX: fmt.Sprintf("Collecting queries-perf data (%d of %d)     [100%%]", lineCount, totalRecords),
-		})
-	} else if lineCount > 0 {
+	if lineCount > 0 {
 		consoleprint.UpdateNodeState(consoleprint.NodeState{
 			Node:     host,
 			StatusUX: fmt.Sprintf("Collected queries-perf data (%d queries)", lineCount),

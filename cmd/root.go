@@ -1362,6 +1362,10 @@ func init() {
 	CollectCmd.PersistentFlags().IntVar(&collectionThreads, "collection-threads", 0, "number of threads to collect from nodes simultaneously (0 = mode default: 20 diagnosis, 5 standard)")
 	CollectCmd.PersistentFlags().StringVar(&outputLoc, "output-file", fmt.Sprintf("diag-%s.tgz", time.Now().Format("20060102-150405")), "name and location of diagnostic tarball")
 	CollectCmd.PersistentFlags().StringVar(&collectorTimeout, "collector-timeout", "", "per-collector timeout (default: 20m diagnosis, 10m standard)")
+	if err := CollectCmd.PersistentFlags().MarkDeprecated("collector-timeout", "it has no effect and will be removed in a future release"); err != nil {
+		simplelog.Errorf("unable to mark flag deprecated critical error %v", err)
+		os.Exit(1)
+	}
 	CollectCmd.PersistentFlags().StringVar(&progressFormat, "progress", "", "progress output format: 'json' for machine-readable CI/CD output")
 	CollectCmd.PersistentFlags().StringVar(&coordinatorLogDir, "coordinator-log-dir", "", "Coordinator log directory (autodetected if not specified)")
 	CollectCmd.PersistentFlags().StringVar(&executorLogDir, "executor-log-dir", "", "Executor log directory (autodetected if not specified)")
@@ -1384,7 +1388,7 @@ func init() {
 		cmd.Flags().BoolVar(&collectWLM, "collect-wlm", conf.GetBoolDefault(stdDef, conf.KeyCollectWLM), "collect WLM configuration")
 		cmd.Flags().BoolVar(&collectWLMClusterUsage, "collect-wlm-cluster-usage", conf.GetBoolDefault(stdDef, conf.KeyCollectWLMClusterUsage), "collect WLM cluster usage data (can be slow on large catalogs)")
 		cmd.Flags().StringVar(&systemTables, "system-tables", strings.Join(conf.SystemTableList(), ","), "comma-separated list of system tables to collect")
-		cmd.Flags().IntVar(&queriesPerfNumDays, conf.KeyQueriesPerfNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays), "number of days of queries performance data to collect")
+		cmd.Flags().IntVar(&queriesPerfNumDays, conf.KeyQueriesPerfNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesPerfNumDays), "number of days of queries performance data to collect (0 = no limit: exports the full job history, which can take hours on large catalogs)")
 	}
 	for _, cmd := range []*cobra.Command{SSHDiagnosisCmd, K8sDiagnosisCmd, LocalDiagnosisCmd, LocalK8sDiagnosisCmd} {
 		cmd.Flags().BoolVar(&collectKVStoreReport, "collect-kvstore-report", conf.GetBoolDefault(diagDef, conf.KeyCollectKVStoreReport), "collect KV store report (requires --dremio-pat-token)")
@@ -1406,10 +1410,10 @@ func init() {
 
 	// ── Per-log day counts — standard mode only ──
 	for _, cmd := range []*cobra.Command{SSHStandardCmd, K8sStandardCmd, LocalStandardCmd, LocalK8sStandardCmd} {
-		cmd.Flags().IntVar(&queriesJSONNumDays, conf.KeyQueriesJSONNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesJSONNumDays), "number of days of queries.json to collect")
-		cmd.Flags().IntVar(&serverLogsNumDays, conf.KeyServerLogsNumDays, conf.GetIntDefault(stdDef, conf.KeyServerLogsNumDays), "number of days of server logs to collect")
-		cmd.Flags().IntVar(&trackerJSONNumDays, conf.KeyTrackerJSONNumDays, conf.GetIntDefault(stdDef, conf.KeyTrackerJSONNumDays), "number of days of tracker.json to collect")
-		cmd.Flags().IntVar(&vacuumLogNumDays, conf.KeyVacuumLogNumDays, conf.GetIntDefault(stdDef, conf.KeyVacuumLogNumDays), "number of days of vacuum.json to collect")
+		cmd.Flags().IntVar(&queriesJSONNumDays, conf.KeyQueriesJSONNumDays, conf.GetIntDefault(stdDef, conf.KeyQueriesJSONNumDays), "number of days of queries.json to collect (0 = no limit)")
+		cmd.Flags().IntVar(&serverLogsNumDays, conf.KeyServerLogsNumDays, conf.GetIntDefault(stdDef, conf.KeyServerLogsNumDays), "number of days of server logs to collect (0 = no limit)")
+		cmd.Flags().IntVar(&trackerJSONNumDays, conf.KeyTrackerJSONNumDays, conf.GetIntDefault(stdDef, conf.KeyTrackerJSONNumDays), "number of days of tracker.json to collect (0 = no limit)")
+		cmd.Flags().IntVar(&vacuumLogNumDays, conf.KeyVacuumLogNumDays, conf.GetIntDefault(stdDef, conf.KeyVacuumLogNumDays), "number of days of vacuum.json to collect (0 = no limit)")
 	}
 
 	// ── Diagnosis-only flags ──

@@ -742,8 +742,9 @@ func streamNodeFiles(c Collector, host string, info *RemoteNodeInfo, cs CopyStra
 }
 
 // nodeDoneStatus renders a node's completion line: collected files, skipped
-// files (base names), incomplete collections and memory-guard skips.
-func nodeDoneStatus(collected int, bytes int64, skipped []string, incomplete []*IncompleteCollectionError, guardSkips []*MemoryGuardError) string {
+// files (base names), incomplete collections, memory-guard skips and failed
+// exports.
+func nodeDoneStatus(collected int, bytes int64, skipped []string, incomplete []*IncompleteCollectionError, guardSkips []*MemoryGuardError, failed []*FailedCollectionError) string {
 	s := fmt.Sprintf("Done: %d files (%s), %d skipped", collected, humanizeBytes(bytes), len(skipped))
 	if len(skipped) > 0 {
 		names := make([]string, len(skipped))
@@ -765,6 +766,13 @@ func nodeDoneStatus(collected int, bytes int64, skipped []string, incomplete []*
 			items[i] = g.Item
 		}
 		s += ", MEMORY GUARD: " + strings.Join(items, ", ")
+	}
+	if len(failed) > 0 {
+		items := make([]string, len(failed))
+		for i, f := range failed {
+			items[i] = f.Item
+		}
+		s += ", FAILED: " + strings.Join(items, ", ")
 	}
 	return s
 }
@@ -854,6 +862,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 	var totalSkippedFiles []string
 	var totalSkippedLog []string                       // host:path, for the ddc.log summary only
 	var totalIncomplete []string                       // "<host>: <item> incomplete after N records (...)"
+	var totalFailedCollections []string                // "<host>: <item> failed (<cause>)", exports that produced nothing
 	var totalGuardSkips []string                       // "<host>: <item> (<detail>)", exports skipped by the viewer memory guard
 	pidByHost := make(map[string]int)                  // DremioPID per host, populated during discovery
 	nodeTypeByHost := make(map[string]string)          // "coordinator" or "executor" per host
@@ -1052,6 +1061,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 		var nodeSkipped []string
 		var nodeIncomplete []*IncompleteCollectionError
 		var nodeGuardSkips []*MemoryGuardError
+		var nodeFailed []*FailedCollectionError
 		if len(info.Files) > 0 {
 			nodeCollected, nodeSkipped = streamNodeFiles(c, host, info, s, nodeType, collectionMode, collectionArgs.CollectGCLogs, collectionArgs)
 		}
@@ -1082,12 +1092,14 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 					Days:                   collectionArgs.DiagLogDays,
 					StartDate:              collectionArgs.StartDate,
 				}
-				if rocksFiles, inc, guard, err := RunRocksDBCollection(rocksArgs); err != nil {
+				if res, err := RunRocksDBCollection(rocksArgs); err != nil {
 					simplelog.Errorf("RocksDB collection failed on %s: %v", host, err)
+					nodeFailed = []*FailedCollectionError{{Item: "rocksdb-viewer", Cause: err}}
 				} else {
-					nodeCollected = append(nodeCollected, rocksFiles...)
-					nodeIncomplete = inc
-					nodeGuardSkips = guard
+					nodeCollected = append(nodeCollected, res.Files...)
+					nodeIncomplete = res.Incomplete
+					nodeGuardSkips = res.GuardSkips
+					nodeFailed = res.Failed
 				}
 			} else {
 				simplelog.Warningf("RocksDB collection skipped on %s: no RocksDB dir detected and --dremio-rocksdb-dir not set", host)
@@ -1111,6 +1123,9 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 		for _, g := range nodeGuardSkips {
 			totalGuardSkips = append(totalGuardSkips, fmt.Sprintf("%s: %s", host, g.Summary()))
 		}
+		for _, f := range nodeFailed {
+			totalFailedCollections = append(totalFailedCollections, fmt.Sprintf("%s: %v", host, f))
+		}
 		if len(nodeCollected) == 0 && len(info.Files) > 0 {
 			totalFailedNodes = append(totalFailedNodes, host)
 		}
@@ -1121,7 +1136,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 			nodeBytes += f.Size
 		}
 
-		statusUX := nodeDoneStatus(len(nodeCollected), nodeBytes, nodeSkipped, nodeIncomplete, nodeGuardSkips)
+		statusUX := nodeDoneStatus(len(nodeCollected), nodeBytes, nodeSkipped, nodeIncomplete, nodeGuardSkips, nodeFailed)
 		if niToolsFailed > 0 {
 			failedTools := make([]string, 0, len(nodeInfoToolErrors))
 			for _, te := range nodeInfoToolErrors {
@@ -1228,6 +1243,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 	summaryInfo.SkippedFiles = totalSkippedFiles
 	summaryInfo.IncompleteCollections = totalIncomplete
 	summaryInfo.MemoryGuardSkips = totalGuardSkips
+	summaryInfo.FailedCollections = totalFailedCollections
 	var totalBytes int64
 	for _, f := range collectedFiles {
 		totalBytes += f.Size
@@ -1250,7 +1266,7 @@ func ExecuteStreamingCollect(c Collector, s CopyStrategy, collectionArgs Args, h
 
 	logDistributedCollectionSummary(
 		collectionMode, coordinators, executors, collectedFiles,
-		nil, totalFailedNodes, totalSkippedLog, totalIncomplete, totalGuardSkips,
+		nil, totalFailedNodes, totalSkippedLog, totalIncomplete, totalGuardSkips, totalFailedCollections,
 		totalNodes-len(totalFailedNodes), time.Since(start),
 	)
 

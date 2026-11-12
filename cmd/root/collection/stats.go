@@ -103,7 +103,7 @@ func (c *Stats) PrintState() {
 	var nodes strings.Builder
 	for i, key := range keys {
 		node := c.nodeCaptureStats[key]
-		nodes.WriteString(fmt.Sprintf("%v. elapsed %v secs - node %v - status %v \n", i+1, key, node.secondsElapsed, node.status))
+		fmt.Fprintf(&nodes, "%v. elapsed %v secs - node %v - status %v \n", i+1, key, node.secondsElapsed, node.status)
 	}
 	fmt.Printf(
 		`

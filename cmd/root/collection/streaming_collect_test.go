@@ -21,10 +21,13 @@ import (
 	"crypto/md5" //nolint:gosec // MD5 used for test checksum verification
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,6 +38,7 @@ import (
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/root/cli"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/collects"
 	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/shutdown"
+	"github.com/dremio/dremio-diagnostic-collector/v4/pkg/simplelog"
 )
 
 // --- mock collector for streaming tests ---
@@ -110,7 +114,8 @@ func (m *mockStreamCollector) DiscoverFiles(host, _, _ string) (*RemoteNodeInfo,
 // --- mock copy strategy ---
 
 type mockCopyStrategy struct {
-	tmpDir string
+	tmpDir  string
+	summary string
 }
 
 func (m *mockCopyStrategy) CreatePath(fileType, source, nodeType string) (string, error) {
@@ -120,8 +125,11 @@ func (m *mockCopyStrategy) CreatePath(fileType, source, nodeType string) (string
 	}
 	return p, nil
 }
-func (m *mockCopyStrategy) ArchiveDiag(_ string, _ string) error { return nil }
-func (m *mockCopyStrategy) GetTmpDir() string                    { return m.tmpDir }
+func (m *mockCopyStrategy) ArchiveDiag(o string, _ string) error {
+	m.summary = o
+	return nil
+}
+func (m *mockCopyStrategy) GetTmpDir() string { return m.tmpDir }
 
 // --- tests ---
 
@@ -418,6 +426,132 @@ func TestStreamingCollect_RocksDBViewer_UsesAutodetectedDir(t *testing.T) {
 	clusterStats := filepath.Join(tmpDir, "cluster-stats", "coord1", "cluster-stats.json")
 	if _, err := os.Stat(clusterStats); os.IsNotExist(err) {
 		t.Errorf("expected %v to exist (rocksdb-viewer ran), but it does not", clusterStats)
+	}
+}
+
+// runFailureReportingCollect runs a one-coordinator standard collection with
+// queries-perf enabled and returns the written summary and the ddc.log content.
+// queriesPerfErr makes every queries_perf export fail with no records;
+// uploadErr makes the viewer upload fail.
+func runFailureReportingCollect(t *testing.T, queriesPerfErr, uploadErr error) (SummaryInfo, string) {
+	t.Helper()
+	return runFailureReportingCollectOut(t, "", queriesPerfErr, uploadErr)
+}
+
+// runFailureReportingCollectOut is runFailureReportingCollect with queriesPerfOut
+// delivered to the line handler before queriesPerfErr, like a merged-output transport.
+func runFailureReportingCollectOut(t *testing.T, queriesPerfOut string, queriesPerfErr, uploadErr error) (SummaryInfo, string) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	logDir := t.TempDir()
+	simplelog.InitLoggerWithOutputDir(logDir)
+	t.Cleanup(func() { _ = simplelog.Close(); simplelog.InitLogger() })
+	cs := &mockCopyStrategy{tmpDir: tmpDir}
+	mc := &mockStreamCollector{
+		coordinators: []string{"coord1"},
+		discoverFunc: func(_ string) (*RemoteNodeInfo, error) {
+			return &RemoteNodeInfo{
+				LogDir:     "/var/log/dremio",
+				ConfDir:    "/opt/dremio/conf",
+				RocksDBDir: "/opt/dremio/data/db",
+				Files: []RemoteFileInfo{
+					{Path: "/var/log/dremio/server.log", Size: 4, FileType: "log"},
+				},
+			}, nil
+		},
+		hostExecuteFunc: func(_ bool, _ string, args ...string) (string, error) {
+			cmd := strings.Join(args, " ")
+			switch {
+			case strings.HasPrefix(cmd, "test -f") && strings.Contains(cmd, "/catalog/CURRENT"):
+				return "exists", nil
+			case strings.Contains(cmd, "uname -m"):
+				return "x86_64\n", nil
+			case strings.Contains(cmd, "chmod +x"), strings.Contains(cmd, "rm -f"):
+				return "", nil
+			case strings.Contains(cmd, "-type queries_perf") && queriesPerfErr != nil:
+				return queriesPerfOut, queriesPerfErr
+			case strings.Contains(cmd, "-type cluster_stats"):
+				return `{"cluster":"stub"}`, nil
+			}
+			return "", nil
+		},
+		streamFunc: func(_, _ string, w io.Writer) error {
+			_, err := w.Write([]byte("stub"))
+			return err
+		},
+		copyToHostFunc: func(_, _, _ string) (string, error) { return "", uploadErr },
+	}
+	args := Args{
+		OutputLoc:          filepath.Join(tmpDir, "output.tar.gz"),
+		CopyStrategy:       cs,
+		CollectionMode:     "standard",
+		CollectionThreads:  1,
+		CollectServerLogs:  true,
+		CollectQueriesPerf: true,
+		QueriesPerfNumDays: 7,
+	}
+	hook := shutdown.NewHook()
+	defer hook.Cleanup()
+
+	if err := ExecuteStreamingCollect(mc, cs, args, hook, func() {}); err != nil {
+		t.Fatalf("ExecuteStreamingCollect failed: %v", err)
+	}
+	var summary SummaryInfo
+	if err := json.Unmarshal([]byte(cs.summary), &summary); err != nil {
+		t.Fatalf("unmarshal summary: %v\n%s", err, cs.summary)
+	}
+	if err := simplelog.Close(); err != nil {
+		t.Fatalf("close log: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(logDir, "ddc.log"))
+	if err != nil {
+		t.Fatalf("read ddc.log: %v", err)
+	}
+	return summary, string(b)
+}
+
+func TestStreamingCollect_RocksDBQueriesPerfFailureReported(t *testing.T) {
+	summary, log := runFailureReportingCollect(t, errors.New("dial tcp: lookup api-server: no such host"), nil)
+	want := []string{"coord1: queries-perf failed (execute rocksdb-viewer queries_perf: dial tcp: lookup api-server: no such host)"}
+	if !reflect.DeepEqual(summary.FailedCollections, want) {
+		t.Errorf("FailedCollections = %q, want %q", summary.FailedCollections, want)
+	}
+	for _, w := range []string{"FAILED COLLECTIONS:", "coord1: queries-perf failed"} {
+		if !strings.Contains(log, w) {
+			t.Errorf("ddc.log missing %q:\n%s", w, log)
+		}
+	}
+	foundRate := false
+	for _, line := range strings.Split(log, "\n") {
+		if strings.Contains(line, "Success Rate:") {
+			foundRate = true
+			if strings.Contains(line, "100.0%") {
+				t.Errorf("success rate must not be 100%%: %s", line)
+			}
+		}
+	}
+	if !foundRate {
+		t.Errorf("ddc.log has no Success Rate line:\n%s", log)
+	}
+}
+
+func TestStreamingCollect_RocksDBQueriesPerfMergedErrorLineFails(t *testing.T) {
+	const sshLine = "ssh: Could not resolve hostname x: Name or service not known"
+	summary, _ := runFailureReportingCollectOut(t, sshLine, errors.New("exit status 255"), nil)
+	want := []string{"coord1: queries-perf failed (execute rocksdb-viewer queries_perf: exit status 255 (" + sshLine + "))"}
+	if !reflect.DeepEqual(summary.FailedCollections, want) {
+		t.Errorf("FailedCollections = %q, want %q", summary.FailedCollections, want)
+	}
+	if len(summary.IncompleteCollections) != 0 {
+		t.Errorf("IncompleteCollections = %q, want none", summary.IncompleteCollections)
+	}
+}
+
+func TestStreamingCollect_RocksDBSetupFailureReported(t *testing.T) {
+	summary, _ := runFailureReportingCollect(t, nil, errors.New("upload denied"))
+	want := []string{"coord1: rocksdb-viewer failed (upload rocksdb-viewer to coord1: upload denied)"}
+	if !reflect.DeepEqual(summary.FailedCollections, want) {
+		t.Errorf("FailedCollections = %q, want %q", summary.FailedCollections, want)
 	}
 }
 

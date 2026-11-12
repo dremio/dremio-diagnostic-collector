@@ -21,7 +21,13 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "golangci-lint" -ErrorAction SilentlyContinue)) {
     Write-Output "golangci-lint not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.1.6
+    $previousToolchain = $env:GOTOOLCHAIN
+    $env:GOTOOLCHAIN = 'go1.27.4'
+    try {
+        go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+    } finally {
+        $env:GOTOOLCHAIN = $previousToolchain
+    }
 }
 
 Write-Output "Checking if gosec is installed..."
@@ -30,6 +36,12 @@ Get-Date -Format "HH:mm:ss"
 if (-not (Get-Command "gosec" -ErrorAction SilentlyContinue)) {
     Write-Output "gosec not found, installing..."
     Get-Date -Format "HH:mm:ss"
-    go install github.com/securego/gosec/v2/cmd/gosec@v2.22.4
+    $previousToolchain = $env:GOTOOLCHAIN
+    $env:GOTOOLCHAIN = 'go1.27.4'
+    try {
+        go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
+    } finally {
+        $env:GOTOOLCHAIN = $previousToolchain
+    }
 }
 

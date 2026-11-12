@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dremio/dremio-diagnostic-collector/v4/cmd/local/conf"
@@ -126,5 +127,42 @@ func TestResolveMetaRefresh(t *testing.T) {
 	}
 	if resolveMetaRefresh(false, false, diagDefault) {
 		t.Error("TUI must trust global=false even when confData=true")
+	}
+}
+
+func TestNumDaysFlagsDocumentZero(t *testing.T) {
+	const suffix = "(0 = no limit)"
+	for _, name := range []string{"queries-json-num-days", "server-logs-num-days", "tracker-json-num-days", "vacuum-log-num-days"} {
+		f := K8sStandardCmd.Flags().Lookup(name)
+		if f == nil {
+			t.Fatalf("flag --%s missing on K8sStandardCmd", name)
+		}
+		if !strings.HasSuffix(f.Usage, suffix) {
+			t.Errorf("--%s usage %q does not end with %q", name, f.Usage, suffix)
+		}
+	}
+	const perfSuffix = "(0 = no limit: exports the full job history, which can take hours on large catalogs)"
+	f := K8sStandardCmd.Flags().Lookup("queries-perf-num-days")
+	if f == nil {
+		t.Fatal("flag --queries-perf-num-days missing on K8sStandardCmd")
+	}
+	if !strings.HasSuffix(f.Usage, perfSuffix) {
+		t.Errorf("--queries-perf-num-days usage %q does not end with %q", f.Usage, perfSuffix)
+	}
+}
+
+func TestCollectorTimeoutDeprecated(t *testing.T) {
+	f := CollectCmd.PersistentFlags().Lookup("collector-timeout")
+	if f == nil {
+		t.Fatal("flag --collector-timeout missing on CollectCmd")
+	}
+	if f.Deprecated != "it has no effect and will be removed in a future release" {
+		t.Errorf("unexpected Deprecated message %q", f.Deprecated)
+	}
+	if !f.Hidden {
+		t.Error("--collector-timeout should be hidden")
+	}
+	if err := K8sStandardCmd.ParseFlags([]string{"--collector-timeout=5m"}); err != nil {
+		t.Errorf("deprecated flag must still be accepted, got %v", err)
 	}
 }
