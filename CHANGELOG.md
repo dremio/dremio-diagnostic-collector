@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.1.0] - Unreleased
+
+- **macOS 13 Ventura or newer is now required** (was macOS 11). DDC is built with Go 1.27.4. `godebug default=go1.24` keeps Go 1.24's runtime defaults, so TLS, certificate and URL handling behave as before.
+- Failed RocksDB viewer exports are now reported. Before, an export that failed only left an ERROR line in ddc.log, and the collection still reported 100% success. This includes queries-perf when the connection dropped, and any cluster-stats, `sys.*` or WLM export. Failures now appear:
+  - on the node status line (`FAILED:`);
+  - in a new `summary.json` field (`failedCollections`);
+  - in the `FAILED COLLECTIONS:` section of the ddc.log summary.
+- The success rate now counts failed exports and memory-guard skips as failed attempts. It is printed truncated rather than rounded, so 1999/2000 reads `99.9%`, not `100.0%`.
+- An export whose RocksDB store doesn't exist in the catalog, such as WLM on clusters without WLM, is logged as "not available in this catalog" (INFO). It is not an error.
+- queries-perf no longer runs a pre-flight `-count`. The count scanned the catalog a second time only to show a percentage, could run for hours, and could fail without any error. Progress now shows the number of queries collected. ddc.log warns when queries-perf runs without a day limit.
+- On SSH, kubectl and local collections, error output from the remote command is no longer saved as queries-perf data. It goes to ddc.log and becomes the failure reason. On the Kubernetes API transport, failed exports include the viewer's error message.
+- The help text and README now say that 0 means "no limit" for the `--*-num-days` flags. For `--queries-perf-num-days`, that means the full job history, which can take hours on large catalogs.
+- `--collector-timeout` is deprecated: it never had an effect. It is still accepted but hidden from `--help`, and using it prints a deprecation warning.
+- While a collection runs, DDC asks macOS and Windows not to idle-sleep. Closing the lid or choosing Sleep still puts the machine to sleep, and there is no keep-awake on Linux.
+- Development tooling: golangci-lint v2.15.0 and gosec v2.30.0. The bootstrap scripts build both with the Go 1.27.4 toolchain.
+
 ## [4.0.7] - 2026-10-21
 
 - Re-vendored dremio-rocksdb-viewer 1.1.0. Every `sys.*` export now streams instead of holding all rows in memory. Before, `sys.jobs_recent` on a large catalog could grow the viewer inside the Dremio coordinator container until Kubernetes OOM-killed the pod. Output is byte-identical to the previous binaries.
