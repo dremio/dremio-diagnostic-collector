@@ -1,6 +1,6 @@
 # Changelog
 
-## [4.1.0] - Unreleased
+## [4.1.0] - 2026-11-12
 
 - **macOS 13 Ventura or newer is now required** (was macOS 11). DDC is built with Go 1.27.4. `godebug default=go1.24` keeps Go 1.24's runtime defaults, so TLS, certificate and URL handling behave as before.
 - Failed RocksDB viewer exports are now reported. Before, an export that failed only left an ERROR line in ddc.log, and the collection still reported 100% success. This includes queries-perf when the connection dropped, and any cluster-stats, `sys.*` or WLM export. Failures now appear:
